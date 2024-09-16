@@ -122,6 +122,7 @@ export const supportedEngineV1List = () => {
     Engine.BIGQUERY,
     Engine.DYNAMODB,
     Engine.DATABRICKS,
+    Engine.COCKROACHDB,
   ];
   if (locale.value === "zh-CN") {
     engines.push(Engine.DM);
@@ -177,6 +178,7 @@ export const instanceV1HasSSL = (
     Engine.MYSQL,
     Engine.TIDB,
     Engine.POSTGRES,
+    Engine.COCKROACHDB,
     Engine.REDIS,
     Engine.ORACLE,
     Engine.MARIADB,
@@ -281,6 +283,8 @@ export const engineNameV1 = (type: Engine): string => {
       return "MySQL";
     case Engine.POSTGRES:
       return "PostgreSQL";
+    case Engine.COCKROACHDB:
+      return "CockroachDB";
     case Engine.SNOWFLAKE:
       return "Snowflake";
     case Engine.TIDB:
@@ -331,15 +335,25 @@ export const hasSchemaProperty = (databaseEngine: Engine) => {
     databaseEngine === Engine.SNOWFLAKE ||
     databaseEngine === Engine.MSSQL ||
     databaseEngine === Engine.REDSHIFT ||
-    databaseEngine === Engine.RISINGWAVE
+    databaseEngine === Engine.RISINGWAVE ||
+    databaseEngine === Engine.COCKROACHDB
   );
+};
+
+export const instanceAllowsSchemaScopedQuery = (
+  instanceOrEngine: Instance | InstanceResource | Engine
+) => {
+  const engine = engineOfInstanceV1(instanceOrEngine);
+  return engine !== Engine.MSSQL && hasSchemaProperty(engine);
 };
 
 export const hasTableEngineProperty = (
   instanceOrEngine: Instance | InstanceResource | Engine
 ) => {
   const engine = engineOfInstanceV1(instanceOrEngine);
-  return ![Engine.POSTGRES, Engine.SNOWFLAKE].includes(engine);
+  return ![Engine.POSTGRES, Engine.COCKROACHDB, Engine.SNOWFLAKE].includes(
+    engine
+  );
 };
 export const hasIndexSizeProperty = (
   instanceOrEngine: Instance | InstanceResource | Engine
@@ -351,9 +365,12 @@ export const hasCollationProperty = (
   instanceOrEngine: Instance | InstanceResource | Engine
 ) => {
   const engine = engineOfInstanceV1(instanceOrEngine);
-  return ![Engine.POSTGRES, Engine.CLICKHOUSE, Engine.SNOWFLAKE].includes(
-    engine
-  );
+  return ![
+    Engine.POSTGRES,
+    Engine.COCKROACHDB,
+    Engine.CLICKHOUSE,
+    Engine.SNOWFLAKE,
+  ].includes(engine);
 };
 
 export const useInstanceV1EditorLanguage = (
@@ -368,4 +385,12 @@ export const isValidSpannerHost = (host: string) => {
   const RE =
     /^projects\/(?<PROJECT_ID>(?:[a-z]|[-.:]|[0-9])+)\/instances\/(?<INSTANCE_ID>(?:[a-z]|[-]|[0-9])+)$/;
   return RE.test(host);
+};
+
+export const getFixedPrimaryKey = (engine: Engine) => {
+  // For MySQL and TiDB, the name of a primary key is always PRIMARY.
+  if ([Engine.MYSQL, Engine.TIDB].includes(engine)) {
+    return "PRIMARY";
+  }
+  return undefined;
 };

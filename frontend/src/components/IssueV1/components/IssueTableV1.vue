@@ -30,7 +30,7 @@
 
   <div
     v-if="isTableInViewport && selectedIssueList.length > 0"
-    class="sticky bottom-0 w-full bg-white flex items-center gap-x-2 px-4 py-2 border-b"
+    class="sticky -bottom-4 w-full bg-white flex items-center gap-x-2 px-4 py-2 border-y"
     :class="bordered && 'border-x'"
   >
     <BatchIssueActionsV1 :issue-list="selectedIssueList" />
@@ -98,8 +98,6 @@ const columnList = computed((): DataTableColumn<ComposedIssue>[] => {
       key: "title",
       title: t("issue.table.name"),
       ellipsis: true,
-      resizable: true,
-      minWidth: 300,
       render: (issue) => {
         const labels = getValidIssueLabels(
           issue.labels,
@@ -108,7 +106,7 @@ const columnList = computed((): DataTableColumn<ComposedIssue>[] => {
         return (
           <div class="flex items-center space-x-2">
             <IssueStatusIconWithTaskSummary issue={issue} />
-            <div class="whitespace-nowrap text-control">
+            <div class="whitespace-nowrap text-control text-opacity-80">
               {props.mode == "ALL"
                 ? `${issue.projectEntity.key}-${extractIssueUID(issue.name)}`
                 : `#${extractIssueUID(issue.name)}`}
@@ -159,7 +157,7 @@ const columnList = computed((): DataTableColumn<ComposedIssue>[] => {
       hide: !showExtendedColumns.value,
       render: (issue) => (
         <div class="flex flex-row items-center overflow-hidden gap-x-2">
-          <BBAvatar size="SMALL" username="issue.creatorEntity.title" />
+          <BBAvatar size="SMALL" username={issue.creatorEntity.title} />
           <span class="truncate">{issue.creatorEntity.title}</span>
         </div>
       ),

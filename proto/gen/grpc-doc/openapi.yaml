@@ -7776,6 +7776,11 @@ paths:
                     pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
                     type: string
                     description: Represents a a duration between -315,576,000,000s and 315,576,000,000s (around 10000 years). Precision is in nanoseconds. 1 nanosecond is represented as 0.000000001s
+                - name: schema
+                  in: query
+                  description: The default schema to execute the statement. Equals to the current schema in Oracle and search path in Postgres.
+                  schema:
+                    type: string
             responses:
                 "200":
                     description: OK
@@ -7870,6 +7875,8 @@ components:
                 disallowPasswordSignin:
                     type: boolean
                     description: disallow_password_signin is the flag to disallow user signin with email&password. (except workspace admins)
+                passwordRestriction:
+                    $ref: '#/components/schemas/PasswordRestrictionSetting'
             description: |-
                 ServerInfo is the API message for server info.
                  Actuator concept is similar to the Spring Boot Actuator.
@@ -8561,6 +8568,7 @@ components:
                         - BIGQUERY
                         - DYNAMODB
                         - DATABRICKS
+                        - COCKROACHDB
                     type: string
                     description: The database engine of the branch.
                     format: enum
@@ -9084,6 +9092,9 @@ components:
                         - CLUSTER
                     type: string
                     format: enum
+                cluster:
+                    type: string
+                    description: Cluster is the cluster name for the data source. Used by CockroachDB.
         DataSourceExternalSecret:
             type: object
             properties:
@@ -9337,6 +9348,7 @@ components:
                         - BIGQUERY
                         - DYNAMODB
                         - DATABRICKS
+                        - COCKROACHDB
                     type: string
                     description: The database engine of the schema.
                     format: enum
@@ -9430,6 +9442,9 @@ components:
                     pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
                     type: string
                     description: The timeout for the request.
+                schema:
+                    type: string
+                    description: The default schema to execute the statement. Equals to the current schema in Oracle and search path in Postgres.
         ExecuteResponse:
             type: object
             properties:
@@ -9810,6 +9825,9 @@ components:
                     type: string
                     description: The timestamp when the group was created.
                     format: date-time
+                source:
+                    type: string
+                    description: source means where the group comes from. For now we support Entra ID SCIM sync, so the source could be Entra ID.
         GroupMember:
             type: object
             properties:
@@ -9969,6 +9987,7 @@ components:
                         - BIGQUERY
                         - DYNAMODB
                         - DATABRICKS
+                        - COCKROACHDB
                     type: string
                     format: enum
                 engineVersion:
@@ -10040,6 +10059,7 @@ components:
                         - BIGQUERY
                         - DYNAMODB
                         - DATABRICKS
+                        - COCKROACHDB
                     type: string
                     format: enum
                 engineVersion:
@@ -10301,6 +10321,8 @@ components:
                     type: integer
                     format: int32
                 database:
+                    type: string
+                error:
                     type: string
         IssueComment_TaskUpdate:
             type: object
@@ -10844,6 +10866,8 @@ components:
                     type: string
                 mfaTempToken:
                     type: string
+                requireResetPassword:
+                    type: boolean
         LogoutRequest:
             type: object
             properties: {}
@@ -11072,6 +11096,32 @@ components:
                         - $ref: '#/components/schemas/SourceInfo'
                     description: The source info derived from input that generated the parsed `expr`.
             description: An expression together with source information as returned by the parser.
+        PasswordRestrictionSetting:
+            type: object
+            properties:
+                minLength:
+                    type: integer
+                    description: min_length is the minimum length for password, should no less than 8.
+                    format: int32
+                requireNumber:
+                    type: boolean
+                    description: require_number requires the password must contains at least one number.
+                requireLetter:
+                    type: boolean
+                    description: require_letter requires the password must contains at least one letter, regardless of upper case or lower case
+                requireUppercaseLetter:
+                    type: boolean
+                    description: require_uppercase_letter requires the password must contains at least one upper case letter.
+                requireSpecialCharacter:
+                    type: boolean
+                    description: require_uppercase_letter requires the password must contains at least one special character.
+                requireResetPasswordForFirstLogin:
+                    type: boolean
+                    description: require_reset_password_for_first_login requires users to reset their password after the 1st login.
+                passwordRotation:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                    description: password_rotation requires users to reset their password after the duration.
         PatchSubscription:
             type: object
             properties:
@@ -11483,6 +11533,7 @@ components:
                         - BIGQUERY
                         - DYNAMODB
                         - DATABRICKS
+                        - COCKROACHDB
                     type: string
                     format: enum
                 currentSchema:
@@ -11590,6 +11641,15 @@ components:
                 autoResolveIssue:
                     type: boolean
                     description: Enable auto resolve issue.
+                enforceIssueTitle:
+                    type: boolean
+                    description: Enforce issue title created by user instead of generated by Bytebase.
+                autoEnableBackup:
+                    type: boolean
+                    description: Whether to automatically enable backup.
+                skipBackupErrors:
+                    type: boolean
+                    description: Whether to skip backup errors and continue the data migration.
         QueryHistory:
             type: object
             properties:
@@ -11659,6 +11719,9 @@ components:
                 explain:
                     type: boolean
                     description: Explain the statement.
+                schema:
+                    type: string
+                    description: The default schema to search objects. Equals to the current schema in Oracle and search path in Postgres.
         QueryResponse:
             type: object
             properties:
@@ -11715,6 +11778,51 @@ components:
                 statement:
                     type: string
                     description: The query statement for the result.
+                postgresError:
+                    $ref: '#/components/schemas/QueryResult_PostgresError'
+        QueryResult_PostgresError:
+            type: object
+            properties:
+                severity:
+                    type: string
+                code:
+                    type: string
+                message:
+                    type: string
+                detail:
+                    type: string
+                hint:
+                    type: string
+                position:
+                    type: integer
+                    format: int32
+                internalPosition:
+                    type: integer
+                    format: int32
+                internalQuery:
+                    type: string
+                where:
+                    type: string
+                schemaName:
+                    type: string
+                tableName:
+                    type: string
+                columnName:
+                    type: string
+                dataTypeName:
+                    type: string
+                constraintName:
+                    type: string
+                file:
+                    type: string
+                line:
+                    type: integer
+                    format: int32
+                routine:
+                    type: string
+            description: |-
+                refer https://www.postgresql.org/docs/11/protocol-error-fields.html
+                 for field description.
         QueryRow:
             type: object
             properties:
@@ -12049,6 +12157,11 @@ components:
             properties:
                 krbConfig:
                     $ref: '#/components/schemas/KerberosConfig'
+        SCIMSetting:
+            type: object
+            properties:
+                token:
+                    type: string
         SMTPMailDeliverySettingValue:
             type: object
             properties:
@@ -12139,6 +12252,7 @@ components:
                         - BIGQUERY
                         - DYNAMODB
                         - DATABRICKS
+                        - COCKROACHDB
                     type: string
                     format: enum
                 comment:
@@ -12236,6 +12350,7 @@ components:
                         - BIGQUERY
                         - DYNAMODB
                         - DATABRICKS
+                        - COCKROACHDB
                     type: string
                     format: enum
                 enabled:
@@ -12276,6 +12391,7 @@ components:
                         - BIGQUERY
                         - DYNAMODB
                         - DATABRICKS
+                        - COCKROACHDB
                     type: string
                     format: enum
                 category:
@@ -12316,6 +12432,7 @@ components:
                         - BIGQUERY
                         - DYNAMODB
                         - DATABRICKS
+                        - COCKROACHDB
                     type: string
                     format: enum
                 category:
@@ -12789,6 +12906,7 @@ components:
                         - BIGQUERY
                         - DYNAMODB
                         - DATABRICKS
+                        - COCKROACHDB
                     type: string
                     description: The SQL dialect.
                     format: enum
@@ -13037,6 +13155,7 @@ components:
                         - BIGQUERY
                         - DYNAMODB
                         - DATABRICKS
+                        - COCKROACHDB
                     type: string
                     description: The database engine of the schema string.
                     format: enum
@@ -13824,6 +13943,20 @@ components:
                     description: |-
                         Should be a valid E.164 compliant phone number.
                          Could be empty.
+                profile:
+                    $ref: '#/components/schemas/User_Profile'
+        User_Profile:
+            type: object
+            properties:
+                lastLoginTime:
+                    type: string
+                    format: date-time
+                lastChangePasswordTime:
+                    type: string
+                    format: date-time
+                source:
+                    type: string
+                    description: source means where the user comes from. For now we support Entra ID SCIM sync, so the source could be Entra ID.
         VCSConnector:
             type: object
             properties:
@@ -13951,6 +14084,10 @@ components:
                     $ref: '#/components/schemas/MaskingAlgorithmSetting'
                 maximumSqlResultSizeSetting:
                     $ref: '#/components/schemas/MaximumSQLResultSizeSetting'
+                scimSetting:
+                    $ref: '#/components/schemas/SCIMSetting'
+                passwordRestrictionSetting:
+                    $ref: '#/components/schemas/PasswordRestrictionSetting'
             description: The data in setting value.
         ViewConfig:
             type: object

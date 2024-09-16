@@ -174,7 +174,22 @@ func (s *ProjectService) UpdateProject(ctx context.Context, request *v1pb.Update
 		ResourceID: project.ResourceID,
 	}
 
+	issueProjectSettingFeatureRelatedPaths := []string{
+		"force_issue_labels",
+		"allow_modify_statement",
+		"auto_resolve_issue",
+		"enforce_issue_title",
+		"auto_enable_backup",
+		"skip_backup_errors",
+	}
 	for _, path := range request.UpdateMask.Paths {
+		if slices.Contains(issueProjectSettingFeatureRelatedPaths, path) {
+			// Check if the issue project setting feature is enabled.
+			if err := s.licenseService.IsFeatureEnabled(api.FeatureIssueProjectSetting); err != nil {
+				return nil, status.Error(codes.PermissionDenied, err.Error())
+			}
+		}
+
 		switch path {
 		case "title":
 			patch.Title = &request.Project.Title
@@ -219,6 +234,18 @@ func (s *ProjectService) UpdateProject(ctx context.Context, request *v1pb.Update
 		case "auto_resolve_issue":
 			projectSettings := project.Setting
 			projectSettings.AutoResolveIssue = request.Project.AutoResolveIssue
+			patch.Setting = projectSettings
+		case "enforce_issue_title":
+			projectSettings := project.Setting
+			projectSettings.EnforceIssueTitle = request.Project.EnforceIssueTitle
+			patch.Setting = projectSettings
+		case "auto_enable_backup":
+			projectSettings := project.Setting
+			projectSettings.AutoEnableBackup = request.Project.AutoEnableBackup
+			patch.Setting = projectSettings
+		case "skip_backup_errors":
+			projectSettings := project.Setting
+			projectSettings.SkipBackupErrors = request.Project.SkipBackupErrors
 			patch.Setting = projectSettings
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, `unsupport update_mask "%s"`, path)
@@ -1253,6 +1280,9 @@ func convertToProject(projectMessage *store.ProjectMessage) *v1pb.Project {
 		ForceIssueLabels:           projectMessage.Setting.ForceIssueLabels,
 		AllowModifyStatement:       projectMessage.Setting.AllowModifyStatement,
 		AutoResolveIssue:           projectMessage.Setting.AutoResolveIssue,
+		EnforceIssueTitle:          projectMessage.Setting.EnforceIssueTitle,
+		AutoEnableBackup:           projectMessage.Setting.AutoEnableBackup,
+		SkipBackupErrors:           projectMessage.Setting.SkipBackupErrors,
 	}
 }
 

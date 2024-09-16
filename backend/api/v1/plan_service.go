@@ -336,7 +336,7 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 		UpdaterID: user.ID,
 	}
 
-	var doUpdateSheet bool
+	var planCheckRunsTrigger bool
 	for _, path := range request.UpdateMask.Paths {
 		switch path {
 		case "title":
@@ -490,20 +490,52 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 							return nil
 						}
 
-						var databaseName *string
+						// The target backup database name.
+						// Format: instances/{instance}/databases/{database}
+						var backupDatabaseName *string
 						if config.ChangeDatabaseConfig.PreUpdateBackupDetail == nil {
 							if payload.PreUpdateBackupDetail.Database != "" {
 								emptyValue := ""
-								databaseName = &emptyValue
+								backupDatabaseName = &emptyValue
 							}
 						} else {
 							if config.ChangeDatabaseConfig.PreUpdateBackupDetail.Database != payload.PreUpdateBackupDetail.Database {
-								databaseName = &config.ChangeDatabaseConfig.PreUpdateBackupDetail.Database
+								backupDatabaseName = &config.ChangeDatabaseConfig.PreUpdateBackupDetail.Database
 							}
 						}
-						if databaseName != nil {
+						if backupDatabaseName != nil {
+							if *backupDatabaseName != "" {
+								// If backup is enabled, we need to check if the backup is available for the source database. AKA, the task's target database.
+								sourceDatabaseName := config.ChangeDatabaseConfig.Target
+								instanceID, databaseName, err := common.GetInstanceDatabaseID(sourceDatabaseName)
+								if err != nil {
+									return errors.Wrapf(err, "failed to get instance database id from %q", sourceDatabaseName)
+								}
+								instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{ResourceID: &instanceID})
+								if err != nil {
+									return errors.Wrapf(err, "failed to get instance %s", instanceID)
+								}
+								if instance == nil {
+									return status.Errorf(codes.NotFound, "instance %q not found", instanceID)
+								}
+								database, err := s.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{
+									InstanceID:          &instanceID,
+									DatabaseName:        &databaseName,
+									IgnoreCaseSensitive: store.IgnoreDatabaseAndTableCaseSensitive(instance),
+								})
+								if err != nil {
+									return errors.Wrapf(err, "failed to get database %s", databaseName)
+								}
+								if database == nil {
+									return status.Errorf(codes.NotFound, "database %q not found", databaseName)
+								}
+								if ok := isBackupAvailable(ctx, s.store, instance, database); !ok {
+									return status.Errorf(codes.FailedPrecondition, "backup is not available for database %q", databaseName)
+								}
+							}
+
 							taskPatch.PreUpdateBackupDetail = &storepb.PreUpdateBackupDetail{
-								Database: *databaseName,
+								Database: *backupDatabaseName,
 							}
 							doUpdate = true
 						}
@@ -694,10 +726,14 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 				}
 			}
 
+			var doUpdateSheet bool
 			for _, taskPatch := range taskPatchList {
+				// If pre-backup detail has been updated, we need to rerun the plan check runs.
+				if taskPatch.PreUpdateBackupDetail != nil {
+					planCheckRunsTrigger = true
+				}
 				if taskPatch.SheetID != nil {
 					doUpdateSheet = true
-					break
 				}
 			}
 
@@ -713,6 +749,11 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 						}
 					}
 				}
+			}
+
+			// If sheet is updated, we need to rerun the plan check runs.
+			if doUpdateSheet {
+				planCheckRunsTrigger = true
 			}
 
 			// Check project setting for modify statement.
@@ -774,7 +815,7 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 		return nil, status.Errorf(codes.NotFound, "updated plan %q not found", request.Plan.Name)
 	}
 
-	if doUpdateSheet {
+	if planCheckRunsTrigger {
 		planCheckRuns, err := getPlanCheckRunsFromPlan(ctx, s.store, updatedPlan)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get plan check runs for plan, error: %v", err)
@@ -923,56 +964,56 @@ func (s *PlanService) BatchCancelPlanCheckRuns(ctx context.Context, request *v1p
 }
 
 func (s *PlanService) buildPlanFindWithFilter(ctx context.Context, planFind *store.FindPlanMessage, filter string) error {
-	filters, err := parseFilter(filter)
+	filters, err := ParseFilter(filter)
 	if err != nil {
 		return errors.Wrap(err, "failed to parse filter")
 	}
 	for _, spec := range filters {
-		switch spec.key {
+		switch spec.Key {
 		case "creator":
-			if spec.operator != comparatorTypeEqual {
+			if spec.Operator != ComparatorTypeEqual {
 				return errors.New(`only support "=" operation for "creator" filter`)
 			}
-			user, err := s.getUserByIdentifier(ctx, spec.value)
+			user, err := s.getUserByIdentifier(ctx, spec.Value)
 			if err != nil {
 				return errors.Wrap(err, "failed to get user by identifier")
 			}
 			planFind.CreatorID = &user.ID
 		case "create_time":
-			if spec.operator != comparatorTypeGreaterEqual && spec.operator != comparatorTypeLessEqual {
+			if spec.Operator != ComparatorTypeGreaterEqual && spec.Operator != ComparatorTypeLessEqual {
 				return errors.New(`only support ">=" and "<=" operation for "create_time" filter`)
 			}
-			t, err := time.Parse(time.RFC3339, spec.value)
+			t, err := time.Parse(time.RFC3339, spec.Value)
 			if err != nil {
 				return errors.Wrap(err, "failed to parse create_time value")
 			}
 			ts := t.Unix()
-			if spec.operator == comparatorTypeGreaterEqual {
+			if spec.Operator == ComparatorTypeGreaterEqual {
 				planFind.CreatedTsAfter = &ts
 			} else {
 				planFind.CreatedTsBefore = &ts
 			}
 		case "has_pipeline":
-			if spec.operator != comparatorTypeEqual {
+			if spec.Operator != ComparatorTypeEqual {
 				return errors.New(`only support "=" operation for "has_pipeline" filter`)
 			}
-			switch spec.value {
+			switch spec.Value {
 			case "false":
 				planFind.NoPipeline = true
 			case "true":
 			default:
-				return errors.Errorf("invalid value %q for has_pipeline", spec.value)
+				return errors.Errorf("invalid value %q for has_pipeline", spec.Value)
 			}
 		case "has_issue":
-			if spec.operator != comparatorTypeEqual {
+			if spec.Operator != ComparatorTypeEqual {
 				return errors.New(`only support "=" operation for "has_issue" filter`)
 			}
-			switch spec.value {
+			switch spec.Value {
 			case "false":
 				planFind.NoIssue = true
 			case "true":
 			default:
-				return errors.Errorf("invalid value %q for has_issue", spec.value)
+				return errors.Errorf("invalid value %q for has_issue", spec.Value)
 			}
 		}
 	}

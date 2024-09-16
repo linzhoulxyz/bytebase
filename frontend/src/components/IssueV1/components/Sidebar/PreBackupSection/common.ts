@@ -34,7 +34,7 @@ const PRE_BACKUP_AVAILABLE_ENGINES = [
   Engine.POSTGRES,
 ];
 
-const ROLLBACK_AVAILABLE_ENGINES = [Engine.MYSQL];
+const ROLLBACK_AVAILABLE_ENGINES = [Engine.MYSQL, Engine.POSTGRES];
 
 export const usePreBackupContext = () => {
   const { t } = useI18n();
@@ -66,7 +66,12 @@ export const usePreBackupContext = () => {
   });
 
   const allowPreBackup = computed((): boolean => {
-    // Always allow pre-backup when creating.
+    // Disallow pre-backup if no backup available for the target database.
+    if (!database.value.backupAvailable) {
+      return false;
+    }
+
+    // Allow toggle pre-backup when creating.
     if (isCreating.value) {
       return true;
     }
@@ -103,11 +108,7 @@ export const usePreBackupContext = () => {
 
   const archiveDatabase = computed((): string => {
     const { engine } = database.value.instanceResource;
-    if (engine === Engine.ORACLE) {
-      return "BBDATAARCHIVE";
-    }
-
-    return "bbdataarchive";
+    return getArchiveDatabase(engine);
   });
 
   const togglePreBackup = async (on: boolean) => {
@@ -207,4 +208,11 @@ export const usePreBackupContext = () => {
     showRollbackSection,
     allowRollback,
   };
+};
+
+export const getArchiveDatabase = (engine: Engine): string => {
+  if (engine === Engine.ORACLE) {
+    return "BBDATAARCHIVE";
+  }
+  return "bbdataarchive";
 };

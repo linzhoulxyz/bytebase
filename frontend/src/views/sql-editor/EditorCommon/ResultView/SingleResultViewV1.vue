@@ -4,7 +4,7 @@
       <ErrorView :error="result.error" />
     </BBAttention>
     <div
-      class="w-full shrink-0 flex flex-row justify-between items-center mb-2 overflow-x-auto"
+      class="w-full shrink-0 flex flex-row justify-between items-center mb-2 overflow-x-auto hide-scrollbar"
     >
       <div class="flex flex-row justify-start items-center mr-2 shrink-0">
         <NInput
@@ -34,7 +34,9 @@
           <span class="ml-2">{{ $t("sql-editor.rows-upper-limit") }}</span>
         </span>
       </div>
-      <div class="flex justify-between items-center gap-x-3 overflow-y-hidden">
+      <div
+        class="flex justify-between items-center shrink-0 gap-x-3 overflow-y-hidden hide-scrollbar"
+      >
         <div class="flex items-center">
           <NSwitch v-model:value="state.vertical" size="small" />
           <span class="ml-1 whitespace-nowrap text-sm text-gray-500">
@@ -47,7 +49,7 @@
           :item-count="table.getCoreRowModel().rows.length"
           :page="pageIndex + 1"
           :page-size="pageSize"
-          class="pagination"
+          class="pagination whitespace-nowrap"
           style="--n-input-width: 2.5rem"
           @update-page="handleChangePage"
         >
@@ -157,7 +159,11 @@
     <EmptyView />
   </template>
   <template v-else-if="viewMode === 'ERROR'">
-    <ErrorView :error="result.error" />
+    <ErrorView
+      :error="result.error"
+      :execute-params="params"
+      :result-set="sqlResultSet"
+    />
   </template>
 </template>
 
@@ -217,7 +223,7 @@ import {
   createExplainToken,
   extractProjectResourceName,
   extractSQLRowValue,
-  generateIssueName,
+  generateIssueTitle,
   hasPermissionToCreateRequestGrantIssue,
   hasWorkspacePermissionV2,
   instanceV1HasStructuredQueryResult,
@@ -226,7 +232,7 @@ import {
 import DataBlock from "./DataBlock.vue";
 import DataTable from "./DataTable";
 import EmptyView from "./EmptyView.vue";
-import ErrorView from "./ErrorView.vue";
+import ErrorView from "./ErrorView";
 import { useSQLResultViewContext } from "./context";
 
 type LocalState = {
@@ -350,7 +356,7 @@ const data = computed(() => {
   if (search) {
     temp = data.filter((item) => {
       return item.values.some((col) => {
-        const value = extractSQLRowValue(col);
+        const value = extractSQLRowValue(col).plain;
         if (isNullOrUndefined(value)) {
           return false;
         }
@@ -443,11 +449,11 @@ const handleRequestExport = async () => {
   const database = props.database;
   const project = database.projectEntity;
   const issueType = "bb.issue.database.data.export";
-  const sqlStorageKey = `bb.sql-editor.export.${uuidv4()}`;
+  const sqlStorageKey = `bb.issues.sql.${uuidv4()}`;
   localStorage.setItem(sqlStorageKey, props.result.statement);
   const query: Record<string, any> = {
     template: issueType,
-    name: generateIssueName(issueType, [database.databaseName]),
+    name: generateIssueTitle(issueType, [database.databaseName]),
     databaseList: database.name,
     sqlStorageKey,
   };
@@ -496,7 +502,7 @@ const handleChangePage = (page: number) => {
 const explainFromSQLResultSetV1 = (resultSet: SQLResultSetV1 | undefined) => {
   if (!resultSet) return "";
   const lines = resultSet.results[0].rows.map((row) =>
-    row.values.map((value) => String(extractSQLRowValue(value)))
+    row.values.map((value) => String(extractSQLRowValue(value).plain))
   );
   const explain = lines.map((line) => line[0]).join("\n");
   return explain;

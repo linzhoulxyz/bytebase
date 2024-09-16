@@ -6,6 +6,7 @@ import (
 	// Drivers.
 	_ "github.com/bytebase/bytebase/backend/plugin/db/bigquery"
 	_ "github.com/bytebase/bytebase/backend/plugin/db/clickhouse"
+	_ "github.com/bytebase/bytebase/backend/plugin/db/cockroachdb"
 	_ "github.com/bytebase/bytebase/backend/plugin/db/databricks"
 	_ "github.com/bytebase/bytebase/backend/plugin/db/dm"
 	_ "github.com/bytebase/bytebase/backend/plugin/db/dynamodb"
@@ -52,6 +53,7 @@ import (
 	_ "github.com/bytebase/bytebase/backend/plugin/parser/sql/transform/mysql"
 
 	// IM webhooks.
+	_ "github.com/bytebase/bytebase/backend/plugin/webhook/dingtalk"
 	_ "github.com/bytebase/bytebase/backend/plugin/webhook/feishu"
 	_ "github.com/bytebase/bytebase/backend/plugin/webhook/slack"
 	_ "github.com/bytebase/bytebase/backend/plugin/webhook/wecom"

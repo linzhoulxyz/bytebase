@@ -1,7 +1,11 @@
-export type WorkspaceMode = "CONSOLE" | "EDITOR";
+import { DatabaseChangeMode } from "./proto/v1/setting_service";
 
 export type AppFeatures = {
   // Use simple and accurate phrases. Namespace if needed
+  "bb.feature.default-workspace-view": "CONSOLE" | "EDITOR";
+  "bb.feature.database-change-mode":
+    | DatabaseChangeMode.PIPELINE
+    | DatabaseChangeMode.EDITOR;
   "bb.feature.custom-color-scheme": Record<string, string> | undefined;
   "bb.feature.disable-kbar": boolean;
   "bb.feature.disallow-navigate-to-console": boolean;
@@ -44,18 +48,19 @@ export type AppFeatures = {
   "bb.feature.sql-editor.hide-projects": boolean;
   "bb.feature.sql-editor.hide-environments": boolean;
   "bb.feature.sql-editor.hide-advance-instance-features": boolean;
+  "bb.feature.sql-editor.sql-check-style": "PREFLIGHT" | "NOTIFICATION";
 };
 
 export type AppProfile = {
-  mode: WorkspaceMode;
   embedded: boolean; // Whether the web app is embedded within iframe or not
   features: AppFeatures;
 };
 
 export const defaultAppProfile = (): AppProfile => ({
-  mode: "CONSOLE",
   embedded: false,
   features: {
+    "bb.feature.default-workspace-view": "CONSOLE",
+    "bb.feature.database-change-mode": DatabaseChangeMode.PIPELINE,
     "bb.feature.custom-color-scheme": undefined,
     "bb.feature.disable-kbar": false,
     "bb.feature.disallow-navigate-to-console": false,
@@ -98,5 +103,6 @@ export const defaultAppProfile = (): AppProfile => ({
     "bb.feature.sql-editor.hide-projects": false,
     "bb.feature.sql-editor.hide-environments": false,
     "bb.feature.sql-editor.hide-advance-instance-features": false,
+    "bb.feature.sql-editor.sql-check-style": "NOTIFICATION",
   },
 });

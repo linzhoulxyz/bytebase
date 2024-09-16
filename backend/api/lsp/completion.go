@@ -42,9 +42,9 @@ func (h *Handler) handleTextDocumentCompletion(ctx context.Context, _ *jsonrpc2.
 		// We don't want to parse a huge file.
 		return newEmptyCompletionList(), nil
 	}
-	_, valid, why := offsetForPosition(content, params.Position)
-	if !valid {
-		return nil, errors.Errorf("invalid position %d:%d (%s)", params.Position.Line, params.Position.Character, why)
+	_, err = offsetForPosition(content, params.Position)
+	if err != nil {
+		return nil, errors.Wrapf(err, "invalid position %d:%d", params.Position.Line, params.Position.Character)
 	}
 
 	defaultDatabase := h.getDefaultDatabase()
@@ -52,7 +52,7 @@ func (h *Handler) handleTextDocumentCompletion(ctx context.Context, _ *jsonrpc2.
 	switch engine {
 	case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE, storepb.Engine_CLICKHOUSE, storepb.Engine_STARROCKS, storepb.Engine_DORIS:
 		// Nothing.
-	case storepb.Engine_POSTGRES, storepb.Engine_REDSHIFT, storepb.Engine_RISINGWAVE:
+	case storepb.Engine_POSTGRES, storepb.Engine_REDSHIFT, storepb.Engine_RISINGWAVE, storepb.Engine_COCKROACHDB:
 		// Nothing.
 	case storepb.Engine_MSSQL:
 	case storepb.Engine_ORACLE, storepb.Engine_DM, storepb.Engine_OCEANBASE_ORACLE, storepb.Engine_SNOWFLAKE:
@@ -65,6 +65,7 @@ func (h *Handler) handleTextDocumentCompletion(ctx context.Context, _ *jsonrpc2.
 		Scene:             h.getScene(),
 		InstanceID:        h.getInstanceID(),
 		DefaultDatabase:   defaultDatabase,
+		DefaultSchema:     h.getDefaultSchema(),
 		Metadata:          h.GetDatabaseMetadataFunc,
 		ListDatabaseNames: h.ListDatabaseNamesFunc,
 	}, string(content), params.Position.Line+1, params.Position.Character)

@@ -117,10 +117,10 @@
 
 <script lang="ts" setup>
 import { asyncComputed, computedAsync } from "@vueuse/core";
-import dayjs from "dayjs";
 import { cloneDeep } from "lodash-es";
 import { NButton, NCheckbox, NDivider, useDialog } from "naive-ui";
 import { Status } from "nice-grpc-common";
+import { v4 as uuidv4 } from "uuid";
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -154,6 +154,7 @@ import { DatabaseMetadata } from "@/types/proto/v1/database_service";
 import {
   defer,
   extractProjectResourceName,
+  generateIssueTitle,
   hasProjectPermissionV2,
 } from "@/utils";
 import { getErrorCode } from "@/utils/grpcweb";
@@ -450,15 +451,18 @@ const handleApplyToDatabase = async (databaseNameList: string[]) => {
   const targetDatabaseList = databaseNameList.map((name) =>
     databaseStore.getDatabaseByName(name)
   );
+  const sqlStorageKey = `bb.issues.sql.${uuidv4()}`;
+  localStorage.setItem(sqlStorageKey, result.statement);
   const query: Record<string, any> = {
     template: "bb.issue.database.schema.update",
     mode: "normal",
     ghost: undefined,
     branch: branch.name,
+    sqlStorageKey,
   };
   query.databaseList = targetDatabaseList.map((db) => db.name).join(",");
-  query.sql = result.statement;
-  query.name = generateIssueName(
+  query.name = generateIssueTitle(
+    "bb.issue.database.schema.update",
     targetDatabaseList.map((db) => db.databaseName)
   );
   const routeInfo = {
@@ -470,20 +474,6 @@ const handleApplyToDatabase = async (databaseNameList: string[]) => {
     query,
   };
   router.push(routeInfo);
-};
-
-const generateIssueName = (databaseNameList: string[]) => {
-  const issueNameParts: string[] = [];
-  if (databaseNameList.length === 1) {
-    issueNameParts.push(`[${databaseNameList[0]}]`);
-  } else {
-    issueNameParts.push(`[${databaseNameList.length} databases]`);
-  }
-  issueNameParts.push(`Edit schema`);
-  const datetime = dayjs().format("@MM-DD HH:mm");
-  const tz = "UTC" + dayjs().format("ZZ");
-  issueNameParts.push(`${datetime} ${tz}`);
-  return issueNameParts.join(" ");
 };
 
 const confirmForceDeleteBranch = () => {

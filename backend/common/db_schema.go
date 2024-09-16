@@ -1,29 +1,28 @@
 package common
 
 import (
-	"regexp"
 	"slices"
-	"strings"
 
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
-var numberReg = regexp.MustCompile("^[0-9]+$")
-
 // GetClassificationAndUserComment parses classification and user comment from the given comment.
-func GetClassificationAndUserComment(comment string) (string, string) {
-	sections := strings.Split(comment, "-")
-	classification := []string{}
-	userComment := ""
-	for i, section := range sections {
-		if numberReg.MatchString(section) {
-			classification = append(classification, section)
-		} else {
-			userComment = strings.Join(sections[i:], "-")
-			break
+func GetClassificationAndUserComment(comment string, classificationConfig *storepb.DataClassificationSetting_DataClassificationConfig) (string, string) {
+	if classificationConfig == nil {
+		return "", comment
+	}
+	if _, ok := classificationConfig.Classification[comment]; ok {
+		return comment, ""
+	}
+	for i := len(comment) - 1; i >= 0; i-- {
+		if comment[i] != '-' {
+			continue
+		}
+		if _, ok := classificationConfig.Classification[comment[:i]]; ok {
+			return comment[:i], comment[i+1:]
 		}
 	}
-	return strings.Join(classification, "-"), userComment
+	return "", comment
 }
 
 // GetCommentFromClassificationAndUserComment returns the comment from the given classification and user comment.
@@ -143,6 +142,9 @@ func EqualTable(s, t *storepb.TableMetadata) bool {
 	if len(s.Indexes) != len(t.Indexes) {
 		return false
 	}
+	if len(s.ForeignKeys) != len(t.ForeignKeys) {
+		return false
+	}
 	if len(s.Partitions) != len(t.Partitions) {
 		return false
 	}
@@ -206,6 +208,33 @@ func EqualTable(s, t *storepb.TableMetadata) bool {
 			return false
 		}
 		if !slices.Equal(si.GetExpressions(), ti.GetExpressions()) {
+			return false
+		}
+	}
+	for i := 0; i < len(s.GetForeignKeys()); i++ {
+		si, ti := s.GetForeignKeys()[i], t.GetForeignKeys()[i]
+		if si.GetName() != ti.GetName() {
+			return false
+		}
+		if !slices.Equal(si.GetColumns(), ti.GetColumns()) {
+			return false
+		}
+		if si.GetReferencedSchema() != ti.GetReferencedSchema() {
+			return false
+		}
+		if si.GetReferencedTable() != ti.GetReferencedTable() {
+			return false
+		}
+		if !slices.Equal(si.GetReferencedColumns(), ti.GetReferencedColumns()) {
+			return false
+		}
+		if si.GetOnDelete() != ti.GetOnDelete() {
+			return false
+		}
+		if si.GetOnUpdate() != ti.GetOnUpdate() {
+			return false
+		}
+		if si.GetMatchType() != ti.GetMatchType() {
 			return false
 		}
 	}

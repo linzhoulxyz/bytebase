@@ -54,9 +54,9 @@
 </template>
 
 <script lang="ts" setup>
-import dayjs from "dayjs";
 import { NButton } from "naive-ui";
 import { Status } from "nice-grpc-common";
+import { v4 as uuidv4 } from "uuid";
 import { computed, reactive, watch } from "vue";
 import { useRouter } from "vue-router";
 import { BBSpin } from "@/bbkit";
@@ -67,7 +67,7 @@ import { SETTING_ROUTE_WORKSPACE_GENERAL } from "@/router/dashboard/workspaceSet
 import { featureToRef, hasFeature } from "@/store";
 import { useSettingV1Store } from "@/store/modules/v1/setting";
 import type { ComposedSlowQueryLog } from "@/types";
-import { extractProjectResourceName } from "@/utils";
+import { extractProjectResourceName, generateIssueTitle } from "@/utils";
 import { getErrorCode } from "@/utils/grpcweb";
 
 const props = defineProps<{
@@ -114,14 +114,18 @@ const showIndexAdvisor = computed(() => {
 });
 
 const handleCreateIndex = () => {
+  const sqlStorageKey = `bb.issues.sql.${uuidv4()}`;
+  localStorage.setItem(sqlStorageKey, state.createIndexStatement);
   const query: Record<string, any> = {
     template: "bb.issue.database.schema.update",
+    name: generateIssueTitle("bb.issue.database.schema.update", [
+      database.value.databaseName,
+    ]),
+    databaseList: database.value.name,
     mode: "normal",
-    ghost: undefined,
+    description: `Create index for database ${database.value.databaseName}`,
+    sqlStorageKey,
   };
-  query.databaseList = database.value.name;
-  query.sql = state.createIndexStatement;
-  query.name = generateIssueName();
 
   const routeInfo = {
     name: PROJECT_V1_ROUTE_ISSUE_DETAIL,
@@ -132,16 +136,6 @@ const handleCreateIndex = () => {
     query,
   };
   router.push(routeInfo);
-};
-
-const generateIssueName = () => {
-  const issueNameParts: string[] = [];
-  issueNameParts.push(`[${database.value.databaseName}]`);
-  issueNameParts.push(`Create index`);
-  const datetime = dayjs().format("@MM-DD HH:mm");
-  const tz = "UTC" + dayjs().format("ZZ");
-  issueNameParts.push(`${datetime} ${tz}`);
-  return issueNameParts.join(" ");
 };
 
 watch(

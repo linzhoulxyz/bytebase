@@ -22,6 +22,7 @@
         <UserDataTable
           :show-roles="false"
           :user-list="filteredUserList"
+          :on-click-user="onClickUser"
           @update-user="handleUpdateUser"
           @select-group="handleUpdateGroup"
         />
@@ -42,6 +43,7 @@
         <UserDataTableByGroup
           :groups="filteredGroupList"
           :allow-edit="allowEditGroup"
+          :on-click-user="onClickUser"
           @update-group="handleUpdateGroup"
         />
       </NTabPane>
@@ -49,6 +51,26 @@
       <template #suffix>
         <div class="flex items-center space-x-3">
           <SearchBox v-model:value="state.activeUserFilterText" />
+
+          <NButton
+            v-if="allowGetSCIMSetting"
+            class="capitalize"
+            @click="
+              () => {
+                if (!hasDirectorySyncFeature) {
+                  state.showFeatureModal = true;
+                  return;
+                }
+                state.showAadSyncDrawer = true;
+              }
+            "
+          >
+            <template #icon>
+              <SettingsIcon v-if="hasDirectorySyncFeature" class="h-5 w-5" />
+              <FeatureBadge v-else feature="bb.feature.directory-sync" />
+            </template>
+            {{ $t(`settings.members.entra-sync.self`) }}
+          </NButton>
 
           <NPopover
             v-if="allowCreateGroup"
@@ -128,15 +150,28 @@
     :group="state.editingGroup"
     @close="state.showCreateGroupDrawer = false"
   />
+
+  <AADSyncDrawer
+    :show="state.showAadSyncDrawer"
+    @close="state.showAadSyncDrawer = false"
+  />
+
+  <FeatureModal
+    feature="bb.feature.directory-sync"
+    :open="state.showFeatureModal"
+    @cancel="state.showFeatureModal = false"
+  />
 </template>
 
 <script setup lang="ts">
-import { PlusIcon } from "lucide-vue-next";
+import { PlusIcon, SettingsIcon } from "lucide-vue-next";
 import { NButton, NTabs, NTabPane, NPopover, NCheckbox } from "naive-ui";
 import { computed, onMounted, reactive, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import { FeatureAttention } from "@/components/FeatureGuard";
+import { FeatureBadge, FeatureModal } from "@/components/FeatureGuard";
+import AADSyncDrawer from "@/components/User/Settings/AADSyncDrawer.vue";
 import CreateGroupDrawer from "@/components/User/Settings/CreateGroupDrawer.vue";
 import CreateUserDrawer from "@/components/User/Settings/CreateUserDrawer.vue";
 import UserDataTable from "@/components/User/Settings/UserDataTable/index.vue";
@@ -148,6 +183,7 @@ import {
   useUIStateStore,
   useGroupStore,
   useSettingV1Store,
+  featureToRef,
 } from "@/store";
 import { groupNamePrefix } from "@/store/modules/v1/common";
 import {
@@ -173,9 +209,15 @@ type LocalState = {
   showInactiveUserList: boolean;
   showCreateUserDrawer: boolean;
   showCreateGroupDrawer: boolean;
+  showAadSyncDrawer: boolean;
   editingUser?: User;
   editingGroup?: Group;
+  showFeatureModal: boolean;
 };
+
+defineProps<{
+  onClickUser?: (user: User, event: MouseEvent) => void;
+}>();
 
 const state = reactive<LocalState>({
   typeTab: defaultTab,
@@ -184,6 +226,8 @@ const state = reactive<LocalState>({
   showInactiveUserList: false,
   showCreateUserDrawer: false,
   showCreateGroupDrawer: false,
+  showAadSyncDrawer: false,
+  showFeatureModal: false,
 });
 
 const { t } = useI18n();
@@ -221,6 +265,12 @@ const workspaceProfileSetting = computed(() =>
   WorkspaceProfileSetting.fromPartial(
     settingV1Store.workspaceProfileSetting || {}
   )
+);
+
+const hasDirectorySyncFeature = featureToRef("bb.feature.directory-sync");
+
+const allowGetSCIMSetting = computed(() =>
+  hasWorkspacePermissionV2("bb.settings.get")
 );
 
 const allowCreateGroup = computed(() =>

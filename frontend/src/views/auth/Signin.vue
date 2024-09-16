@@ -269,7 +269,8 @@ onMounted(async () => {
   }
   // Try to signin with example account in demo site.
   if (
-    window.location.href.startsWith("https://demo.bytebase.com") &&
+    (window.location.href.startsWith("https://demo.bytebase.com") ||
+      window.location.href.startsWith("https://sql-editor.com")) &&
     isDemo.value &&
     state.email &&
     state.password
@@ -290,7 +291,7 @@ const trySignin = async (idpName?: string) => {
   if (state.isLoading) return;
   state.isLoading = true;
   try {
-    const mfaTempToken = await authStore.login({
+    const { mfaTempToken } = await authStore.login({
       email: state.email,
       password: state.password,
       web: true,

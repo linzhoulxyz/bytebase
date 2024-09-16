@@ -288,7 +288,9 @@
       "n-rows": "{n} 行"
     },
     "back-to-workspace": "返回工作空间",
-    "override": "覆盖"
+    "override": "覆盖",
+    "encoding": "编码",
+    "finish": "完成"
   },
   "error-page": {
     "go-back-home": "回到主页"
@@ -469,13 +471,16 @@
       "general": "通用",
       "members": "成员",
       "users-and-groups": "用户和群组",
+      "iam-and-admin": "IAM & 管理",
       "im-integration": "IM",
       "sso": "SSO",
       "gitops": "GitOps",
       "subscription": "订阅",
       "labels": "标签",
-      "sensitive-data": "数据脱敏",
-      "access-control": "数据访问控制",
+      "data-masking": "数据屏蔽",
+      "data-classification": "数据分类",
+      "access-control": "访问控制",
+      "data-access": "数据访问",
       "audit-log": "审计日志",
       "custom-roles": "自定义角色",
       "mail-delivery": "邮件发送"
@@ -487,7 +492,7 @@
       "phone-tips": "请包含国家代码前缀",
       "country-code": "国家或地区代码",
       "password": "密码",
-      "password-hint": "最少 8 个字符，其中至少包含 1 个字母和 1 个数字。",
+      "password-hint": "密码应遵循限制设置",
       "password-confirm": "确认密码",
       "password-confirm-placeholder": "确认新密码",
       "password-mismatch": "新密码不匹配",
@@ -566,12 +571,23 @@
       "view-by-roles": "按角色查看",
       "add-member": "添加成员",
       "add-user": "添加用户",
+      "entra-sync": {
+        "self": "从 Entra ID (Azure AD) 同步",
+        "description": "将 Entra ID（前 Azure AD）中的用户和组同步到您的 Bytebase 实例。",
+        "endpoint": "Endpoint",
+        "endpoint-tip": "将其粘贴到 Entra 中的「Tenant URL」字段。Entra 将通过该 endpoint 将用户和组同步到 Bytebase。",
+        "secret-token": "Secret Token",
+        "secret-token-tip": "将其粘贴到 Entra 中的「Secret Token」字段。",
+        "reset-token": "重置密钥",
+        "reset-token-warning": "您需要更新 Entra 应用程序配置。"
+      },
       "update-user": "更新用户",
       "workspace-role-at-least-one": "至少选择一个工作空间级别的角色",
       "search-member": "搜索成员",
       "revoked": "已撤销",
       "view-by-members": "按成员查看",
       "revoke-access": "撤销访问权限",
+      "revoke-access-alert": "您确定要撤销访问权限吗？",
       "grant-access": "授予访问权限",
       "select-user": "选择用户 | 选择用户",
       "select-group": "选择组 | 选择组",
@@ -644,6 +660,7 @@
         "logo-upload-tip": "支持 {extension} 类型文件，不能大于 {size} MiB",
         "logo-upload-succeed": "Logo 更新完成",
         "security": "安全",
+        "account": "帐户",
         "watermark": {
           "self": "水印",
           "update-success": "水印设置已更新",
@@ -701,6 +718,16 @@
             "description": "仅允许具有指定域名的电子邮箱的用户进行登录或注册。"
           }
         },
+        "password-restriction": {
+          "self": "密码限制",
+          "min-length": "密码最小长度不得少于 {min} 个字符",
+          "require-number": "密码必须至少包含一个数字",
+          "require-letter": "密码必须至少包含一个字母（不区分大小写）",
+          "require-uppercase-letter": "密码必须至少包含一个大写字母",
+          "require-special-character": "密码必须至少包含一个特殊字符",
+          "require-reset-password-for-first-login": "要求用户在首次登录后重置密码",
+          "password-rotation": "要求用户每 {day} 天重置一次密码"
+        },
         "config-updated": "配置已更新。",
         "ai-assistant": {
           "self": "AI 助手",
@@ -745,13 +772,16 @@
         },
         "database-change-mode": {
           "self": "数据库变更模式",
-          "description": "控制用户如何进行数据库变更。工单模式使用工单/任务工作流和自定义审批流来实现结构化流程。SQL 编辑器模式允许用户在 SQL 编辑器中直接执行变更语句，以便快速简单地进行更改。",
+          "description": "控制用户如何变更数据库",
           "issue-mode": {
-            "self": "工单模式"
+            "self": "工单模式（团队）",
+            "description": "使用工单来提交，审核，发布，版本化数据库变更。适合团队协同。"
           },
           "sql-editor-mode": {
-            "self": "SQL 编辑器模式"
-          }
+            "self": "SQL 编辑器模式（单人）",
+            "description": "使用 SQL 编辑器直接执行数据库变更。适合单人使用。"
+          },
+          "can-be-changed-later": "此设置以后可以随时更改。"
         }
       }
     },
@@ -999,6 +1029,7 @@
       "verb-type-target-by-people": "{verb}{type} {target}",
       "verb-type-target-by-system-bot": "{type} {target} {verb}",
       "changed-x-link": "修改了 {name}。{link}",
+      "failed-to-backup": "数据备份失败：{error}",
       "prior-back-table": "已备份到数据库 {database} 中表 {tables}",
       "prior-back-table-for-line": "数据备份到数据库 {database} 和表 {tables}，用于第 {line} 行的DML"
     },
@@ -1249,7 +1280,6 @@
       "you-are-not-allowed-to-perform-this-action": "您无权执行此操作",
       "cannot-close-issue-with-running-tasks": "无法关闭还存在运行中任务的工单"
     },
-    "approval-requested": "审批请求",
     "unfinished-resolved-issue-tips": "该工单被标记为「已完成」，但其中某些任务并未成功执行。",
     "some-tasks-are-not-executed-successfully": "（部分任务并未成功执行）",
     "preview": "预览工单",
@@ -1300,7 +1330,15 @@
     },
     "sql-review-only": "仅 SQL 审核",
     "create-issue": "创建变更工单",
-    "this-plan-will-be-converted-to-a-new-issue": "该计划将转换为一个变更工单"
+    "this-plan-will-be-converted-to-a-new-issue": "该计划将转换为一个变更工单",
+    "title": {
+      "edit-schema": "变更 Schema",
+      "change-data": "变更数据",
+      "export-data": "导出数据",
+      "create-database": "创建数据库",
+      "request-querier-role": "申请查询者角色",
+      "request-exporter-role": "申请导出者角色"
+    }
   },
   "alter-schema": {
     "vcs-enabled": "该项目开启了基于 VCS 的版本管理，选择下面的数据库会将您导航到相应的 Git 仓库以发起变更流程。",
@@ -1324,10 +1362,9 @@
     "troubleshoot": "问题排查",
     "transfer-in-db": "转进数据库",
     "request-db": "申请数据库",
-    "from-unassigned-databases": "转移未分配的数据库",
-    "from-projects": "从其他项目转移",
+    "from-unassigned-databases": "未分配的数据库",
+    "from-projects": "从其他项目",
     "transfer-in-db-title": "转进数据库",
-    "transfer-in-db-alert": "您确定要转进 \"{ dbName }\" 到我们的项目中吗？",
     "unassigned-db-hint": "新同步的数据库起先是未分配的状态，必须移至一个项目以供使用。",
     "transfer-out-db": "转出数据库",
     "transfer-out-db-title": "转出数据库",
@@ -1764,22 +1801,6 @@
     "row-count-est": "估计行数",
     "incorrect-project-warning": "SQL 编辑器只能查询用户可用的项目中的数据库。您应该首先将此数据库转移到一个可用的项目中。",
     "go-to-transfer": "前去转移",
-    "pitr": {
-      "restore": "@:common.restore@:common.database",
-      "no-available-backup": "没有可用的备份",
-      "point-in-time": "时间点",
-      "help-info": "将数据库的状态恢复到一个时间点。{link}。",
-      "minimum-supported-engine-and-version": "需要 {engine} >= {min_version}",
-      "restore-to-point-in-time": "恢复到指定时间点",
-      "no-earlier-than": "恢复的时间点不能早于 [{earliest}] (最早可用的备份)。",
-      "no-later-than-now": "恢复的时间点不能晚于当前时间。",
-      "will-overwrite-current-database": "会覆盖现有数据库",
-      "restore-before-last-migration": "恢复到上次变更历史之前",
-      "restore-before-last-migration-help-info": "@:{'database.pitr.restore-before-last-migration'}。{link}。",
-      "restore-to": "恢复到",
-      "restore-to-new-db": "新数据库",
-      "restore-to-in-place": "原数据库"
-    },
     "show-reserved-tables": "显示 Bytebase 保留的表",
     "show-reserved-databases": "显示 Bytebase 保留的数据库",
     "synced-at": "同步于 {time}",
@@ -1828,9 +1849,10 @@
       "generated-ddl-statement": "生成的 DDL 语句"
     },
     "sensitive": "敏感",
-    "access-denied": "您没有访问该数据库的权限",
+    "access-denied": "您无权访问该数据库",
     "schema": {
-      "select": "选择 schema"
+      "select": "选择 schema",
+      "unspecified": "未指定"
     },
     "show-missing-databases": "显示未找到的数据库",
     "n-selected-m-in-total": "（已选择 {selected}，共计 {total}）",
@@ -1889,7 +1911,8 @@
     "foreign-keys": "外键",
     "foreign-key": {
       "reference": "引用"
-    }
+    },
+    "create-target-database-or-schema-for-backup": "请先创建备份的目标数据库或 Schema"
   },
   "repository": {
     "our-webhook-link": "Bytebase 创建的 webhook 可以在 {webhookLink} 中找到。",
@@ -2091,6 +2114,25 @@
         "auto-resolve-issue": {
           "self": "自动完成工单",
           "description": "所有任务执行成功后自动完成工单。"
+        },
+        "enforce-issue-title": {
+          "self": "要求手动输入工单标题",
+          "description": "工单标题必须由用户输入而不是自动生成。"
+        },
+        "default-backup-behavior": {
+          "self": "默认备份行为",
+          "description": "创建数据更改问题时的默认备份行为。",
+          "default_backup_behavior_no_backup": "禁用备份",
+          "default_backup_behavior_backup_on_error_stop": "启用备份，但在发生错误时停止任务",
+          "default_backup_behavior_backup_on_error_skip": "启用备份，失败时跳过备份错误"
+        },
+        "auto-enable-backup": {
+          "self": "自动启用备份",
+          "description": "自动为所有数据更改工单启用备份。"
+        },
+        "skip-backup-errors": {
+          "self": "跳过备份失败的错误",
+          "description": "当备份失败时，跳过错误并且变更数据任务将继续执行。"
         }
       }
     },
@@ -2466,7 +2508,13 @@
     "manage-connections": "管理连接",
     "view-detail": "查看详情",
     "generate-sql": "生成 SQL",
-    "current-editing-statement-is-not-empty": "当前编辑中的语句不为空。"
+    "current-editing-statement-is-not-empty": "当前编辑中的语句不为空。",
+    "run-anyway": "仍要运行",
+    "no-project": {
+      "not-member-of-any-projects": "你不是任何项目的成员。",
+      "go-to-create": "去创建",
+      "contact-the-admin-to-grant-access": "联系管理员以授予访问权限。"
+    }
   },
   "schema-editor": {
     "self": "Schema 编辑器",
@@ -2562,14 +2610,18 @@
       "description": "关闭后更改将会丢失。"
     },
     "tenant-mode-tips": "点击“预览工单”后，当前更改将会应用于所有选定的租户数据库。",
-    "edit-foreign-key": "修改外键",
+    "foreign-key": {
+      "edit": "修改外键",
+      "name-description": "外键的名称应该是唯一的"
+    },
     "select-reference-schema": "选择外键的 Schema",
     "select-reference-table": "选择外键的表",
     "select-reference-column": "选择外键的列",
     "index": {
       "indexes": "索引",
       "edit-indexes": "编辑索引",
-      "unique": "唯一"
+      "unique": "唯一",
+      "dependent-columns": "依赖列"
     },
     "generated-ddl-is-empty": "生成的 DDL 为空",
     "table-partition": {
@@ -2841,6 +2893,18 @@
       "bb-feature-issue-advanced-search": {
         "title": "工单高级搜索",
         "desc": "通过高级搜索来访问无限制的历史工单。"
+      },
+      "bb-feature-issue-project-setting": {
+        "title": "工单项目设置",
+        "desc": "自定义高级工单项目设置。包括创建工单限制以及默认备份设置等。"
+      },
+      "bb-feature-password-restriction": {
+        "title": "密码限制",
+        "desc": "允许配置用户密码的规则"
+      },
+      "bb-feature-directory-sync": {
+        "title": "目录同步",
+        "desc": "将 Entra ID（以前称为 Azure AD）中的用户和组同步到您的 Bytebase 实例"
       }
     }
   },
@@ -2909,7 +2973,7 @@
       "self": "绑定到资源",
       "label": "审核策略需要绑定到环境资源或项目资源上，并影响对应资源下所有数据库。若一个数据库同时受到项目级别与环境级别策略影响，则只有项目级别策略生效。",
       "label-environment": "SQL 审查策略将影响属于所选环境的所有数据库。",
-      "label-project": "SQL 审核策略将影响所选项目下的所有数据库。环境的 SQL 审核策略将被忽略。",
+      "label-project": "SQL 审核策略将影响所选项目下的所有数据库。数据库所属环境的 SQL 审核策略将被忽略。",
       "override-warning": "以下资源已与其他 SQL 审核策略绑定。点击“{button}”将覆盖配置。"
     },
     "create": {
@@ -3603,7 +3667,8 @@
       "no-file-to-upload": "没有可以上传的文件",
       "upload-sql-or-zip-file": "上传 .sql 或 .zip 文件",
       "optional-upload-sql-or-zip-file": "（可选）上传 .sql 或 .zip 文件"
-    }
+    },
+    "change-type": "更改类型"
   },
   "export-data": {
     "export-rows": "导出行数",
@@ -3686,5 +3751,8 @@
   },
   "worksheet": {
     "self": "工作表"
+  },
+  "setup": {
+    "self": "设置"
   }
 }

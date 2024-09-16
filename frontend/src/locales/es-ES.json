@@ -288,7 +288,9 @@
       "n-rows": "{n} filas"
     },
     "back-to-workspace": "Volver al espacio de trabajo",
-    "override": "Anular"
+    "override": "Anular",
+    "encoding": "Codificación",
+    "finish": "Finalizar"
   },
   "error-page": {
     "go-back-home": "Volver al inicio"
@@ -469,13 +471,16 @@
       "general": "General",
       "members": "Miembros",
       "users-and-groups": "Usuarios y grupos",
+      "iam-and-admin": "IAM y administración",
       "im-integration": "Integración de IM",
       "sso": "SSO",
       "gitops": "GitOps",
       "subscription": "Suscripción",
       "labels": "Etiquetas",
-      "sensitive-data": "Enmascaramiento de Datos",
-      "access-control": "Control de Acceso a Datos",
+      "data-masking": "Enmascaramiento de datos",
+      "data-classification": "Clasificación de datos",
+      "access-control": "Control de acceso",
+      "data-access": "Acceso a datos",
       "audit-log": "Registro de auditoría",
       "custom-roles": "Roles personalizados",
       "mail-delivery": "Entrega de Correo"
@@ -487,7 +492,7 @@
       "phone-tips": "Asegúrese de incluir el código del país.",
       "country-code": "Códigos de país y de área",
       "password": "Contraseña",
-      "password-hint": "Mínimo ocho caracteres, al menos contiene una letra y un número.",
+      "password-hint": "La contraseña debe seguir la configuración de restricción",
       "password-confirm": "Confirmar contraseña",
       "password-confirm-placeholder": "Confirmar nueva contraseña",
       "password-mismatch": "Nueva contraseña no coincide",
@@ -566,12 +571,23 @@
       "view-by-roles": "Ver por roles",
       "add-member": "Agregar miembro",
       "add-user": "Agregar usuario",
+      "entra-sync": {
+        "self": "Sincronización desde Entra ID (Azure AD)",
+        "description": "Sincronice usuarios y grupos de Entra ID (anteriormente Azure AD) con su instancia de Bytebase.",
+        "endpoint": "Punto final",
+        "endpoint-tip": "Pegue esto en el campo \"Tenant URL\" en Entra. Entra sincronizará usuarios y grupos con Bytebase a través de este punto de conexión.",
+        "secret-token": "Secret Token",
+        "secret-token-tip": "Pegue esto en el campo \"Secret Token\" en Entra.",
+        "reset-token": "Restablecer token",
+        "reset-token-warning": "Debe actualizar la configuración de aprovisionamiento de aplicaciones de Entra."
+      },
       "update-user": "Actualizar usuario",
       "workspace-role-at-least-one": "El espacio de trabajo debe tener al menos un administrador",
       "search-member": "Buscar miembro",
       "revoked": "Revocado",
       "view-by-members": "Ver por miembros",
       "revoke-access": "Revocar acceso",
+      "revoke-access-alert": "¿Está seguro de revocar el acceso?",
       "grant-access": "Conceder acceso",
       "select-user": "Seleccionar usuario | Seleccionar usuarios",
       "select-group": "Seleccionar grupo | Seleccionar grupos",
@@ -644,6 +660,7 @@
         "logo-upload-tip": "{extension} hasta {size} MiB",
         "logo-upload-succeed": "Logo actualizado correctamente",
         "security": "Seguridad",
+        "account": "Cuenta",
         "watermark": {
           "self": "Marca de agua",
           "update-success": "Configuración de marca de agua actualizada",
@@ -701,6 +718,16 @@
             "description": "Restrinja el inicio de sesión a usuarios con direcciones de correo electrónico de los dominios especificados."
           }
         },
+        "password-restriction": {
+          "self": "Restricción de contraseña",
+          "min-length": "La longitud mínima de la contraseña no debe ser inferior a {min} caracteres",
+          "require-number": "Requiere que la contraseña contenga al menos un número",
+          "require-letter": "Requiere que la contraseña contenga al menos una letra, independientemente de si es mayúscula o minúscula.",
+          "require-uppercase-letter": "Requiere que la contraseña contenga al menos una letra mayúscula",
+          "require-special-character": "Requiere que la contraseña contenga al menos un carácter especial",
+          "require-reset-password-for-first-login": "Requerir que los usuarios restablezcan su contraseña después del primer inicio de sesión",
+          "password-rotation": "Requerir que los usuarios restablezcan su contraseña cada {day} días"
+        },
         "config-updated": "La configuración se ha actualizado.",
         "ai-assistant": {
           "self": "Asistente de AI",
@@ -745,13 +772,16 @@
         },
         "database-change-mode": {
           "self": "Modo de cambio de base de datos",
-          "description": "Controla cómo los usuarios realizan migraciones de esquemas de bases de datos. El modo de emisión utiliza flujos de trabajo de problemas/tareas con aprobaciones personalizadas para un proceso estructurado. El modo Editor SQL permite la ejecución directa de SQL en un editor SQL para realizar cambios rápidos y sencillos.",
+          "description": "Controla cómo los usuarios realizan migraciones de esquemas de bases de datos",
           "issue-mode": {
-            "self": "Modo de emisión"
+            "self": "Modo de emisión (Equipo)",
+            "description": "Utilice emisión para solicitar, revisar, implementar y crear versiones de cambios en la base de datos. Adecuado para la colaboración en equipo.."
           },
           "sql-editor-mode": {
-            "self": "Modo de edición SQL"
-          }
+            "self": "Modo de edición SQL (Individual)",
+            "description": "Permite la ejecución directa de SQL en un editor de SQL para realizar cambios rápidos y sencillos."
+          },
+          "can-be-changed-later": "Utilice el Editor SQL para ejecutar cambios en la base de datos directamente. Adecuado para particulares."
         }
       }
     },
@@ -999,6 +1029,7 @@
       "verb-type-target-by-people": "{verb} {type} {target}",
       "verb-type-target-by-system-bot": "{type} {target} {verb}",
       "changed-x-link": "cambiado {name}. \n{link}",
+      "failed-to-backup": "No se pudo realizar la copia de seguridad de los datos: {error}",
       "prior-back-table": "Copia de seguridad de datos en la base de datos {database} y tablas {tables}",
       "prior-back-table-for-line": "Copia de seguridad de datos en la base de datos {database} y la tabla {tables} para DML en la línea {line}"
     },
@@ -1249,7 +1280,6 @@
       "you-are-not-allowed-to-perform-this-action": "No tienes permiso para realizar esta acción.",
       "cannot-close-issue-with-running-tasks": "No se puede cerrar el problema con las tareas en ejecución"
     },
-    "approval-requested": "Aprobación solicitada",
     "unfinished-resolved-issue-tips": "Este problema está marcado como \"Listo\", pero algunas de sus tareas no se ejecutan correctamente.",
     "some-tasks-are-not-executed-successfully": "(Algunas tareas no se ejecutan correctamente)",
     "preview": "Problema de vista previa",
@@ -1300,7 +1330,15 @@
     },
     "sql-review-only": "Sólo revisión de SQL",
     "create-issue": "Crear problema",
-    "this-plan-will-be-converted-to-a-new-issue": "Este plan se convertirá en una nueva edición."
+    "this-plan-will-be-converted-to-a-new-issue": "Este plan se convertirá en una nueva edición.",
+    "title": {
+      "edit-schema": "Editar esquema",
+      "change-data": "Cambiar datos",
+      "export-data": "Exportar datos",
+      "create-database": "Crear base de datos",
+      "request-querier-role": "Rol de consultador de solicitudes",
+      "request-exporter-role": "Solicitar función de exportación"
+    }
   },
   "alter-schema": {
     "vcs-enabled": "Este proyecto ha habilitado el control de versiones basado en VCS y seleccionar la base de datos a continuación lo llevará al repositorio Git correspondiente para iniciar el proceso de cambio.",
@@ -1324,10 +1362,9 @@
     "troubleshoot": "Solucionar problemas",
     "transfer-in-db": "Transferir BD",
     "request-db": "Solicitar BD",
-    "from-unassigned-databases": "Transferir bases de datos no asignadas",
-    "from-projects": "Transfer from other projects",
+    "from-unassigned-databases": "Bases de datos no asignadas",
+    "from-projects": "De otro proyecto",
     "transfer-in-db-title": "Transferir base de datos",
-    "transfer-in-db-alert": "¿Estás seguro de transferir \"{dbName}\" a nuestro proyecto?",
     "unassigned-db-hint": "Las bases de datos recién sincronizadas comienzan sin asignar y deben ser asignadas a un proyecto para su uso.",
     "transfer-out-db": "Transferir base de datos",
     "transfer-out-db-title": "Transferir la base de datos",
@@ -1764,22 +1801,6 @@
     "row-count-est": "Cantidad est. de filas",
     "incorrect-project-warning": "El editor de SQL solo puede consultar bases de datos en proyectos disponibles para el usuario. Primero debe transferir esta base de datos a un proyecto.",
     "go-to-transfer": "Ir a transferir",
-    "pitr": {
-      "restore": "@:common.restore @:common.database",
-      "no-available-backup": "No hay copia de seguridad disponible",
-      "point-in-time": "Punto en el tiempo",
-      "help-info": "Restaurar el estado de la base de datos a un punto en el tiempo. {link}.",
-      "minimum-supported-engine-and-version": "Se requiere {engine} >= {min_version}",
-      "restore-to-point-in-time": "Restaurar a un punto en el tiempo",
-      "no-earlier-than": "El punto de restauración no puede ser anterior a [{earliest}] (la copia de seguridad más antigua disponible).",
-      "no-later-than-now": "El punto de restauración no puede ser posterior a ahora.",
-      "will-overwrite-current-database": "Se sobrescribirá la base de datos actual",
-      "restore-before-last-migration": "Restaurar al punto antes de la última migración",
-      "restore-before-last-migration-help-info": "@:{'database.pitr.restore-before-last-migration'}. {link}.",
-      "restore-to": "Restaurar a",
-      "restore-to-new-db": "A una nueva base de datos",
-      "restore-to-in-place": "En el mismo lugar"
-    },
     "show-reserved-tables": "Mostrar tablas reservadas de Bytebase",
     "show-reserved-databases": "Mostrar bases de datos reservadas de Bytebase",
     "synced-at": "Sincronizado en {time}",
@@ -1830,7 +1851,8 @@
     "sensitive": "Sensible",
     "access-denied": "No tiene permiso para acceder a esta base de datos.",
     "schema": {
-      "select": "Seleccionar esquema"
+      "select": "Seleccionar esquema",
+      "unspecified": "No especificado"
     },
     "show-missing-databases": "Mostrar bases de datos faltantes",
     "n-selected-m-in-total": "({selected} seleccionados, {total} en total)",
@@ -1889,7 +1911,8 @@
     "foreign-keys": "claves foráneas",
     "foreign-key": {
       "reference": "Referencia"
-    }
+    },
+    "create-target-database-or-schema-for-backup": "Primero cree la base de datos o el esquema de destino para la copia de seguridad"
   },
   "repository": {
     "our-webhook-link": "El webhook creado por Bytebase se puede encontrar en {webhookLink}.",
@@ -2091,6 +2114,25 @@
         "auto-resolve-issue": {
           "self": "Problema de resolución automática",
           "description": "Resuelva automáticamente el problema después de completar todas las tareas."
+        },
+        "enforce-issue-title": {
+          "self": "Hacer cumplir el título del problema",
+          "description": "Exigir que el título del problema no esté vacío y que lo cree el usuario en lugar de generarse automáticamente."
+        },
+        "default-backup-behavior": {
+          "self": "Comportamiento de copia de seguridad predeterminado",
+          "description": "El comportamiento de copia de seguridad predeterminado al crear problemas de cambio de datos.",
+          "default_backup_behavior_no_backup": "Deshabilitar copia de seguridad",
+          "default_backup_behavior_backup_on_error_stop": "Habilitar copia de seguridad, pero detener la tarea en caso de error",
+          "default_backup_behavior_backup_on_error_skip": "Habilitar copia de seguridad, omitir error de copia de seguridad en caso de falla"
+        },
+        "auto-enable-backup": {
+          "self": "Habilitar automáticamente la copia de seguridad",
+          "description": "Habilitar automáticamente la copia de seguridad para todos los problemas de modificación de datos."
+        },
+        "skip-backup-errors": {
+          "self": "Omitir errores de copia de seguridad",
+          "description": "Se omitirán los errores de copia de seguridad y las tareas de cambio de datos continuarán ejecutándose."
         }
       }
     },
@@ -2466,7 +2508,13 @@
     "manage-connections": "Gestionar las conexiones",
     "view-detail": "Ver detalle",
     "generate-sql": "Generar SQL",
-    "current-editing-statement-is-not-empty": "La declaración de edición actual no está vacía."
+    "current-editing-statement-is-not-empty": "La declaración de edición actual no está vacía.",
+    "run-anyway": "Corre de todos modos",
+    "no-project": {
+      "not-member-of-any-projects": "No eres miembro de ningún proyecto.",
+      "go-to-create": "ir a crear",
+      "contact-the-admin-to-grant-access": "Póngase en contacto con el administrador para otorgar acceso."
+    }
   },
   "schema-editor": {
     "self": "Editor de esquema",
@@ -2562,14 +2610,18 @@
       "description": "¿Está seguro de que desea cerrar el panel? Se perderán los cambios realizados."
     },
     "tenant-mode-tips": "Los cambios se aplicarán a todas las bases de datos de inquilinos seleccionados después de hacer clic en \"Vista previa de la incidencia\".",
-    "edit-foreign-key": "Editar clave externa",
+    "foreign-key": {
+      "edit": "Editar clave externa",
+      "name-description": "El nombre único de la clave externa"
+    },
     "select-reference-schema": "Seleccionar un esquema de referencia",
     "select-reference-table": "Seleccionar una tabla de referencia",
     "select-reference-column": "Seleccionar una columna de referencia",
     "index": {
       "indexes": "Índices",
       "edit-indexes": "Editar índices",
-      "unique": "Único"
+      "unique": "Único",
+      "dependent-columns": "Columnas dependientes"
     },
     "generated-ddl-is-empty": "El DDL generado está vacío",
     "table-partition": {
@@ -2841,6 +2893,18 @@
       "bb-feature-issue-advanced-search": {
         "title": "Búsqueda avanzada de problemas",
         "desc": "Acceda a un historial de problemas ilimitado con búsqueda avanzada de problemas."
+      },
+      "bb-feature-issue-project-setting": {
+        "title": "Configuración avanzada de proyectos de problemas",
+        "desc": "Personalice la configuración avanzada del proyecto de problemas, incluida la creación de restricciones de problemas y configuraciones de copia de seguridad predeterminadas."
+      },
+      "bb-feature-password-restriction": {
+        "title": "Restricción de contraseña",
+        "desc": "Permitir configurar la restricción de contraseña de los usuarios"
+      },
+      "bb-feature-directory-sync": {
+        "title": "Sincronización de directorios",
+        "desc": "Sincronice usuarios y grupos de Entra ID (anteriormente Azure AD) con su instancia de Bytebase"
       }
     }
   },
@@ -3603,7 +3667,8 @@
       "no-file-to-upload": "No hay archivos para subir",
       "upload-sql-or-zip-file": "Cargue el archivo .sql o .zip",
       "optional-upload-sql-or-zip-file": "(Opcional) Cargue el archivo .sql o .zip"
-    }
+    },
+    "change-type": "Cambiar tipo"
   },
   "export-data": {
     "export-rows": "Exportar filas",
@@ -3686,5 +3751,8 @@
   },
   "worksheet": {
     "self": "Hoja de trabajo"
+  },
+  "setup": {
+    "self": "Configuración"
   }
 }

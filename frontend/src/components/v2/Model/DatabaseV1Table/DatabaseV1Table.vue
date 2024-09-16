@@ -47,7 +47,7 @@ export type Mode =
 
 const props = withDefaults(
   defineProps<{
-    mode: Mode;
+    mode?: Mode;
     databaseList: ComposedDatabase[];
     bordered?: boolean;
     loading?: boolean;
@@ -56,12 +56,14 @@ const props = withDefaults(
     schemaless?: boolean;
     customClick?: boolean;
     rowClickable?: boolean;
+    selectedDatabaseNames?: string[];
   }>(),
   {
     mode: "ALL",
     bordered: true,
     showSelection: true,
     rowClickable: true,
+    selectedDatabaseNames: () => [],
   }
 );
 
@@ -72,7 +74,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const state = reactive<LocalState>({
-  selectedDatabaseNameList: new Set(),
+  selectedDatabaseNameList: new Set(props.selectedDatabaseNames),
 });
 
 const columnList = computed((): DatabaseDataTableColumn[] => {

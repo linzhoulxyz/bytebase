@@ -384,7 +384,7 @@ func (s *Syncer) SyncDatabaseSchema(ctx context.Context, database *store.Databas
 		setUserCommentFromComment(databaseMetadata)
 	} else {
 		// Get classification from the comment.
-		setClassificationAndUserCommentFromComment(databaseMetadata, dbModelConfig)
+		setClassificationAndUserCommentFromComment(databaseMetadata, dbModelConfig, classificationConfig)
 	}
 
 	syncStatus := api.OK
@@ -412,7 +412,7 @@ func (s *Syncer) SyncDatabaseSchema(ctx context.Context, database *store.Databas
 	// if oldDatabaseMetadata is nil and databaseMetadata is not, they are not equal resulting a sync.
 	if force || !common.EqualDatabaseSchemaMetadataFast(oldDatabaseMetadata, databaseMetadata) {
 		var schemaBuf bytes.Buffer
-		if _, err := driver.Dump(ctx, &schemaBuf); err != nil {
+		if err := driver.Dump(ctx, &schemaBuf); err != nil {
 			return errors.Wrapf(err, "failed to dump database schema for database %q", database.DatabaseName)
 		}
 		rawDump = schemaBuf.Bytes()
@@ -579,20 +579,20 @@ func (s *Syncer) upsertDatabaseConnectionAnomaly(ctx context.Context, instance *
 	}
 }
 
-func setClassificationAndUserCommentFromComment(dbSchema *storepb.DatabaseSchemaMetadata, databaseConfig *model.DatabaseConfig) {
+func setClassificationAndUserCommentFromComment(dbSchema *storepb.DatabaseSchemaMetadata, databaseConfig *model.DatabaseConfig, classificationConfig *storepb.DataClassificationSetting_DataClassificationConfig) {
 	for _, schema := range dbSchema.Schemas {
 		schemaConfig := databaseConfig.CreateOrGetSchemaConfig(schema.Name)
 
 		for _, table := range schema.Tables {
 			tableConfig := schemaConfig.CreateOrGetTableConfig(table.Name)
-			classification, userComment := common.GetClassificationAndUserComment(table.Comment)
+			classification, userComment := common.GetClassificationAndUserComment(table.Comment, classificationConfig)
 
 			table.UserComment = userComment
 			tableConfig.ClassificationID = classification
 
 			for _, col := range table.Columns {
 				columnConfig := tableConfig.CreateOrGetColumnConfig(col.Name)
-				colClassification, colUserComment := common.GetClassificationAndUserComment(col.Comment)
+				colClassification, colUserComment := common.GetClassificationAndUserComment(col.Comment, classificationConfig)
 
 				col.UserComment = colUserComment
 				columnConfig.ClassificationId = colClassification
@@ -649,12 +649,10 @@ func getOrDefaultLastSyncTime(t *timestamppb.Timestamp) time.Time {
 
 func disableSchemaDriftAnomalyCheck(dbTp storepb.Engine) bool {
 	m := map[storepb.Engine]struct{}{
-		storepb.Engine_MONGODB:          {},
-		storepb.Engine_REDIS:            {},
-		storepb.Engine_ORACLE:           {},
-		storepb.Engine_OCEANBASE_ORACLE: {},
-		storepb.Engine_MSSQL:            {},
-		storepb.Engine_REDSHIFT:         {},
+		storepb.Engine_MONGODB:    {},
+		storepb.Engine_REDIS:      {},
+		storepb.Engine_REDSHIFT:   {},
+		storepb.Engine_RISINGWAVE: {},
 	}
 	_, ok := m[dbTp]
 	return ok

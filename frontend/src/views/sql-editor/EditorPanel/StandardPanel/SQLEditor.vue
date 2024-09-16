@@ -13,10 +13,12 @@
       :auto-complete-context="{
         instance: instance.name,
         database: database.name,
+        schema: chosenSchema,
         scene: 'query',
       }"
-      @update:content="handleChange"
-      @select-content="handleChangeSelection"
+      @update:content="handleUpdateStatement"
+      @select-content="handleUpdateSelectedStatement"
+      @update:selection="handleUpdateSelection"
       @ready="handleEditorReady"
     />
   </div>
@@ -31,20 +33,24 @@ import type {
   IStandaloneCodeEditor,
   MonacoModule,
 } from "@/components/MonacoEditor";
+import type { Selection as MonacoSelection } from "@/components/MonacoEditor";
 import MonacoEditor from "@/components/MonacoEditor/MonacoEditor.vue";
 import {
   extensionNameOfLanguage,
   formatEditorContent,
+  positionWithOffset,
 } from "@/components/MonacoEditor/utils";
 import { useEmitteryEventListener } from "@/composables/useEmitteryEventListener";
+import { useExecuteSQL } from "@/composables/useExecuteSQL";
 import {
   useUIStateStore,
   useWorkSheetAndTabStore,
   useSQLEditorTabStore,
   useConnectionOfCurrentSQLEditorTab,
 } from "@/store";
-import type { SQLDialect, SQLEditorQueryParams } from "@/types";
+import type { SQLDialect, SQLEditorQueryParams, SQLEditorTab } from "@/types";
 import { dialectOfEngineV1 } from "@/types";
+import { Advice_Status, type Advice } from "@/types/proto/v1/sql_service";
 import { useInstanceV1EditorLanguage } from "@/utils";
 import { useSQLEditorContext } from "../../context";
 
@@ -58,6 +64,11 @@ const uiStateStore = useUIStateStore();
 const { events: editorEvents } = useSQLEditorContext();
 const { currentTab, isSwitchingTab } = storeToRefs(tabStore);
 const pendingFormatContentCommand = ref(false);
+const pendingSetSelectionCommand = ref<{
+  start: { line: number; column: number };
+  end?: { line: number; column: number };
+}>();
+const { events: executeSQLEvents } = useExecuteSQL();
 
 const content = computed(() => currentTab.value?.statement ?? "");
 const advices = computed((): AdviceOption[] => {
@@ -65,19 +76,7 @@ const advices = computed((): AdviceOption[] => {
   if (!tab) {
     return [];
   }
-  return (
-    Array.from(tab.queryContext?.results.values() || [])
-      .map((result) => result?.advices || [])
-      .flat() ?? []
-  ).map((advice) => ({
-    severity: "ERROR",
-    message: advice.content,
-    startLineNumber: advice.line,
-    endLineNumber: advice.line,
-    startColumn: advice.column,
-    endColumn: advice.column,
-    source: advice.detail,
-  }));
+  return tab.editorState.advices;
 });
 const { instance, database } = useConnectionOfCurrentSQLEditorTab();
 const language = useInstanceV1EditorLanguage(instance);
@@ -93,7 +92,13 @@ const filename = computed(() => {
   return `${name}.${ext}`;
 });
 
-const handleChange = (value: string) => {
+const chosenSchema = computed(() => {
+  const tab = currentTab.value;
+  if (!tab || tab.connection.schema === "") return undefined;
+  return tab.connection.schema;
+});
+
+const handleUpdateStatement = (value: string) => {
   // When we are switching between tabs, the MonacoEditor emits a 'change'
   // event, but we shouldn't update the current tab;
   if (isSwitchingTab.value) {
@@ -106,19 +111,26 @@ const handleChange = (value: string) => {
   if (value === tab.statement) {
     return;
   }
-  // Clear old advices when the statement is changed.
-  tab.queryContext?.results.forEach((result) => {
-    result.advices = [];
-  });
   tabStore.updateCurrentTab({
     statement: value,
     status: "DIRTY",
   });
 };
 
-const handleChangeSelection = (value: string) => {
+const handleUpdateSelectedStatement = (value: string) => {
   tabStore.updateCurrentTab({
     selectedStatement: value,
+  });
+};
+
+const handleUpdateSelection = (selection: MonacoSelection | null) => {
+  const tab = currentTab.value;
+  if (!tab) return;
+  tabStore.updateCurrentTab({
+    editorState: {
+      ...tab.editorState,
+      selection,
+    },
   });
 };
 
@@ -141,6 +153,7 @@ const runQueryAction = (explain = false) => {
     statement,
     engine: instance.value.engine,
     explain,
+    selection: tab.editorState.selection,
   });
   uiStateStore.saveIntroStateByKey({
     key: "data.query",
@@ -184,8 +197,80 @@ const handleEditorReady = (
     },
     { immediate: true }
   );
+
+  watch(
+    pendingSetSelectionCommand,
+    (range) => {
+      if (range) {
+        const start = range.start;
+        const end = range.end ?? start;
+        editor.setSelection({
+          startLineNumber: start.line,
+          startColumn: start.column,
+          endLineNumber: end.line,
+          endColumn: end.column,
+        });
+        editor.revealLineNearTop(start.line);
+        editor.focus();
+        nextTick(() => {
+          pendingSetSelectionCommand.value = undefined;
+        });
+      }
+    },
+    { immediate: true }
+  );
 };
+const updateAdvices = (
+  tab: SQLEditorTab,
+  params: SQLEditorQueryParams,
+  advices: Advice[]
+) => {
+  tab.editorState.advices = advices.map<AdviceOption>((advice) => {
+    const [startLine, startColumn] = positionWithOffset(
+      advice.startPosition?.line ?? advice.line,
+      advice.startPosition?.column ?? advice.column,
+      params.selection
+    );
+    const [endLine, endColumn] = positionWithOffset(
+      advice.endPosition?.line ?? advice.startPosition?.line ?? advice.line,
+      advice.endPosition?.column ??
+        advice.startPosition?.column ??
+        advice.column,
+      params.selection
+    );
+    const code = advice.code;
+    const source = [`L${startLine}:C${startColumn}`];
+    if (code > 0) {
+      source.unshift(`(${code})`);
+    }
+    if (advice.title) {
+      source.unshift(advice.title);
+    }
+    return {
+      severity: advice.status === Advice_Status.ERROR ? "ERROR" : "WARNING",
+      message: advice.content,
+      source: source.join(" "),
+      startLineNumber: startLine,
+      endLineNumber: endLine,
+      startColumn: startColumn,
+      endColumn: endColumn,
+    };
+  });
+};
+
 useEmitteryEventListener(editorEvents, "format-content", () => {
   pendingFormatContentCommand.value = true;
 });
+useEmitteryEventListener(editorEvents, "set-editor-selection", (range) => {
+  pendingSetSelectionCommand.value = range;
+});
+
+useEmitteryEventListener(
+  executeSQLEvents,
+  "update:advices",
+  ({ tab, params, advices }) => {
+    if (tab.id !== currentTab.value?.id) return;
+    updateAdvices(tab, params, advices);
+  }
+);
 </script>

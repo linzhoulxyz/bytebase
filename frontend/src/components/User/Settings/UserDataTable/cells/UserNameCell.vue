@@ -6,7 +6,14 @@
       <div class="flex flex-col">
         <div class="flex flex-row items-center space-x-2">
           <span
-            v-if="permissionStore.onlyWorkspaceMember"
+            v-if="onClickUser"
+            class="normal-link truncate max-w-[10rem]"
+            @click="onClickUser(user, $event)"
+          >
+            {{ user.title }}
+          </span>
+          <span
+            v-else-if="permissionStore.onlyWorkspaceMember"
             class="truncate max-w-[10em]"
           >
             {{ user.title }}
@@ -18,6 +25,9 @@
           >
             {{ user.title }}
           </router-link>
+          <NTag v-if="user.profile?.source" size="small" round type="primary">
+            {{ user.profile.source }}
+          </NTag>
           <YouTag v-if="currentUserV1.name === user.name" />
           <SystemBotTag v-if="user.name === SYSTEM_BOT_USER_NAME" />
           <ServiceAccountTag
@@ -45,7 +55,7 @@
           @click.prevent="() => copyServiceKey(user.serviceKey)"
         >
           <template #icon>
-            <heroicons-outline:clipboard class="w-4 h-4" />
+            <ClipboardIcon class="w-4 h-4" />
           </template>
           {{ $t("settings.members.copy-service-key") }}
         </NButton>
@@ -56,7 +66,7 @@
           @click.prevent="$emit('reset-service-key', user)"
         >
           <template #icon>
-            <heroicons-outline:reply class="w-4 h-4" />
+            <ReplyIcon class="w-4 h-4" />
           </template>
           {{ $t("settings.members.reset-service-key") }}
         </NButton>
@@ -66,7 +76,8 @@
 </template>
 
 <script lang="ts" setup>
-import { NButton } from "naive-ui";
+import { ClipboardIcon, ReplyIcon } from "lucide-vue-next";
+import { NButton, NTag } from "naive-ui";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import UserAvatar from "@/components/User/UserAvatar.vue";
@@ -84,6 +95,7 @@ import { hasWorkspacePermissionV2, toClipboard } from "@/utils";
 
 defineProps<{
   user: User;
+  onClickUser?: (user: User, event: MouseEvent) => void;
 }>();
 
 defineEmits<{

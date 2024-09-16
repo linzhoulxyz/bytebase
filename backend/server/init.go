@@ -56,6 +56,45 @@ func (s *Server) getInitSetting(ctx context.Context) (string, time.Duration, err
 		return "", 0, err
 	}
 
+	// Init SCIM config
+	scimToken, err := common.RandomString(secretLength)
+	if err != nil {
+		return "", 0, errors.Wrap(err, "failed to generate random SCIM secret")
+	}
+	scimSettingValue, err := protojson.Marshal(&storepb.SCIMSetting{
+		Token: scimToken,
+	})
+	if err != nil {
+		return "", 0, errors.Wrap(err, "failed to marshal initial scim setting")
+	}
+	if _, _, err := s.store.CreateSettingIfNotExistV2(ctx, &store.SettingMessage{
+		Name:        api.SettingSCIM,
+		Value:       string(scimSettingValue),
+		Description: "The SCIM sync",
+	}, api.SystemBotID); err != nil {
+		return "", 0, err
+	}
+
+	// Init password validation
+	passwordSettingValue, err := protojson.Marshal(&storepb.PasswordRestrictionSetting{
+		MinLength:                         8,
+		RequireNumber:                     false,
+		RequireLetter:                     true,
+		RequireUppercaseLetter:            false,
+		RequireSpecialCharacter:           false,
+		RequireResetPasswordForFirstLogin: false,
+	})
+	if err != nil {
+		return "", 0, errors.Wrap(err, "failed to marshal initial password validation setting")
+	}
+	if _, _, err := s.store.CreateSettingIfNotExistV2(ctx, &store.SettingMessage{
+		Name:        api.SettingPasswordRestriction,
+		Value:       string(passwordSettingValue),
+		Description: "The password validation",
+	}, api.SystemBotID); err != nil {
+		return "", 0, err
+	}
+
 	// initial license
 	if _, _, err = s.store.CreateSettingIfNotExistV2(ctx, &store.SettingMessage{
 		Name:        api.SettingEnterpriseLicense,
@@ -154,11 +193,7 @@ func (s *Server) getInitSetting(ctx context.Context) (string, time.Duration, err
 	}
 
 	// initial workspace profile setting
-	settingName := api.SettingWorkspaceProfile
-	workspaceProfileSetting, err := s.store.GetSettingV2(ctx, &store.FindSettingMessage{
-		Name:    &settingName,
-		Enforce: true,
-	})
+	workspaceProfileSetting, err := s.store.GetSettingV2(ctx, api.SettingWorkspaceProfile)
 	if err != nil {
 		return "", 0, err
 	}
@@ -208,20 +243,29 @@ func (s *Server) getInitSetting(ctx context.Context) (string, time.Duration, err
 		return "", 0, err
 	}
 
-	// Get token duration and external URL.
-	workspaceProfileSettingName := api.SettingWorkspaceProfile
-	setting, err := s.store.GetSettingV2(ctx, &store.FindSettingMessage{Name: &workspaceProfileSettingName})
+	// Get token duration.
+	workspaceProfile, err := s.store.GetWorkspaceGeneralSetting(ctx)
 	if err != nil {
 		return "", 0, err
 	}
+	passwordRestriction, err := s.store.GetPasswordRestrictionSetting(ctx)
+	if err != nil {
+		return "", 0, err
+	}
+
 	tokenDuration := auth.DefaultTokenDuration
-	if setting != nil {
-		settingValue := new(storepb.WorkspaceProfileSetting)
-		if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(setting.Value), settingValue); err != nil {
-			return "", 0, err
-		}
-		if settingValue.TokenDuration != nil && settingValue.TokenDuration.Seconds > 0 {
-			tokenDuration = settingValue.TokenDuration.AsDuration()
+	if workspaceProfile.TokenDuration != nil && workspaceProfile.TokenDuration.GetSeconds() > 0 {
+		tokenDuration = workspaceProfile.TokenDuration.AsDuration()
+	}
+	// Currently we implement the password rotation restriction in a simple way:
+	// 1. Only check if users need to reset their password during login.
+	// 2. For the 1st time login, if `RequireResetPasswordForFirstLogin` is true, `require_reset_password` in the response will be true
+	// 3. Otherwise if the `PasswordRotation` exists, check the password last updated time to decide if the `require_reset_password` is true.
+	// So we will use the minimum value between (`workspaceProfile.TokenDuration`, `passwordRestriction.PasswordRotation`) to force to expire the token.
+	if passwordRestriction.PasswordRotation != nil && passwordRestriction.PasswordRotation.GetSeconds() > 0 {
+		passwordRotation := passwordRestriction.PasswordRotation.AsDuration()
+		if passwordRotation.Seconds() < tokenDuration.Seconds() {
+			tokenDuration = passwordRotation
 		}
 	}
 

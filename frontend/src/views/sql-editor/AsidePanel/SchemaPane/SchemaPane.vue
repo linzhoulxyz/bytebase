@@ -6,6 +6,7 @@
       <div class="flex-1 overflow-hidden">
         <SearchBox
           v-model:value="searchPattern"
+          :disabled="!currentTab"
           size="small"
           style="width: 100%; max-width: 100%"
         />
@@ -24,15 +25,16 @@
       class="schema-tree flex-1 px-1 pb-1 text-sm overflow-hidden select-none"
       :data-height="treeContainerHeight"
     >
+      <MaskSpinner v-if="isFetchingMetadata" />
       <NTree
-        v-if="tree"
+        v-else-if="tree"
         ref="treeRef"
         v-model:expanded-keys="expandedKeys"
         :selected-keys="selectedKeys"
         :block-line="true"
         :data="tree"
         :show-irrelevant-nodes="false"
-        :pattern="mounted ? searchPattern : ''"
+        :pattern="mounted ? debouncedSearchPattern : ''"
         :virtual-scroll="true"
         :node-props="nodeProps"
         :theme-overrides="{ nodeHeight: '21px' }"
@@ -69,7 +71,12 @@
 </template>
 
 <script setup lang="ts">
-import { computedAsync, useElementSize, useMounted } from "@vueuse/core";
+import {
+  computedAsync,
+  refDebounced,
+  useElementSize,
+  useMounted,
+} from "@vueuse/core";
 import { head, uniq } from "lodash-es";
 import {
   NDropdown,
@@ -79,7 +86,7 @@ import {
   type TreeOption,
 } from "naive-ui";
 import { storeToRefs } from "pinia";
-import { computed, h, nextTick, ref, watch } from "vue";
+import { computed, h, nextTick, reactive, ref, watch } from "vue";
 import { watchEffect } from "vue";
 import { BBModal } from "@/bbkit";
 import TableSchemaViewer from "@/components/TableSchemaViewer.vue";
@@ -93,7 +100,7 @@ import {
 } from "@/store";
 import { isValidDatabaseName } from "@/types";
 import { DatabaseMetadataView } from "@/types/proto/v1/database_service";
-import { extractDatabaseResourceName, isDescendantOf } from "@/utils";
+import { allEqual, extractDatabaseResourceName, isDescendantOf } from "@/utils";
 import { useEditorPanelContext } from "../../EditorPanel";
 import { useSQLEditorContext } from "../../context";
 import SyncSchemaButton from "./SyncSchemaButton.vue";
@@ -117,7 +124,7 @@ const { height: treeContainerHeight } = useElementSize(
     box: "content-box",
   }
 );
-const searchPattern = ref("");
+const searchPatternByTabId = reactive(new Map<string, string>());
 const { viewState: panelViewState } = useEditorPanelContext();
 const { schemaViewer } = useSQLEditorContext();
 const {
@@ -131,6 +138,17 @@ const {
 const { selectAllFromTableOrView, viewDetail } = useActions();
 const { currentTab } = storeToRefs(useSQLEditorTabStore());
 const { database } = useConnectionOfCurrentSQLEditorTab();
+const searchPattern = computed({
+  get() {
+    const id = currentTab.value?.id ?? "";
+    return searchPatternByTabId.get(id) ?? "";
+  },
+  set(value) {
+    const id = currentTab.value?.id ?? "";
+    searchPatternByTabId.set(id, value);
+  },
+});
+const debouncedSearchPattern = refDebounced(searchPattern, 200);
 const isFetchingMetadata = ref(false);
 const metadata = computedAsync(
   async () => {
@@ -232,7 +250,14 @@ const renderLabel = ({ option }: { option: TreeOption }) => {
 const selectedKeys = computed(() => {
   const db = database.value;
   if (!isValidDatabaseName(db.name)) return [];
-  if (!panelViewState.value) return [];
+  const keys: string[] = [];
+  const tab = currentTab.value;
+  if (tab && tab.connection.schema) {
+    keys.push(`${db.name}/schemas/${tab.connection.schema}`);
+  }
+  if (!panelViewState.value || panelViewState.value.view === "CODE") {
+    return keys;
+  }
   const {
     schema,
     detail: {
@@ -245,6 +270,7 @@ const selectedKeys = computed(() => {
       partition,
       index,
       foreignKey,
+      dependentColumn,
     },
   } = panelViewState.value;
 
@@ -262,16 +288,17 @@ const selectedKeys = computed(() => {
     }
   } else if (view) {
     parts.push(`views/${view}`);
+    if (column) {
+      parts.push(`columns/${column}`);
+    } else if (dependentColumn) {
+      parts.push(`dependentColumns/${dependentColumn}`);
+    }
   } else if (procedure) {
     parts.push(`procedures/${procedure}`);
   } else if (func) {
     parts.push(`functions/${func}`);
   } else if (externalTable) {
     parts.push(`externalTables/${externalTable}`);
-  }
-  if (parts.length <= 2) {
-    // don't highlight if only the root (schema) node is picked
-    return [];
   }
 
   return [parts.join("/")];
@@ -299,6 +326,15 @@ const expandNode = (node: TreeNode) => {
 
 useEmitteryEventListener(nodeClickEvents, "single-click", ({ node }) => {
   expandNode(node);
+  if (node.meta.type === "schema") {
+    const tab = currentTab.value;
+    if (tab) {
+      tab.connection.schema = (
+        node.meta.target as NodeTarget<"schema">
+      ).schema.name;
+      return;
+    }
+  }
   viewDetail(node);
 });
 useEmitteryEventListener(nodeClickEvents, "double-click", ({ node }) => {
@@ -308,21 +344,30 @@ useEmitteryEventListener(nodeClickEvents, "double-click", ({ node }) => {
 });
 
 watch(
-  [isFetchingMetadata, metadata],
-  ([isFetchingMetadata, metadata]) => {
-    if (isFetchingMetadata || !metadata) {
+  [isFetchingMetadata, metadata, currentTab],
+  ([isFetchingMetadata, metadata, tab]) => {
+    const cleanup = () => {
       tree.value = undefined;
-      return;
+    };
+    if (isFetchingMetadata || !metadata || !tab) {
+      return cleanup();
     }
-    tree.value = buildDatabaseSchemaTree(database.value, metadata);
+    if (
+      !allEqual(
+        extractDatabaseResourceName(metadata.name).database,
+        tab.connection.database,
+        database.value.name
+      )
+    ) {
+      return cleanup();
+    }
 
-    const tab = currentTab.value;
-    if (tab) {
-      const { database } = extractDatabaseResourceName(metadata.name);
-      if (database !== tab.treeState.database) {
-        tab.treeState.database = database;
-        tab.treeState.keys = defaultExpandedKeys();
-      }
+    tree.value = buildDatabaseSchemaTree(database.value, metadata);
+    if (tab.treeState.database !== tab.connection.database) {
+      // Set initial tree state for the tab when it firstly opens or its
+      // connection has been changed
+      tab.treeState.database = tab.connection.database;
+      tab.treeState.keys = defaultExpandedKeys();
     }
   },
   {
@@ -336,7 +381,7 @@ watch(
   --n-node-content-height: 21px !important;
 }
 .schema-tree :deep(.n-tree-node-content) {
-  @apply !pl-0 text-sm;
+  @apply !px-0 text-sm;
 }
 .schema-tree :deep(.n-tree-node-wrapper) {
   padding: 0;

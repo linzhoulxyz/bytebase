@@ -56,7 +56,8 @@ const (
 	orderByKeyAverageRowsExamined = "average_rows_examined"
 	orderByKeyMaximumRowsExamined = "maximum_rows_examined"
 
-	backupDatabaseName = "bbdataarchive"
+	backupDatabaseName       = "bbdataarchive"
+	oracleBackupDatabaseName = "BBDATAARCHIVE"
 )
 
 // DatabaseService implements the database service.
@@ -761,27 +762,27 @@ func (s *DatabaseService) ListChangeHistories(ctx context.Context, request *v1pb
 		find.ShowFull = true
 	}
 
-	filters, err := parseFilter(request.Filter)
+	filters, err := ParseFilter(request.Filter)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	for _, expr := range filters {
-		if expr.operator != comparatorTypeEqual {
+		if expr.Operator != ComparatorTypeEqual {
 			return nil, status.Errorf(codes.InvalidArgument, `only support "=" operation for filter`)
 		}
-		switch expr.key {
+		switch expr.Key {
 		case "source":
-			changeSource := db.MigrationSource(expr.value)
+			changeSource := db.MigrationSource(expr.Value)
 			find.Source = &changeSource
 		case "type":
-			for _, changeType := range strings.Split(expr.value, " | ") {
+			for _, changeType := range strings.Split(expr.Value, " | ") {
 				find.TypeList = append(find.TypeList, db.MigrationType(changeType))
 			}
 		case "table":
-			resourcesFilter := expr.value
+			resourcesFilter := expr.Value
 			find.ResourcesFilter = &resourcesFilter
 		default:
-			return nil, status.Errorf(codes.InvalidArgument, "invalid filter key %q", expr.key)
+			return nil, status.Errorf(codes.InvalidArgument, "invalid filter key %q", expr.Key)
 		}
 	}
 
@@ -1384,23 +1385,23 @@ func (s *DatabaseService) ListSlowQueries(ctx context.Context, request *v1pb.Lis
 		ProjectID: &projectID,
 	}
 
-	filters, err := parseFilter(request.Filter)
+	filters, err := ParseFilter(request.Filter)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	var startLogDate, endLogDate *time.Time
 	for _, expr := range filters {
-		switch expr.key {
+		switch expr.Key {
 		case filterKeyEnvironment:
 			reg := regexp.MustCompile(`^environments/(.+)`)
-			match := reg.FindStringSubmatch(expr.value)
+			match := reg.FindStringSubmatch(expr.Value)
 			if len(match) != 2 {
-				return nil, status.Errorf(codes.InvalidArgument, "invalid environment filter %q", expr.value)
+				return nil, status.Errorf(codes.InvalidArgument, "invalid environment filter %q", expr.Value)
 			}
 			findDatabase.EffectiveEnvironmentID = &match[1]
 		case filterKeyDatabase:
-			instanceID, databaseName, err := common.GetInstanceDatabaseID(expr.value)
+			instanceID, databaseName, err := common.GetInstanceDatabaseID(expr.Value)
 			if err != nil {
 				return nil, status.Error(codes.InvalidArgument, err.Error())
 			}
@@ -1415,52 +1416,52 @@ func (s *DatabaseService) ListSlowQueries(ctx context.Context, request *v1pb.Lis
 			findDatabase.DatabaseName = &databaseName
 			findDatabase.IgnoreCaseSensitive = store.IgnoreDatabaseAndTableCaseSensitive(instance)
 		case filterKeyStartTime:
-			switch expr.operator {
-			case comparatorTypeGreater:
+			switch expr.Operator {
+			case ComparatorTypeGreater:
 				if startLogDate != nil {
 					return nil, status.Errorf(codes.InvalidArgument, "invalid filter %q", request.Filter)
 				}
-				t, err := time.Parse(time.RFC3339, expr.value)
+				t, err := time.Parse(time.RFC3339, expr.Value)
 				if err != nil {
-					return nil, status.Errorf(codes.InvalidArgument, "invalid start_time filter %q", expr.value)
+					return nil, status.Errorf(codes.InvalidArgument, "invalid start_time filter %q", expr.Value)
 				}
 				t = t.AddDate(0, 0, 1).UTC()
 				startLogDate = &t
-			case comparatorTypeGreaterEqual:
+			case ComparatorTypeGreaterEqual:
 				if startLogDate != nil {
 					return nil, status.Errorf(codes.InvalidArgument, "invalid filter %q", request.Filter)
 				}
-				t, err := time.Parse(time.RFC3339, expr.value)
+				t, err := time.Parse(time.RFC3339, expr.Value)
 				if err != nil {
-					return nil, status.Errorf(codes.InvalidArgument, "invalid start_time filter %q", expr.value)
+					return nil, status.Errorf(codes.InvalidArgument, "invalid start_time filter %q", expr.Value)
 				}
 				t = t.UTC()
 				startLogDate = &t
-			case comparatorTypeLess:
+			case ComparatorTypeLess:
 				if endLogDate != nil {
 					return nil, status.Errorf(codes.InvalidArgument, "invalid filter %q", request.Filter)
 				}
-				t, err := time.Parse(time.RFC3339, expr.value)
+				t, err := time.Parse(time.RFC3339, expr.Value)
 				if err != nil {
-					return nil, status.Errorf(codes.InvalidArgument, "invalid start_time filter %q", expr.value)
+					return nil, status.Errorf(codes.InvalidArgument, "invalid start_time filter %q", expr.Value)
 				}
 				t = t.UTC()
 				endLogDate = &t
-			case comparatorTypeLessEqual:
+			case ComparatorTypeLessEqual:
 				if endLogDate != nil {
 					return nil, status.Errorf(codes.InvalidArgument, "invalid filter %q", request.Filter)
 				}
-				t, err := time.Parse(time.RFC3339, expr.value)
+				t, err := time.Parse(time.RFC3339, expr.Value)
 				if err != nil {
-					return nil, status.Errorf(codes.InvalidArgument, "invalid start_time filter %q", expr.value)
+					return nil, status.Errorf(codes.InvalidArgument, "invalid start_time filter %q", expr.Value)
 				}
 				t = t.AddDate(0, 0, 1).UTC()
 				endLogDate = &t
 			default:
-				return nil, status.Errorf(codes.InvalidArgument, "invalid start_time filter %q %q %q", expr.key, expr.operator, expr.value)
+				return nil, status.Errorf(codes.InvalidArgument, "invalid start_time filter %q %q %q", expr.Key, expr.Operator, expr.Value)
 			}
 		default:
-			return nil, status.Errorf(codes.InvalidArgument, "invalid filter key %q", expr.key)
+			return nil, status.Errorf(codes.InvalidArgument, "invalid filter key %q", expr.Key)
 		}
 	}
 
@@ -1688,29 +1689,45 @@ func (s *DatabaseService) convertToDatabase(ctx context.Context, database *store
 		SchemaVersion:        database.SchemaVersion.Version,
 		Labels:               database.Metadata.Labels,
 		InstanceResource:     instanceResource,
-		BackupAvailable:      s.isBackupAvailable(ctx, instance, database),
+		BackupAvailable:      isBackupAvailable(ctx, s.store, instance, database),
 	}, nil
 }
 
-func (s *DatabaseService) isBackupAvailable(ctx context.Context, instance *store.InstanceMessage, database *store.DatabaseMessage) bool {
+func isBackupAvailable(ctx context.Context, s *store.Store, instance *store.InstanceMessage, _ *store.DatabaseMessage) bool {
 	switch instance.Engine {
 	case storepb.Engine_POSTGRES:
-		dbSchema, err := s.store.GetDBSchema(ctx, database.UID)
-		if err != nil {
-			slog.Debug("Failed to get db schema for checking backup availability", "err", err)
-			return false
-		}
-		if dbSchema == nil {
-			return false
-		}
-		for _, schema := range dbSchema.GetMetadata().GetSchemas() {
-			if schema.GetName() == backupDatabaseName {
-				return true
-			}
-		}
-	case storepb.Engine_MYSQL, storepb.Engine_ORACLE, storepb.Engine_MSSQL, storepb.Engine_TIDB:
+		// It's so slow for ListDatabases, so we comment it out.
+		// TODO(d/rebelice): check backup availability for postgres faster.
+		// dbSchema, err := s.GetDBSchema(ctx, database.UID)
+		// if err != nil {
+		// 	slog.Debug("Failed to get db schema for checking backup availability", "err", err)
+		// 	return false
+		// }
+		// if dbSchema == nil {
+		// 	return false
+		// }
+		// for _, schema := range dbSchema.GetMetadata().GetSchemas() {
+		// 	if schema.GetName() == backupDatabaseName {
+		// 		return true
+		// 	}
+		// }
+		//
+		// Return true for all postgres database, we'll truthfully check it in the sql review rules.
+		return true
+	case storepb.Engine_MYSQL, storepb.Engine_MSSQL, storepb.Engine_TIDB:
 		dbName := backupDatabaseName
-		backupDB, err := s.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{
+		backupDB, err := s.GetDatabaseV2(ctx, &store.FindDatabaseMessage{
+			InstanceID:   &instance.ResourceID,
+			DatabaseName: &dbName,
+		})
+		if err != nil {
+			slog.Debug("Failed to get backup database", "err", err)
+			return false
+		}
+		return backupDB != nil
+	case storepb.Engine_ORACLE:
+		dbName := oracleBackupDatabaseName
+		backupDB, err := s.GetDatabaseV2(ctx, &store.FindDatabaseMessage{
 			InstanceID:   &instance.ResourceID,
 			DatabaseName: &dbName,
 		})
@@ -2067,16 +2084,14 @@ func (s *DatabaseService) pgAdviseIndex(ctx context.Context, request *v1pb.Advis
 }
 
 func (s *DatabaseService) getOpenAISetting(ctx context.Context) (string, string, error) {
-	openaiKeyName := api.SettingPluginOpenAIKey
-	key, err := s.store.GetSettingV2(ctx, &store.FindSettingMessage{Name: &openaiKeyName})
+	key, err := s.store.GetSettingV2(ctx, api.SettingPluginOpenAIKey)
 	if err != nil {
 		return "", "", status.Errorf(codes.Internal, "Failed to get setting: %v", err)
 	}
 	if key.Value == "" {
 		return "", "", status.Errorf(codes.FailedPrecondition, "OpenAI key is not set")
 	}
-	openaiEndpointName := api.SettingPluginOpenAIEndpoint
-	endpointSetting, err := s.store.GetSettingV2(ctx, &store.FindSettingMessage{Name: &openaiEndpointName})
+	endpointSetting, err := s.store.GetSettingV2(ctx, api.SettingPluginOpenAIEndpoint)
 	if err != nil {
 		return "", "", status.Errorf(codes.Internal, "Failed to get setting: %v", err)
 	}

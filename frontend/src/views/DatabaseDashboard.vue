@@ -56,6 +56,7 @@ import {
   buildSearchTextBySearchParams,
   buildSearchParamsBySearchText,
   databaseV1Url,
+  wrapRefAsPromise,
 } from "@/utils";
 
 interface LocalState {
@@ -63,6 +64,13 @@ interface LocalState {
   params: SearchParams;
   selectedLabels: { key: string; value: string }[];
 }
+
+const props = defineProps<{
+  onClickDatabase?: (db: ComposedDatabase, event: MouseEvent) => void;
+}>();
+const emit = defineEmits<{
+  (event: "ready"): void;
+}>();
 
 const uiStateStore = useUIStateStore();
 const { projectList } = useProjectV1List();
@@ -208,6 +216,11 @@ const handleDatabasesSelectionChanged = (
 };
 
 const handleDatabaseClick = (event: MouseEvent, database: ComposedDatabase) => {
+  if (props.onClickDatabase) {
+    props.onClickDatabase(database, event);
+    return;
+  }
+
   const url = databaseV1Url(database);
   if (event.ctrlKey || event.metaKey) {
     window.open(url, "_blank");
@@ -215,4 +228,8 @@ const handleDatabaseClick = (event: MouseEvent, database: ComposedDatabase) => {
     router.push(url);
   }
 };
+
+wrapRefAsPromise(ready, /* expected */ true).then(() => {
+  emit("ready");
+});
 </script>

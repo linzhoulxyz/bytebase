@@ -243,6 +243,9 @@ type ConnectionContext struct {
 
 // QueryContext is the context to query.
 type QueryContext struct {
+	// Schema is the specific schema for the query.
+	// Mainly used for the search path of PostgreSQL.
+	Schema string
 	// Limit is the maximum row count returned. No limit enforced if limit <= 0
 	Limit   int
 	Explain bool
@@ -302,7 +305,7 @@ type Driver interface {
 	// CheckSlowQueryLogEnabled checks if the slow query log is enabled.
 	CheckSlowQueryLogEnabled(ctx context.Context) error
 	// Dump dumps the schema of database.
-	Dump(ctx context.Context, out io.Writer) (string, error)
+	Dump(ctx context.Context, out io.Writer) error
 }
 
 // Register makes a database driver available by the provided type.

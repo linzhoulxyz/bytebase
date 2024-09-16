@@ -27,6 +27,7 @@ func init() {
 	base.RegisterCompleteFunc(store.Engine_RISINGWAVE, Completion)
 	base.RegisterCompleteFunc(store.Engine_DM, Completion)
 	base.RegisterCompleteFunc(store.Engine_SNOWFLAKE, Completion)
+	base.RegisterCompleteFunc(store.Engine_COCKROACHDB, Completion)
 }
 
 // Completion is the entry point of PostgreSQL code completion.
@@ -153,6 +154,7 @@ type Completer struct {
 	scanner             *base.Scanner
 	instanceID          string
 	defaultDatabase     string
+	defaultSchema       string
 	getMetadata         base.GetDatabaseMetadataFunc
 	listDatabaseNames   base.ListDatabaseNamesFunc
 	metadataCache       map[string]*model.DatabaseMetadata
@@ -182,6 +184,10 @@ func NewTrickyCompleter(ctx context.Context, cCtx base.CompletionContext, statem
 		pg.PostgreSQLParserRULE_target_alias,
 		pg.PostgreSQLParserRULE_with_clause,
 	)
+	defaultSchema := cCtx.DefaultSchema
+	if defaultSchema == "" {
+		defaultSchema = "public"
+	}
 	return &Completer{
 		ctx:                 ctx,
 		core:                core,
@@ -191,6 +197,7 @@ func NewTrickyCompleter(ctx context.Context, cCtx base.CompletionContext, statem
 		scanner:             scanner,
 		instanceID:          cCtx.InstanceID,
 		defaultDatabase:     cCtx.DefaultDatabase,
+		defaultSchema:       defaultSchema,
 		getMetadata:         cCtx.Metadata,
 		metadataCache:       make(map[string]*model.DatabaseMetadata),
 		noSeparatorRequired: newNoSeparatorRequired(),
@@ -212,6 +219,10 @@ func NewStandardCompleter(ctx context.Context, cCtx base.CompletionContext, stat
 		pg.PostgreSQLParserRULE_target_alias,
 		pg.PostgreSQLParserRULE_with_clause,
 	)
+	defaultSchema := cCtx.DefaultSchema
+	if defaultSchema == "" {
+		defaultSchema = "public"
+	}
 	return &Completer{
 		ctx:                 ctx,
 		core:                core,
@@ -221,6 +232,7 @@ func NewStandardCompleter(ctx context.Context, cCtx base.CompletionContext, stat
 		scanner:             scanner,
 		instanceID:          cCtx.InstanceID,
 		defaultDatabase:     cCtx.DefaultDatabase,
+		defaultSchema:       defaultSchema,
 		getMetadata:         cCtx.Metadata,
 		metadataCache:       make(map[string]*model.DatabaseMetadata),
 		noSeparatorRequired: newNoSeparatorRequired(),
@@ -280,6 +292,10 @@ func (m CompletionMap) insertFunctions() {
 }
 
 func (m CompletionMap) insertSchemas(c *Completer) {
+	// Skip if user has specified the schema.
+	if c.defaultSchema != "" && c.defaultSchema != "public" {
+		return
+	}
 	for _, schema := range c.listAllSchemas() {
 		m.Insert(base.Candidate{
 			Type: base.CandidateTypeSchema,
@@ -397,7 +413,6 @@ func (m CompletionMap) toSlice() []base.Candidate {
 }
 
 func (c *Completer) convertCandidates(candidates *base.CandidatesCollection) ([]base.Candidate, error) {
-	defaultSchema := "public"
 	keywordEntries := make(CompletionMap)
 	runtimeFunctionEntries := make(CompletionMap)
 	schemaEntries := make(CompletionMap)
@@ -467,7 +482,7 @@ func (c *Completer) convertCandidates(candidates *base.CandidatesCollection) ([]
 			if flags&ObjectFlagsShowSecond != 0 {
 				schemas := make(map[string]bool)
 				if len(qualifier) == 0 {
-					schemas[defaultSchema] = true
+					schemas[c.defaultSchema] = true
 					// User didn't specify the schema, we need to append cte tables.
 					schemas[""] = true
 				} else {
@@ -497,7 +512,7 @@ func (c *Completer) convertCandidates(candidates *base.CandidatesCollection) ([]
 			}
 
 			if len(schema) == 0 {
-				schemas[defaultSchema] = true
+				schemas[c.defaultSchema] = true
 				// User didn't specify the schema, we need to append cte tables.
 				schemas[""] = true
 			}
@@ -537,7 +552,7 @@ func (c *Completer) convertCandidates(candidates *base.CandidatesCollection) ([]
 
 			if flags&ObjectFlagsShowColumns != 0 {
 				if schema == table {
-					schemas[defaultSchema] = true
+					schemas[c.defaultSchema] = true
 					// User didn't specify the schema, we need to append cte tables.
 					schemas[""] = true
 				}

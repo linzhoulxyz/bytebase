@@ -13,11 +13,15 @@ import {
   useProjectV1Store,
   useSheetV1Store,
 } from "@/store";
-import { projectNamePrefix } from "@/store/modules/v1/common";
+import {
+  databaseNamePrefix,
+  projectNamePrefix,
+} from "@/store/modules/v1/common";
 import { useDatabaseV1List } from "@/store/modules/v1/databaseList";
 import type { ComposedProject } from "@/types";
 import {
   emptyIssue,
+  isValidDatabaseName,
   isValidProjectName,
   TaskTypeListWithStatement,
 } from "@/types";
@@ -44,6 +48,7 @@ import {
   sheetNameOfTaskV1,
   wrapRefAsPromise,
 } from "@/utils";
+import { getArchiveDatabase } from "../../components/Sidebar/PreBackupSection/common";
 import { nextUID } from "../base";
 import { databaseEngineForSpec, sheetNameForSpec } from "../plan";
 import { getLocalSheetByName } from "../sheet";
@@ -116,8 +121,11 @@ const buildIssue = async (params: CreateIssueParams) => {
   issue.project = project.name;
   issue.projectEntity = project;
   issue.name = `${project.name}/issues/${nextUID()}`;
-  issue.title = query.name;
   issue.status = IssueStatus.OPEN;
+  // Only set title from query if enforceIssueTitle is false.
+  if (!project.enforceIssueTitle) {
+    issue.title = query.name;
+  }
 
   const template = query.template as TemplateType | undefined;
   if (template === "bb.issue.database.data.export") {
@@ -313,6 +321,15 @@ export const buildSpecForTarget = async (
     if (version) {
       spec.changeDatabaseConfig.schemaVersion = version;
     }
+    const database = useDatabaseV1Store().getDatabaseByName(target);
+    if (isValidDatabaseName(database.name)) {
+      // Set default backup behavior for the database.
+      if (project.autoEnableBackup) {
+        spec.changeDatabaseConfig.preUpdateBackupDetail = {
+          database: `${database.instance}/${databaseNamePrefix}${getArchiveDatabase(database.instanceResource.engine)}`,
+        };
+      }
+    }
   }
   if (template === "bb.issue.database.schema.update") {
     const type =
@@ -443,20 +460,6 @@ const maybeSetInitialDatabaseConfigForSpec = async (
 const extractInitialSQLFromQuery = (
   query: Record<string, string>
 ): InitialSQL => {
-  const sqlMapJSON = query.sqlMap;
-  if (sqlMapJSON && sqlMapJSON.startsWith("{") && sqlMapJSON.endsWith("}")) {
-    try {
-      const sqlMap = JSON.parse(sqlMapJSON) as Record<string, string>;
-      const keys = Object.keys(sqlMap);
-      if (keys.every((key) => typeof sqlMap[key] === "string")) {
-        return {
-          sqlMap,
-        };
-      }
-    } catch {
-      // Nothing
-    }
-  }
   const sql = query.sql;
   if (sql && typeof sql === "string") {
     return {
@@ -469,6 +472,21 @@ const extractInitialSQLFromQuery = (
     return {
       sql,
     };
+  }
+  const sqlMapStorageKey = query.sqlMapStorageKey;
+  if (sqlMapStorageKey && typeof sqlMapStorageKey === "string") {
+    const sqlMapJSON = localStorage.getItem(sqlMapStorageKey) ?? "{}";
+    try {
+      const sqlMap = JSON.parse(sqlMapJSON) as Record<string, string>;
+      const keys = Object.keys(sqlMap);
+      if (keys.every((key) => typeof sqlMap[key] === "string")) {
+        return {
+          sqlMap,
+        };
+      }
+    } catch {
+      // Nothing
+    }
   }
   return {};
 };

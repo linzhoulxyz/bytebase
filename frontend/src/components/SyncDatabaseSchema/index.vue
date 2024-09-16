@@ -62,10 +62,10 @@
 </template>
 
 <script lang="ts" setup>
-import dayjs from "dayjs";
 import { isUndefined } from "lodash-es";
 import type { ButtonProps } from "naive-ui";
 import { NRadioGroup, NRadio, useDialog } from "naive-ui";
+import { v4 as uuidv4 } from "uuid";
 import { computed, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -80,7 +80,7 @@ import {
   isValidProjectName,
 } from "@/types";
 import { Engine } from "@/types/proto/v1/common";
-import { extractProjectResourceName } from "@/utils";
+import { extractProjectResourceName, generateIssueTitle } from "@/utils";
 import LearnMoreLink from "../LearnMoreLink.vue";
 import DatabaseSchemaSelector from "./DatabaseSchemaSelector.vue";
 import RawSQLEditor from "./RawSQLEditor.vue";
@@ -239,8 +239,11 @@ const tryFinishSetup = async () => {
     const diff = targetDatabaseViewRef.value!.databaseDiffCache[db.name];
     sqlMap[db.name] = diff.edited;
   });
-  query.sqlMap = JSON.stringify(sqlMap);
-  query.name = generateIssueName(
+  const sqlMapStorageKey = `bb.issues.sql-map.${uuidv4()}`;
+  localStorage.setItem(sqlMapStorageKey, JSON.stringify(sqlMap));
+  query.sqlMapStorageKey = sqlMapStorageKey;
+  query.name = generateIssueTitle(
+    "bb.issue.database.schema.update",
     targetDatabaseList.map((db) => db.databaseName)
   );
 
@@ -253,20 +256,6 @@ const tryFinishSetup = async () => {
     query,
   };
   router.push(routeInfo);
-};
-
-const generateIssueName = (databaseNameList: string[]) => {
-  const issueNameParts: string[] = [];
-  if (databaseNameList.length === 1) {
-    issueNameParts.push(`[${databaseNameList[0]}]`);
-  } else {
-    issueNameParts.push(`[${databaseNameList.length} databases]`);
-  }
-  issueNameParts.push(`Edit schema`);
-  const datetime = dayjs().format("@MM-DD HH:mm");
-  const tz = "UTC" + dayjs().format("ZZ");
-  issueNameParts.push(`${datetime} ${tz}`);
-  return issueNameParts.join(" ");
 };
 
 const cancelSetup = () => {

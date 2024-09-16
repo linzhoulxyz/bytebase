@@ -288,7 +288,9 @@
       "n-rows": "{n} rows"
     },
     "back-to-workspace": "Back to workspace",
-    "override": "Override"
+    "override": "Override",
+    "encoding": "Encoding",
+    "finish": "Finish"
   },
   "error-page": {
     "go-back-home": "Go back home"
@@ -469,13 +471,16 @@
       "general": "General",
       "members": "Members",
       "users-and-groups": "Users & Groups",
+      "iam-and-admin": "IAM & Admin",
       "im-integration": "IM",
       "sso": "SSO",
       "gitops": "GitOps",
       "subscription": "Subscription",
       "labels": "Labels",
-      "sensitive-data": "Data Masking",
-      "access-control": "Data Access Control",
+      "data-masking": "Data Masking",
+      "data-classification": "Data Classification",
+      "access-control": "Access Control",
+      "data-access": "Data Access",
       "audit-log": "Audit Log",
       "custom-roles": "Custom Roles",
       "mail-delivery": "Mail Delivery"
@@ -487,7 +492,7 @@
       "phone-tips": "Be sure to include the country code",
       "country-code": "Country Code",
       "password": "Password",
-      "password-hint": "Minimum eight characters, at least contains one letter and one number.",
+      "password-hint": "Password should follow restriction setting",
       "password-confirm": "Password Confirm",
       "password-confirm-placeholder": "Confirm new password",
       "password-mismatch": "New password mismatch",
@@ -566,12 +571,23 @@
       "view-by-roles": "View by roles",
       "add-member": "Add member",
       "add-user": "Add user",
+      "entra-sync": {
+        "self": "Sync from Entra ID (Azure AD)",
+        "description": "Sync users and groups from Entra ID (formerly Azure AD) to your Bytebase instance.",
+        "endpoint": "Endpoint",
+        "endpoint-tip": "Paste this to the \"Tenant URL\" field in Entra. Entra will sync users and groups to Bytebase via this endpoint.",
+        "secret-token": "Secret Token",
+        "secret-token-tip": "Paste this to the \"Secret Token\" field in Entra.",
+        "reset-token": "Reset token",
+        "reset-token-warning": "You need to update the Entra application provisioning config."
+      },
       "update-user": "Update user",
       "workspace-role-at-least-one": "At least one workspace role is required",
       "search-member": "Search member",
       "revoked": "Revoked",
       "view-by-members": "View by members",
       "revoke-access": "Revoke Access",
+      "revoke-access-alert": "Are you sure to revoke access?",
       "grant-access": "Grant Access",
       "select-user": "Select user | Select users",
       "select-group": "Select group | Select groups",
@@ -644,6 +660,7 @@
         "logo-upload-tip": "{extension} up to {size} MiB",
         "logo-upload-succeed": "Successfully updated the logo",
         "security": "Security",
+        "account": "Account",
         "watermark": {
           "self": "Watermark",
           "update-success": "Watermark setting updated",
@@ -661,8 +678,8 @@
           "need-all-user-2fa-enabled": "Requires all users to enable 2FA first. There are still {count} users who have not enabled 2FA: {users}"
         },
         "disallow-password-signin": {
-          "enable": "Disallow signin with email&password",
-          "description": "Users cannot sign in with email&password, only SSO is allowed.",
+          "enable": "Disallow signin with email & password",
+          "description": "Users cannot sign in with email & password, only SSO is allowed.",
           "require-sso-setup": "A functional SSO must be created first, or users won't be able to log in."
         },
         "network": "Network",
@@ -700,6 +717,16 @@
             "self": "Members restriction",
             "description": "Restrict sign-in to users with email addresses from the specified domains."
           }
+        },
+        "password-restriction": {
+          "self": "Password Restriction",
+          "min-length": "Minimum length for password should no less than {min} characters",
+          "require-number": "The password must contain at least one number",
+          "require-letter": "The password must contain at least one letter, regardless of upper case or lower case",
+          "require-uppercase-letter": "The password must contain at least one upper case letter",
+          "require-special-character": "The password must contain at least one special character",
+          "require-reset-password-for-first-login": "Require users reset their password after the 1st time login",
+          "password-rotation": "Require users reset their password every {day} days"
         },
         "config-updated": "Configuration is updated.",
         "ai-assistant": {
@@ -745,13 +772,16 @@
         },
         "database-change-mode": {
           "self": "Database Change Mode",
-          "description": "Controls how users perform database schema migrations. Issue mode uses issue/task workflows with custom approvals for a structured process. SQL Editor mode allows direct SQL execution in a SQL editor for quick and simple changes.",
+          "description": "Control how users perform database changes",
           "issue-mode": {
-            "self": "Issue Mode"
+            "self": "Issue Mode (Team)",
+            "description": "Use issue to request, review, roll out, and version database changes. Suitable for team collaboration."
           },
           "sql-editor-mode": {
-            "self": "SQL Editor Mode"
-          }
+            "self": "SQL Editor Mode (Individual)",
+            "description": "Use SQL Editor to execute database changes directly. Suitable for the individual."
+          },
+          "can-be-changed-later": "This setting can be changed anytime later."
         }
       }
     },
@@ -999,6 +1029,7 @@
       "verb-type-target-by-people": "{verb} {type} {target}",
       "verb-type-target-by-system-bot": "{type} {target} {verb}",
       "changed-x-link": "changed {name}. {link}",
+      "failed-to-backup": "Failed to backup data: {error}",
       "prior-back-table": "Data backup to database {database} and tables {tables}",
       "prior-back-table-for-line": "Data backup to database {database} and table {tables} for DML in line {line}"
     },
@@ -1249,7 +1280,6 @@
       "you-are-not-allowed-to-perform-this-action": "You are not allowed to perform this action",
       "cannot-close-issue-with-running-tasks": "Cannot close issue with running tasks"
     },
-    "approval-requested": "Approval Requested",
     "unfinished-resolved-issue-tips": "This issue is marked as \"Done\" but some of its tasks are not executed successfully.",
     "some-tasks-are-not-executed-successfully": "(Some tasks are not executed successfully)",
     "preview": "Preview issue",
@@ -1300,7 +1330,15 @@
     },
     "sql-review-only": "SQL Review Only",
     "create-issue": "Create issue",
-    "this-plan-will-be-converted-to-a-new-issue": "This plan will be converted to a new issue"
+    "this-plan-will-be-converted-to-a-new-issue": "This plan will be converted to a new issue",
+    "title": {
+      "edit-schema": "Edit schema",
+      "change-data": "Change data",
+      "export-data": "Export data",
+      "create-database": "Create database",
+      "request-querier-role": "Request querier role",
+      "request-exporter-role": "Request exporter role"
+    }
   },
   "alter-schema": {
     "vcs-enabled": "This project has enabled VCS based version control and selecting database below will navigate you to the corresponding Git repository to initiate the change process.",
@@ -1324,10 +1362,9 @@
     "troubleshoot": "Troubleshoot",
     "transfer-in-db": "Transfer in DB",
     "request-db": "Request DB",
-    "from-unassigned-databases": "Transfer unassigned databases",
-    "from-projects": "Transfer from other projects",
+    "from-unassigned-databases": "Unassigned databases",
+    "from-projects": "From other projects",
     "transfer-in-db-title": "Transfer in database",
-    "transfer-in-db-alert": "Are you sure to transfer \"{ dbName }\" into our project?",
     "unassigned-db-hint": "Newly synced databases start unassigned and must be moved to a project for use.",
     "transfer-out-db": "Transfer out DB",
     "transfer-out-db-title": "Transfer out database",
@@ -1764,22 +1801,6 @@
     "row-count-est": "Row count est.",
     "incorrect-project-warning": "SQL editor can only query databases in projects available to the user. You should first transfer this database into a project.",
     "go-to-transfer": "Go to transfer",
-    "pitr": {
-      "restore": "@:common.restore @:common.database",
-      "no-available-backup": "No available backup",
-      "point-in-time": "Point in time",
-      "help-info": "Restore the database state to a point in time. {link}.",
-      "minimum-supported-engine-and-version": "{engine} >= {min_version} required",
-      "restore-to-point-in-time": "Restore to point in time",
-      "no-earlier-than": "Restore point-in-time cannot be earlier than [{earliest}] (the earliest available backup).",
-      "no-later-than-now": "Restore point-in-time cannot be later than now.",
-      "will-overwrite-current-database": "Will overwrite current database",
-      "restore-before-last-migration": "Restore to the point before last migration",
-      "restore-before-last-migration-help-info": "@:{'database.pitr.restore-before-last-migration'}. {link}.",
-      "restore-to": "Restore",
-      "restore-to-new-db": "To new database",
-      "restore-to-in-place": "In place"
-    },
     "show-reserved-tables": "Show Bytebase reserved tables",
     "show-reserved-databases": "Show Bytebase reserved databases",
     "synced-at": "Synced at {time}",
@@ -1830,7 +1851,8 @@
     "sensitive": "Sensitive",
     "access-denied": "You don't have the permission to access this database.",
     "schema": {
-      "select": "Select schema"
+      "select": "Select schema",
+      "unspecified": "Unspecified"
     },
     "show-missing-databases": "Show missing databases",
     "n-selected-m-in-total": "({selected} selected, {total} in total)",
@@ -1889,7 +1911,8 @@
     "foreign-keys": "Foreign keys",
     "foreign-key": {
       "reference": "Reference"
-    }
+    },
+    "create-target-database-or-schema-for-backup": "Please create the target database or schema for the backup first"
   },
   "repository": {
     "our-webhook-link": "The webhook created by Bytebase can be found at {webhookLink}.",
@@ -2091,6 +2114,25 @@
         "auto-resolve-issue": {
           "self": "Auto resolve issue",
           "description": "Automatically resolve the issue after all tasks are completed."
+        },
+        "enforce-issue-title": {
+          "self": "Enforce issue title",
+          "description": "Enforce issue title to be non-empty and created by user instead of auto generated."
+        },
+        "default-backup-behavior": {
+          "self": "Default backup behavior",
+          "description": "The default backup behavior when creating data changing issues.",
+          "default_backup_behavior_no_backup": "Disable backup",
+          "default_backup_behavior_backup_on_error_stop": "Enable backup, but stop the task on error",
+          "default_backup_behavior_backup_on_error_skip": "Enable backup, skip backup error on failure"
+        },
+        "auto-enable-backup": {
+          "self": "Auto enable backup",
+          "description": "Automatically enable backup for all data changing issues."
+        },
+        "skip-backup-errors": {
+          "self": "Skip backup errors",
+          "description": "Skip backup errors and changing data tasks will continue to run."
         }
       }
     },
@@ -2466,7 +2508,13 @@
     "manage-connections": "Manage connections",
     "view-detail": "View detail",
     "generate-sql": "Generate SQL",
-    "current-editing-statement-is-not-empty": "Current editing statement is not empty."
+    "current-editing-statement-is-not-empty": "Current editing statement is not empty.",
+    "run-anyway": "Run anyway",
+    "no-project": {
+      "not-member-of-any-projects": "You are not any member of any projects.",
+      "go-to-create": "Go to create",
+      "contact-the-admin-to-grant-access": "Contact to the admin to grant access."
+    }
   },
   "schema-editor": {
     "self": "Schema Editor",
@@ -2562,14 +2610,18 @@
       "description": "Are you sure you want to close the panel? Your changes will be lost."
     },
     "tenant-mode-tips": "Changes will be applied to all selected tenant databases after clicking \"Preview issue\".",
-    "edit-foreign-key": "Edit foreign key",
+    "foreign-key": {
+      "edit": "Edit foreign key",
+      "name-description": "The unique name of foreign key"
+    },
     "select-reference-schema": "Select a schema to reference to",
     "select-reference-table": "Select a table to reference to",
     "select-reference-column": "Select a column to reference to",
     "index": {
       "indexes": "Indexes",
       "edit-indexes": "Edit indexes",
-      "unique": "Unique"
+      "unique": "Unique",
+      "dependent-columns": "Depenedent columns"
     },
     "generated-ddl-is-empty": "Generated DDL is empty",
     "table-partition": {
@@ -2827,8 +2879,8 @@
         "desc": "Once disabled, users cannot self-service signup and can only be invited by the workspace admin."
       },
       "bb-feature-disallow-password-signin": {
-        "title": "Disallow signin with email&password",
-        "desc": "Users cannot sign in with email&password, only SSO is allowed."
+        "title": "Disallow signin with email & password",
+        "desc": "Users cannot sign in with email & password, only SSO is allowed."
       },
       "bb-feature-schema-template": {
         "title": "Schema Template",
@@ -2841,6 +2893,18 @@
       "bb-feature-issue-advanced-search": {
         "title": "Advanced issue search",
         "desc": "Access unlimited issue history with advanced issue search."
+      },
+      "bb-feature-issue-project-setting": {
+        "title": "Issue project setting",
+        "desc": "Customize advanced issue project settings. Including creating issue restrictions and default backup settings."
+      },
+      "bb-feature-password-restriction": {
+        "title": "Password restriction",
+        "desc": "Allow to configure the restriction for users' password"
+      },
+      "bb-feature-directory-sync": {
+        "title": "Directory sync",
+        "desc": "Sync users and groups from Entra ID (formerly Azure AD) to your Bytebase instance"
       }
     }
   },
@@ -2907,9 +2971,9 @@
       "no-linked-resources": "No attached resources",
       "change-resources": "Change attached resources",
       "self": "Attach to resources",
-      "label": "You can apply the review policy to environments or projects, this will affect all databases belong to the resource. The database will use the SQL review policy attached to the project, otherwise fallback to the environment policy.",
-      "label-environment": "The SQL review policy will effect all databases belongs to the selected environment.",
-      "label-project": "The SQL review policy will effect all databases belongs to the selected project. The SQL review policy for environment will be ignored.",
+      "label": "You can apply the SQL review policy to environments or projects. The database will use the project-level policy if exists, or fallback to the environment-level policy.",
+      "label-environment": "The SQL review policy will affect all databases belonging to the selected environment.",
+      "label-project": "The SQL review policy will affect all databases belonging to the selected project. This will supersede the database environment-level policy.",
       "override-warning": "Following resources already bound with other SQL review policies. Click \"{button}\" will override the config."
     },
     "create": {
@@ -3603,7 +3667,8 @@
       "no-file-to-upload": "No file to upload",
       "upload-sql-or-zip-file": "Upload .sql or .zip file",
       "optional-upload-sql-or-zip-file": "(Optional) Upload .sql or .zip file"
-    }
+    },
+    "change-type": "Change type"
   },
   "export-data": {
     "export-rows": "Export rows",
@@ -3686,5 +3751,8 @@
   },
   "worksheet": {
     "self": "Worksheet"
+  },
+  "setup": {
+    "self": "Setup"
   }
 }

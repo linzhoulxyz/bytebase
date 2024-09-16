@@ -233,6 +233,12 @@ const (
 	// MySQLWhereRequirement is an advisor type for MySQL WHERE clause requirement.
 	MySQLWhereRequirement Type = "bb.plugin.advisor.mysql.where.require"
 
+	// MySQLWhereRequirementForSelect is an advisor type for MySQL WHERE clause requirement in SELECT statements.
+	MySQLWhereRequirementForSelect Type = "bb.plugin.advisor.mysql.where.require.select"
+
+	// MySQLWhereRequirementForUpdateDelete is an advisor type for MySQL WHERE clause requirement in UPDATE/DELETE statements.
+	MySQLWhereRequirementForUpdateDelete Type = "bb.plugin.advisor.mysql.where.require.update-delete"
+
 	// MySQLNoLeadingWildcardLike is an advisor type for MySQL no leading wildcard LIKE.
 	MySQLNoLeadingWildcardLike Type = "bb.plugin.advisor.mysql.where.no-leading-wildcard-like"
 
@@ -502,8 +508,11 @@ const (
 	// PostgreSQLNoLeadingWildcardLike is an advisor type for PostgreSQL no leading wildcard LIKE.
 	PostgreSQLNoLeadingWildcardLike Type = "bb.plugin.advisor.postgresql.where.no-leading-wildcard-like"
 
-	// PostgreSQLWhereRequirement is an advisor type for PostgreSQL WHERE clause requirement.
-	PostgreSQLWhereRequirement Type = "bb.plugin.advisor.postgresql.where.require"
+	// PostgreSQLWhereRequirementForSelect is an advisor type for PostgreSQL WHERE clause requirement for SELECT statements.
+	PostgreSQLWhereRequirementForSelect Type = "bb.plugin.advisor.postgresql.where.require.select"
+
+	// PostgreSQLWhereRequirementForUpdateDelete is an advisor type for PostgreSQL WHERE clause requirement for UPDATE/DELETE statements.
+	PostgreSQLWhereRequirementForUpdateDelete Type = "bb.plugin.advisor.postgresql.where.require.update-delete"
 
 	// PostgreSQLNoSelectAll is an advisor type for PostgreSQL no select all.
 	PostgreSQLNoSelectAll Type = "bb.plugin.advisor.postgresql.select.no-select-all"
@@ -618,6 +627,9 @@ const (
 	// OracleSyntax is an advisor type for Oracle syntax.
 	OracleSyntax Type = "bb.plugin.advisor.oracle.syntax"
 
+	// OracleBuiltinPriorBackupCheck is an advisor type for Oracle prior backup check.
+	OracleBuiltinPriorBackupCheck Type = "bb.plugin.advisor.oracle.builtin.prior-backup-check"
+
 	// OracleTableRequirePK is an advisor type for Oracle table require primary key.
 	OracleTableRequirePK Type = "bb.plugin.advisor.oracle.table.require-pk"
 
@@ -645,8 +657,11 @@ const (
 	// OracleNoLeadingWildcardLike is an advisor type for Oracle no leading wildcard LIKE.
 	OracleNoLeadingWildcardLike Type = "bb.plugin.advisor.oracle.where.no-leading-wildcard-like"
 
-	// OracleWhereRequirement is an advisor type for Oracle WHERE clause requirement.
-	OracleWhereRequirement Type = "bb.plugin.advisor.oracle.where.require"
+	// OracleWhereRequirementForSelect is an advisor type for Oracle WHERE clause requirement in SELECT statements.
+	OracleWhereRequirementForSelect Type = "bb.plugin.advisor.oracle.where.require.select"
+
+	// OracleWhereRequirementForUpdateDelete is an advisor type for Oracle WHERE clause requirement in UPDATE/DELETE statements.
+	OracleWhereRequirementForUpdateDelete Type = "bb.plugin.advisor.oracle.where.require.update-delete"
 
 	// OracleInsertMustSpecifyColumn is an advisor type for Oracle to enforce column specified.
 	OracleInsertMustSpecifyColumn Type = "bb.plugin.advisor.oracle.insert.must-specify-column"
@@ -701,6 +716,12 @@ const (
 	// SnowflakeWhereRequirement is an advisor type for Snowflake WHERE clause requirement.
 	SnowflakeWhereRequirement Type = "bb.plugin.advisor.snowflake.where.require"
 
+	// SnowflakeWhereRequirementForSelect is an advisor type for Snowflake WHERE clause requirement for SELECT statements.
+	SnowflakeWhereRequirementForSelect Type = "bb.plugin.advisor.snowflake.where.require.select"
+
+	// SnowflakeWhereRequirementForUpdateDelete is an advisor type for Snowflake WHERE clause requirement for UPDATE/DELETE statements.
+	SnowflakeWhereRequirementForUpdateDelete Type = "bb.plugin.advisor.snowflake.where.require.update-delete"
+
 	// SnowflakeIdentifierNamingNoKeyword is an advisor type for Snowflake identifier naming convention without keyword.
 	SnowflakeIdentifierNamingNoKeyword Type = "bb.plugin.advisor.snowflake.naming.identifier-no-keyword"
 
@@ -727,6 +748,9 @@ const (
 	// MSSQLSyntax is an advisor type for MSSQL syntax.
 	MSSQLSyntax Type = "bb.plugin.advisor.mssql.syntax"
 
+	// MSSQLBuiltinPriorBackupCheck is an advisor type for MSSQL prior backup check.
+	MSSQLBuiltinPriorBackupCheck Type = "bb.plugin.advisor.mssql.builtin.prior-backup-check"
+
 	// MSSQLNoSelectAll is an advisor type for MSSQL no select all.
 	MSSQLNoSelectAll Type = "bb.plugin.advisor.mssql.select.no-select-all"
 
@@ -739,8 +763,11 @@ const (
 	// MSSQLIdentifierNamingNoKeyword is an advisor type for MSSQL identifier naming convention without keyword.
 	MSSQLIdentifierNamingNoKeyword Type = "bb.plugin.advisor.mssql.naming.identifier-no-keyword"
 
-	// MSSQLWhereRequirement is an advisor type for MSSQL WHERE clause requirement.
-	MSSQLWhereRequirement Type = "bb.plugin.advisor.mssql.where.require"
+	// MSSQLWhereRequirementForSelect is an advisor type for MySQL WHERE clause requirement in SELECT statements.
+	MSSQLWhereRequirementForSelect Type = "bb.plugin.advisor.mssql.where.require.select"
+
+	// MSSQLWhereRequirementForUpdateDelete is an advisor type for MySQL WHERE clause requirement in UPDATE/DELETE statements.
+	MSSQLWhereRequirementForUpdateDelete Type = "bb.plugin.advisor.mssql.where.require.update-delete"
 
 	// MSSQLColumnMaximumVarcharLength is an advisor type for MSSQL maximum varchar length.
 	MSSQLColumnMaximumVarcharLength Type = "bb.plugin.advisor.mssql.column.maximum-varchar-length"

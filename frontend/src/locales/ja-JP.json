@@ -288,7 +288,9 @@
       "n-rows": "{n} 行"
     },
     "back-to-workspace": "ワークスペースに戻る",
-    "override": "オーバーライド"
+    "override": "オーバーライド",
+    "encoding": "エンコーディング",
+    "finish": "仕上げる"
   },
   "error-page": {
     "go-back-home": "ホームページに戻る"
@@ -469,13 +471,16 @@
       "general": "ユニバーサル",
       "members": "メンバー",
       "users-and-groups": "ユーザーとグループ",
+      "iam-and-admin": "IAM と管理",
       "im-integration": "私は",
       "sso": "SSO",
       "gitops": "GitOps",
       "subscription": "サブスクリプション",
       "labels": "ラベル",
-      "sensitive-data": "データマスキング",
-      "access-control": "データアクセス制御",
+      "data-masking": "データマスキング",
+      "data-classification": "データ分類",
+      "access-control": "アクセス制御",
+      "data-access": "データアクセス",
       "audit-log": "監査ログ",
       "custom-roles": "カスタムロール",
       "mail-delivery": "メール送信"
@@ -487,7 +492,7 @@
       "phone-tips": "国コードを必ず含めてください",
       "country-code": "国または地域コード",
       "password": "パスワード",
-      "password-hint": "最低 8 文字で、少なくとも 1 つの文字と 1 つの数字が含まれます。",
+      "password-hint": "パスワードは制限設定に従う必要があります",
       "password-confirm": "パスワードの確認",
       "password-confirm-placeholder": "新しいパスワードを確認します",
       "password-mismatch": "新しいパスワードが一致しません",
@@ -566,12 +571,23 @@
       "view-by-roles": "役割ごとに表示",
       "add-member": "メンバーを追加",
       "add-user": "ユーザーを追加",
+      "entra-sync": {
+        "self": "Entra ID (Azure AD) から同期",
+        "description": "Entra ID (旧 Azure AD) のユーザーとグループを Bytebase インスタンスに同期します。",
+        "endpoint": "Endpoint",
+        "endpoint-tip": "これを Entra の「Tenant URL」フィールドに貼り付けます。Entra は、このエンドポイントを介してユーザーとグループを Bytebase に同期します。",
+        "secret-token": "Secret Token",
+        "secret-token-tip": "これを Entra の「Secret Token」フィールドに貼り付けます。",
+        "reset-token": "トークンをリセット",
+        "reset-token-warning": "Entra アプリケーションのプロビジョニング構成を更新する必要があります。"
+      },
       "update-user": "ユーザーを更新",
       "workspace-role-at-least-one": "少なくとも 1 つのワークスペースレベルの役割を選択してください",
       "search-member": "メンバーを検索",
       "revoked": "取り消されました",
       "view-by-members": "メンバー別に表示",
       "revoke-access": "アクセスを取り消す",
+      "revoke-access-alert": "アクセスを取り消してもよろしいですか?",
       "grant-access": "アクセスを許可する",
       "select-user": "ユーザーを選択 | ユーザーを選択",
       "select-group": "グループを選択 | グループを選択",
@@ -644,6 +660,7 @@
         "logo-upload-tip": "{extension} タイプのファイルをサポートします。{size} MiB より大きくすることはできません",
         "logo-upload-succeed": "ロゴ更新完了",
         "security": "安全性",
+        "account": "アカウント",
         "watermark": {
           "self": "透かし",
           "update-success": "ウォーターマーク設定が更新されました",
@@ -701,6 +718,16 @@
             "description": "指定されたドメインの電子メール アドレスを持つユーザーのみにサインインを制限します。"
           }
         },
+        "password-restriction": {
+          "self": "パスワード制限",
+          "min-length": "パスワードの最小文字数は {min} 文字以上である必要があります",
+          "require-number": "パスワードには少なくとも1つの数字が含まれている必要があります",
+          "require-letter": "パスワードには大文字、小文字に関係なく少なくとも1文字が含まれている必要があります",
+          "require-uppercase-letter": "パスワードには少なくとも1つの大文字が含まれている必要があります",
+          "require-special-character": "パスワードには少なくとも1つの特殊文字が含まれている必要があります",
+          "require-reset-password-for-first-login": "初回ログイン後にユーザーにパスワードのリセットを要求する",
+          "password-rotation": "ユーザーに{day}日ごとにパスワードのリセットを要求する"
+        },
         "config-updated": "構成が更新されました。",
         "ai-assistant": {
           "self": "AI助手",
@@ -745,13 +772,16 @@
         },
         "database-change-mode": {
           "self": "データベース変更モード",
-          "description": "ユーザーがデータベース スキーマの移行を実行する方法を制御します。問題モードでは、構造化されたプロセスにカスタム承認を使用した問題/タスク ワークフローを使用します。SQL エディター モードでは、SQL エディターで直接 SQL を実行して、すばやく簡単に変更できます。",
+          "description": "ユーザーがデータベース スキーマの移行を実行する方法を制御します",
           "issue-mode": {
-            "self": "発行モード"
+            "self": "作業モード（チーム）",
+            "description": "作業を使用して、データベースの変更をリクエスト、レビュー、ロールアウト、バージョン管理します。チームコラボレーションに適しています。。"
           },
           "sql-editor-mode": {
-            "self": "SQL エディター モード"
-          }
+            "self": "SQL エディター モード (個人)",
+            "description": "SQL エディタを使用してデータベースの変更を直接実行します。個人に適しています。"
+          },
+          "can-be-changed-later": "この設定は後でいつでも変更できます。"
         }
       }
     },
@@ -999,6 +1029,7 @@
       "verb-type-target-by-people": "{verb}{type} {target}",
       "verb-type-target-by-system-bot": "{type} {target} {verb}",
       "changed-x-link": "{name} が変更されました。 {link}",
+      "failed-to-backup": "データのバックアップに失敗しました: {error}",
       "prior-back-table": "データベース {database} のテーブル {tables} にバックアップされました",
       "prior-back-table-for-line": "DML のデータベース {database} とテーブル {tables} の行 {line} へのデータのバックアップ"
     },
@@ -1249,7 +1280,6 @@
       "you-are-not-allowed-to-perform-this-action": "このアクションを実行する権限がありません",
       "cannot-close-issue-with-running-tasks": "実行中のタスクに関する問題を解決できません"
     },
-    "approval-requested": "承認リクエスト",
     "unfinished-resolved-issue-tips": "作業指示書は「完了」とマークされましたが、一部のタスクは正常に実行されませんでした。",
     "some-tasks-are-not-executed-successfully": "(一部のタスクは正常に実行されませんでした)",
     "preview": "作業指示のプレビュー",
@@ -1300,7 +1330,15 @@
     },
     "sql-review-only": "SQLレビューのみ",
     "create-issue": "問題を作成",
-    "this-plan-will-be-converted-to-a-new-issue": "この計画は新しい問題に変換されます"
+    "this-plan-will-be-converted-to-a-new-issue": "この計画は新しい問題に変換されます",
+    "title": {
+      "edit-schema": "スキーマを編集",
+      "change-data": "データの変更",
+      "export-data": "データをエクスポート",
+      "create-database": "データベースを作成する",
+      "request-querier-role": "リクエストクエリーロール",
+      "request-exporter-role": "エクスポートロールのリクエスト"
+    }
   },
   "alter-schema": {
     "vcs-enabled": "このプロジェクトでは、VCS ベースのバージョン管理が有効になっています。以下のデータベースを選択すると、対応する Git リポジトリに移動して、変更プロセスを開始します。",
@@ -1324,10 +1362,9 @@
     "troubleshoot": "トラブルシューティング",
     "transfer-in-db": "データベースへの転送",
     "request-db": "データベースの申請",
-    "from-unassigned-databases": "未割り当てのデータベースを転送する",
-    "from-projects": "他のプロジェクトからの移管",
+    "from-unassigned-databases": "割り当てられていないデータベース",
+    "from-projects": "他のプロジェクトから",
     "transfer-in-db-title": "データベースへの転送",
-    "transfer-in-db-alert": "「{ dbName }」をプロジェクトに転送してもよろしいですか?",
     "unassigned-db-hint": "新しく同期されたデータベースは最初は割り当てられていないため、使用するにはプロジェクトに移動する必要があります。",
     "transfer-out-db": "データベースを転送する",
     "transfer-out-db-title": "データベースを転送する",
@@ -1764,22 +1801,6 @@
     "row-count-est": "推定行数",
     "incorrect-project-warning": "SQL エディターは、ユーザーが使用できるプロジェクト内のデータベースのみをクエリできます。まず、このデータベースを作業中のプロジェクトに転送する必要があります。",
     "go-to-transfer": "転送に行く",
-    "pitr": {
-      "restore": "@:common.restore@:common.database",
-      "no-available-backup": "利用可能なバックアップがありません",
-      "point-in-time": "時点",
-      "help-info": "データベースの状態を特定の時点に復元します。 {link}。",
-      "minimum-supported-engine-and-version": "{engine} >= {min_version} が必要です",
-      "restore-to-point-in-time": "指定した時点に復元する",
-      "no-earlier-than": "[{earliest}] (利用可能な最も古いバックアップ) よりも古い時点から復元することはできません。",
-      "no-later-than-now": "回復時刻を現在時刻より遅くすることはできません。",
-      "will-overwrite-current-database": "既存のデータベースを上書きします",
-      "restore-before-last-migration": "最後の変更前の履歴に戻す",
-      "restore-before-last-migration-help-info": "@:{'database.pitr.restore-before-last-migration'}。 {link}。",
-      "restore-to": "再開しました",
-      "restore-to-new-db": "新しいデータベース",
-      "restore-to-in-place": "オリジナルデータベース"
-    },
     "show-reserved-tables": "バイトベース予約テーブルを表示",
     "show-reserved-databases": "Bytebase によって保持されているデータベースを表示する",
     "synced-at": "{time} と同期しました",
@@ -1830,7 +1851,8 @@
     "sensitive": "センシティブ",
     "access-denied": "データベースにアクセスする権限がありません",
     "schema": {
-      "select": "スキーマの選択"
+      "select": "スキーマの選択",
+      "unspecified": "不特定"
     },
     "show-missing-databases": "データベースが見つからないことを表示",
     "n-selected-m-in-total": "({selected} 個が選択され、合計 {total} 個)",
@@ -1889,7 +1911,8 @@
     "foreign-keys": "外部キー",
     "foreign-key": {
       "reference": "参照"
-    }
+    },
+    "create-target-database-or-schema-for-backup": "まずバックアップのターゲットデータベースまたはスキーマを作成してください"
   },
   "repository": {
     "our-webhook-link": "Bytebase によって作成された Webhook は、{webhookLink} にあります。",
@@ -2091,6 +2114,25 @@
         "auto-resolve-issue": {
           "self": "自動解決の問題",
           "description": "すべてのタスクが完了すると、問題が自動的に解決されます。"
+        },
+        "enforce-issue-title": {
+          "self": "問題のタイトルを強制する",
+          "description": "問題のタイトルが空でないこと、および自動生成ではなくユーザーが作成することを強制します。"
+        },
+        "default-backup-behavior": {
+          "self": "デフォルトのバックアップ動作",
+          "description": "データ変更の問題を作成するときのデフォルトのバックアップ動作。",
+          "default_backup_behavior_no_backup": "バックアップを無効にする",
+          "default_backup_behavior_backup_on_error_stop": "バックアップを有効にするが、エラーが発生した場合はタスクを停止する",
+          "default_backup_behavior_backup_on_error_skip": "バックアップを有効にし、失敗した場合はバックアップ エラーをスキップします"
+        },
+        "auto-enable-backup": {
+          "self": "バックアップの自動有効化",
+          "description": "すべてのデータ変更の問題に対してバックアップを自動的に有効にします。"
+        },
+        "skip-backup-errors": {
+          "self": "バックアップエラーをスキップ",
+          "description": "バックアップ エラーをスキップすると、データの変更タスクは引き続き実行されます。"
         }
       }
     },
@@ -2466,7 +2508,13 @@
     "manage-connections": "接続を管理する",
     "view-detail": "詳細を見る",
     "generate-sql": "SQLの生成",
-    "current-editing-statement-is-not-empty": "現在編集中のステートメントは空ではありません。"
+    "current-editing-statement-is-not-empty": "現在編集中のステートメントは空ではありません。",
+    "run-anyway": "とにかく走ってください",
+    "no-project": {
+      "not-member-of-any-projects": "あなたはどのプロジェクトのメンバーでもありません。",
+      "go-to-create": "作成に行く",
+      "contact-the-admin-to-grant-access": "管理者に連絡してアクセスを許可してください。"
+    }
   },
   "schema-editor": {
     "self": "スキーマエディタ",
@@ -2562,14 +2610,18 @@
       "description": "変更は閉じると失われます。"
     },
     "tenant-mode-tips": "[チケットのプレビュー] をクリックすると、現在の変更が選択したすべてのテナント データベースに適用されます。",
-    "edit-foreign-key": "外部キーを変更する",
+    "foreign-key": {
+      "edit": "外部キーを編集",
+      "name-description": "外部キーの一意の名前"
+    },
     "select-reference-schema": "外部キーのスキーマを選択します",
     "select-reference-table": "外部キーのあるテーブルを選択",
     "select-reference-column": "外部キー列を選択します",
     "index": {
       "indexes": "索引",
       "edit-indexes": "インデックスの編集",
-      "unique": "のみ"
+      "unique": "唯一",
+      "dependent-columns": "従属列"
     },
     "generated-ddl-is-empty": "生成された DDL は空です",
     "table-partition": {
@@ -2841,6 +2893,18 @@
       "bb-feature-issue-advanced-search": {
         "title": "チケットの詳細検索",
         "desc": "高度な検索機能を使用して、無制限の過去のチケットにアクセスできます。"
+      },
+      "bb-feature-issue-project-setting": {
+        "title": "高度な問題プロジェクト設定",
+        "desc": "高度な問題プロジェクト設定をカスタマイズします。問題制限の作成やデフォルトのバックアップ設定などが含まれます。"
+      },
+      "bb-feature-password-restriction": {
+        "title": "パスワード制限",
+        "desc": "ユーザーのパスワードの制限を設定できるようにする"
+      },
+      "bb-feature-directory-sync": {
+        "title": "ディレクトリ同期",
+        "desc": "Entra ID (旧 Azure AD) のユーザーとグループを Bytebase インスタンスに同期します"
       }
     }
   },
@@ -3603,7 +3667,8 @@
       "no-file-to-upload": "アップロードするファイルがありません",
       "upload-sql-or-zip-file": ".sql または .zip ファイルをアップロードする",
       "optional-upload-sql-or-zip-file": "(オプション) .sql または .zip ファイルをアップロードします"
-    }
+    },
+    "change-type": "タイプを変更"
   },
   "export-data": {
     "export-rows": "エクスポート行数",
@@ -3686,5 +3751,8 @@
   },
   "worksheet": {
     "self": "ワークシート"
+  },
+  "setup": {
+    "self": "設定"
   }
 }

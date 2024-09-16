@@ -13,6 +13,7 @@ import (
 
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/plugin/parser/base"
+	"github.com/bytebase/bytebase/backend/store/model"
 	"github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
@@ -121,7 +122,7 @@ func generateSQLForSingleTable(ctx context.Context, tCtx base.TransformContext, 
 			return nil, errors.Errorf("prior backup cannot handle statements on different tables more than %d", maxMixedDMLCount)
 		}
 	}
-	generatedColumns, normalColumns, err := classifyColumns(ctx, tCtx.GetDatabaseMetadataFunc, tCtx.InstanceID, table)
+	generatedColumns, normalColumns, err := classifyColumns(ctx, tCtx.GetDatabaseMetadataFunc, tCtx.ListDatabaseNamesFunc, tCtx.IgnoreCaseSensitive, tCtx.InstanceID, table)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to classify columns")
 	}
@@ -164,12 +165,21 @@ func generateSQLForSingleTable(ctx context.Context, tCtx base.TransformContext, 
 		if len(item.table.Alias) > 0 {
 			tableNameOrAlias = item.table.Alias
 		}
+		if _, err := buf.WriteString("  "); err != nil {
+			return nil, errors.Wrap(err, "failed to write space")
+		}
+		cteString := extractCTE(item.tree)
+		if len(cteString) > 0 {
+			if _, err := buf.WriteString(fmt.Sprintf("%s ", cteString)); err != nil {
+				return nil, errors.Wrap(err, "failed to write cte")
+			}
+		}
 		if len(generatedColumns) == 0 {
-			if _, err := buf.WriteString(fmt.Sprintf("  SELECT `%s`.* FROM ", tableNameOrAlias)); err != nil {
+			if _, err := buf.WriteString(fmt.Sprintf("SELECT `%s`.* FROM ", tableNameOrAlias)); err != nil {
 				return nil, errors.Wrap(err, "failed to write select statement")
 			}
 		} else {
-			if _, err := buf.WriteString("  SELECT "); err != nil {
+			if _, err := buf.WriteString("SELECT "); err != nil {
 				return nil, errors.Wrap(err, "failed to write select statement")
 			}
 			for i, column := range normalColumns {
@@ -217,6 +227,21 @@ func equalTable(a, b *TableReference) bool {
 	return a.Table == b.Table
 }
 
+func extractCTE(ctx antlr.ParserRuleContext) string {
+	switch node := ctx.(type) {
+	case *parser.UpdateStatementContext:
+		if node.WithClause() != nil {
+			return node.GetParser().GetTokenStream().GetTextFromRuleContext(node.WithClause())
+		}
+	case *parser.DeleteStatementContext:
+		if node.WithClause() != nil {
+			return node.GetParser().GetTokenStream().GetTextFromRuleContext(node.WithClause())
+		}
+	}
+
+	return ""
+}
+
 func generateSQLForMixedDML(ctx context.Context, tCtx base.TransformContext, statementInfoList []statementInfo, databaseName string, tablePrefix string) ([]base.BackupStatement, error) {
 	var result []base.BackupStatement
 	offsetLength := 1
@@ -234,7 +259,7 @@ func generateSQLForMixedDML(ctx context.Context, tCtx base.TransformContext, sta
 		if _, err := buf.WriteString(fmt.Sprintf("CREATE TABLE `%s`.`%s` LIKE `%s`.`%s`;\n", databaseName, targetTable, table.Database, table.Table)); err != nil {
 			return nil, errors.Wrap(err, "failed to write create table statement")
 		}
-		generatedColumns, normalColumns, err := classifyColumns(ctx, tCtx.GetDatabaseMetadataFunc, tCtx.InstanceID, table)
+		generatedColumns, normalColumns, err := classifyColumns(ctx, tCtx.GetDatabaseMetadataFunc, tCtx.ListDatabaseNamesFunc, tCtx.IgnoreCaseSensitive, tCtx.InstanceID, table)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to classify columns")
 		}
@@ -242,9 +267,18 @@ func generateSQLForMixedDML(ctx context.Context, tCtx base.TransformContext, sta
 		if len(table.Alias) > 0 {
 			tableNameOrAlias = table.Alias
 		}
+		cteString := extractCTE(statementInfo.tree)
 		if len(generatedColumns) == 0 {
-			if _, err := buf.WriteString(fmt.Sprintf("INSERT INTO `%s`.`%s` SELECT `%s`.* FROM ", databaseName, targetTable, tableNameOrAlias)); err != nil {
+			if _, err := buf.WriteString(fmt.Sprintf("INSERT INTO `%s`.`%s` ", databaseName, targetTable)); err != nil {
 				return nil, errors.Wrap(err, "failed to write insert into statement")
+			}
+			if len(cteString) > 0 {
+				if _, err := buf.WriteString(fmt.Sprintf("%s ", cteString)); err != nil {
+					return nil, errors.Wrap(err, "failed to write cte")
+				}
+			}
+			if _, err := buf.WriteString(fmt.Sprintf("SELECT `%s`.* FROM ", tableNameOrAlias)); err != nil {
+				return nil, errors.Wrap(err, "failed to write SELECT")
 			}
 		} else {
 			if _, err := buf.WriteString(fmt.Sprintf("INSERT INTO `%s`.`%s` (", databaseName, targetTable)); err != nil {
@@ -260,7 +294,15 @@ func generateSQLForMixedDML(ctx context.Context, tCtx base.TransformContext, sta
 					return nil, errors.Wrap(err, "failed to write column")
 				}
 			}
-			if _, err := buf.WriteString(") SELECT "); err != nil {
+			if _, err := buf.WriteString(") "); err != nil {
+				return nil, errors.Wrap(err, "failed to write")
+			}
+			if len(cteString) > 0 {
+				if _, err := buf.WriteString(fmt.Sprintf("%s ", cteString)); err != nil {
+					return nil, errors.Wrap(err, "failed to write cte")
+				}
+			}
+			if _, err := buf.WriteString("SELECT "); err != nil {
 				return nil, errors.Wrap(err, "failed to write select")
 			}
 			for i, column := range normalColumns {
@@ -294,33 +336,62 @@ func generateSQLForMixedDML(ctx context.Context, tCtx base.TransformContext, sta
 	return result, nil
 }
 
-func classifyColumns(ctx context.Context, getDatabaseMetadataFunc base.GetDatabaseMetadataFunc, instanceID string, table *TableReference) ([]string, []string, error) {
+func classifyColumns(ctx context.Context, getDatabaseMetadataFunc base.GetDatabaseMetadataFunc, listDatabaseNamesFunc base.ListDatabaseNamesFunc, ignoreCaseSensitive bool, instanceID string, table *TableReference) ([]string, []string, error) {
 	if getDatabaseMetadataFunc == nil {
 		return nil, nil, errors.New("GetDatabaseMetadataFunc is not set")
 	}
 
-	_, metadata, err := getDatabaseMetadataFunc(ctx, instanceID, table.Database)
+	var dbSchema *model.DatabaseMetadata
+	allDatabaseNames, err := listDatabaseNamesFunc(ctx, instanceID)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "failed to get database metadata for InstanceID %q, Database %q", instanceID, table.Database)
+		return nil, nil, errors.Wrap(err, "failed to list databases names")
 	}
-
-	if metadata == nil {
+	if ignoreCaseSensitive {
+		for _, db := range allDatabaseNames {
+			if strings.EqualFold(db, table.Database) {
+				_, dbSchema, err = getDatabaseMetadataFunc(ctx, instanceID, db)
+				if err != nil {
+					return nil, nil, errors.Wrapf(err, "failed to get database metadata for database %q", db)
+				}
+				break
+			}
+		}
+	} else {
+		for _, db := range allDatabaseNames {
+			if db == table.Database {
+				_, dbSchema, err = getDatabaseMetadataFunc(ctx, instanceID, db)
+				if err != nil {
+					return nil, nil, errors.Wrapf(err, "failed to get database metadata for database %q", db)
+				}
+				break
+			}
+		}
+	}
+	if dbSchema == nil {
 		slog.Debug("failed to get database metadata", slog.String("instanceID", instanceID), slog.String("database", table.Database))
 		return nil, nil, errors.Errorf("failed to get database metadata for InstanceID %q, Database %q", instanceID, table.Database)
 	}
 
-	schemaMetadata := metadata.GetSchema("")
-	if schemaMetadata == nil {
+	emptySchema := ""
+	schema := dbSchema.GetSchema(emptySchema)
+	if schema == nil {
 		return nil, nil, errors.New("failed to get schema metadata")
 	}
 
-	tableMetadata := schemaMetadata.GetTable(table.Table)
-	if tableMetadata == nil {
-		return nil, nil, errors.New("failed to get table metadata for table " + table.Table)
+	var tableSchema *model.TableMetadata
+	if ignoreCaseSensitive {
+		for _, tableName := range schema.ListTableNames() {
+			if strings.EqualFold(tableName, table.Table) {
+				tableSchema = schema.GetTable(tableName)
+				break
+			}
+		}
+	} else {
+		tableSchema = schema.GetTable(table.Table)
 	}
 
 	var generatedColumns, normalColumns []string
-	for _, column := range tableMetadata.GetColumns() {
+	for _, column := range tableSchema.GetColumns() {
 		if column.GetGeneration() != nil {
 			generatedColumns = append(generatedColumns, column.GetName())
 		} else {
@@ -456,6 +527,14 @@ func (l *tableReferenceListener) EnterDeleteStatement(ctx *parser.DeleteStatemen
 		return
 	}
 
+	cteMap := make(map[string]bool)
+	if ctx.WithClause() != nil {
+		for _, cte := range ctx.WithClause().AllCommonTableExpression() {
+			tableName := NormalizeMySQLIdentifier(cte.Identifier())
+			cteMap[tableName] = true
+		}
+	}
+
 	if ctx.TableRef() != nil {
 		// Single table delete statement.
 		database, table := NormalizeMySQLTableRef(ctx.TableRef())
@@ -504,6 +583,10 @@ func (l *tableReferenceListener) EnterDeleteStatement(ctx *parser.DeleteStatemen
 				return
 			}
 
+			if len(database) == 0 && cteMap[table] {
+				continue
+			}
+
 			singleTable, ok := singleTables.singleTables[table]
 			if !ok {
 				l.err = errors.Errorf("cannot extract reference table: no matched table %q in referenced table list", table)
@@ -526,8 +609,18 @@ func (l *tableReferenceListener) EnterUpdateStatement(ctx *parser.UpdateStatemen
 		return
 	}
 
+	cteMap := make(map[string]bool)
+
+	if ctx.WithClause() != nil {
+		for _, cte := range ctx.WithClause().AllCommonTableExpression() {
+			tableName := NormalizeMySQLIdentifier(cte.Identifier())
+			cteMap[tableName] = true
+		}
+	}
+
 	listener := &updateTableListener{
 		tables: make(map[string]bool),
+		cteMap: cteMap,
 	}
 
 	antlr.ParseTreeWalkerDefault.Walk(listener, ctx.UpdateList())
@@ -603,9 +696,12 @@ type updateTableListener struct {
 	*parser.BaseMySQLParserListener
 
 	tables map[string]bool
+	cteMap map[string]bool
 }
 
 func (l *updateTableListener) EnterUpdateElement(ctx *parser.UpdateElementContext) {
 	_, table, _ := NormalizeMySQLColumnRef(ctx.ColumnRef())
-	l.tables[table] = true
+	if _, exists := l.cteMap[table]; !exists {
+		l.tables[table] = true
+	}
 }

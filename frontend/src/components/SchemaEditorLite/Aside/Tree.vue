@@ -102,6 +102,7 @@
 
 <script lang="ts" setup>
 import { useElementSize } from "@vueuse/core";
+import { MD5 } from "crypto-js";
 import { cloneDeep, debounce, escape, head } from "lodash-es";
 import { MoreHorizontalIcon, CopyIcon } from "lucide-vue-next";
 import type { TreeOption } from "naive-ui";
@@ -127,7 +128,11 @@ import type {
   TableMetadata,
   ViewMetadata,
 } from "@/types/proto/v1/database_service";
-import { getHighlightHTMLByKeyWords, isDescendantOf } from "@/utils";
+import {
+  getFixedPrimaryKey,
+  getHighlightHTMLByKeyWords,
+  isDescendantOf,
+} from "@/utils";
 import FunctionNameModal from "../Modals/FunctionNameModal.vue";
 import ProcedureNameModal from "../Modals/ProcedureNameModal.vue";
 import SchemaNameModal from "../Modals/SchemaNameModal.vue";
@@ -302,7 +307,7 @@ useEmitteryEventListener(events, "rebuild-tree", (params) => {
   debouncedBuildDatabaseTreeData(params.openFirstChild);
 });
 watch(disableDiffColoring, () =>
-  buildDatabaseTreeData(/* openFirstChild */ true)
+  buildDatabaseTreeData(/* !openFirstChild */ false)
 );
 
 const tabWatchKey = computed(() => {
@@ -608,6 +613,7 @@ const renderSuffix = ({ option }: { option: TreeOption }) => {
 
 const handleDuplicateTable = (treeNode: TreeNodeForTable) => {
   const { db } = treeNode;
+  const engine = db.instanceResource.engine;
   const { schema, table } = treeNode.metadata;
   const flattenTableList = treeNode.metadata.database.schemas.flatMap(
     (schema) => schema.tables
@@ -651,6 +657,18 @@ const handleDuplicateTable = (treeNode: TreeNodeForTable) => {
 
   const newTable = cloneDeep(table);
   newTable.name = getDuplicateName(targetName);
+  // As index names should be unique, we need to generate new names for them.
+  for (const index of newTable.indexes) {
+    let name = `${index.name}_${MD5(`${newTable.name}_${Date.now()}`).toString().slice(0, 6)}`;
+    if (index.primary) {
+      const fixedName = getFixedPrimaryKey(engine);
+      // If the primary key name is fixed, use it instead.
+      if (fixedName) {
+        name = fixedName;
+      }
+    }
+    index.name = name;
+  }
   schema.tables.push(newTable);
   markEditStatus(
     db,

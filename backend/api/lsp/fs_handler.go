@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"os"
 
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/go-lsp"
 	"github.com/sourcegraph/jsonrpc2"
+
+	"github.com/bytebase/bytebase/backend/common/log"
+	"github.com/bytebase/bytebase/backend/plugin/parser/base"
 )
 
 // GetFS returns the file system.
@@ -31,7 +35,7 @@ func (h *Handler) readFile(_ context.Context, uri lsp.DocumentURI) ([]byte, erro
 }
 
 // handleFileSystemRequest handles textDocument/did* requests.
-func (h *Handler) handleFileSystemRequest(ctx context.Context, req *jsonrpc2.Request) (lsp.DocumentURI, bool, error) {
+func (h *Handler) handleFileSystemRequest(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) (lsp.DocumentURI, bool, error) {
 	fs := h.GetFS()
 
 	do := func(uri lsp.DocumentURI, op func() error) (lsp.DocumentURI, bool, error) {
@@ -70,7 +74,22 @@ func (h *Handler) handleFileSystemRequest(ctx context.Context, req *jsonrpc2.Req
 			return "", false, err
 		}
 		return do(params.TextDocument.URI, func() error {
-			return fs.DidChange(&params)
+			if err := fs.DidChange(&params); err != nil {
+				return err
+			}
+			uri := params.TextDocument.URI
+			content, found := fs.get(uri)
+			if !found {
+				return &os.PathError{Op: "Open", Path: string(uri), Err: os.ErrNotExist}
+			}
+			diagnostics, err := base.Diagnose(ctx, base.DiagnoseContext{}, h.getEngineType(ctx), string(content))
+			if err != nil {
+				slog.Warn("dianose error", log.BBError(err))
+			}
+			return conn.Notify(ctx, string(LSPMethodPublishDiagnostics), &lsp.PublishDiagnosticsParams{
+				URI:         uri,
+				Diagnostics: diagnostics,
+			})
 		})
 	case LSPMethodTextDocumentDidClose:
 		var params lsp.DidCloseTextDocumentParams

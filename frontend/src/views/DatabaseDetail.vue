@@ -74,11 +74,11 @@
           </dl>
         </div>
         <div
-          v-if="allowToChangeDatabase"
           class="flex flex-row justify-start items-center flex-wrap shrink gap-x-2 gap-y-2"
           data-label="bb-database-detail-action-buttons-container"
         >
           <SyncDatabaseButton
+            v-if="allowSyncDatabase"
             :type="'default'"
             :text="false"
             :database="database"
@@ -118,21 +118,24 @@
         />
       </NTabPane>
       <NTabPane
-        v-if="allowToChangeDatabase && allowListChangeHistories"
+        v-if="
+          databaseChangeMode === DatabaseChangeMode.PIPELINE &&
+          allowListChangeHistories
+        "
         name="change-history"
         :tab="$t('change-history.self')"
       >
         <DatabaseChangeHistoryPanel class="mt-2" :database="database" />
       </NTabPane>
       <NTabPane
-        v-if="allowToChangeDatabase && allowListSlowQueries"
+        v-if="allowListSlowQueries"
         name="slow-query"
         :tab="$t('slow-query.slow-queries')"
       >
         <DatabaseSlowQueryPanel class="mt-2" :database="database" />
       </NTabPane>
       <NTabPane
-        v-if="allowToChangeDatabase"
+        v-if="allowUpdateDatabase"
         name="setting"
         :tab="$t('common.settings')"
       >
@@ -212,12 +215,10 @@ import {
   ProductionEnvironmentV1Icon,
   ProjectV1Name,
 } from "@/components/v2";
-import { PROJECT_V1_ROUTE_DATABASE_DETAIL } from "@/router/dashboard/projectV1";
 import { PROJECT_V1_ROUTE_ISSUE_DETAIL } from "@/router/dashboard/projectV1";
 import {
   useAnomalyV1Store,
   useAppFeature,
-  useCurrentUserIamPolicy,
   useDatabaseV1Store,
   useEnvironmentV1Store,
 } from "@/store";
@@ -228,6 +229,7 @@ import {
 import { UNKNOWN_PROJECT_NAME, unknownEnvironment } from "@/types";
 import type { Anomaly } from "@/types/proto/v1/anomaly_service";
 import { State } from "@/types/proto/v1/common";
+import { DatabaseChangeMode } from "@/types/proto/v1/setting_service";
 import {
   instanceV1HasAlterSchema,
   isDatabaseV1Queryable,
@@ -272,9 +274,10 @@ const state = reactive<LocalState>({
   selectedTab: "overview",
 });
 const route = useRoute();
-const currentUserIamPolicy = useCurrentUserIamPolicy();
 const anomalyList = ref<Anomaly[]>([]);
 const {
+  allowSyncDatabase,
+  allowUpdateDatabase,
   allowTransferDatabase,
   allowChangeData,
   allowAlterSchema,
@@ -284,6 +287,7 @@ const {
 const disableSchemaEditor = useAppFeature(
   "bb.feature.issue.disable-schema-editor"
 );
+const databaseChangeMode = useAppFeature("bb.feature.database-change-mode");
 
 onMounted(async () => {
   anomalyList.value = await useAnomalyV1Store().fetchAnomalyList({
@@ -306,7 +310,6 @@ watch(
   () => state.selectedTab,
   (tab) => {
     router.replace({
-      name: PROJECT_V1_ROUTE_DATABASE_DETAIL,
       hash: `#${tab}`,
       query: route.query,
     });
@@ -319,12 +322,6 @@ const database = computed(() => {
   );
 });
 const project = computed(() => database.value.projectEntity);
-
-const allowToChangeDatabase = computed(() => {
-  return currentUserIamPolicy.allowToChangeDatabaseOfProject(
-    project.value.name
-  );
-});
 
 const hasSchemaDiagramFeature = computed((): boolean => {
   return instanceV1HasAlterSchema(database.value.instanceResource);

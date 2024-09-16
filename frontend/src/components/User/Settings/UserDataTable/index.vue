@@ -6,6 +6,7 @@
     :striped="true"
     :bordered="true"
     :max-height="'calc(100vh - 20rem)'"
+    :row-key="(data: User) => data.name"
     virtual-scroll
   />
 
@@ -47,6 +48,7 @@ defineOptions({
 const props = defineProps<{
   showRoles: boolean;
   userList: User[];
+  onClickUser?: (user: User, event: MouseEvent) => void;
 }>();
 
 const emit = defineEmits<{
@@ -74,6 +76,7 @@ const columns = computed(() => {
         return h(UserNameCell, {
           user,
           "onReset-service-key": tryResetServiceKey,
+          "on-click-user": props.onClickUser,
         });
       },
     },

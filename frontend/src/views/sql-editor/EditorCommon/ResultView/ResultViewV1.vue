@@ -47,7 +47,11 @@
         <EmptyView />
       </template>
       <template v-else-if="viewMode === 'ERROR'">
-        <ErrorView :error="resultSet.error">
+        <ErrorView
+          :error="resultSet.error"
+          :execute-params="executeParams"
+          :result-set="resultSet"
+        >
           <template #suffix>
             <RequestQueryButton
               v-if="
@@ -116,7 +120,7 @@ import type { QueryResult } from "@/types/proto/v1/sql_service";
 import { hasWorkspacePermissionV2 } from "@/utils";
 import DetailPanel from "./DetailPanel.vue";
 import EmptyView from "./EmptyView.vue";
-import ErrorView from "./ErrorView.vue";
+import ErrorView from "./ErrorView";
 import RequestQueryButton from "./RequestQueryButton.vue";
 import SingleResultViewV1 from "./SingleResultViewV1.vue";
 import type { SQLResultViewContext } from "./context";

@@ -13,6 +13,7 @@ import (
 
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
+	"github.com/bytebase/bytebase/backend/component/config"
 	"github.com/bytebase/bytebase/backend/plugin/parser/base"
 	"github.com/bytebase/bytebase/backend/store"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
@@ -34,11 +35,14 @@ const (
 	LSPMethodTextDocumentDidChange Method = "textDocument/didChange"
 	LSPMethodTextDocumentDidClose  Method = "textDocument/didClose"
 	LSPMethodTextDocumentDidSave   Method = "textDocument/didSave"
+
+	// See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics.
+	LSPMethodPublishDiagnostics Method = "textDocument/publishDiagnostics"
 )
 
 // NewHandler creates a new Language Server Protocol handler.
-func NewHandler(s *store.Store) jsonrpc2.Handler {
-	return lspHandler{jsonrpc2.HandlerWithError((&Handler{store: s}).handle)}
+func NewHandler(s *store.Store, profile *config.Profile) jsonrpc2.Handler {
+	return lspHandler{Handler: jsonrpc2.HandlerWithError((&Handler{store: s, profile: profile}).handle)}
 }
 
 type lspHandler struct {
@@ -62,6 +66,7 @@ type Handler struct {
 	store    *store.Store
 
 	shutDown bool
+	profile  *config.Profile
 }
 
 // ShutDown shuts down the handler.
@@ -89,6 +94,15 @@ func (h *Handler) getDefaultDatabase() string {
 		return ""
 	}
 	return h.metadata.DatabaseName
+}
+
+func (h *Handler) getDefaultSchema() string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.metadata == nil {
+		return ""
+	}
+	return h.metadata.Schema
 }
 
 func (h *Handler) getInstanceID() string {
@@ -263,7 +277,7 @@ func (h *Handler) handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2
 		return h.handleTextDocumentCompletion(ctx, conn, req, params)
 	default:
 		if isFileSystemRequest(req.Method) {
-			_, _, err := h.handleFileSystemRequest(ctx, req)
+			_, _, err := h.handleFileSystemRequest(ctx, conn, req)
 			return nil, err
 		}
 		return nil, &jsonrpc2.Error{Code: jsonrpc2.CodeMethodNotFound, Message: fmt.Sprintf("method not supported: %s", req.Method)}

@@ -30,11 +30,7 @@
             </a>
           </div>
           <NFormItem
-            v-if="
-              (isCreating &&
-                state.user.userType !== UserType.SERVICE_ACCOUNT) ||
-              !isCreating
-            "
+            v-if="state.user.userType !== UserType.SERVICE_ACCOUNT"
             :label="$t('common.name')"
           >
             <NInput
@@ -56,6 +52,7 @@
             <EmailInput
               v-else
               v-model:value="state.user.email"
+              :readonly="disallowEditUser"
               :domain="workspaceDomain"
             />
           </NFormItem>
@@ -83,46 +80,13 @@
                 />
               </div>
             </NFormItem>
-            <NFormItem :label="$t('settings.profile.password')">
-              <div class="w-full space-y-1">
-                <span
-                  :class="[
-                    'textinfolabel text-sm',
-                    state.passwordHint ? '!text-error' : '',
-                  ]"
-                >
-                  {{ $t("settings.profile.password-hint") }}
-                </span>
-                <NInput
-                  v-model:value="state.user.password"
-                  type="password"
-                  :status="state.passwordHint ? 'error' : undefined"
-                  :input-props="{ autocomplete: 'new-password' }"
-                  :placeholder="$t('common.sensitive-placeholder')"
-                  @blur="checkPassword"
-                />
-              </div>
-            </NFormItem>
-            <NFormItem :label="$t('settings.profile.password-confirm')">
-              <div class="w-full flex flex-col justify-start items-start">
-                <NInput
-                  v-model:value="state.passwordConfirm"
-                  type="password"
-                  :status="state.passwordMismatch ? 'error' : undefined"
-                  :input-props="{ autocomplete: 'new-password' }"
-                  :placeholder="
-                    $t('settings.profile.password-confirm-placeholder')
-                  "
-                  @blur="checkPasswordMismatch"
-                />
-                <span
-                  v-if="state.passwordMismatch"
-                  class="text-error text-sm mt-1 pl-1"
-                >
-                  {{ $t("settings.profile.password-mismatch") }}
-                </span>
-              </div>
-            </NFormItem>
+
+            <UserPassword
+              ref="userPasswordRef"
+              v-model:password="state.user.password"
+              v-model:password-confirm="state.passwordConfirm"
+              :password-restriction="passwordRestrictionSetting"
+            />
           </template>
         </NForm>
       </template>
@@ -178,7 +142,7 @@
 </template>
 
 <script lang="ts" setup>
-import { cloneDeep, head, isEmpty, isEqual, isUndefined } from "lodash-es";
+import { cloneDeep, head, isEqual, isUndefined } from "lodash-es";
 import { ArchiveIcon } from "lucide-vue-next";
 import {
   NPopconfirm,
@@ -189,7 +153,7 @@ import {
   NRadioGroup,
   NRadio,
 } from "naive-ui";
-import { computed, reactive } from "vue";
+import { computed, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import EmailInput from "@/components/EmailInput.vue";
 import { Drawer, DrawerContent } from "@/components/v2";
@@ -209,15 +173,13 @@ import {
   User,
 } from "@/types/proto/v1/auth_service";
 import { State } from "@/types/proto/v1/common";
-import { randomString } from "@/utils";
+import UserPassword from "./UserPassword.vue";
 
 interface LocalState {
   isRequesting: boolean;
   user: User;
   roles: string[];
   passwordConfirm: string;
-  passwordHint: boolean;
-  passwordMismatch: boolean;
 }
 
 const serviceAccountEmailSuffix = "service.bytebase.com";
@@ -249,6 +211,7 @@ const initUser = () => {
 const { t } = useI18n();
 const settingV1Store = useSettingV1Store();
 const userStore = useUserStore();
+const userPasswordRef = ref<InstanceType<typeof UserPassword>>();
 
 const hideServiceAccount = useAppFeature(
   "bb.feature.members.hide-service-account"
@@ -259,9 +222,11 @@ const state = reactive<LocalState>({
   user: initUser(),
   roles: initRoles(),
   passwordConfirm: "",
-  passwordHint: false,
-  passwordMismatch: false,
 });
+
+const passwordRestrictionSetting = computed(
+  () => settingV1Store.passwordRestriction
+);
 
 const workspaceDomain = computed(() => {
   if (!settingV1Store.workspaceProfileSetting?.enforceIdentityDomain) {
@@ -272,22 +237,6 @@ const workspaceDomain = computed(() => {
 
 const isCreating = computed(() => !props.user);
 
-const checkPassword = () => {
-  const pwd = state.user?.password ?? "";
-  if (!pwd) {
-    state.passwordHint = false;
-    return;
-  }
-  state.passwordHint = !/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/.test(pwd);
-  return;
-};
-
-const checkPasswordMismatch = () => {
-  state.passwordMismatch =
-    !isEmpty(state.user?.password) &&
-    state.user?.password !== state.passwordConfirm;
-};
-
 const rolesChanged = computed(() => {
   if (isCreating.value) {
     return true;
@@ -296,16 +245,23 @@ const rolesChanged = computed(() => {
   return !isUndefined(state.roles) && !isEqual(initRoles(), state.roles);
 });
 
+const disallowEditUser = computed(() => !!props.user?.profile?.source);
+
 const allowConfirm = computed(() => {
   if (!state.user.email) {
+    return false;
+  }
+  if (userPasswordRef.value?.passwordHint) {
+    return false;
+  }
+  if (userPasswordRef.value?.passwordMismatch) {
     return false;
   }
 
   if (
     !isCreating.value &&
-    (state.passwordMismatch ||
-      (getUpdateMaskFromUsers(props.user!, state.user).length == 0 &&
-        !rolesChanged.value))
+    getUpdateMaskFromUsers(props.user!, state.user).length == 0 &&
+    !rolesChanged.value
   ) {
     return false;
   }
@@ -361,16 +317,16 @@ const tryCreateOrUpdateUser = async () => {
     const createdUser = await userStore.createUser({
       ...state.user,
       title: state.user.title || extractUserTitle(state.user.email),
-      password:
-        state.user.password ||
-        randomString(10) + randomString(10, "0123456789"),
+      password: state.user.password,
     });
-    await workspaceStore.patchIamPolicy([
-      {
-        member: `user:${createdUser.email}`,
-        roles: state.roles,
-      },
-    ]);
+    if (state.roles.length > 0) {
+      await workspaceStore.patchIamPolicy([
+        {
+          member: `user:${createdUser.email}`,
+          roles: state.roles,
+        },
+      ]);
+    }
     pushNotification({
       module: "bytebase",
       style: "SUCCESS",

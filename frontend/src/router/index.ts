@@ -19,6 +19,7 @@ import authRoutes, {
   AUTH_OAUTH_CALLBACK_MODULE,
   AUTH_OIDC_CALLBACK_MODULE,
   AUTH_PASSWORD_FORGOT_MODULE,
+  AUTH_PASSWORD_RESET_MODULE,
   AUTH_SIGNIN_ADMIN_MODULE,
   AUTH_SIGNIN_MODULE,
   AUTH_SIGNUP_MODULE,
@@ -33,11 +34,17 @@ import {
   WORKSPACE_ROOT_MODULE,
 } from "./dashboard/workspaceRoutes";
 import { SETTING_ROUTE } from "./dashboard/workspaceSetting";
+import setupRoutes from "./setup";
 import sqlEditorRoutes from "./sqlEditor";
 
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes: [...authRoutes, ...dashboardRoutes, ...sqlEditorRoutes],
+  routes: [
+    ...authRoutes,
+    ...setupRoutes,
+    ...dashboardRoutes,
+    ...sqlEditorRoutes,
+  ],
   linkExactActiveClass: "bg-link-hover",
   scrollBehavior(to /*, from, savedPosition */) {
     if (to.hash) {
@@ -63,17 +70,6 @@ router.beforeEach((to, from, next) => {
     "bb.feature.disallow-navigate-to-console"
   );
 
-  // In standalone mode, we don't want to user get out of some standalone pages.
-  if (disallowNavigateAwaySQLEditor.value) {
-    // If user is trying to navigate away from SQL Editor, we'll explicitly return false to cancel the navigation.
-    if (
-      from.name?.toString().startsWith("sql-editor") &&
-      !to.name?.toString().startsWith("sql-editor")
-    ) {
-      return false;
-    }
-  }
-
   const authStore = useAuthStore();
   const routerStore = useRouterStore();
   const isLoggedIn = authStore.isLoggedIn();
@@ -87,6 +83,15 @@ router.beforeEach((to, from, next) => {
 
   if (toModule != fromModule) {
     routerStore.setBackPath(from.fullPath);
+  }
+
+  if (
+    to.name === "error.403" ||
+    to.name === "error.404" ||
+    to.name === "error.500"
+  ) {
+    next();
+    return;
   }
 
   // SSO callback routes are relayes to handle the IdP callback and dispatch the subsequent events.
@@ -175,10 +180,18 @@ router.beforeEach((to, from, next) => {
     }
   }
 
+  // In standalone mode, we don't want to user get out of some standalone pages.
+  if (disallowNavigateAwaySQLEditor.value) {
+    // If user is trying to navigate away from SQL Editor, we'll explicitly return false to cancel the navigation.
+    if (
+      from.name?.toString().startsWith("sql-editor") &&
+      !to.name?.toString().startsWith("sql-editor")
+    ) {
+      return false;
+    }
+  }
+
   if (
-    to.name === "error.403" ||
-    to.name === "error.404" ||
-    to.name === "error.500" ||
     to.name?.toString().startsWith(ENVIRONMENT_V1_ROUTE_DASHBOARD) ||
     to.name?.toString().startsWith(INSTANCE_ROUTE_DASHBOARD) ||
     to.name?.toString().startsWith(PROJECT_V1_ROUTE_DASHBOARD) ||
@@ -186,7 +199,9 @@ router.beforeEach((to, from, next) => {
     to.name === INSTANCE_ROUTE_DETAIL ||
     to.name?.toString().startsWith("sql-editor") ||
     to.name?.toString().startsWith(SETTING_ROUTE) ||
-    to.name?.toString().startsWith("workspace")
+    to.name?.toString().startsWith("workspace") ||
+    to.name?.toString().startsWith("setup") ||
+    to.name === AUTH_PASSWORD_RESET_MODULE
   ) {
     next();
     return;

@@ -131,6 +131,8 @@ message Value {
     SemanticTypeSetting semantic_type_setting_value = 11;
     MaskingAlgorithmSetting masking_algorithm_setting_value = 12;
     MaximumSQLResultSizeSetting maximum_sql_result_size_setting = 13;
+    SCIMSetting scim_setting = 14;
+    PasswordRestrictionSetting password_restriction_setting = 15;
   }
 }
 
@@ -478,4 +480,25 @@ message MaximumSQLResultSizeSetting {
   // The limit is in bytes.
   // The default value is 100MB, we will use the default value if the setting not exists, or the limit <= 0.
   int64 limit = 1;
+}
+
+message SCIMSetting {
+  string token = 1;
+}
+
+message PasswordRestrictionSetting {
+  // min_length is the minimum length for password, should no less than 8.
+  int32 min_length = 1;
+  // require_number requires the password must contains at least one number.
+  bool require_number = 2;
+  // require_letter requires the password must contains at least one letter, regardless of upper case or lower case
+  bool require_letter = 3;
+  // require_uppercase_letter requires the password must contains at least one upper case letter.
+  bool require_uppercase_letter = 4;
+  // require_uppercase_letter requires the password must contains at least one special character.
+  bool require_special_character = 5;
+  // require_reset_password_for_first_login requires users to reset their password after the 1st login.
+  bool require_reset_password_for_first_login = 6;
+  // password_rotation requires users to reset their password after the duration.
+  google.protobuf.Duration password_rotation = 7;
 }

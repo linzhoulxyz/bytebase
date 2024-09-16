@@ -16,24 +16,14 @@
       {{ $t("sql-editor.self") }}
     </div>
   </NTooltip>
-
-  <RequestQueryPanel
-    v-if="state.showRequestQueryPanel"
-    :project-name="database.project"
-    :database="database"
-    :redirect-to-issue-page="!disallowNavigateToConsole"
-    @close="state.showRequestQueryPanel = false"
-  />
 </template>
 
 <script lang="ts" setup>
 import { NTooltip } from "naive-ui";
 import { computed } from "vue";
-import { reactive } from "vue";
 import { useRouter } from "vue-router";
-import RequestQueryPanel from "@/components/Issue/panel/RequestQueryPanel/index.vue";
 import { SQL_EDITOR_DATABASE_MODULE } from "@/router/sqlEditor";
-import { useAppFeature, useSQLEditorTreeStore } from "@/store";
+import { useSQLEditorTreeStore } from "@/store";
 import type { ComposedDatabase } from "@/types";
 import { DEFAULT_PROJECT_NAME, defaultProject } from "@/types";
 import type { VueClass } from "@/utils";
@@ -41,11 +31,8 @@ import {
   hasProjectPermissionV2,
   extractProjectResourceName,
   extractInstanceResourceName,
+  isSQLEditorRoute,
 } from "@/utils";
-
-interface LocalState {
-  showRequestQueryPanel: boolean;
-}
 
 const props = withDefaults(
   defineProps<{
@@ -72,12 +59,6 @@ const emit = defineEmits<{
 }>();
 
 const router = useRouter();
-const disallowNavigateToConsole = useAppFeature(
-  "bb.feature.disallow-navigate-to-console"
-);
-const state = reactive<LocalState>({
-  showRequestQueryPanel: false,
-});
 
 const disabled = computed(() => props.disabled || !props.database);
 
@@ -97,7 +78,6 @@ const classes = computed(() => {
 
 const gotoSQLEditor = () => {
   if (disabled.value) {
-    state.showRequestQueryPanel = true;
     return;
   }
 
@@ -131,6 +111,10 @@ const gotoSQLEditor = () => {
       schema: props.schema ? props.schema : undefined,
     },
   });
-  window.open(route.fullPath);
+  if (isSQLEditorRoute(router)) {
+    router.push(route);
+  } else {
+    window.open(route.fullPath);
+  }
 };
 </script>

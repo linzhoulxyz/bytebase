@@ -61,6 +61,10 @@ const (
 	FeatureSecureToken FeatureType = "bb.feature.secure-token"
 	// FeatureExternalSecretManager uses secrets from external secret manager.
 	FeatureExternalSecretManager FeatureType = "bb.feature.external-secret-manager"
+	// FeaturePasswordRestriction allows user to configure the password restriction.
+	FeaturePasswordRestriction FeatureType = "bb.feature.password-restriction"
+	// FeatureDirectorySync allows to sync users and groups from Entra ID.
+	FeatureDirectorySync FeatureType = "bb.feature.directory-sync"
 
 	// FeatureRBAC enables RBAC.
 	//
@@ -124,6 +128,8 @@ const (
 	FeatureDatabaseGrouping FeatureType = "bb.feature.database-grouping"
 	// FeatureSchemaTemplate allows user to create and use the schema template.
 	FeatureSchemaTemplate FeatureType = "bb.feature.schema-template"
+	// FeatureIssueProjectSetting supports some advanced project settings for issue.
+	FeatureIssueProjectSetting FeatureType = "bb.feature.issue-project-setting"
 
 	// Database management.
 
@@ -192,6 +198,10 @@ func (e FeatureType) Name() string {
 		return "Disallow password signin"
 	case FeatureSecureToken:
 		return "Secure token"
+	case FeaturePasswordRestriction:
+		return "Password restriction"
+	case FeatureDirectorySync:
+		return "Directory sync"
 	case FeatureExternalSecretManager:
 		return "External Secret Manager"
 	case FeatureRBAC:
@@ -228,6 +238,8 @@ func (e FeatureType) Name() string {
 		return "Database grouping"
 	case FeatureSchemaTemplate:
 		return "Schema template"
+	case FeatureIssueProjectSetting:
+		return "Issue project setting"
 	// Database management
 	case FeatureReadReplicaConnection:
 		return "Read replica connection"
@@ -289,6 +301,8 @@ var FeatureMatrix = map[FeatureType][3]bool{
 	FeatureDisallowSignup:         {false, false, true},
 	FeatureDisallowPasswordSignin: {false, false, true},
 	FeatureSecureToken:            {false, false, true},
+	FeaturePasswordRestriction:    {false, false, true},
+	FeatureDirectorySync:          {false, false, true},
 	FeatureExternalSecretManager:  {false, false, true},
 	FeatureRBAC:                   {true, true, true},
 	FeatureWatermark:              {false, false, true},
@@ -299,15 +313,16 @@ var FeatureMatrix = map[FeatureType][3]bool{
 	// Branding
 	FeatureBranding: {false, false, true},
 	// Change Workflow
-	FeatureDBAWorkflow:      {false, false, true},
-	FeatureMultiTenancy:     {false, false, true},
-	FeatureOnlineMigration:  {false, true, true},
-	FeatureSchemaDrift:      {false, false, true},
-	FeatureSQLReview:        {true, true, true},
-	FeatureTaskScheduleTime: {false, true, true},
-	FeatureEncryptedSecrets: {false, true, true},
-	FeatureDatabaseGrouping: {false, false, true},
-	FeatureSchemaTemplate:   {false, false, true},
+	FeatureDBAWorkflow:         {false, false, true},
+	FeatureMultiTenancy:        {false, false, true},
+	FeatureOnlineMigration:     {false, true, true},
+	FeatureSchemaDrift:         {false, false, true},
+	FeatureSQLReview:           {true, true, true},
+	FeatureTaskScheduleTime:    {false, true, true},
+	FeatureEncryptedSecrets:    {false, true, true},
+	FeatureDatabaseGrouping:    {false, false, true},
+	FeatureSchemaTemplate:      {false, false, true},
+	FeatureIssueProjectSetting: {false, true, true},
 	// Database management
 	FeatureReadReplicaConnection:      {false, false, true},
 	FeatureInstanceSSHConnection:      {false, false, true},

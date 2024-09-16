@@ -166,6 +166,8 @@
             <BBButtonConfirm
               :disabled="!allowRevokeMember"
               :style="'DELETE'"
+              :confirm-title="$t('settings.members.revoke-access-alert')"
+              :ok-text="$t('settings.members.revoke-access')"
               :button-text="$t('settings.members.revoke-access')"
               :require-confirm="true"
               @confirm="handleDeleteMember"
@@ -185,7 +187,10 @@
   <EditProjectRolePanel
     v-if="editingBinding"
     :project="project"
-    :binding="editingBinding"
+    :binding="{
+      ...editingBinding,
+      members: [binding.binding],
+    }"
     @close="editingBinding = null"
   />
 

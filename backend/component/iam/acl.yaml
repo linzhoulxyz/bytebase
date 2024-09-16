@@ -320,6 +320,7 @@ roles:
       - bb.vcsConnectors.get
       - bb.vcsConnectors.list
       - bb.vcsConnectors.update
+      - bb.worksheets.get
   - name: roles/projectDeveloper
     title: Project developer
     permissions:
@@ -334,6 +335,7 @@ roles:
       - bb.changelists.create
       - bb.changelists.get
       - bb.changelists.list
+      - bb.changelists.update
       - bb.databases.check
       - bb.databases.get
       - bb.databases.getSchema
@@ -366,12 +368,14 @@ roles:
   - name: roles/projectQuerier
     title: Project querier
     permissions:
+      - bb.databases.check
       - bb.databases.get
       - bb.databases.getSchema
       - bb.databases.list
       - bb.databases.query
       - bb.projects.get
       - bb.projects.getIamPolicy
+      - bb.worksheets.get
   - name: roles/projectExporter
     title: Project exporter
     permissions:
@@ -381,6 +385,7 @@ roles:
       - bb.databases.list
       - bb.projects.get
       - bb.projects.getIamPolicy
+      - bb.worksheets.get
   - name: roles/projectReleaser
     title: Project releaser
     permissions:

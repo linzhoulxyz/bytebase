@@ -12,7 +12,6 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -236,6 +235,7 @@ func (s *BranchService) CreateBranch(ctx context.Context, request *v1pb.CreateBr
 		config := databaseSchema.GetConfig()
 		sanitizeCommentForSchemaMetadata(filteredBaseSchemaMetadata, model.NewDatabaseConfig(config), classificationConfig.ClassificationFromConfig)
 		initBranchLastUpdateInfoConfig(filteredBaseSchemaMetadata, config)
+		config = alignDatabaseConfig(filteredBaseSchemaMetadata, config)
 		created, err := s.store.CreateBranch(ctx, &store.BranchMessage{
 			ProjectID:  project.ResourceID,
 			ResourceID: branchID,
@@ -339,7 +339,7 @@ func (s *BranchService) UpdateBranch(ctx context.Context, request *v1pb.UpdateBr
 
 		reconcileMetadata(metadata, branch.Engine)
 		filteredMetadata := filterDatabaseMetadataByEngine(metadata, branch.Engine)
-		updateConfigBranchUpdateInfoForUpdate(branch.Head.Metadata, filteredMetadata, config, common.FormatUserUID(user.ID), common.FormatBranchResourceID(projectID, branchID))
+		config = updateConfigBranchUpdateInfoForUpdate(branch.Head.Metadata, filteredMetadata, config, common.FormatUserUID(user.ID), common.FormatBranchResourceID(projectID, branchID))
 		defaultSchema := extractDefaultSchemaForOracleBranch(storepb.Engine(branch.Engine), filteredMetadata)
 		schema, err := schema.GetDesignSchema(branch.Engine, defaultSchema, filteredMetadata)
 		if err != nil {
@@ -462,12 +462,12 @@ func (s *BranchService) MergeBranch(ctx context.Context, request *v1pb.MergeBran
 	sanitizeCommentForSchemaMetadata(headBranch.Head.Metadata, model.NewDatabaseConfig(headBranch.Head.DatabaseConfig), classificationConfig.ClassificationFromConfig)
 	sanitizeCommentForSchemaMetadata(baseBranch.Head.Metadata, model.NewDatabaseConfig(baseBranch.Head.DatabaseConfig), classificationConfig.ClassificationFromConfig)
 
-	adHead, err := tryMerge(headBranch.Base.Metadata, headBranch.Head.Metadata, baseBranch.Head.Metadata, baseBranch.Engine)
+	adHead, adConfig, err := tryMerge(headBranch.Base.Metadata, headBranch.Head.Metadata, baseBranch.Head.Metadata, headBranch.Base.DatabaseConfig, headBranch.Head.DatabaseConfig, baseBranch.Head.DatabaseConfig, baseBranch.Engine)
 	if err != nil {
 		slog.Info("cannot merge branches", log.BBError(err))
 		return nil, status.Errorf(codes.Aborted, "cannot merge branches without conflict, error: %v", err)
 	}
-	mergedMetadata, err := tryMerge(baseBranch.Head.Metadata, adHead, baseBranch.Head.Metadata, baseBranch.Engine)
+	mergedMetadata, mergedConfig, err := tryMerge(baseBranch.Head.Metadata, adHead, baseBranch.Head.Metadata, baseBranch.Head.DatabaseConfig, adConfig, baseBranch.Head.DatabaseConfig, baseBranch.Engine)
 	if err != nil {
 		slog.Info("cannot merge branches", log.BBError(err))
 		return nil, status.Errorf(codes.Aborted, "cannot merge branches without conflict, error: %v", err)
@@ -482,16 +482,16 @@ func (s *BranchService) MergeBranch(ctx context.Context, request *v1pb.MergeBran
 	}
 	// XXX(zp): We only try to merge the schema config while the schema could be merged successfully. Otherwise, users manually merge the
 	// metadata in the frontend, and config would be ignored.
-	mergedConfig := utils.MergeDatabaseConfig(baseBranch.Head.GetDatabaseConfig(), headBranch.Base.GetDatabaseConfig(), headBranch.Head.GetDatabaseConfig())
+	classificationIDSource := utils.MergeDatabaseConfig(baseBranch.Head.GetDatabaseConfig(), headBranch.Base.GetDatabaseConfig(), headBranch.Head.GetDatabaseConfig())
+	setClassificationIDToConfig(classificationIDSource, mergedConfig)
 
 	mergedSchemaBytes := []byte(mergedSchema)
 
 	reconcileMetadata(mergedMetadata, baseBranch.Engine)
 	filteredMergedMetadata := filterDatabaseMetadataByEngine(mergedMetadata, baseBranch.Engine)
-	updateDatabaseConfigLastModifierForMerge(baseBranch.Head.Metadata, filteredMergedMetadata, baseBranch.Head.DatabaseConfig, mergedConfig)
 	baseBranchNewHead := &storepb.BranchSnapshot{
 		Metadata:       filteredMergedMetadata,
-		DatabaseConfig: baseBranch.Head.DatabaseConfig,
+		DatabaseConfig: mergedConfig,
 	}
 	baseBranchNewHeadSchema := mergedSchemaBytes
 
@@ -583,21 +583,24 @@ func (s *BranchService) RebaseBranch(ctx context.Context, request *v1pb.RebaseBr
 		}
 		newHeadMetadata = filterDatabaseMetadataByEngine(newHeadMetadata, baseBranch.Engine)
 		newHeadConfig = baseBranch.Head.GetDatabaseConfig()
-		// If users solve the conflict manually, it is equivalent to them updating HEAD on the branch first.
-		updateConfigBranchUpdateInfoForUpdate(baseBranch.Head.Metadata, newHeadMetadata, newHeadConfig, common.FormatUserUID(user.ID), common.FormatBranchResourceID(baseProjectID, baseBranchID))
-		// String-based rebase operation do not include the structural information, such as classification, so we need to sanitize the user comment,
-		// trim the classification in user comment if the classification is not from the config.
-		modelNewHeadConfig := model.NewDatabaseConfig(newHeadConfig)
-
+		// While users manually merge the metadata in the frontend, the config is stale.
+		// We should align the config with the merged metadata.
 		classificationConfig, err := s.store.GetDataClassificationConfigByID(ctx, baseProject.DataClassificationConfigID)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, `failed to get classification config by id "%s" with error: %v`, baseProject.DataClassificationConfigID, err)
 		}
-
-		trimClassificationIDFromCommentIfNeeded(newHeadMetadata, classificationConfig.ClassificationFromConfig)
+		newHeadConfig = alignDatabaseConfig(newHeadMetadata, newHeadConfig)
+		// String-based rebase operation do not include the structural information, such as classification, so we need to sanitize the user comment,
+		// trim the classification in user comment if the classification is not from the config.
+		trimClassificationIDFromCommentIfNeeded(newHeadMetadata, classificationConfig)
+		modelNewHeadConfig := model.NewDatabaseConfig(newHeadConfig)
 		sanitizeCommentForSchemaMetadata(newHeadMetadata, modelNewHeadConfig, classificationConfig.ClassificationFromConfig)
+
+		// If users solve the conflict manually, it is equivalent to them updating HEAD on the branch first.
+		newHeadConfig = updateConfigBranchUpdateInfoForUpdate(baseBranch.Head.Metadata, newHeadMetadata, newHeadConfig, common.FormatUserUID(user.ID), common.FormatBranchResourceID(baseProjectID, baseBranchID))
+		newHeadConfig = alignDatabaseConfig(newHeadMetadata, newHeadConfig)
 	} else {
-		newHeadMetadata, err = tryMerge(baseBranch.Base.Metadata, baseBranch.Head.Metadata, filteredNewBaseMetadata, baseBranch.Engine)
+		newHeadMetadata, newHeadConfig, err = tryMerge(baseBranch.Base.Metadata, baseBranch.Head.Metadata, filteredNewBaseMetadata, baseBranch.Base.DatabaseConfig, baseBranch.Head.DatabaseConfig, newBaseConfig, baseBranch.Engine)
 		if err != nil {
 			slog.Info("cannot rebase branches", log.BBError(err))
 			conflictSchema, err := diff3.Merge(
@@ -624,9 +627,11 @@ func (s *BranchService) RebaseBranch(ctx context.Context, request *v1pb.RebaseBr
 		if newHeadMetadata == nil {
 			return nil, status.Errorf(codes.Internal, "merged metadata should not be nil if there is no error while merging (%+v, %+v, %+v)", baseBranch.Base.Metadata, baseBranch.Head.Metadata, filteredNewBaseMetadata)
 		}
+		alignDatabaseConfig(newHeadMetadata, newHeadConfig)
 		// XXX(zp): We only try to merge the schema config while the schema could be merged successfully. Otherwise, users manually merge the
 		// metadata in the frontend, and config would be ignored.
-		newHeadConfig = utils.MergeDatabaseConfig(newBaseConfig, baseBranch.Base.GetDatabaseConfig(), baseBranch.Head.GetDatabaseConfig())
+		classificationIDSource := utils.MergeDatabaseConfig(newBaseConfig, baseBranch.Base.GetDatabaseConfig(), baseBranch.Head.GetDatabaseConfig())
+		setClassificationIDToConfig(classificationIDSource, newHeadConfig)
 	}
 
 	reconcileMetadata(newHeadMetadata, baseBranch.Engine)
@@ -636,10 +641,8 @@ func (s *BranchService) RebaseBranch(ctx context.Context, request *v1pb.RebaseBr
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert new head metadata to schema string, %v", err)
 	}
-
 	newBaseSchemaBytes := []byte(newBaseSchema)
 	newHeadSchemaBytes := []byte(newHeadSchema)
-	updateDatabaseConfigLastModifierForMerge(filteredNewHeadMetadata, filteredNewBaseMetadata, newHeadConfig, newBaseConfig)
 	if request.ValidateOnly {
 		baseBranch.Base = &storepb.BranchSnapshot{
 			Metadata:       filteredNewBaseMetadata,
@@ -721,8 +724,7 @@ func (s *BranchService) getFilteredNewBaseFromRebaseRequest(ctx context.Context,
 			return nil, "", nil, status.Error(codes.Internal, err.Error())
 		}
 
-		alignedDatabaseConfig := databaseSchema.GetConfig()
-		alignDatabaseConfig(filteredNewBaseMetadata, alignedDatabaseConfig)
+		alignedDatabaseConfig := alignDatabaseConfig(filteredNewBaseMetadata, databaseSchema.GetConfig())
 		return filteredNewBaseMetadata, sourceSchema, alignedDatabaseConfig, nil
 	}
 
@@ -1248,12 +1250,13 @@ func reconcileMySQLPartitionMetadata(partitions []*storepb.TablePartitionMetadat
 // updateConfigBranchUpdateInfoForUpdate compare the proto of old and new metadata, and update the config branch update info.
 // NOTE: this function would not delete the config of deleted objects, and it's safe because the next time adding the object
 // back will trigger the update of the config branch update info.
-func updateConfigBranchUpdateInfoForUpdate(old *storepb.DatabaseSchemaMetadata, new *storepb.DatabaseSchemaMetadata, config *storepb.DatabaseConfig, formattedUserUID string, formattedBranchResourceID string) {
+func updateConfigBranchUpdateInfoForUpdate(old *storepb.DatabaseSchemaMetadata, new *storepb.DatabaseSchemaMetadata, config *storepb.DatabaseConfig, formattedUserUID string, formattedBranchResourceID string) *storepb.DatabaseConfig {
 	time := timestamppb.Now()
 
+	alignedConfig := alignDatabaseConfig(new, config)
 	oldModel := model.NewDatabaseMetadata(old)
 
-	newSchemaConfigMap := buildMap(config.SchemaConfigs, func(s *storepb.SchemaConfig) string {
+	newSchemaConfigMap := buildMap(alignedConfig.SchemaConfigs, func(s *storepb.SchemaConfig) string {
 		return s.Name
 	})
 	var newSchemaConfigs []*storepb.SchemaConfig
@@ -1393,7 +1396,9 @@ func updateConfigBranchUpdateInfoForUpdate(old *storepb.DatabaseSchemaMetadata, 
 		newSchemaConfig.FunctionConfigs = append(newSchemaConfig.FunctionConfigs, newFunctionConfig...)
 		newSchemaConfig.ProcedureConfigs = append(newSchemaConfig.ProcedureConfigs, newProcedureConfig...)
 	}
-	config.SchemaConfigs = append(config.SchemaConfigs, newSchemaConfigs...)
+	alignedConfig.SchemaConfigs = append(alignedConfig.SchemaConfigs, newSchemaConfigs...)
+
+	return alignedConfig
 }
 
 func initSchemaConfig(schema *storepb.SchemaMetadata, formattedUserUID string, branchResourceID string, time *timestamppb.Timestamp) *storepb.SchemaConfig {
@@ -1421,11 +1426,18 @@ func initSchemaConfig(schema *storepb.SchemaMetadata, formattedUserUID string, b
 }
 
 func initTableConfig(table *storepb.TableMetadata, formattedUserEmail string, branchResourceID string, time *timestamppb.Timestamp) *storepb.TableConfig {
+	var columnConfigs []*storepb.ColumnConfig
+	for _, column := range table.Columns {
+		columnConfigs = append(columnConfigs, &storepb.ColumnConfig{
+			Name: column.Name,
+		})
+	}
 	return &storepb.TableConfig{
-		Name:         table.Name,
-		Updater:      formattedUserEmail,
-		SourceBranch: branchResourceID,
-		UpdateTime:   time,
+		Name:          table.Name,
+		Updater:       formattedUserEmail,
+		SourceBranch:  branchResourceID,
+		UpdateTime:    time,
+		ColumnConfigs: columnConfigs,
 	}
 }
 
@@ -1529,308 +1541,185 @@ func initBranchLastUpdateInfoConfig(metadata *storepb.DatabaseSchemaMetadata, co
 	}
 }
 
-func trimClassificationIDFromCommentIfNeeded(dbSchema *storepb.DatabaseSchemaMetadata, classificationFromConfig bool) {
-	if classificationFromConfig {
+func trimClassificationIDFromCommentIfNeeded(dbSchema *storepb.DatabaseSchemaMetadata, classificationConfig *storepb.DataClassificationSetting_DataClassificationConfig) {
+	if classificationConfig.ClassificationFromConfig {
 		return
 	}
 	for _, schema := range dbSchema.Schemas {
 		for _, table := range schema.Tables {
-			if !classificationFromConfig {
-				_, table.UserComment = common.GetClassificationAndUserComment(table.Comment)
+			if !classificationConfig.ClassificationFromConfig {
+				_, table.UserComment = common.GetClassificationAndUserComment(table.Comment, classificationConfig)
 			}
 			for _, col := range table.Columns {
-				if !classificationFromConfig {
-					_, col.UserComment = common.GetClassificationAndUserComment(col.Comment)
+				if !classificationConfig.ClassificationFromConfig {
+					_, col.UserComment = common.GetClassificationAndUserComment(col.Comment, classificationConfig)
 				}
 			}
 		}
 	}
 }
 
-func updateDatabaseConfigLastModifierForMerge(baseMetadata *storepb.DatabaseSchemaMetadata, headMetadata *storepb.DatabaseSchemaMetadata, baseConfig *storepb.DatabaseConfig, headConfig *storepb.DatabaseConfig) {
-	now := timestamppb.Now()
-	baseModel := model.NewDatabaseMetadata(baseMetadata)
-	baseSchemaConfigMap := buildMap(baseConfig.SchemaConfigs, func(s *storepb.SchemaConfig) string {
-		return s.GetName()
-	})
-	headSchemaConfigMap := buildMap(headConfig.SchemaConfigs, func(s *storepb.SchemaConfig) string {
-		return s.GetName()
-	})
-
-	var newBaseSchemaConfigs []*storepb.SchemaConfig
-	for _, headSchema := range headMetadata.Schemas {
-		headSchemaConfig := headSchemaConfigMap[headSchema.Name]
-		if headSchemaConfig == nil {
-			headSchemaConfig = initSchemaConfig(headSchema, "", "", now)
-		}
-		baseSchema := baseModel.GetSchema(headSchema.Name)
-		if baseSchema == nil {
-			//nolint
-			newBaseSchemaConfig := proto.Clone(headSchemaConfig).(*storepb.SchemaConfig)
-			newBaseSchemaConfigs = append(newBaseSchemaConfigs, newBaseSchemaConfig)
-			continue
-		}
-
-		// Modified schema, set the last updater as head in base.
-		baseSchemaConfig := baseSchemaConfigMap[headSchema.Name]
-		// Rebase database, no schema config.
-		if baseSchemaConfig == nil {
-			baseSchemaConfig = initSchemaConfig(baseSchema.GetProto(), "", "", now)
-		}
-
-		// Tables
-		baseTableConfigMap := buildMap(baseSchemaConfig.TableConfigs, func(s *storepb.TableConfig) string {
-			return s.GetName()
-		})
-		headTableConfigMap := buildMap(headSchemaConfig.TableConfigs, func(s *storepb.TableConfig) string {
-			return s.GetName()
-		})
-		var newBaseTableConfigs []*storepb.TableConfig
-		for _, headTable := range headSchema.Tables {
-			headTableConfig := headTableConfigMap[headTable.Name]
-			if headTableConfig == nil {
-				headTableConfig = initTableConfig(headTable, "", "", now)
-			}
-			baseTable := baseSchema.GetTable(headTable.Name)
-			// New table, reset the source branch and last modifier because we do not remove the config while deleting the object.
-			if baseTable == nil {
-				//nolint
-				newBaseTableConfig := proto.Clone(headTableConfig).(*storepb.TableConfig)
-				newBaseTableConfig.SourceBranch = headTableConfig.SourceBranch
-				newBaseTableConfig.Updater = headTableConfig.Updater
-				newBaseTableConfig.UpdateTime = now
-				newBaseTableConfigs = append(newBaseTableConfigs, newBaseTableConfig)
-				continue
-			}
-			// Modified table, set the last updater as head in base.
-			baseTableConfig := baseTableConfigMap[headTable.Name]
-			// Rebase database, no schema config.
-			if baseTableConfig == nil {
-				baseTableConfig = initTableConfig(baseTable.GetProto(), "", "", now)
-			}
-			if diff := cmp.Diff(baseTable.GetProto(), baseTable, protocmp.Transform()); diff != "" {
-				baseTableConfig.SourceBranch = headTableConfig.SourceBranch
-				baseTableConfig.Updater = headTableConfig.Updater
-				baseTableConfig.UpdateTime = now
-			}
-		}
-		baseSchemaConfig.TableConfigs = append(baseSchemaConfig.TableConfigs, newBaseTableConfigs...)
-
-		// Views
-		baseViewConfigMap := buildMap(baseSchemaConfig.ViewConfigs, func(s *storepb.ViewConfig) string {
-			return s.GetName()
-		})
-		headViewConfigMap := buildMap(headSchemaConfig.ViewConfigs, func(s *storepb.ViewConfig) string {
-			return s.GetName()
-		})
-		var newBaseViewConfigs []*storepb.ViewConfig
-		for _, headView := range headSchema.Views {
-			headViewConfig := headViewConfigMap[headView.Name]
-			if headViewConfig == nil {
-				headViewConfig = initViewConfig(headView, "", "", now)
-			}
-			baseView := baseSchema.GetView(headView.Name)
-			// New view, reset the source branch and last modifier because we do not remove the config while deleting the object.
-			if baseView == nil {
-				//nolint
-				newBaseViewConfig := proto.Clone(headViewConfig).(*storepb.ViewConfig)
-				newBaseViewConfig.SourceBranch = headViewConfig.SourceBranch
-				newBaseViewConfig.Updater = headViewConfig.Updater
-				newBaseViewConfig.UpdateTime = now
-				newBaseViewConfigs = append(newBaseViewConfigs, newBaseViewConfig)
-				continue
-			}
-			// Modified view, set the last updater as head in base.
-			baseViewConfig := baseViewConfigMap[headView.Name]
-			// Rebase database, no schema config.
-			if baseViewConfig == nil {
-				baseViewConfig = initViewConfig(baseView.GetProto(), "", "", now)
-			}
-			if !equalView(headView, baseView.GetProto()) {
-				baseViewConfig.SourceBranch = headViewConfig.SourceBranch
-				baseViewConfig.Updater = headViewConfig.Updater
-				baseViewConfig.UpdateTime = now
-			}
-		}
-		baseSchemaConfig.ViewConfigs = append(baseSchemaConfig.ViewConfigs, newBaseViewConfigs...)
-
-		// Functions
-		baseFunctionConfigMap := buildMap(baseSchemaConfig.FunctionConfigs, func(s *storepb.FunctionConfig) string {
-			return s.GetName()
-		})
-		headFunctionConfigMap := buildMap(headSchemaConfig.FunctionConfigs, func(s *storepb.FunctionConfig) string {
-			return s.GetName()
-		})
-		var newBaseFunctionConfigs []*storepb.FunctionConfig
-		for _, headFunction := range headSchema.Functions {
-			headFunctionConfig := headFunctionConfigMap[headFunction.Name]
-			if headFunctionConfig == nil {
-				headFunctionConfig = initFunctionConfig(headFunction, "", "", now)
-			}
-			baseFunction := baseSchema.GetFunction(headFunction.Name)
-			// New function, reset the source branch and last modifier because we do not remove the config while deleting the object.
-			if baseFunction == nil {
-				//nolint
-				newBaseFunctionConfig := proto.Clone(headFunctionConfig).(*storepb.FunctionConfig)
-				newBaseFunctionConfig.SourceBranch = headFunctionConfig.SourceBranch
-				newBaseFunctionConfig.Updater = headFunctionConfig.Updater
-				newBaseFunctionConfig.UpdateTime = now
-				newBaseFunctionConfigs = append(newBaseFunctionConfigs, newBaseFunctionConfig)
-				continue
-			}
-			// Modified function, set the last updater as head in base.
-			baseFunctionConfig := baseFunctionConfigMap[headFunction.Name]
-			// Rebase database, no schema config.
-			if baseFunctionConfig == nil {
-				baseFunctionConfig = initFunctionConfig(baseFunction.GetProto(), "", "", now)
-			}
-			if !equalFunction(headFunction, baseFunction.GetProto()) {
-				baseFunctionConfig.SourceBranch = headFunctionConfig.SourceBranch
-				baseFunctionConfig.Updater = headFunctionConfig.Updater
-				baseFunctionConfig.UpdateTime = now
-			}
-		}
-		baseSchemaConfig.FunctionConfigs = append(baseSchemaConfig.FunctionConfigs, newBaseFunctionConfigs...)
-
-		// Procedures
-		baseProcedureConfigMap := buildMap(baseSchemaConfig.ProcedureConfigs, func(s *storepb.ProcedureConfig) string {
-			return s.GetName()
-		})
-		headProcedureConfigMap := buildMap(headSchemaConfig.ProcedureConfigs, func(s *storepb.ProcedureConfig) string {
-			return s.GetName()
-		})
-		var newBaseProcedureConfigs []*storepb.ProcedureConfig
-		for _, headProcedure := range headSchema.Procedures {
-			headProcedureConfig := headProcedureConfigMap[headProcedure.Name]
-			if headProcedureConfig == nil {
-				headProcedureConfig = initProcedureConfig(headProcedure, "", "", now)
-			}
-			baseProcedure := baseSchema.GetProcedure(headProcedure.Name)
-			// New procedure, reset the source branch and last modifier because we do not remove the config while deleting the object.
-			if baseProcedure == nil {
-				//nolint
-				newBaseProcedureConfig := proto.Clone(headProcedureConfig).(*storepb.ProcedureConfig)
-				newBaseProcedureConfig.SourceBranch = headProcedureConfig.SourceBranch
-				newBaseProcedureConfig.Updater = headProcedureConfig.Updater
-				newBaseProcedureConfig.UpdateTime = now
-				newBaseProcedureConfigs = append(newBaseProcedureConfigs, newBaseProcedureConfig)
-				continue
-			}
-			// Modified procedure, set the last updater as head in base.
-			baseProcedureConfig := baseProcedureConfigMap[headProcedure.Name]
-			if !equalProcedure(headProcedure, baseProcedure.GetProto()) {
-				baseProcedureConfig.SourceBranch = headProcedureConfig.SourceBranch
-				baseProcedureConfig.Updater = headProcedureConfig.Updater
-				baseProcedureConfig.UpdateTime = now
-			}
-		}
-		baseSchemaConfig.ProcedureConfigs = append(baseSchemaConfig.ProcedureConfigs, newBaseProcedureConfigs...)
+// alignDatabaseConfig aligns the database config with the metadata by adding an empty config for the missing objects,
+// and deleting the config for the deleted objects.
+func alignDatabaseConfig(metadata *storepb.DatabaseSchemaMetadata, config *storepb.DatabaseConfig) *storepb.DatabaseConfig {
+	result := &storepb.DatabaseConfig{
+		Name: metadata.GetName(),
 	}
-
-	baseConfig.SchemaConfigs = append(baseConfig.SchemaConfigs, newBaseSchemaConfigs...)
-}
-
-func alignDatabaseConfig(metadata *storepb.DatabaseSchemaMetadata, config *storepb.DatabaseConfig) {
-	if config == nil {
-		config = &storepb.DatabaseConfig{
-			Name: metadata.Name,
-		}
-	}
-	now := timestamppb.Now()
 	dbModel := model.NewDatabaseMetadata(metadata)
 	schemaConfigMap := buildMap(config.SchemaConfigs, func(s *storepb.SchemaConfig) string {
 		return s.Name
 	})
-	var newSchemaConfigs []*storepb.SchemaConfig
 	for _, schemaName := range dbModel.ListSchemaNames() {
-		schemaModel := dbModel.GetSchema(schemaName)
-		schemaConfig, ok := schemaConfigMap[schemaName]
+		schema := dbModel.GetSchema(schemaName)
+		oldSchemaConfig, ok := schemaConfigMap[schemaName]
 		if !ok {
-			newSchemaConfigs = append(newSchemaConfigs, initSchemaConfig(schemaModel.GetProto(), "", "", now))
+			schemaConfig := initSchemaConfig(schema.GetProto(), "", "", nil)
+			result.SchemaConfigs = append(result.SchemaConfigs, schemaConfig)
 			continue
 		}
-
-		var newTableConfigs []*storepb.TableConfig
-		tableConfigMap := buildMap(schemaConfig.TableConfigs, func(s *storepb.TableConfig) string {
-			return s.Name
-		})
-		for _, tableName := range schemaModel.ListTableNames() {
-			tableModel := schemaModel.GetTable(tableName)
-			if _, ok := tableConfigMap[tableName]; !ok {
-				newTableConfigs = append(newTableConfigs, initTableConfig(tableModel.GetProto(), "", "", now))
+		schemaConfig := &storepb.SchemaConfig{
+			Name: schemaName,
+		}
+		for _, tableName := range schema.ListTableNames() {
+			table := schema.GetTable(tableName)
+			tableConfigMap := buildMap(oldSchemaConfig.TableConfigs, func(t *storepb.TableConfig) string {
+				return t.Name
+			})
+			oldTableConfig, ok := tableConfigMap[tableName]
+			if !ok {
+				tableConfig := initTableConfig(table.GetProto(), "", "", nil)
+				schemaConfig.TableConfigs = append(schemaConfig.TableConfigs, tableConfig)
 				continue
 			}
+			//nolint
+			tableConfig := &storepb.TableConfig{
+				Name:             tableName,
+				ClassificationId: oldTableConfig.ClassificationId,
+				Updater:          oldTableConfig.Updater,
+				UpdateTime:       oldTableConfig.UpdateTime,
+				SourceBranch:     oldTableConfig.SourceBranch,
+			}
+			columnConfigMap := buildMap(oldTableConfig.ColumnConfigs, func(c *storepb.ColumnConfig) string {
+				return c.Name
+			})
+			for _, columnProto := range table.GetColumns() {
+				columnName := columnProto.GetName()
+				if columnConfig, ok := columnConfigMap[columnName]; !ok {
+					tableConfig.ColumnConfigs = append(tableConfig.ColumnConfigs, &storepb.ColumnConfig{
+						Name: columnName,
+					})
+				} else {
+					columnConfig := &storepb.ColumnConfig{
+						Name:             columnName,
+						ClassificationId: columnConfig.ClassificationId,
+						SemanticTypeId:   columnConfig.SemanticTypeId,
+						Labels:           columnConfig.Labels,
+					}
+					tableConfig.ColumnConfigs = append(tableConfig.ColumnConfigs, columnConfig)
+				}
+			}
+			schemaConfig.TableConfigs = append(schemaConfig.TableConfigs, tableConfig)
 		}
-		schemaConfig.TableConfigs = append(schemaConfig.TableConfigs, newTableConfigs...)
 
-		var newViewConfigs []*storepb.ViewConfig
-		viewConfigMap := buildMap(schemaConfig.ViewConfigs, func(s *storepb.ViewConfig) string {
-			return s.Name
-		})
-		for _, viewName := range schemaModel.ListViewNames() {
-			viewModel := schemaModel.GetView(viewName)
-			if _, ok := viewConfigMap[viewName]; !ok {
-				newViewConfigs = append(newViewConfigs, initViewConfig(viewModel.GetProto(), "", "", now))
+		for _, viewName := range schema.ListViewNames() {
+			view := schema.GetView(viewName)
+			viewConfigMap := buildMap(oldSchemaConfig.ViewConfigs, func(v *storepb.ViewConfig) string {
+				return v.Name
+			})
+			oldViewConfig, ok := viewConfigMap[viewName]
+			if !ok {
+				viewConfig := initViewConfig(view.GetProto(), "", "", nil)
+				schemaConfig.ViewConfigs = append(schemaConfig.ViewConfigs, viewConfig)
 				continue
 			}
-		}
-		schemaConfig.ViewConfigs = append(schemaConfig.ViewConfigs, newViewConfigs...)
+			viewConfig := &storepb.ViewConfig{
+				Name:         viewName,
+				Updater:      oldViewConfig.Updater,
+				UpdateTime:   oldViewConfig.UpdateTime,
+				SourceBranch: oldViewConfig.SourceBranch,
+			}
 
-		var newProcedureConfigs []*storepb.ProcedureConfig
-		procedureConfigMap := buildMap(schemaConfig.ProcedureConfigs, func(s *storepb.ProcedureConfig) string {
-			return s.Name
-		})
-		for _, procedureName := range schemaModel.ListProcedureNames() {
-			procedureModel := schemaModel.GetProcedure(procedureName)
-			if _, ok := procedureConfigMap[procedureName]; !ok {
-				newProcedureConfigs = append(newProcedureConfigs, initProcedureConfig(procedureModel.GetProto(), "", "", now))
+			schemaConfig.ViewConfigs = append(schemaConfig.ViewConfigs, viewConfig)
+		}
+
+		for _, procedureName := range schema.ListProcedureNames() {
+			procedure := schema.GetProcedure(procedureName)
+			procedureConfigMap := buildMap(oldSchemaConfig.ProcedureConfigs, func(p *storepb.ProcedureConfig) string {
+				return p.Name
+			})
+			oldProcedureConfig, ok := procedureConfigMap[procedureName]
+			if !ok {
+				procedureConfig := initProcedureConfig(procedure.GetProto(), "", "", nil)
+				schemaConfig.ProcedureConfigs = append(schemaConfig.ProcedureConfigs, procedureConfig)
 				continue
 			}
+			procedureConfig := &storepb.ProcedureConfig{
+				Name:         procedureName,
+				Updater:      oldProcedureConfig.Updater,
+				UpdateTime:   oldProcedureConfig.UpdateTime,
+				SourceBranch: oldProcedureConfig.SourceBranch,
+			}
+			schemaConfig.ProcedureConfigs = append(schemaConfig.ProcedureConfigs, procedureConfig)
 		}
-		schemaConfig.ProcedureConfigs = append(schemaConfig.ProcedureConfigs, newProcedureConfigs...)
 
-		var newFunctionConfigs []*storepb.FunctionConfig
-		functionConfigMap := buildMap(schemaConfig.FunctionConfigs, func(s *storepb.FunctionConfig) string {
-			return s.Name
-		})
-		for _, functionName := range schemaModel.ListFunctionNames() {
-			functionModel := schemaModel.GetFunction(functionName)
-			if _, ok := functionConfigMap[functionName]; !ok {
-				newFunctionConfigs = append(newFunctionConfigs, initFunctionConfig(functionModel.GetProto(), "", "", now))
+		for _, functionName := range schema.ListFunctionNames() {
+			function := schema.GetFunction(functionName)
+			functionConfigMap := buildMap(oldSchemaConfig.FunctionConfigs, func(f *storepb.FunctionConfig) string {
+				return f.Name
+			})
+			oldFunctionConfig, ok := functionConfigMap[functionName]
+			if !ok {
+				functionConfig := initFunctionConfig(function.GetProto(), "", "", nil)
+				schemaConfig.FunctionConfigs = append(schemaConfig.FunctionConfigs, functionConfig)
 				continue
 			}
+			functionConfig := &storepb.FunctionConfig{
+				Name:         functionName,
+				Updater:      oldFunctionConfig.Updater,
+				UpdateTime:   oldFunctionConfig.UpdateTime,
+				SourceBranch: oldFunctionConfig.SourceBranch,
+			}
+			schemaConfig.FunctionConfigs = append(schemaConfig.FunctionConfigs, functionConfig)
 		}
-		schemaConfig.FunctionConfigs = append(schemaConfig.FunctionConfigs, newFunctionConfigs...)
+		result.SchemaConfigs = append(result.SchemaConfigs, schemaConfig)
 	}
-	config.SchemaConfigs = append(config.SchemaConfigs, newSchemaConfigs...)
+	return result
 }
 
 func formatViewDef(def string) string {
-	return strings.TrimRight(def, "; \n\r\t")
+	return strings.TrimRightFunc(def, utils.IsSpaceOrSemicolon)
 }
 
-func equalView(a, b *storepb.ViewMetadata) bool {
-	if a.GetName() != b.GetName() {
-		return false
-	}
-	if a.GetComment() != b.GetComment() {
-		return false
-	}
-	return equalViewDefinition(a.GetDefinition(), b.GetDefinition())
-}
+// setClassificationIDToConfig inplace set the classification ID from the a config to the b config.
+func setClassificationIDToConfig(a, b *storepb.DatabaseConfig) {
+	aSchemaConfigMap := buildMap(a.SchemaConfigs, func(s *storepb.SchemaConfig) string {
+		return s.Name
+	})
 
-func equalFunction(a, b *storepb.FunctionMetadata) bool {
-	if a.GetName() != b.GetName() {
-		return false
+	for _, schemaConfig := range b.SchemaConfigs {
+		aSchemaConfig, ok := aSchemaConfigMap[schemaConfig.Name]
+		if !ok {
+			continue
+		}
+		aTableConfigMap := buildMap(aSchemaConfig.TableConfigs, func(t *storepb.TableConfig) string {
+			return t.Name
+		})
+		for _, tableConfig := range schemaConfig.TableConfigs {
+			aTableConfig, ok := aTableConfigMap[tableConfig.Name]
+			if !ok {
+				continue
+			}
+			tableConfig.ClassificationId = aTableConfig.ClassificationId
+			aColumnConfigMap := buildMap(aTableConfig.ColumnConfigs, func(c *storepb.ColumnConfig) string {
+				return c.Name
+			})
+			for _, columnConfig := range tableConfig.ColumnConfigs {
+				aColumnConfig, ok := aColumnConfigMap[columnConfig.Name]
+				if !ok {
+					continue
+				}
+				columnConfig.ClassificationId = aColumnConfig.ClassificationId
+			}
+		}
 	}
-
-	return equalRoutineDefinition(a.GetDefinition(), b.GetDefinition())
-}
-
-func equalProcedure(a, b *storepb.ProcedureMetadata) bool {
-	if a.GetName() != b.GetName() {
-		return false
-	}
-
-	return equalRoutineDefinition(a.GetDefinition(), b.GetDefinition())
 }

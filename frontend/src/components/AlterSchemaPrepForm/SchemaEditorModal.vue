@@ -93,7 +93,10 @@
     <div class="w-full flex flex-row justify-between items-center">
       <div class="flex flex-row items-center text-sm text-gray-500"></div>
       <div class="flex justify-end items-center space-x-3">
-        <NCheckbox v-model:checked="state.planOnly">
+        <NCheckbox
+          v-if="databaseChangeMode === DatabaseChangeMode.PIPELINE"
+          v-model:checked="state.planOnly"
+        >
           {{ $t("issue.sql-review-only") }}
         </NCheckbox>
         <NCheckbox
@@ -126,9 +129,9 @@
 </template>
 
 <script lang="ts" setup>
-import dayjs from "dayjs";
 import { cloneDeep, head, uniq } from "lodash-es";
 import { NTabs, NCheckbox, NButton, NTabPane, useDialog } from "naive-ui";
+import { v4 as uuidv4 } from "uuid";
 import type { PropType } from "vue";
 import { computed, onMounted, h, reactive, ref, watch } from "vue";
 import { I18nT, useI18n } from "vue-i18n";
@@ -145,13 +148,20 @@ import {
   useDatabaseV1Store,
   useNotificationStore,
   useDBSchemaV1Store,
+  useAppFeature,
 } from "@/store";
 import type { ComposedDatabase } from "@/types";
 import { dialectOfEngineV1, isValidProjectName, unknownProject } from "@/types";
 import { Engine } from "@/types/proto/v1/common";
 import type { DatabaseMetadata } from "@/types/proto/v1/database_service";
 import { DatabaseMetadataView } from "@/types/proto/v1/database_service";
-import { TinyTimer, defer, extractProjectResourceName } from "@/utils";
+import { DatabaseChangeMode } from "@/types/proto/v1/setting_service";
+import {
+  TinyTimer,
+  defer,
+  extractProjectResourceName,
+  generateIssueTitle,
+} from "@/utils";
 import { allowGhostForDatabase } from "../IssueV1/components/Sidebar/GhostSection/common";
 import { MonacoEditor } from "../MonacoEditor";
 import { provideSQLCheckContext } from "../SQLCheck";
@@ -221,6 +231,7 @@ const notificationStore = useNotificationStore();
 const dbSchemaStore = useDBSchemaV1Store();
 const { runSQLCheck } = provideSQLCheckContext();
 const $dialog = useDialog();
+const databaseChangeMode = useAppFeature("bb.feature.database-change-mode");
 
 const allowPreviewIssue = computed(() => {
   if (state.selectedTab === "schema-editor") {
@@ -257,7 +268,10 @@ const editTargetsKey = computed(() => {
 });
 
 const allowUseOnlineSchemaMigration = computed(() => {
-  return databaseList.value.every((db) => allowGhostForDatabase(db));
+  return (
+    databaseChangeMode.value === DatabaseChangeMode.PIPELINE &&
+    databaseList.value.every((db) => allowGhostForDatabase(db))
+  );
 });
 
 const prepareDatabaseMetadata = async () => {
@@ -439,16 +453,18 @@ const handlePreviewIssue = async () => {
   }
 
   if (state.selectedTab === "raw-sql") {
-    query.sql = state.editStatement;
-
-    query.name = generateIssueName(
-      databaseList.value.map((db) => db.databaseName),
-      false /* !onlineMode */
+    query.name = generateIssueTitle(
+      "bb.issue.database.schema.update",
+      databaseList.value.map((db) => db.databaseName)
     );
+
+    const sqlStorageKey = `bb.issues.sql.${uuidv4()}`;
+    localStorage.setItem(sqlStorageKey, state.editStatement);
+    query.sqlStorageKey = sqlStorageKey;
   } else {
-    query.name = generateIssueName(
-      databaseList.value.map((db) => db.databaseName),
-      false /* !onlineMode */
+    query.name = generateIssueTitle(
+      "bb.issue.database.schema.update",
+      databaseList.value.map((db) => db.databaseName)
     );
 
     state.previewStatus = "Generating DDL";
@@ -481,9 +497,15 @@ const handlePreviewIssue = async () => {
       const sql = statementList[i];
       sqlMap[db.name] = sql;
     });
-    query.sqlMap = JSON.stringify(sqlMap);
+    const sqlMapStorageKey = `bb.issues.sql-map.${uuidv4()}`;
+    localStorage.setItem(sqlMapStorageKey, JSON.stringify(sqlMap));
+    query.sqlMapStorageKey = sqlMapStorageKey;
     const databaseNameList = databaseList.value.map((db) => db.databaseName);
-    query.name = generateIssueName(databaseNameList, !!query.ghost);
+    query.name = generateIssueTitle(
+      "bb.issue.database.schema.update",
+      databaseNameList,
+      !!query.ghost
+    );
   }
 
   const routeInfo = {
@@ -504,27 +526,6 @@ const handlePreviewIssue = async () => {
     router.push(routeInfo);
   }
   cleanup();
-};
-
-const generateIssueName = (
-  databaseNameList: string[],
-  isOnlineMode: boolean
-) => {
-  const issueNameParts: string[] = [];
-  if (databaseNameList.length === 1) {
-    issueNameParts.push(`[${databaseNameList[0]}]`);
-  } else {
-    issueNameParts.push(`[${databaseNameList.length} databases]`);
-  }
-  if (isOnlineMode) {
-    issueNameParts.push("Online schema change");
-  } else {
-    issueNameParts.push(`Edit schema`);
-  }
-  const datetime = dayjs().format("@MM-DD HH:mm");
-  const tz = "UTC" + dayjs().format("ZZ");
-  issueNameParts.push(`${datetime} ${tz}`);
-  return issueNameParts.join(" ");
 };
 
 const renderEmptyGeneratedDDLContent = (databases: ComposedDatabase[]) => {

@@ -489,6 +489,11 @@ func printColumnClause(buf *strings.Builder, column *storepb.ColumnMetadata) err
 		}
 	}
 
+	if column.OnUpdate != "" {
+		if _, err := buf.WriteString(fmt.Sprintf(" ON UPDATE %s", column.OnUpdate)); err != nil {
+			return err
+		}
+	}
 	if column.Comment != "" {
 		if _, err := fmt.Fprintf(buf, " COMMENT '%s'", column.Comment); err != nil {
 			return err
@@ -530,7 +535,7 @@ func printDefaultClause(buf *strings.Builder, column *storepb.ColumnMetadata) er
 	}
 
 	if column.GetDefault() != nil {
-		if _, err := fmt.Fprintf(buf, " DEFAULT '%s'", column.GetDefault().String()); err != nil {
+		if _, err := fmt.Fprintf(buf, " DEFAULT '%s'", column.GetDefault().GetValue()); err != nil {
 			return err
 		}
 	}

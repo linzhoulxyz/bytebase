@@ -6,7 +6,14 @@
       <div class="flex flex-col">
         <div class="flex flex-row items-center space-x-2">
           <span
-            v-if="permissionStore.onlyWorkspaceMember"
+            v-if="onClickUser"
+            class="normal-link truncate max-w-[10rem]"
+            @click="onClickUser(user, $event)"
+          >
+            {{ user.title }}
+          </span>
+          <span
+            v-else-if="permissionStore.onlyWorkspaceMember"
             class="truncate max-w-[10em]"
           >
             {{ user.title }}
@@ -18,6 +25,9 @@
           >
             {{ user.title }}
           </router-link>
+          <NTag v-if="user.profile?.source" size="small" round type="primary">
+            {{ user.profile.source }}
+          </NTag>
           <YouTag v-if="currentUserV1.name === user.name" />
           <SystemBotTag v-if="user.name === SYSTEM_BOT_USER_NAME" />
           <ServiceAccountTag
@@ -33,6 +43,7 @@
 </template>
 
 <script lang="ts" setup>
+import { NTag } from "naive-ui";
 import { computed } from "vue";
 import UserAvatar from "@/components/User/UserAvatar.vue";
 import ServiceAccountTag from "@/components/misc/ServiceAccountTag.vue";
@@ -41,11 +52,12 @@ import YouTag from "@/components/misc/YouTag.vue";
 import { useCurrentUserV1, usePermissionStore } from "@/store";
 import { SYSTEM_BOT_USER_NAME } from "@/types";
 import { unknownUser } from "@/types";
-import { UserType } from "@/types/proto/v1/auth_service";
+import { User, UserType } from "@/types/proto/v1/auth_service";
 import type { MemberBinding } from "../../types";
 
 const props = defineProps<{
   binding: MemberBinding;
+  onClickUser?: (user: User, event: MouseEvent) => void;
 }>();
 
 const currentUserV1 = useCurrentUserV1();

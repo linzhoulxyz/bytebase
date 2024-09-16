@@ -1,21 +1,33 @@
+import { MD5 } from "crypto-js";
 import { pull, pullAt } from "lodash-es";
+import { Engine } from "@/types/proto/v1/common";
 import type {
   ForeignKeyMetadata,
   TableMetadata,
 } from "@/types/proto/v1/database_service";
 import { IndexMetadata } from "@/types/proto/v1/database_service";
-import { upsertArray } from "@/utils";
+import { getFixedPrimaryKey, upsertArray } from "@/utils";
 
 export const upsertColumnPrimaryKey = (
+  engine: Engine,
   table: TableMetadata,
   columnName: string
 ) => {
   const pkIndex = table.indexes.findIndex((idx) => idx.primary);
   if (pkIndex < 0) {
+    let name = getFixedPrimaryKey(engine);
+    // If no fixed primary key, generate a unique name.
+    if (!name) {
+      // For Postgres, constraint name must be unique within the schema.
+      // Format: table_pk_{md5(table_pk_timestamp).slice(0, 6)}, e.g. test_pk_d4402d
+      const nameParts: string[] = [table.name, "pk"];
+      const rawName = nameParts.join("_").toLowerCase();
+      name = `${rawName}_${MD5(`${rawName}_${Date.now()}`).toString().slice(0, 6)}`;
+    }
     table.indexes.push(
       IndexMetadata.fromPartial({
+        name,
         primary: true,
-        name: "PRIMARY",
         unique: true,
         expressions: [columnName],
       })
@@ -25,6 +37,7 @@ export const upsertColumnPrimaryKey = (
     upsertArray(pk.expressions, columnName);
   }
 };
+
 export const removeColumnPrimaryKey = (
   table: TableMetadata,
   columnName: string
@@ -39,6 +52,7 @@ export const removeColumnPrimaryKey = (
     pullAt(table.indexes, pkIndex);
   }
 };
+
 export const upsertColumnFromForeignKey = (
   fk: ForeignKeyMetadata,
   columnName: string,
@@ -52,6 +66,7 @@ export const upsertColumnFromForeignKey = (
     fk.referencedColumns[position] = referencedColumnName;
   }
 };
+
 export const removeColumnFromForeignKey = (
   table: TableMetadata,
   fk: ForeignKeyMetadata,
@@ -70,6 +85,7 @@ export const removeColumnFromForeignKey = (
     }
   }
 };
+
 export const removeColumnFromAllForeignKeys = (
   table: TableMetadata,
   columnName: string

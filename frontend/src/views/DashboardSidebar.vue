@@ -4,7 +4,7 @@
     :key="'dashboard'"
     :item-list="dashboardSidebarItemList"
     :get-item-class="getItemClass"
-    :logo-redirect="WORKSPACE_ROUTE_MY_ISSUES"
+    :logo-redirect="logoRedirect"
   />
 </template>
 
@@ -15,11 +15,12 @@ import {
   LinkIcon,
   HomeIcon,
   DatabaseIcon,
-  ShieldAlertIcon,
+  WorkflowIcon,
   GalleryHorizontalEndIcon,
   LayersIcon,
   SquareStackIcon,
   ShieldCheck,
+  UsersIcon,
 } from "lucide-vue-next";
 import { computed, h } from "vue";
 import { useI18n } from "vue-i18n";
@@ -36,12 +37,13 @@ import {
   INSTANCE_ROUTE_DASHBOARD,
   PROJECT_V1_ROUTE_DASHBOARD,
   WORKSPACE_ROUTE_MY_ISSUES,
-  WORKSPACE_ROUTE_ANOMALY_CENTER,
   WORKSPACE_ROUTE_SQL_REVIEW,
   WORKSPACE_ROUTE_SCHEMA_TEMPLATE,
   WORKSPACE_ROUTE_CUSTOM_APPROVAL,
   WORKSPACE_ROUTE_RISK_CENTER,
-  WORKSPACE_ROUTE_SENSITIVE_DATA,
+  WORKSPACE_ROUTE_DATA_MASKING,
+  WORKSPACE_ROUTE_DATA_CLASSIFICATION,
+  WORKSPACE_ROUTE_DATA_ACCESS_CONTROL,
   WORKSPACE_ROUTE_AUDIT_LOG,
   WORKSPACE_ROUTE_GITOPS,
   WORKSPACE_ROUTE_SSO,
@@ -52,13 +54,16 @@ import {
   WORKSPACE_ROUTE_USER_PROFILE,
   WORKSPACE_ROUTE_IM,
 } from "@/router/dashboard/workspaceRoutes";
-import { usePermissionStore } from "@/store";
+import { SQL_EDITOR_HOME_MODULE } from "@/router/sqlEditor";
+import { useAppFeature, usePermissionStore } from "@/store";
 import type { Permission } from "@/types";
+import { DatabaseChangeMode } from "@/types/proto/v1/setting_service";
 import { hasWorkspacePermissionV2 } from "@/utils";
 
 interface DashboardSidebarItem extends SidebarItem {
   navigationId?: string;
   shortcuts?: string[];
+  hide?: boolean;
   children?: DashboardSidebarItem[];
 }
 
@@ -66,6 +71,7 @@ const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const permissionStore = usePermissionStore();
+const databaseChangeMode = useAppFeature("bb.feature.database-change-mode");
 
 const getItemClass = (item: SidebarItem): string[] => {
   const { name: current } = route;
@@ -159,6 +165,7 @@ const dashboardSidebarItemList = computed((): DashboardSidebarItem[] => {
       title: t("issue.my-issues"),
       icon: () => h(HomeIcon),
       name: WORKSPACE_ROUTE_MY_ISSUES,
+      hide: databaseChangeMode.value === DatabaseChangeMode.EDITOR,
       type: "route",
       shortcuts: ["g", "m", "i"],
     },
@@ -199,16 +206,8 @@ const dashboardSidebarItemList = computed((): DashboardSidebarItem[] => {
       name: "",
     },
     {
-      navigationId: "bb.navigation.anomaly-center",
-      title: t("anomaly-center"),
-      icon: () => h(ShieldAlertIcon),
-      name: WORKSPACE_ROUTE_ANOMALY_CENTER,
-      type: "route",
-      shortcuts: ["g", "a", "c"],
-    },
-    {
-      title: t("settings.sidebar.security-and-policy"),
-      icon: () => h(ShieldCheck),
+      title: t("settings.sidebar.iam-and-admin"),
+      icon: () => h(UsersIcon),
       type: "div",
       children: [
         {
@@ -228,13 +227,26 @@ const dashboardSidebarItemList = computed((): DashboardSidebarItem[] => {
           type: "route",
         },
         {
-          title: t("sql-review.title"),
-          name: WORKSPACE_ROUTE_SQL_REVIEW,
+          title: t("settings.sidebar.sso"),
+          name: WORKSPACE_ROUTE_SSO,
           type: "route",
         },
         {
-          title: t("schema-template.self"),
-          name: WORKSPACE_ROUTE_SCHEMA_TEMPLATE,
+          title: t("settings.sidebar.audit-log"),
+          name: WORKSPACE_ROUTE_AUDIT_LOG,
+          type: "route",
+        },
+      ],
+    },
+    {
+      title: "CI/CD",
+      icon: () => h(WorkflowIcon),
+      type: "div",
+      hide: databaseChangeMode.value === DatabaseChangeMode.EDITOR,
+      children: [
+        {
+          title: t("sql-review.title"),
+          name: WORKSPACE_ROUTE_SQL_REVIEW,
           type: "route",
         },
         {
@@ -248,13 +260,36 @@ const dashboardSidebarItemList = computed((): DashboardSidebarItem[] => {
           type: "route",
         },
         {
-          title: t("settings.sidebar.sensitive-data"),
-          name: WORKSPACE_ROUTE_SENSITIVE_DATA,
+          title: t("schema-template.self"),
+          name: WORKSPACE_ROUTE_SCHEMA_TEMPLATE,
           type: "route",
         },
         {
-          title: t("settings.sidebar.audit-log"),
-          name: WORKSPACE_ROUTE_AUDIT_LOG,
+          title: t("settings.sidebar.gitops"),
+          name: WORKSPACE_ROUTE_GITOPS,
+          type: "route",
+          hide: databaseChangeMode.value === DatabaseChangeMode.EDITOR,
+        },
+      ],
+    },
+    {
+      title: t("settings.sidebar.data-access"),
+      icon: () => h(ShieldCheck),
+      type: "div",
+      children: [
+        {
+          title: t("settings.sidebar.data-classification"),
+          name: WORKSPACE_ROUTE_DATA_CLASSIFICATION,
+          type: "route",
+        },
+        {
+          title: t("settings.sidebar.data-masking"),
+          name: WORKSPACE_ROUTE_DATA_MASKING,
+          type: "route",
+        },
+        {
+          title: t("settings.sidebar.access-control"),
+          name: WORKSPACE_ROUTE_DATA_ACCESS_CONTROL,
           type: "route",
         },
       ],
@@ -263,17 +298,8 @@ const dashboardSidebarItemList = computed((): DashboardSidebarItem[] => {
       title: t("settings.sidebar.integration"),
       icon: () => h(LinkIcon),
       type: "div",
+      hide: databaseChangeMode.value === DatabaseChangeMode.EDITOR,
       children: [
-        {
-          title: t("settings.sidebar.gitops"),
-          name: WORKSPACE_ROUTE_GITOPS,
-          type: "route",
-        },
-        {
-          title: t("settings.sidebar.sso"),
-          name: WORKSPACE_ROUTE_SSO,
-          type: "route",
-        },
         {
           title: t("settings.sidebar.mail-delivery"),
           name: WORKSPACE_ROUTE_MAIL_DELIVERY,
@@ -289,6 +315,13 @@ const dashboardSidebarItemList = computed((): DashboardSidebarItem[] => {
   ];
 
   return filterSidebarByPermissions(sidebarList);
+});
+
+const logoRedirect = computed(() => {
+  if (databaseChangeMode.value === DatabaseChangeMode.EDITOR) {
+    return SQL_EDITOR_HOME_MODULE;
+  }
+  return WORKSPACE_ROUTE_MY_ISSUES;
 });
 
 const navigationKbarActions = computed((): Action[] => {
