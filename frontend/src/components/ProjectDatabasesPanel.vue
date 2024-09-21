@@ -1,7 +1,19 @@
 <template>
   <div class="space-y-4">
+    <div v-if="databaseList.length === 0" class="textinfolabel p-2">
+      <i18n-t keypath="project.overview.no-db-prompt" tag="p">
+        <template #newDb>
+          <span class="text-main">{{ $t("quick-action.new-db") }}</span>
+        </template>
+        <template #transferInDb>
+          <span class="text-main">
+            {{ $t("quick-action.transfer-in-db") }}
+          </span>
+        </template>
+      </i18n-t>
+    </div>
     <div
-      class="w-full text-lg font-medium leading-7 text-main flex flex-col sm:flex-row items-start sm:items-end justify-between gap-2"
+      class="w-full flex flex-col sm:flex-row items-start sm:items-end justify-between gap-2"
     >
       <AdvancedSearch
         v-model:params="state.params"
@@ -37,7 +49,6 @@
 import { reactive, computed } from "vue";
 import { useRouter } from "vue-router";
 import DatabaseV1Table from "@/components/v2/Model/DatabaseV1Table";
-import { useFilterStore } from "@/store";
 import type { ComposedDatabase, ComposedProject } from "@/types";
 import { UNKNOWN_ID } from "@/types";
 import type { SearchParams } from "@/utils";
@@ -64,7 +75,6 @@ const props = defineProps<{
 }>();
 
 const router = useRouter();
-const { filter } = useFilterStore();
 
 const state = reactive<LocalState>({
   selectedDatabaseNames: new Set(),
@@ -124,9 +134,6 @@ const filteredDatabaseList = computed(() => {
     list = list.filter((db) => {
       return labels.some((kv) => db.labels[kv.key] === kv.value);
     });
-  }
-  if (filter.database) {
-    list = list.filter((db) => db.name === filter.database);
   }
   return list;
 });

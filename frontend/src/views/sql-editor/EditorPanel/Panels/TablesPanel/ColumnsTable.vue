@@ -12,6 +12,7 @@
       :striped="true"
       :bordered="true"
       :bottom-bordered="true"
+      row-class-name="cursor-default"
     />
   </div>
 </template>
@@ -33,8 +34,7 @@ import type {
   SchemaMetadata,
   TableMetadata,
 } from "@/types/proto/v1/database_service";
-import { getHighlightHTMLByRegExp } from "@/utils";
-import { useAutoHeightDataTable } from "../../common";
+import { getHighlightHTMLByRegExp, useAutoHeightDataTable } from "@/utils";
 import { useEditorPanelContext } from "../../context";
 
 const props = defineProps<{
@@ -46,13 +46,9 @@ const props = defineProps<{
 }>();
 
 const { viewState } = useEditorPanelContext();
-const { containerElRef, tableBodyHeight, layoutReady } =
+const { containerElRef, virtualListRef, tableBodyHeight, layoutReady } =
   useAutoHeightDataTable();
 const dataTableRef = ref<DataTableInst>();
-const vlRef = computed(() => {
-  return (dataTableRef.value as any)?.$refs?.mainTableInstRef?.bodyInstRef
-    ?.virtualListRef;
-});
 const { t } = useI18n();
 
 const filteredColumns = computed(() => {
@@ -184,7 +180,7 @@ const isColumnPrimaryKey = (column: ColumnMetadata): boolean => {
 };
 
 watch(
-  [() => viewState.value?.detail.column, vlRef],
+  [() => viewState.value?.detail.column, virtualListRef],
   ([column, vl]) => {
     if (column && vl) {
       requestAnimationFrame(() => {

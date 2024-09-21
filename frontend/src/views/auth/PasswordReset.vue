@@ -8,16 +8,14 @@
     </div>
 
     <div class="mt-8">
-      <div class="mt-6">
-        <NForm>
-          <UserPassword
-            ref="userPasswordRef"
-            v-model:password="state.password"
-            v-model:password-confirm="state.passwordConfirm"
-            :show-learn-more="false"
-            :password-restriction="passwordRestrictionSetting"
-          />
-        </NForm>
+      <div class="mt-6 space-y-6">
+        <UserPassword
+          ref="userPasswordRef"
+          v-model:password="state.password"
+          v-model:password-confirm="state.passwordConfirm"
+          :show-learn-more="false"
+          :password-restriction="passwordRestrictionSetting"
+        />
         <NButton
           type="primary"
           size="large"
@@ -33,7 +31,7 @@
 </template>
 
 <script lang="ts" setup>
-import { NButton, NForm } from "naive-ui";
+import { NButton } from "naive-ui";
 import { computed, reactive, ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -69,9 +67,14 @@ const passwordRestrictionSetting = computed(
   () => settingV1Store.passwordRestriction
 );
 
+const redirectQuery = computed(() => {
+  const query = new URLSearchParams(window.location.search);
+  return query.get("redirect") || "/";
+});
+
 onMounted(async () => {
   if (!authStore.requireResetPassword) {
-    router.replace("/");
+    router.replace(redirectQuery.value);
     return;
   }
   await settingV1Store.getOrFetchSettingByName(
@@ -106,6 +109,6 @@ const onConfirm = async () => {
     title: t("common.updated"),
   });
   authStore.setRequireResetPassword(false);
-  router.replace("/");
+  router.replace(redirectQuery.value);
 };
 </script>

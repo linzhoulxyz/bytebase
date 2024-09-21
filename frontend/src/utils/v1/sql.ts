@@ -66,6 +66,7 @@ export const wrapSQLIdentifier = (id: string, engine: Engine) => {
       Engine.ORACLE,
       Engine.OCEANBASE_ORACLE,
       Engine.REDSHIFT,
+      Engine.COCKROACHDB,
     ].includes(engine)
   ) {
     return `"${id}"`;
@@ -178,11 +179,10 @@ export const compareQueryRowValues = (
 
   // NULL or undefined values go behind
   if (isNullOrUndefined(valueA)) return 1;
-  if (isNullOrUndefined(valueB)) return 0;
+  if (isNullOrUndefined(valueB)) return -1;
 
   if (Long.isLong(rawA) && Long.isLong(rawB)) {
-    const cmp = rawA.compare(rawB);
-    return cmp <= 0 ? 0 : 1;
+    return rawA.compare(rawB);
   }
 
   if (typeof valueA === "number" && typeof valueB === "number") {

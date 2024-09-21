@@ -15,7 +15,6 @@ import i18n from "./plugins/i18n";
 import NaiveUI from "./plugins/naive-ui";
 import { isSilent } from "./plugins/silent-request";
 import { router } from "./router";
-import { AUTH_SIGNIN_MODULE } from "./router/auth";
 import { pinia, pushNotification, useAuthStore } from "./store";
 import {
   humanizeTs,
@@ -69,7 +68,7 @@ axios.interceptors.response.use(
         const origin = location.origin;
         const pathname = location.pathname;
         if (
-          pathname !== "/auth/mfa" &&
+          !pathname.startsWith("/auth") &&
           error.response.request.responseURL.startsWith(origin)
         ) {
           // If the request URL starts with the browser's location origin
@@ -77,11 +76,7 @@ axios.interceptors.response.use(
           // we know this is a request to Bytebase API endpoint (not an external service).
           // Means that the auth session is error or expired.
           // So we need to "kick out" here.
-          try {
-            await useAuthStore().logout();
-          } finally {
-            router.push({ name: AUTH_SIGNIN_MODULE });
-          }
+          await useAuthStore().logout();
         }
       }
 

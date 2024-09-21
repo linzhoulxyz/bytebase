@@ -694,10 +694,9 @@
         },
         "sign-in-frequency": {
           "self": "Frecuencia de inicio de sesión",
-          "description": "La frecuencia de inicio de sesión es el período antes de que un usuario deba iniciar sesión nuevamente.",
+          "description": "La frecuencia de inicio de sesión define con qué frecuencia los usuarios deben volver a autenticarse. Las actualizaciones de configuración requieren que los usuarios inicien sesión nuevamente para que los cambios surtan efecto.",
           "hours": "Horas",
-          "days": "Días",
-          "config-updated": "La configuración se ha actualizado. Necesita reiniciar Bytebase y volver a iniciar sesión para que surta efecto."
+          "days": "Días"
         },
         "maximum-role-expiration": {
           "self": "Caducidad máxima del rol",
@@ -781,7 +780,9 @@
             "self": "Modo de edición SQL (Individual)",
             "description": "Permite la ejecución directa de SQL en un editor de SQL para realizar cambios rápidos y sencillos."
           },
-          "can-be-changed-later": "Utilice el Editor SQL para ejecutar cambios en la base de datos directamente. Adecuado para particulares."
+          "can-be-changed-later": "Utilice el Editor SQL para ejecutar cambios en la base de datos directamente. Adecuado para particulares.",
+          "default-view-changed-to-sql-editor": "La vista predeterminada del espacio de trabajo se ha cambiado al Editor SQL.",
+          "go-to-sql-editor": "Ir al editor SQL"
         }
       }
     },

@@ -68,7 +68,7 @@
 import { NButton } from "naive-ui";
 import { computed, reactive } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import { BBTextField } from "@/bbkit";
 import { useAuthStore } from "@/store";
 
@@ -82,7 +82,6 @@ interface LocalState {
 
 const { t } = useI18n();
 const route = useRoute();
-const router = useRouter();
 const authStore = useAuthStore();
 const state = reactive<LocalState>({
   selectedMFAType: "OTP",
@@ -92,9 +91,6 @@ const state = reactive<LocalState>({
 
 const mfaTempToken = computed(() => {
   return route.query.mfaTempToken as string;
-});
-const redirectUrl = computed(() => {
-  return route.query.redirect as string;
 });
 
 const challengeDescription = computed(() => {
@@ -119,6 +115,5 @@ const challenge = async () => {
     mfaTempToken: mfaTempToken.value,
     ...mfaContext,
   });
-  router.replace(redirectUrl.value || "/");
 };
 </script>

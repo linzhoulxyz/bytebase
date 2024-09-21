@@ -7,7 +7,7 @@
         </h1>
       </div>
     </div>
-    <div class="flex-1 lg:px-4">
+    <div class="flex-1 mt-4 lg:px-4 lg:mt-0">
       <p class="mt-0.5 mb-2 font-medium">
         {{ $t("settings.general.workspace.database-change-mode.description") }}
         <LearnMoreLink
@@ -76,12 +76,22 @@
       container-class="flex flex-col gap-2"
     >
       <div class="py-2">
-        The workspace's default view has been changed to SQL Editor.
+        {{
+          $t(
+            "settings.general.workspace.database-change-mode.default-view-changed-to-sql-editor"
+          )
+        }}
       </div>
       <div class="flex items-center justify-end gap-2">
-        <NButton @click="state.showModal = false">OK</NButton>
+        <NButton @click="state.showModal = false">
+          {{ $t("common.ok") }}
+        </NButton>
         <NButton type="primary" @click="goToSQLEditor">
-          Go to SQL Editor
+          {{
+            $t(
+              "settings.general.workspace.database-change-mode.go-to-sql-editor"
+            )
+          }}
         </NButton>
       </div>
     </BBModal>

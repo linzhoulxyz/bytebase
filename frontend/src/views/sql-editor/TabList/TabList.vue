@@ -8,7 +8,7 @@
       <Draggable
         id="tab-list"
         ref="tabListRef"
-        v-model="filteredTabIdList"
+        v-model="tabStore.tabIdList"
         item-key="id"
         animation="300"
         class="tab-list hide-scrollbar"
@@ -69,7 +69,6 @@ import ProfileDropdown from "@/components/ProfileDropdown.vue";
 import { useEmitteryEventListener } from "@/composables/useEmitteryEventListener";
 import {
   useAppFeature,
-  useFilterStore,
   useSQLEditorStore,
   useSQLEditorTabStore,
 } from "@/store";
@@ -94,7 +93,6 @@ type LocalState = {
 const tabStore = useSQLEditorTabStore();
 
 const { t } = useI18n();
-const { filter } = useFilterStore();
 const dialog = useDialog();
 
 const state = reactive<LocalState>({
@@ -125,25 +123,6 @@ const hideSettingButton = computed(() => {
   return false;
 });
 
-const filteredTabIdList = computed(() => {
-  // If a database is selected, only show tabs that are associated with the database.
-  if (filter.database) {
-    return tabStore.tabIdList.filter((id) => {
-      const tab = tabStore.tabById(id);
-      if (
-        !tab?.connection.database ||
-        tab.connection.database === filter.database
-      ) {
-        return true;
-      } else {
-        return false;
-      }
-    });
-  }
-
-  return tabStore.tabIdList;
-});
-
 const handleSelectTab = async (tab: SQLEditorTab | undefined) => {
   tabStore.setCurrentTabId(tab?.id ?? "");
 };
@@ -170,10 +149,7 @@ const handleRemoveTab = async (
   focusWhenConfirm = false
 ) => {
   const _defer = defer<boolean>();
-  if (
-    (tab.mode === "READONLY" || tab.mode === "STANDARD") &&
-    tab.status === "DIRTY"
-  ) {
+  if (tab.mode === "WORKSHEET" && tab.status === "DIRTY") {
     if (focusWhenConfirm) {
       tabStore.setCurrentTabId(tab.id);
     }
