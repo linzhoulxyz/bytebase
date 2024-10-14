@@ -131,6 +131,8 @@ const (
 	SchemaRuleStatementDisallowOfflineDDL = "statement.disallow-offline-ddl"
 	// SchemaRuleStatementDisallowCrossDBQueries disallow cross database queries.
 	SchemaRuleStatementDisallowCrossDBQueries = "statement.disallow-cross-db-queries"
+	// SchemaRuleStatementMaxExecutionTime enforce the maximum execution time.
+	SchemaRuleStatementMaxExecutionTime = "statement.max-execution-time"
 	// SchemaRuleTableRequirePK require the table to have a primary key.
 	SchemaRuleTableRequirePK SQLReviewRuleType = "table.require-pk"
 	// SchemaRuleTableNoFK require the table disallow the foreign key.
@@ -303,8 +305,9 @@ type RequiredColumnRulePayload struct {
 
 // CommentConventionRulePayload is the payload for comment convention rule.
 type CommentConventionRulePayload struct {
-	Required  bool `json:"required"`
-	MaxLength int  `json:"maxLength"`
+	Required               bool `json:"required"`
+	RequiredClassification bool `json:"requiredClassification"`
+	MaxLength              int  `json:"maxLength"`
 }
 
 // NumberTypeRulePayload is the number type payload.
@@ -485,6 +488,7 @@ type SQLReviewCheckContext struct {
 	Driver                *sql.DB
 	Context               context.Context
 	PreUpdateBackupDetail *storepb.PreUpdateBackupDetail
+	ClassificationConfig  *storepb.DataClassificationSetting_DataClassificationConfig
 
 	// Snowflake specific fields
 	CurrentDatabase string
@@ -556,6 +560,7 @@ func SQLReviewCheck(
 				Driver:                checkContext.Driver,
 				Context:               checkContext.Context,
 				CurrentDatabase:       checkContext.CurrentDatabase,
+				ClassificationConfig:  checkContext.ClassificationConfig,
 			},
 			statements,
 		)
@@ -1477,6 +1482,10 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 		if engine == storepb.Engine_MSSQL {
 			return MSSQLStatementDisallowCrossDBQueries, nil
 		}
+	case SchemaRuleStatementMaxExecutionTime:
+		if engine == storepb.Engine_MYSQL || engine == storepb.Engine_MARIADB {
+			return MySQLStatementMaxExecutionTime, nil
+		}
 	case SchemaRuleCommentLength:
 		if engine == storepb.Engine_POSTGRES {
 			return PostgreSQLCommentConvention, nil
@@ -1508,7 +1517,7 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLFunctionDisallowedList, nil
 		}
 	case SchemaRuleOnlineMigration:
-		if engine == storepb.Engine_MYSQL {
+		if engine == storepb.Engine_MYSQL || engine == storepb.Engine_MARIADB {
 			return MySQLOnlineMigration, nil
 		}
 	case SchemaRuleStatementNonTransactional:

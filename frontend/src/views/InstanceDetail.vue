@@ -12,18 +12,10 @@
     <NTabs>
       <template #suffix>
         <div class="space-x-2">
-          <NButton
-            v-if="allowSyncInstance"
-            :loading="state.syncingSchema"
-            @click.prevent="syncSchema"
-          >
-            <template v-if="state.syncingSchema">
-              {{ $t("instance.syncing") }}
-            </template>
-            <template v-else>
-              {{ $t("common.sync-now") }}
-            </template>
-          </NButton>
+          <InstanceSyncButton
+            v-if="instance.state === State.ACTIVE"
+            @sync-schema="syncSchema"
+          />
           <NButton
             v-if="allowCreateDatabase"
             type="primary"
@@ -71,16 +63,16 @@
   </Drawer>
 </template>
 
-<script lang="ts" setup>
+<script lang="tsx" setup>
 import { useTitle } from "@vueuse/core";
 import { NButton, NTabPane, NTabs } from "naive-ui";
-import type { ClientError } from "nice-grpc-web";
 import { computed, reactive } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import ArchiveBanner from "@/components/ArchiveBanner.vue";
 import { CreateDatabasePrepPanel } from "@/components/CreateDatabasePrepForm";
 import { EngineIcon } from "@/components/Icon";
+import InstanceSyncButton from "@/components/Instance/InstanceSyncButton.vue";
 import {
   InstanceForm,
   Form as InstanceFormBody,
@@ -106,7 +98,6 @@ import { DatabaseChangeMode } from "@/types/proto/v1/setting_service";
 import {
   instanceV1HasCreateDatabase,
   instanceV1Name,
-  hasWorkspacePermissionV2,
   hasWorkspaceLevelProjectPermissionInAnyProject,
   wrapRefAsPromise,
   autoDatabaseRoute,
@@ -148,6 +139,7 @@ const instance = computed(() => {
     `${instanceNamePrefix}${props.instanceId}`
   );
 });
+
 const environment = computed(() => {
   return useEnvironmentV1Store().getEnvironmentByName(
     instance.value.environment
@@ -162,13 +154,6 @@ const instanceRoleList = computed(() => {
   return instance.value.roles;
 });
 
-const allowSyncInstance = computed(() => {
-  return (
-    instance.value.state === State.ACTIVE &&
-    hasWorkspacePermissionV2("bb.instances.sync")
-  );
-});
-
 const allowCreateDatabase = computed(() => {
   return (
     databaseChangeMode.value === DatabaseChangeMode.PIPELINE &&
@@ -178,40 +163,25 @@ const allowCreateDatabase = computed(() => {
   );
 });
 
-const syncSchema = async () => {
-  state.syncingSchema = true;
-  try {
-    await instanceV1Store.syncInstance(instance.value);
-    // Remove the database list cache for the instance.
-    listCache.cacheMap.delete(listCache.getCacheKey(instance.value.name));
-    await wrapRefAsPromise(ready, true);
-    // Clear the db schema metadata cache entities.
-    // So we will re-fetch new values when needed.
-    const dbSchemaStore = useDBSchemaV1Store();
-    databaseList.value.forEach((database) =>
-      dbSchemaStore.removeCache(database.name)
-    );
-    pushNotification({
-      module: "bytebase",
-      style: "SUCCESS",
-      title: t(
-        "instance.successfully-synced-schema-for-instance-instance-value-name",
-        [instance.value.title]
-      ),
-    });
-  } catch (error) {
-    pushNotification({
-      module: "bytebase",
-      style: "CRITICAL",
-      title: t(
-        "instance.failed-to-sync-schema-for-instance-instance-value-name",
-        [instance.value.title]
-      ),
-      description: (error as ClientError).details,
-    });
-  } finally {
-    state.syncingSchema = false;
-  }
+const syncSchema = async (enableFullSync: boolean) => {
+  await instanceV1Store.syncInstance(instance.value, enableFullSync);
+  // Remove the database list cache for the instance.
+  listCache.cacheMap.delete(listCache.getCacheKey(instance.value.name));
+  await wrapRefAsPromise(ready, true);
+  // Clear the db schema metadata cache entities.
+  // So we will re-fetch new values when needed.
+  const dbSchemaStore = useDBSchemaV1Store();
+  databaseList.value.forEach((database) =>
+    dbSchemaStore.removeCache(database.name)
+  );
+  pushNotification({
+    module: "bytebase",
+    style: "SUCCESS",
+    title: t(
+      "instance.successfully-synced-schema-for-instance-instance-value-name",
+      [instance.value.title]
+    ),
+  });
 };
 
 const createDatabase = () => {

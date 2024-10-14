@@ -79,14 +79,18 @@ export const useInstanceV1Store = defineStore("instance_v1", () => {
     const composed = await upsertInstances([instance]);
     return composed[0];
   };
-  const syncInstance = async (instance: Instance) => {
+  const syncInstance = async (instance: Instance, enableFullSync: boolean) => {
     await instanceServiceClient.syncInstance({
       name: instance.name,
+      enableFullSync,
     });
   };
-  const batchSyncInstances = async (instanceNameList: string[]) => {
+  const batchSyncInstances = async (
+    instanceNameList: string[],
+    enableFullSync: boolean
+  ) => {
     await instanceServiceClient.batchSyncInstances({
-      requests: instanceNameList.map((name) => ({ name })),
+      requests: instanceNameList.map((name) => ({ name, enableFullSync })),
     });
   };
   const fetchInstanceByName = async (name: string, silent = false) => {

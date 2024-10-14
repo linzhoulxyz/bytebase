@@ -414,6 +414,10 @@
                 </li>
               
                 <li>
+                  <a href="#bytebase.store.PackageMetadata"><span class="badge">M</span>PackageMetadata</a>
+                </li>
+              
+                <li>
                   <a href="#bytebase.store.ProcedureConfig"><span class="badge">M</span>ProcedureConfig</a>
                 </li>
               
@@ -897,7 +901,15 @@
                 </li>
               
                 <li>
+                  <a href="#bytebase.store.PlanConfig.ReleaseSource"><span class="badge">M</span>PlanConfig.ReleaseSource</a>
+                </li>
+              
+                <li>
                   <a href="#bytebase.store.PlanConfig.Spec"><span class="badge">M</span>PlanConfig.Spec</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.store.PlanConfig.SpecReleaseSource"><span class="badge">M</span>PlanConfig.SpecReleaseSource</a>
                 </li>
               
                 <li>
@@ -1064,11 +1076,53 @@
         
           
           <li>
+            <a href="#store%2frelease.proto">store/release.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#bytebase.store.ReleasePayload"><span class="badge">M</span>ReleasePayload</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.store.ReleasePayload.File"><span class="badge">M</span>ReleasePayload.File</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.store.ReleasePayload.VCSSource"><span class="badge">M</span>ReleasePayload.VCSSource</a>
+                </li>
+              
+              
+                <li>
+                  <a href="#bytebase.store.ReleaseFileType"><span class="badge">E</span>ReleaseFileType</a>
+                </li>
+              
+              
+              
+            </ul>
+          </li>
+        
+          
+          <li>
             <a href="#store%2freview_config.proto">store/review_config.proto</a>
             <ul>
               
                 <li>
                   <a href="#bytebase.store.ReviewConfigPayload"><span class="badge">M</span>ReviewConfigPayload</a>
+                </li>
+              
+              
+              
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#store%2frevision.proto">store/revision.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#bytebase.store.RevisionPayload"><span class="badge">M</span>RevisionPayload</a>
                 </li>
               
               
@@ -1320,6 +1374,10 @@
               
                 <li>
                   <a href="#bytebase.store.TaskDatabaseUpdatePayload.FlagsEntry"><span class="badge">M</span>TaskDatabaseUpdatePayload.FlagsEntry</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.store.TaskReleaseSource"><span class="badge">M</span>TaskReleaseSource</a>
                 </li>
               
               
@@ -3602,6 +3660,37 @@ If the key length is not specified, it&#39;s -1. </p></td>
 
         
       
+        <h3 id="bytebase.store.PackageMetadata">PackageMetadata</h3>
+        <p>PackageMetadata is the metadata for packages.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The name is the name of a package. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>definition</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The definition is the definition of a package. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="bytebase.store.ProcedureConfig">ProcedureConfig</h3>
         <p></p>
 
@@ -3812,6 +3901,13 @@ It is an empty string for databases without such concept such as MySQL. </p></td
                   <td><a href="#bytebase.store.SequenceMetadata">SequenceMetadata</a></td>
                   <td>repeated</td>
                   <td><p>The sequences is the list of sequences in a schema. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>packages</td>
+                  <td><a href="#bytebase.store.PackageMetadata">PackageMetadata</a></td>
+                  <td>repeated</td>
+                  <td><p>The packages is the list of packages in a schema. </p></td>
                 </tr>
               
             </tbody>
@@ -7441,6 +7537,13 @@ Format: instances/{instance}/databases/{database} </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>release_source</td>
+                  <td><a href="#bytebase.store.PlanConfig.ReleaseSource">PlanConfig.ReleaseSource</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -7712,6 +7815,31 @@ Leave it empty if no needs to encrypt the zip file. </p></td>
 
         
       
+        <h3 id="bytebase.store.PlanConfig.ReleaseSource">PlanConfig.ReleaseSource</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>release</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The release.
+Format: projects/{project}/releases/{release} </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="bytebase.store.PlanConfig.Spec">PlanConfig.Spec</h3>
         <p></p>
 
@@ -7745,6 +7873,13 @@ Must be a subset of the specs in the same step. </p></td>
                 </tr>
               
                 <tr>
+                  <td>spec_release_source</td>
+                  <td><a href="#bytebase.store.PlanConfig.SpecReleaseSource">PlanConfig.SpecReleaseSource</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
                   <td>create_database_config</td>
                   <td><a href="#bytebase.store.PlanConfig.CreateDatabaseConfig">PlanConfig.CreateDatabaseConfig</a></td>
                   <td></td>
@@ -7763,6 +7898,31 @@ Must be a subset of the specs in the same step. </p></td>
                   <td><a href="#bytebase.store.PlanConfig.ExportDataConfig">PlanConfig.ExportDataConfig</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.store.PlanConfig.SpecReleaseSource">PlanConfig.SpecReleaseSource</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>file</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Format: projects/{project}/releases/{release}/files/{file}
+{file} is URL path escaped. </p></td>
                 </tr>
               
             </tbody>
@@ -7957,7 +8117,7 @@ If the condition evaluates to false, then this binding does not apply to the cur
         
       
         <h3 id="bytebase.store.DataSourceQueryPolicy">DataSourceQueryPolicy</h3>
-        <p>DataSourceQueryPolicy is the policy configuration for data source query.</p>
+        <p>DataSourceQueryPolicy is the policy configuration for running statements in the SQL editor.</p>
 
         
           <table class="field-table">
@@ -7971,6 +8131,20 @@ If the condition evaluates to false, then this binding does not apply to the cur
                   <td><a href="#bytebase.store.DataSourceQueryPolicy.Restriction">DataSourceQueryPolicy.Restriction</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>enable_ddl</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Allow running DDL statements in the SQL editor. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>enable_dml</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Allow running DML statements in the SQL editor. </p></td>
                 </tr>
               
             </tbody>
@@ -8805,6 +8979,166 @@ IM integration setting should be set for this function to work. </p></td>
     
       
       <div class="file-heading">
+        <h2 id="store/release.proto">store/release.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="bytebase.store.ReleasePayload">ReleasePayload</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>files</td>
+                  <td><a href="#bytebase.store.ReleasePayload.File">ReleasePayload.File</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>vcs_source</td>
+                  <td><a href="#bytebase.store.ReleasePayload.VCSSource">ReleasePayload.VCSSource</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.store.ReleasePayload.File">ReleasePayload.File</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The name of the file.
+Expressed as a path, e.g. `2.2/V0001_create_table.sql` </p></td>
+                </tr>
+              
+                <tr>
+                  <td>sheet</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The sheet that holds the content.
+Format: projects/{project}/sheets/{sheet} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>sheet_sha256</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The SHA256 hash value of the sheet. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>type</td>
+                  <td><a href="#bytebase.store.ReleaseFileType">ReleaseFileType</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.store.ReleasePayload.VCSSource">ReleasePayload.VCSSource</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>vcs_type</td>
+                  <td><a href="#bytebase.store.VCSType">VCSType</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>pull_request_url</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+        <h3 id="bytebase.store.ReleaseFileType">ReleaseFileType</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>TYPE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>VERSIONED</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+
+      
+
+      
+    
+      
+      <div class="file-heading">
         <h2 id="store/review_config.proto">store/review_config.proto</h2><a href="#title">Top</a>
       </div>
       <p></p>
@@ -8825,6 +9159,92 @@ IM integration setting should be set for this function to work. </p></td>
                   <td><a href="#bytebase.store.SQLReviewRule">SQLReviewRule</a></td>
                   <td>repeated</td>
                   <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+    
+      
+      <div class="file-heading">
+        <h2 id="store/revision.proto">store/revision.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="bytebase.store.RevisionPayload">RevisionPayload</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>release</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Format: projects/{project}/releases/{release}
+Can be empty. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>sheet</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The sheet that holds the content.
+Format: projects/{project}/sheets/{sheet} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>sheet_sha256</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The SHA256 hash value of the sheet. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>type</td>
+                  <td><a href="#bytebase.store.ReleaseFileType">ReleaseFileType</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>file</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The name of the file in the release.
+Expressed as a path, e.g. `2.2/V0001_create_table.sql`
+Can be empty. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>task_run</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The task run associated with the revision.
+Can be empty.
+Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task}/taskRuns/{taskRun} </p></td>
                 </tr>
               
             </tbody>
@@ -10150,7 +10570,7 @@ use the default full mask algorithm. </p></td>
               
                 <tr>
                   <td>expression</td>
-                  <td><a href="#google.api.expr.v1alpha1.ParsedExpr">google.api.expr.v1alpha1.ParsedExpr</a></td>
+                  <td><a href="#google.api.expr.v1alpha1.Expr">google.api.expr.v1alpha1.Expr</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -10881,7 +11301,7 @@ Default to this mode.</p></td>
         
       
         <h3 id="bytebase.store.TaskDatabaseUpdatePayload">TaskDatabaseUpdatePayload</h3>
-        <p>TaskDatabaseDataUpdatePayload is the task payload for database data update (DML).</p>
+        <p>TaskDatabaseUpdatePayload is the task payload for updating database (DDL & DML).</p>
 
         
           <table class="field-table">
@@ -10939,6 +11359,13 @@ Default to this mode.</p></td>
                   <td><p>flags is used for ghost sync </p></td>
                 </tr>
               
+                <tr>
+                  <td>task_release_source</td>
+                  <td><a href="#bytebase.store.TaskReleaseSource">TaskReleaseSource</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -10968,6 +11395,31 @@ Default to this mode.</p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.store.TaskReleaseSource">TaskReleaseSource</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>file</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Format: projects/{project}/releases/{release}/files/{file}
+{file} is URL path escaped. </p></td>
                 </tr>
               
             </tbody>

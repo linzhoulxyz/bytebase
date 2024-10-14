@@ -225,7 +225,7 @@
     "will-lose-unsaved-data": "这会丢失当前所有未保存的数据。",
     "deleted": "已删除",
     "will-override-current-data": "将会覆盖当前数据。",
-    "rollout": "发布",
+    "roll-out": "发布",
     "uploading": "上传中",
     "active": "开启",
     "added": "已创建",
@@ -290,7 +290,9 @@
     "back-to-workspace": "返回工作空间",
     "override": "覆盖",
     "encoding": "编码",
-    "finish": "完成"
+    "finish": "完成",
+    "title": "标题",
+    "hide": "隐藏"
   },
   "error-page": {
     "go-back-home": "回到主页"
@@ -371,7 +373,7 @@
     "skip": "跳过",
     "skip-modal-title": "跳过任务[{name}]？",
     "task-checks": "任务检查项",
-    "prior-backup": "受影响数据预备份",
+    "prior-backup": "预备份受影响数据",
     "skip-failed-in-current-stage": "跳过当前阶段失败的任务",
     "apply-change-to-all-pending-tasks": {
       "title": "应用到所有未执行任务？",
@@ -489,7 +491,7 @@
       "email": "邮箱",
       "role": "角色",
       "phone": "手机号",
-      "phone-tips": "请包含国家代码前缀",
+      "phone-tips": "请包含国家代码前缀 +86xxxxxx",
       "country-code": "国家或地区代码",
       "password": "密码",
       "password-hint": "密码应遵循限制设置",
@@ -773,12 +775,12 @@
           "self": "数据库变更模式",
           "description": "控制用户如何变更数据库",
           "issue-mode": {
-            "self": "工单模式（团队）",
-            "description": "使用工单来提交，审核，发布，版本化数据库变更。适合团队协同。"
+            "self": "工单模式（管控）",
+            "description": "使用工单来提交，审核，发布，版本化数据库变更。适合团队协同及需要管控的环境。"
           },
           "sql-editor-mode": {
-            "self": "SQL 编辑器模式（单人）",
-            "description": "使用 SQL 编辑器直接执行数据库变更。适合单人使用。"
+            "self": "SQL 编辑器模式（直接）",
+            "description": "使用 SQL 编辑器直接执行数据库变更。适合单人使用或不需要管控的环境。"
           },
           "can-be-changed-later": "此设置以后可以随时更改。",
           "default-view-changed-to-sql-editor": "工作空间的默认视图已更改为 SQL 编辑器。",
@@ -1047,6 +1049,11 @@
     "waiting-rollout": "等待发布",
     "opened-by-at": "{id} 由 {creator} 开启于 {time}",
     "commit-by-at": "{id} {title} 由 {author} 提交于 {time}",
+    "status": {
+      "open": "开启中",
+      "done": "已完成",
+      "canceled": "已关闭"
+    },
     "status-transition": {
       "modal": {
         "resolve": "完成工单?",
@@ -1270,7 +1277,7 @@
         "admin": "{environment} 环境没有配置 SQL 审核策略。{link}",
         "developer": "{environment} 环境没有配置 SQL 审核策略，请让您的 DBA 配置。"
       },
-      "statement-is-too-large": "语句过大",
+      "statement-is-too-large": "当前语句大小超过 1MB，将跳过 SQL 检查。",
       "back-to-edit": "返回编辑",
       "continue-anyway": "仍然继续",
       "sql-review-violations": "违反的 SQL 审核规则"
@@ -1414,6 +1421,12 @@
     "select-database-user": "选择数据库用户",
     "new-database": "@:common.new@:common.database",
     "syncing": "同步中 ...",
+    "sync": {
+      "self": "同步实例",
+      "sync-all": "同步所有数据库",
+      "sync-new": "仅同步新数据库",
+      "sync-all-tip": "数据库同步是异步的，可能需要几秒到几分钟"
+    },
     "selected-n-instances": "已选择 {n} 个实例",
     "create-migration-schema": "@:common.create@:common.migration @:{'common.schema'}",
     "missing-migration-schema": "缺少@:common.migration @:common.schema",
@@ -1620,11 +1633,16 @@
     "access-control": {
       "title": "访问控制",
       "disable-copy-data-from-sql-editor": "限制 SQL 编辑器中的数据复制 (管理员/DBA 可以复制)",
-      "restrict-admin-data-sources": {
-        "self": "管理员数据源查询限制",
-        "disallow": "禁止从管理员数据源查询数据",
-        "fallback": "如果没有只读数据源，则可以对管理员数据源进行查询"
+      "restrict-admin-connection": {
+        "self": "管理员连接查询限制",
+        "disallow": "禁止用管理员连接查询数据",
+        "fallback": "如果没有只读连接可用，则回退到管理员连接"
       }
+    },
+    "statement-execution": {
+      "title": "语句执行",
+      "allow-ddl": "允许在 SQL 编辑器中运行 DDL 语句",
+      "allow-dml": "允许在 SQL 编辑器中运行 DML 语句"
     }
   },
   "quick-start": {
@@ -1676,7 +1694,7 @@
     "password-forgot": "忘记密码",
     "password-reset": {
       "title": "重置您的密码",
-      "content": "我们会将重置密码链接发送到您的邮箱",
+      "content": "依据密码限制策略，您需要重置登录密码。",
       "send-reset-link": "发送重置链接",
       "return-to-sign-in": "返回登录"
     },
@@ -1695,15 +1713,9 @@
       "info": "当要发布对数据库的变更时，该选项控制了是否需要人工发布。",
       "auto": "自动发布",
       "auto-info": "如果预检查都通过的话，会自动发布，执行变更。",
-      "manual-by-project-owner": "项目所有者",
-      "manual-by-project-releaser": "项目的发布者",
-      "manual-by-issue-creator": "工单的创建者",
       "manual-by-last-approver": "自定义审批的最后一个审批人发布",
       "manual-by-dedicated-roles": "特定角色手工发布",
-      "manual-by-dedicated-roles-info": "允许以下任一选中角色，点击「发布」按钮后，执行变更。",
-      "manual-by-dba": "DBA",
-      "manual-by-workspace-admin": "Bytebase 工作空间管理员",
-      "manual-by-custom-project-roles": "自定义项目角色"
+      "manual-by-dedicated-roles-info": "允许以下任一选中角色，点击「发布」按钮后，执行变更。"
     },
     "environment-tier": {
       "name": "环境级别",
@@ -1745,12 +1757,12 @@
     "all-tables": "所有表",
     "affected-tables": "受影响的表",
     "select-affection-tables": "选择受影响的表",
-    "view-full": "查看全部"
+    "view-full": "查看全部",
+    "rollback-tip": "选择要回滚到的某个 DDL 历史记录。"
   },
   "database": {
     "sync-database": "同步数据库",
     "select": "选择数据库",
-    "the-list-might-be-out-of-date-and-is-refreshed-roughly-every-10-minutes": "该表每隔约10分钟刷新一次，所以展示的可能不是最新信息。",
     "no-anomalies-detected": "没有检测到异常",
     "sync-status": "同步状态",
     "last-successful-sync": "最后一次成功的同步",
@@ -1918,7 +1930,7 @@
   "repository": {
     "our-webhook-link": "Bytebase 创建的 webhook 可以在 {webhookLink} 中找到。",
     "branch-observe-file-change": "Bytebase 跟踪文件变更的分支。",
-    "database-group-description": "默认情况下，更改将应用于项目中的所有数据库。或者，它们可以应用于数据库组。",
+    "database-group-description": "默认情况下，更改将应用于项目中的所有数据库。或者，也可以应用于指定的数据库分组。",
     "base-directory": "根目录",
     "base-directory-description": "Bytebase 观察文件变化的根目录。如果文件存储在存储库根目录中，请使用“/”。",
     "merge-request": "合并请求",
@@ -2365,6 +2377,7 @@
     "no-data-available": "暂无数据",
     "download-as-file": "下载为 {file} 格式",
     "only-select-allowed": "只允许执行 {select} 语句",
+    "enable-ddl-for-environment": "您可以为环境 {environment} 启用 DDL/DML 语句。",
     "want-to-action": "如果您想要{want}，点击“{action}”按钮{reaction}。",
     "and-submit-an-issue": "并提交一个工单",
     "to-enable-admin-mode": "来开启管理员模式",
@@ -2759,7 +2772,7 @@
         "title": "批量模式",
         "desc": "批量变更一组属于不同租户或者数据库分库的数据库。"
       },
-      "bb-feature-approval-policy": {
+      "bb-feature-rollout-policy": {
         "title": "发布策略",
         "desc": "「发布策略」可以控制数据库 schema 的变更是否需要手动发布"
       },
@@ -3212,7 +3225,22 @@
       "dont-show-again": "不再显示",
       "text2sql": "Text2SQL",
       "disable-text2sql": "关闭 Text2SQL",
-      "enable-text2sql": "开启 Text2SQL"
+      "enable-text2sql": "开启 Text2SQL",
+      "actions": {
+        "chat": "对话",
+        "explain-code": "解释代码",
+        "find-problems": "找出问题",
+        "new-chat": "开启新对话",
+        "insert-at-caret": "在光标处插入"
+      },
+      "send": "发送",
+      "new-line": "换行",
+      "ai-assistant": "AI 助手",
+      "not-configured": {
+        "self": "AI 助手尚未配置。",
+        "contact-admin-to-configure": "请联系您的组织管理员。",
+        "go-to-configure": "前往配置"
+      }
     }
   },
   "custom-approval": {
@@ -3470,12 +3498,16 @@
     "select-role": "选择角色",
     "expired-tip": "该角色可能已经过期。",
     "import-from-role": "从角色导入",
-    "workspace-roles": "工作空间角色",
+    "workspace-roles": {
+      "self": "工作空间角色"
+    },
     "project-roles": {
       "self": "项目角色",
       "apply-to-all-projects": "应用到所有项目"
     },
-    "custom-roles": "自定义角色",
+    "custom-roles": {
+      "self": "自定义角色"
+    },
     "workspace-admin": {
       "self": "工作空间管理员",
       "description": "工作空间内的所有权限。"
@@ -3511,6 +3543,9 @@
     "project-viewer": {
       "self": "项目查看者",
       "description": "可查看项目基本信息，并可自助发起数据查询、数据导出请求。"
+    },
+    "issue-creator": {
+      "self": "工单创建者"
     }
   },
   "database-group": {

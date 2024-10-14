@@ -225,7 +225,7 @@
     "will-lose-unsaved-data": "Se perderán los datos no guardados.",
     "deleted": "Eliminado",
     "will-override-current-data": "Se sobrescribirán los datos actuales.",
-    "rollout": "Implementar",
+    "roll-out": "Implementar",
     "uploading": "Subiendo",
     "active": "Activo",
     "added": "Agregado",
@@ -290,7 +290,9 @@
     "back-to-workspace": "Volver al espacio de trabajo",
     "override": "Anular",
     "encoding": "Codificación",
-    "finish": "Finalizar"
+    "finish": "Finalizar",
+    "title": "Título",
+    "hide": "Esconder"
   },
   "error-page": {
     "go-back-home": "Volver al inicio"
@@ -371,7 +373,7 @@
     "skip": "Saltar",
     "skip-modal-title": "¿Saltar tarea [{name}]?",
     "task-checks": "Comprobaciones de tarea",
-    "prior-backup": "Respaldo Previo",
+    "prior-backup": "Respaldo previo",
     "skip-failed-in-current-stage": "Saltar tareas fallidas en la etapa actual",
     "apply-change-to-all-pending-tasks": {
       "title": "¿Aplicar cambio a todas las tareas pendientes?",
@@ -489,7 +491,7 @@
       "email": "Correo electrónico",
       "role": "Rol",
       "phone": "Número de móvil",
-      "phone-tips": "Asegúrese de incluir el código del país.",
+      "phone-tips": "Asegúrese de incluir el código del país +1xxxxxx",
       "country-code": "Códigos de país y de área",
       "password": "Contraseña",
       "password-hint": "La contraseña debe seguir la configuración de restricción",
@@ -773,12 +775,12 @@
           "self": "Modo de cambio de base de datos",
           "description": "Controla cómo los usuarios realizan migraciones de esquemas de bases de datos",
           "issue-mode": {
-            "self": "Modo de emisión (Equipo)",
-            "description": "Utilice emisión para solicitar, revisar, implementar y crear versiones de cambios en la base de datos. Adecuado para la colaboración en equipo.."
+            "self": "Modo de emisión (Gobernado)",
+            "description": "Utilice issues para solicitar, revisar, implementar y versionar cambios en la base de datos. Adecuado para la colaboración en equipo y entornos de producción."
           },
           "sql-editor-mode": {
-            "self": "Modo de edición SQL (Individual)",
-            "description": "Permite la ejecución directa de SQL en un editor de SQL para realizar cambios rápidos y sencillos."
+            "self": "Modo de edición SQL (Directo)",
+            "description": "Utilice el Editor SQL para ejecutar cambios en la base de datos directamente. Adecuado para uso individual y entornos no productivos."
           },
           "can-be-changed-later": "Utilice el Editor SQL para ejecutar cambios en la base de datos directamente. Adecuado para particulares.",
           "default-view-changed-to-sql-editor": "La vista predeterminada del espacio de trabajo se ha cambiado al Editor SQL.",
@@ -1047,6 +1049,11 @@
     "waiting-rollout": "Esperando el lanzamiento",
     "opened-by-at": "abierta por {creator} a las {time}",
     "commit-by-at": "commit {id} {title} por {author} a las {time}",
+    "status": {
+      "open": "Abierto",
+      "done": "Hecho",
+      "canceled": "Cancelado"
+    },
     "status-transition": {
       "modal": {
         "resolve": "¿Resolver incidencia?",
@@ -1270,7 +1277,7 @@
         "admin": "El entorno {environment} no ha configurado la política de revisión de SQL. {link}",
         "developer": "El entorno {environment} no ha configurado la política de revisión de SQL. \nSolicite a su DBA que configure."
       },
-      "statement-is-too-large": "La declaración es demasiado grande.",
+      "statement-is-too-large": "Como el tamaño de la declaración actual supera 1 MB, se omitirá la comprobación de SQL.",
       "back-to-edit": "Volver a editar",
       "continue-anyway": "De todas maneras, continúe",
       "sql-review-violations": "Infracciones de revisión de SQL"
@@ -1414,6 +1421,12 @@
     "select-database-user": "Seleccionar usuario de base de datos",
     "new-database": "Nueva base de datos",
     "syncing": "Sincronizando...",
+    "sync": {
+      "self": "Instancia de sincronización",
+      "sync-all": "Sincronizar todas las bases de datos",
+      "sync-new": "Sincronizar únicamente bases de datos nuevas",
+      "sync-all-tip": "La sincronización de la base de datos es asincrónica y puede tardar entre unos segundos y minutos."
+    },
     "selected-n-instances": "{n} instancia seleccionada | {n} instancias seleccionadas",
     "create-migration-schema": "Crear esquema de migración",
     "missing-migration-schema": "Falta el esquema de migración",
@@ -1618,13 +1631,18 @@
     "successfully-updated-environment": "entorno '{name}' actualizado exitosamente.",
     "production-environment": "Entorno de producción",
     "access-control": {
-      "title": "Control de acceso",
+      "title": "Control de Acceso",
       "disable-copy-data-from-sql-editor": "Restringir la copia de datos en el editor SQL (permitido para administradores/DBA)",
-      "restrict-admin-data-sources": {
-        "self": "Restringir fuentes de datos de administrador",
-        "disallow": "No permitir consultar datos de la fuente de datos del administrador",
-        "fallback": "Recurrir a la fuente de datos del administrador si no hay ninguna fuente de datos de solo lectura disponible"
+      "restrict-admin-connection": {
+        "self": "Restricciones de consulta de conexión de administrador",
+        "disallow": "Prohibir consultar datos desde la conexión de administrador",
+        "fallback": "Volver a la conexión de administrador si no hay una conexión de solo lectura disponible"
       }
+    },
+    "statement-execution": {
+      "title": "Ejecución de la declaración",
+      "allow-ddl": "Permitir la ejecución de sentencias DDL en el editor SQL",
+      "allow-dml": "Permitir la ejecución de sentencias DML en el editor SQL"
     }
   },
   "quick-start": {
@@ -1676,7 +1694,7 @@
     "password-forgot": "Contraseña olvidada",
     "password-reset": {
       "title": "Restablecer su contraseña",
-      "content": "Ingrese su dirección de correo electrónico y le enviaremos un enlace para restablecer su contraseña",
+      "content": "Debe restablecer su contraseña de acuerdo con la política de restricción de contraseña.",
       "send-reset-link": "Enviar enlace de restablecimiento",
       "return-to-sign-in": "Volver a iniciar sesión"
     },
@@ -1690,23 +1708,17 @@
   },
   "policy": {
     "rollout": {
-      "name": "Política de implementación",
+      "name": "Política de Implementación",
       "tip": "La política se aplica retrospectivamente a las incidencias.",
       "info": "Para implementar cambios en la base de datos, esta configuración controla si la implementación requiere aprobación manual.",
       "auto": "Implementar automático",
       "auto-info": "Si se aprueban todas las comprobaciones, el cambio se implementará y ejecutará automáticamente.",
-      "manual-by-project-owner": "Dueño del proyecto",
-      "manual-by-project-releaser": "Liberador de proyecto",
-      "manual-by-issue-creator": "Creador del problema",
       "manual-by-last-approver": "Implementación manual por parte del último aprobador de la aprobación personalizada",
       "manual-by-dedicated-roles": "Implementación manual por roles especializados",
-      "manual-by-dedicated-roles-info": "Permita que cualquiera de los siguientes roles seleccionados haga clic en el botón \"Implementar\" y luego se ejecutará el cambio.",
-      "manual-by-dba": "DBA",
-      "manual-by-workspace-admin": "Administrador del espacio de trabajo",
-      "manual-by-custom-project-roles": "Roles de proyecto personalizados"
+      "manual-by-dedicated-roles-info": "Permita que cualquiera de los siguientes roles seleccionados haga clic en el botón \"Implementar\" y luego se ejecutará el cambio."
     },
     "environment-tier": {
-      "name": "Nivel de entorno",
+      "name": "Nivel de Entorno",
       "description": "El entorno aparecerá de manera diferente a otros entornos.",
       "mark-env-as-production": "Marcar como entorno de producción"
     }
@@ -1745,12 +1757,12 @@
     "all-tables": "Todas las tablas",
     "affected-tables": "Tablas afectadas",
     "select-affection-tables": "Seleccionar tablas afectadas",
-    "view-full": "Ver completo"
+    "view-full": "Ver completo",
+    "rollback-tip": "Seleccione un historial de DDL específico para revertir."
   },
   "database": {
     "sync-database": "Sincronizar base de datos",
     "select": "Seleccionar base de datos",
-    "the-list-might-be-out-of-date-and-is-refreshed-roughly-every-10-minutes": "La lista podría estar desactualizada y se actualiza aproximadamente cada 10 minutos",
     "no-anomalies-detected": "No se detectaron anomalías",
     "sync-status": "Estado de sincronización",
     "last-successful-sync": "Última sincronización exitosa",
@@ -2099,7 +2111,7 @@
         "only-apply-to-main-branches": "Sólo aplica en sucursales principales"
       },
       "issue-related": {
-        "self": "Problema relacionado",
+        "self": "Problema Relacionado",
         "labels": {
           "self": "Etiquetas",
           "configure-labels": "Configurar etiquetas",
@@ -2365,6 +2377,7 @@
     "no-data-available": "No hay datos disponibles",
     "download-as-file": "Descargar como {file}",
     "only-select-allowed": "Solo se permiten declaraciones {select} para ejecutar.",
+    "enable-ddl-for-environment": "Puede habilitar la declaración DDL/DML para el entorno {environment}.",
     "want-to-action": "Si desea {want}, haga clic en el botón {action} {reaction}.",
     "and-submit-an-issue": "y enviar un problema",
     "to-enable-admin-mode": "para habilitar el modo administrador",
@@ -2759,7 +2772,7 @@
         "title": "Modo Lote",
         "desc": "Cambio por lotes de un grupo de bases de datos de diferentes inquilinos o particiones."
       },
-      "bb-feature-approval-policy": {
+      "bb-feature-rollout-policy": {
         "title": "Política de implementación",
         "desc": "La política de implementación controla si la tarea de cambio de esquema requiere una implementación manual."
       },
@@ -3212,7 +3225,22 @@
       "dont-show-again": "No mostrar de nuevo",
       "text2sql": "Text2SQL",
       "disable-text2sql": "Deshabilitar Text2SQL",
-      "enable-text2sql": "Habilitar Text2SQL"
+      "enable-text2sql": "Habilitar Text2SQL",
+      "actions": {
+        "chat": "Charlar",
+        "explain-code": "Explicar el código",
+        "find-problems": "encontrar problemas",
+        "new-chat": "Nuevo chat",
+        "insert-at-caret": "Insertar en el cursor"
+      },
+      "send": "Enviar",
+      "new-line": "Nueva linea",
+      "ai-assistant": "Asistente de IA",
+      "not-configured": {
+        "self": "El Asistente AI no está configurado.",
+        "contact-admin-to-configure": "Comuníquese con el administrador de su organización.",
+        "go-to-configure": "Ir a configurar"
+      }
     }
   },
   "custom-approval": {
@@ -3470,12 +3498,16 @@
     "select-role": "Seleccionar rol",
     "expired-tip": "El papel puede haber expirado.",
     "import-from-role": "Importar desde el rol",
-    "workspace-roles": "Roles de espacio de trabajo",
+    "workspace-roles": {
+      "self": "Roles de espacio de trabajo"
+    },
     "project-roles": {
       "self": "Roles de proyecto",
       "apply-to-all-projects": "Aplicar a todos los proyectos"
     },
-    "custom-roles": "Roles personalizados",
+    "custom-roles": {
+      "self": "Roles personalizados"
+    },
     "workspace-admin": {
       "self": "Administrador del espacio de trabajo",
       "description": "El administrador del espacio de trabajo tiene todos los permisos dentro del espacio de trabajo."
@@ -3511,6 +3543,9 @@
     "project-viewer": {
       "self": "Espectador del proyecto",
       "description": "El espectador del proyecto tiene todos los permisos dentro del proyecto, excepto la gestión de miembros del proyecto."
+    },
+    "issue-creator": {
+      "self": "Creador del problema"
     }
   },
   "database-group": {

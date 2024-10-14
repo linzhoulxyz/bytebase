@@ -65,7 +65,7 @@ func (s *QueryResultMasker) MaskResults(ctx context.Context, spans []*base.Query
 			return errors.Errorf("query span error: %v", spans[i].NotFoundError)
 		}
 		// Skip masking for error result.
-		if results[i].Error != "" {
+		if results[i].Error != "" && len(results[i].Rows) == 0 {
 			continue
 		}
 		maskers, err := s.getMaskersForQuerySpan(ctx, m, instance, spans[i], action)
@@ -366,6 +366,7 @@ func isMaskingSupported(e storepb.Engine) bool {
 		storepb.Engine_MSSQL:     true,
 		storepb.Engine_MARIADB:   true,
 		storepb.Engine_OCEANBASE: true,
+		storepb.Engine_TIDB:      true,
 	}
 
 	if _, ok := supportedEngines[e]; !ok {

@@ -12,7 +12,7 @@ import {
   IssueCommentType,
   type ComposedIssueComment,
 } from "@/store";
-import type { ComposedIssue } from "@/types";
+import { getDateForPbTimestamp, type ComposedIssue } from "@/types";
 import {
   IssueComment_Approval,
   IssueComment_Approval_Status,
@@ -23,7 +23,7 @@ import {
   IssueComment_TaskUpdate_Status,
   IssueStatus,
 } from "@/types/proto/v1/issue_service";
-import { findStageByName, findTaskByName, extractSheetUID } from "@/utils";
+import { findStageByName, findTaskByName } from "@/utils";
 import { extractUserResourceName } from "@/utils";
 import StageName from "./StageName.vue";
 import StatementUpdate from "./StatementUpdate.vue";
@@ -160,10 +160,7 @@ const renderActionSentence = () => {
           {{
             name: () => "SQL",
             link: () => (
-              <StatementUpdate
-                oldSheetId={extractSheetUID(fromSheet)}
-                newSheetId={extractSheetUID(toSheet)}
-              />
+              <StatementUpdate oldSheet={fromSheet} newSheet={toSheet} />
             ),
           }}
         </Translation>
@@ -177,8 +174,12 @@ const renderActionSentence = () => {
       const timeFormat = "YYYY-MM-DD HH:mm:ss UTCZZ";
       return t("activity.sentence.changed-from-to", {
         name: t("task.rollout-time"),
-        oldValue: oldVal ? dayjs(oldVal).format(timeFormat) : "Unset",
-        newValue: newVal ? dayjs(newVal).format(timeFormat) : "Unset",
+        oldValue: oldVal
+          ? dayjs(getDateForPbTimestamp(oldVal)).format(timeFormat)
+          : "Unset",
+        newValue: newVal
+          ? dayjs(getDateForPbTimestamp(newVal)).format(timeFormat)
+          : "Unset",
       });
     }
   } else if (issueComment.type === IssueCommentType.TASK_PRIOR_BACKUP) {

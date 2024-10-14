@@ -33,12 +33,13 @@ import { NSwitch, NTooltip } from "naive-ui";
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import InstanceAssignment from "@/components/InstanceAssignment.vue";
-import { specForTask, useIssueContext } from "@/components/IssueV1/logic";
+import { useIssueContext } from "@/components/IssueV1/logic";
 import type { ErrorItem } from "@/components/misc/ErrorList.vue";
 import { default as ErrorList } from "@/components/misc/ErrorList.vue";
 import { hasFeature } from "@/store";
 import { Engine } from "@/types/proto/v1/common";
 import {
+  MIN_GHOST_SUPPORT_MARIADB_VERSION,
   MIN_GHOST_SUPPORT_MYSQL_VERSION,
   engineNameV1,
   flattenTaskV1List,
@@ -47,7 +48,7 @@ import {
 import { allowGhostForTask, useIssueGhostContext } from "./common";
 
 const { t } = useI18n();
-const { isCreating, issue, selectedTask: task, events } = useIssueContext();
+const { isCreating, issue, events } = useIssueContext();
 const { viewType, toggleGhost, showFeatureModal, showMissingInstanceLicense } =
   useIssueGhostContext();
 const isUpdating = ref(false);
@@ -87,9 +88,7 @@ const errors = computed(() => {
       )
     );
     errors.push({
-      error: `${engineNameV1(
-        Engine.MYSQL
-      )} >= ${MIN_GHOST_SUPPORT_MYSQL_VERSION}`,
+      error: `${engineNameV1(Engine.MYSQL)} >= ${MIN_GHOST_SUPPORT_MYSQL_VERSION}, ${engineNameV1(Engine.MARIADB)} >= ${MIN_GHOST_SUPPORT_MARIADB_VERSION}`,
       indent: 1,
     });
   }
@@ -111,11 +110,9 @@ const toggleChecked = async (on: boolean) => {
     return;
   }
 
-  const spec = specForTask(issue.value.planEntity, task.value);
-  if (!spec) return;
   isUpdating.value = true;
   try {
-    await toggleGhost(spec, on);
+    await toggleGhost(on);
   } finally {
     isUpdating.value = false;
   }

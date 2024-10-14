@@ -82,11 +82,15 @@
       "description": "建议在数据库层面设置字符集。在更细粒度设置字符集会带来不必要的复杂性。建议错误等级：错误。"
     },
     "table-comment": {
-      "title": "注释检查",
+      "title": "表注释检查",
       "description": "配置表是否需要注释和最大注释长度。",
       "component": {
         "required": {
           "title": "必须注释"
+        },
+        "requiredClassification": {
+          "title": "需要分类",
+          "tooltip": "评论应遵循{'{'}分类 ID{'}'}-{'{'}评论{'}'}格式。"
         },
         "maxLength": {
           "title": "长度限制"
@@ -302,11 +306,15 @@
       "description": "无符号类型不存储负数，同样的类型存放的数值范围增加一倍，可以避免自增列超出上限。建议错误等级：警告"
     },
     "column-comment": {
-      "title": "强制列增加注释并限制长度",
+      "title": "列注释检查",
       "description": "对列添加注释是良好的开发习惯，但过长的注释将导致 Schema 易读性降低。建议错误等级：警告",
       "component": {
         "required": {
           "title": "必须注释"
+        },
+        "requiredClassification": {
+          "title": "需要分类",
+          "tooltip": "评论应遵循{'{'}分类 ID{'}'}-{'{'}评论{'}'}格式。"
         },
         "maxLength": {
           "title": "长度限制"
@@ -534,6 +542,10 @@
     "schema-backward-compatibility": {
       "title": "检查应用向后兼容性",
       "description": "某些变更可能影响现有应用功能，例如修改数据库对象名，增加新的约束等，此规范可避免不谨慎变更导致现有应用运行失败。建议错误等级：警告"
+    },
+    "statement-max-execution-time": {
+      "title": "最大执行时间",
+      "description": "设置SQL语句的最大执行时间，如果执行时间超过限制，语句将被终止。建议错误级别：错误"
     },
     "database-drop-empty-database": {
       "title": "禁止删除非空数据库",

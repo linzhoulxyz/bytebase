@@ -121,6 +121,10 @@
       payload:
         type: BOOLEAN
         default: false
+    - key: requiredClassification
+      payload:
+        type: BOOLEAN
+        default: false
     - key: maxLength
       payload:
         type: NUMBER
@@ -130,6 +134,10 @@
   category: TABLE
   componentList:
     - key: required
+      payload:
+        type: BOOLEAN
+        default: false
+    - key: requiredClassification
       payload:
         type: BOOLEAN
         default: false
@@ -145,6 +153,10 @@
       payload:
         type: BOOLEAN
         default: false
+    - key: requiredClassification
+      payload:
+        type: BOOLEAN
+        default: false
     - key: maxLength
       payload:
         type: NUMBER
@@ -154,6 +166,10 @@
   category: TABLE
   componentList:
     - key: required
+      payload:
+        type: BOOLEAN
+        default: false
+    - key: requiredClassification
       payload:
         type: BOOLEAN
         default: false
@@ -636,6 +652,12 @@
 - type: statement.disallow-cross-db-queries
   category: STATEMENT
   engine: MSSQL
+- type: statement.max-execution-time
+  category: STATEMENT
+  engine: MYSQL
+- type: statement.max-execution-time
+  category: STATEMENT
+  engine: MARIADB
 - type: naming.fully-qualified
   category: NAMING
   engine: POSTGRES
@@ -1384,6 +1406,10 @@
       payload:
         type: BOOLEAN
         default: false
+    - key: requiredClassification
+      payload:
+        type: BOOLEAN
+        default: false
     - key: maxLength
       payload:
         type: NUMBER
@@ -1393,6 +1419,10 @@
   category: COLUMN
   componentList:
     - key: required
+      payload:
+        type: BOOLEAN
+        default: false
+    - key: requiredClassification
       payload:
         type: BOOLEAN
         default: false
@@ -1408,6 +1438,10 @@
       payload:
         type: BOOLEAN
         default: false
+    - key: requiredClassification
+      payload:
+        type: BOOLEAN
+        default: false
     - key: maxLength
       payload:
         type: NUMBER
@@ -1417,6 +1451,10 @@
   category: COLUMN
   componentList:
     - key: required
+      payload:
+        type: BOOLEAN
+        default: false
+    - key: requiredClassification
       payload:
         type: BOOLEAN
         default: false
@@ -2041,6 +2079,14 @@
         type: NUMBER
         default: 100000000
   engine: MYSQL
+- type: advice.online-migration
+  category: ADVICE
+  componentList:
+    - key: number
+      payload:
+        type: NUMBER
+        default: 100000000
+  engine: MARIADB
 - type: statement.add-foreign-key-not-valid
   category: STATEMENT
   engine: POSTGRES

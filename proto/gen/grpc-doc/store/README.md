@@ -63,6 +63,7 @@
     - [InstanceRoleMetadata](#bytebase-store-InstanceRoleMetadata)
     - [LinkedDatabaseMetadata](#bytebase-store-LinkedDatabaseMetadata)
     - [MaterializedViewMetadata](#bytebase-store-MaterializedViewMetadata)
+    - [PackageMetadata](#bytebase-store-PackageMetadata)
     - [ProcedureConfig](#bytebase-store-ProcedureConfig)
     - [ProcedureMetadata](#bytebase-store-ProcedureMetadata)
     - [SchemaConfig](#bytebase-store-SchemaConfig)
@@ -180,7 +181,9 @@
     - [PlanConfig.CreateDatabaseConfig](#bytebase-store-PlanConfig-CreateDatabaseConfig)
     - [PlanConfig.CreateDatabaseConfig.LabelsEntry](#bytebase-store-PlanConfig-CreateDatabaseConfig-LabelsEntry)
     - [PlanConfig.ExportDataConfig](#bytebase-store-PlanConfig-ExportDataConfig)
+    - [PlanConfig.ReleaseSource](#bytebase-store-PlanConfig-ReleaseSource)
     - [PlanConfig.Spec](#bytebase-store-PlanConfig-Spec)
+    - [PlanConfig.SpecReleaseSource](#bytebase-store-PlanConfig-SpecReleaseSource)
     - [PlanConfig.Step](#bytebase-store-PlanConfig-Step)
     - [PlanConfig.VCSSource](#bytebase-store-PlanConfig-VCSSource)
   
@@ -220,8 +223,18 @@
 - [store/query_history.proto](#store_query_history-proto)
     - [QueryHistoryPayload](#bytebase-store-QueryHistoryPayload)
   
+- [store/release.proto](#store_release-proto)
+    - [ReleasePayload](#bytebase-store-ReleasePayload)
+    - [ReleasePayload.File](#bytebase-store-ReleasePayload-File)
+    - [ReleasePayload.VCSSource](#bytebase-store-ReleasePayload-VCSSource)
+  
+    - [ReleaseFileType](#bytebase-store-ReleaseFileType)
+  
 - [store/review_config.proto](#store_review_config-proto)
     - [ReviewConfigPayload](#bytebase-store-ReviewConfigPayload)
+  
+- [store/revision.proto](#store_revision-proto)
+    - [RevisionPayload](#bytebase-store-RevisionPayload)
   
 - [store/role.proto](#store_role-proto)
     - [RolePermissions](#bytebase-store-RolePermissions)
@@ -282,6 +295,7 @@
     - [TaskDatabaseDataExportPayload](#bytebase-store-TaskDatabaseDataExportPayload)
     - [TaskDatabaseUpdatePayload](#bytebase-store-TaskDatabaseUpdatePayload)
     - [TaskDatabaseUpdatePayload.FlagsEntry](#bytebase-store-TaskDatabaseUpdatePayload-FlagsEntry)
+    - [TaskReleaseSource](#bytebase-store-TaskReleaseSource)
   
 - [store/task_run.proto](#store_task_run-proto)
     - [PriorBackupDetail](#bytebase-store-PriorBackupDetail)
@@ -1204,6 +1218,22 @@ MaterializedViewMetadata is the metadata for materialized views.
 
 
 
+<a name="bytebase-store-PackageMetadata"></a>
+
+### PackageMetadata
+PackageMetadata is the metadata for packages.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name is the name of a package. |
+| definition | [string](#string) |  | The definition is the definition of a package. |
+
+
+
+
+
+
 <a name="bytebase-store-ProcedureConfig"></a>
 
 ### ProcedureConfig
@@ -1276,6 +1306,7 @@ This is the concept of schema in Postgres, but it&#39;s a no-op for MySQL.
 | tasks | [TaskMetadata](#bytebase-store-TaskMetadata) | repeated | The routines is the list of routines in a schema, currently, only used for Snowflake. |
 | materialized_views | [MaterializedViewMetadata](#bytebase-store-MaterializedViewMetadata) | repeated | The materialized_views is the list of materialized views in a schema. |
 | sequences | [SequenceMetadata](#bytebase-store-SequenceMetadata) | repeated | The sequences is the list of sequences in a schema. |
+| packages | [PackageMetadata](#bytebase-store-PackageMetadata) | repeated | The packages is the list of packages in a schema. |
 
 
 
@@ -2813,6 +2844,7 @@ InstanceRole is the API message for instance role.
 | ----- | ---- | ----- | ----------- |
 | steps | [PlanConfig.Step](#bytebase-store-PlanConfig-Step) | repeated |  |
 | vcs_source | [PlanConfig.VCSSource](#bytebase-store-PlanConfig-VCSSource) |  |  |
+| release_source | [PlanConfig.ReleaseSource](#bytebase-store-PlanConfig-ReleaseSource) |  |  |
 
 
 
@@ -2913,6 +2945,21 @@ InstanceRole is the API message for instance role.
 
 
 
+<a name="bytebase-store-PlanConfig-ReleaseSource"></a>
+
+### PlanConfig.ReleaseSource
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| release | [string](#string) |  | The release. Format: projects/{project}/releases/{release} |
+
+
+
+
+
+
 <a name="bytebase-store-PlanConfig-Spec"></a>
 
 ### PlanConfig.Spec
@@ -2924,9 +2971,25 @@ InstanceRole is the API message for instance role.
 | earliest_allowed_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | earliest_allowed_time the earliest execution time of the change. |
 | id | [string](#string) |  | A UUID4 string that uniquely identifies the Spec. |
 | depends_on_specs | [string](#string) | repeated | IDs of the specs that this spec depends on. Must be a subset of the specs in the same step. |
+| spec_release_source | [PlanConfig.SpecReleaseSource](#bytebase-store-PlanConfig-SpecReleaseSource) |  |  |
 | create_database_config | [PlanConfig.CreateDatabaseConfig](#bytebase-store-PlanConfig-CreateDatabaseConfig) |  |  |
 | change_database_config | [PlanConfig.ChangeDatabaseConfig](#bytebase-store-PlanConfig-ChangeDatabaseConfig) |  |  |
 | export_data_config | [PlanConfig.ExportDataConfig](#bytebase-store-PlanConfig-ExportDataConfig) |  |  |
+
+
+
+
+
+
+<a name="bytebase-store-PlanConfig-SpecReleaseSource"></a>
+
+### PlanConfig.SpecReleaseSource
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| file | [string](#string) |  | Format: projects/{project}/releases/{release}/files/{file} {file} is URL path escaped. |
 
 
 
@@ -3019,12 +3082,14 @@ Type is the database change type.
 <a name="bytebase-store-DataSourceQueryPolicy"></a>
 
 ### DataSourceQueryPolicy
-DataSourceQueryPolicy is the policy configuration for data source query.
+DataSourceQueryPolicy is the policy configuration for running statements in the SQL editor.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | admin_data_source_restriction | [DataSourceQueryPolicy.Restriction](#bytebase-store-DataSourceQueryPolicy-Restriction) |  |  |
+| enable_ddl | [bool](#bool) |  | Allow running DDL statements in the SQL editor. |
+| enable_dml | [bool](#bool) |  | Allow running DML statements in the SQL editor. |
 
 
 
@@ -3455,6 +3520,86 @@ SlowQueryPolicy is the policy configuration for slow query.
 
 
 
+<a name="store_release-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## store/release.proto
+
+
+
+<a name="bytebase-store-ReleasePayload"></a>
+
+### ReleasePayload
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| title | [string](#string) |  |  |
+| files | [ReleasePayload.File](#bytebase-store-ReleasePayload-File) | repeated |  |
+| vcs_source | [ReleasePayload.VCSSource](#bytebase-store-ReleasePayload-VCSSource) |  |  |
+
+
+
+
+
+
+<a name="bytebase-store-ReleasePayload-File"></a>
+
+### ReleasePayload.File
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the file. Expressed as a path, e.g. `2.2/V0001_create_table.sql` |
+| sheet | [string](#string) |  | The sheet that holds the content. Format: projects/{project}/sheets/{sheet} |
+| sheet_sha256 | [string](#string) |  | The SHA256 hash value of the sheet. |
+| type | [ReleaseFileType](#bytebase-store-ReleaseFileType) |  |  |
+| version | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="bytebase-store-ReleasePayload-VCSSource"></a>
+
+### ReleasePayload.VCSSource
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| vcs_type | [VCSType](#bytebase-store-VCSType) |  |  |
+| pull_request_url | [string](#string) |  |  |
+
+
+
+
+
+ 
+
+
+<a name="bytebase-store-ReleaseFileType"></a>
+
+### ReleaseFileType
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| TYPE_UNSPECIFIED | 0 |  |
+| VERSIONED | 1 |  |
+
+
+ 
+
+ 
+
+ 
+
+
+
 <a name="store_review_config-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -3471,6 +3616,43 @@ SlowQueryPolicy is the policy configuration for slow query.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | sql_review_rules | [SQLReviewRule](#bytebase-store-SQLReviewRule) | repeated |  |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+
+<a name="store_revision-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## store/revision.proto
+
+
+
+<a name="bytebase-store-RevisionPayload"></a>
+
+### RevisionPayload
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| release | [string](#string) |  | Format: projects/{project}/releases/{release} Can be empty. |
+| sheet | [string](#string) |  | The sheet that holds the content. Format: projects/{project}/sheets/{sheet} |
+| sheet_sha256 | [string](#string) |  | The SHA256 hash value of the sheet. |
+| type | [ReleaseFileType](#bytebase-store-ReleaseFileType) |  |  |
+| version | [string](#string) |  |  |
+| file | [string](#string) |  | The name of the file in the release. Expressed as a path, e.g. `2.2/V0001_create_table.sql` Can be empty. |
+| task_run | [string](#string) |  | The task run associated with the revision. Can be empty. Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task}/taskRuns/{taskRun} |
 
 
 
@@ -4079,7 +4261,7 @@ SlowQueryPolicy is the policy configuration for slow query.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| expression | [google.api.expr.v1alpha1.ParsedExpr](#google-api-expr-v1alpha1-ParsedExpr) |  |  |
+| expression | [google.api.expr.v1alpha1.Expr](#google-api-expr-v1alpha1-Expr) |  |  |
 | template | [ApprovalTemplate](#bytebase-store-ApprovalTemplate) |  |  |
 | condition | [google.type.Expr](#google-type-Expr) |  |  |
 
@@ -4373,7 +4555,7 @@ TaskDatabaseDataExportPayload is the task payload for database data export.
 <a name="bytebase-store-TaskDatabaseUpdatePayload"></a>
 
 ### TaskDatabaseUpdatePayload
-TaskDatabaseDataUpdatePayload is the task payload for database data update (DML).
+TaskDatabaseUpdatePayload is the task payload for updating database (DDL &amp; DML).
 
 
 | Field | Type | Label | Description |
@@ -4385,6 +4567,7 @@ TaskDatabaseDataUpdatePayload is the task payload for database data update (DML)
 | sheet_id | [int32](#int32) |  |  |
 | pre_update_backup_detail | [PreUpdateBackupDetail](#bytebase-store-PreUpdateBackupDetail) |  |  |
 | flags | [TaskDatabaseUpdatePayload.FlagsEntry](#bytebase-store-TaskDatabaseUpdatePayload-FlagsEntry) | repeated | flags is used for ghost sync |
+| task_release_source | [TaskReleaseSource](#bytebase-store-TaskReleaseSource) |  |  |
 
 
 
@@ -4401,6 +4584,21 @@ TaskDatabaseDataUpdatePayload is the task payload for database data update (DML)
 | ----- | ---- | ----- | ----------- |
 | key | [string](#string) |  |  |
 | value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="bytebase-store-TaskReleaseSource"></a>
+
+### TaskReleaseSource
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| file | [string](#string) |  | Format: projects/{project}/releases/{release}/files/{file} {file} is URL path escaped. |
 
 
 

@@ -9,13 +9,11 @@ import (
 
 	"github.com/antlr4-go/antlr/v4"
 	"github.com/pkg/errors"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	tsql "github.com/bytebase/tsql-parser"
 	mssqldb "github.com/microsoft/go-mssqldb"
 
-	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
 	"github.com/bytebase/bytebase/backend/plugin/db/util"
 	tsqlparser "github.com/bytebase/bytebase/backend/plugin/parser/tsql"
@@ -23,121 +21,7 @@ import (
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
-var nullRowValue = &v1pb.RowValue{
-	Kind: &v1pb.RowValue_NullValue{
-		NullValue: structpb.NullValue_NULL_VALUE,
-	},
-}
-
-func rowsToQueryResult(rows *sql.Rows, limit int64) (*v1pb.QueryResult, error) {
-	columnNames, err := rows.Columns()
-	if err != nil {
-		return nil, err
-	}
-	columnTypes, err := rows.ColumnTypes()
-	if err != nil {
-		return nil, err
-	}
-	// DatabaseTypeName returns the database system name of the column type.
-	// refer: https://pkg.go.dev/database/sql#ColumnType.DatabaseTypeName
-	var columnTypeNames []string
-	for _, v := range columnTypes {
-		columnTypeNames = append(columnTypeNames, strings.ToUpper(v.DatabaseTypeName()))
-	}
-	result := &v1pb.QueryResult{
-		ColumnNames:     columnNames,
-		ColumnTypeNames: columnTypeNames,
-	}
-	columnLength := len(columnNames)
-
-	if columnLength > 0 {
-		for rows.Next() {
-			values := make([]any, columnLength)
-			for i, v := range columnTypeNames {
-				values[i] = makeValueByTypeName(v)
-			}
-
-			if err := rows.Scan(values...); err != nil {
-				return nil, err
-			}
-
-			row := &v1pb.QueryRow{}
-			for i := 0; i < columnLength; i++ {
-				rowValue := nullRowValue
-				switch raw := values[i].(type) {
-				case *sql.NullString:
-					if raw.Valid {
-						rowValue = &v1pb.RowValue{
-							Kind: &v1pb.RowValue_StringValue{
-								StringValue: raw.String,
-							},
-						}
-					}
-				case *sql.NullInt64:
-					if raw.Valid {
-						rowValue = &v1pb.RowValue{
-							Kind: &v1pb.RowValue_Int64Value{
-								Int64Value: raw.Int64,
-							},
-						}
-					}
-				case *[]byte:
-					if len(*raw) > 0 {
-						rowValue = &v1pb.RowValue{
-							Kind: &v1pb.RowValue_BytesValue{
-								BytesValue: *raw,
-							},
-						}
-					}
-				case *sql.NullBool:
-					if raw.Valid {
-						var v int64
-						if raw.Bool {
-							v = 1
-						}
-						rowValue = &v1pb.RowValue{
-							Kind: &v1pb.RowValue_Int64Value{
-								Int64Value: v,
-							},
-						}
-					}
-				case *sql.NullFloat64:
-					if raw.Valid {
-						rowValue = &v1pb.RowValue{
-							Kind: &v1pb.RowValue_DoubleValue{
-								DoubleValue: raw.Float64,
-							},
-						}
-					}
-				case *mssqldb.NullUniqueIdentifier:
-					if raw.Valid {
-						rowValue = &v1pb.RowValue{
-							Kind: &v1pb.RowValue_StringValue{
-								StringValue: raw.UUID.String(),
-							},
-						}
-					}
-				}
-
-				row.Values = append(row.Values, rowValue)
-			}
-
-			result.Rows = append(result.Rows, row)
-			n := len(result.Rows)
-			if (n&(n-1) == 0) && int64(proto.Size(result)) > limit {
-				result.Error = common.FormatMaximumSQLResultSizeMessage(limit)
-				break
-			}
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return result, nil
-}
-
-func makeValueByTypeName(typeName string) any {
+func makeValueByTypeName(typeName string, _ *sql.ColumnType) any {
 	switch typeName {
 	case "UNIQUEIDENTIFIER":
 		return new(mssqldb.NullUniqueIdentifier)
@@ -163,8 +47,10 @@ func makeValueByTypeName(typeName string) any {
 	// // Source values of type [time.Time] may be scanned into values of type
 	// *time.Time, *interface{}, *string, or *[]byte. When converting to
 	// the latter two, [time.RFC3339Nano] is used.
-	case "SMALLDATETIME", "DATETIME", "DATETIME2", "DATE", "TIME", "DATETIMEOFFSET":
-		return new(sql.NullString)
+	case "SMALLDATETIME", "DATETIME", "DATETIME2", "DATE", "TIME":
+		return new(sql.NullTime)
+	case "DATETIMEOFFSET":
+		return new(sql.NullTime)
 	case "IMAGE":
 		return new([]byte)
 	case "BINARY":
@@ -173,6 +59,84 @@ func makeValueByTypeName(typeName string) any {
 		return new([]byte)
 	}
 	return new(sql.NullString)
+}
+
+func convertValue(typeName string, value any) *v1pb.RowValue {
+	switch raw := value.(type) {
+	case *sql.NullString:
+		if raw.Valid {
+			return &v1pb.RowValue{
+				Kind: &v1pb.RowValue_StringValue{
+					StringValue: raw.String,
+				},
+			}
+		}
+	case *sql.NullInt64:
+		if raw.Valid {
+			return &v1pb.RowValue{
+				Kind: &v1pb.RowValue_Int64Value{
+					Int64Value: raw.Int64,
+				},
+			}
+		}
+	case *[]byte:
+		if len(*raw) > 0 {
+			return &v1pb.RowValue{
+				Kind: &v1pb.RowValue_BytesValue{
+					BytesValue: *raw,
+				},
+			}
+		}
+	case *sql.NullBool:
+		if raw.Valid {
+			var v int64
+			if raw.Bool {
+				v = 1
+			}
+			return &v1pb.RowValue{
+				Kind: &v1pb.RowValue_Int64Value{
+					Int64Value: v,
+				},
+			}
+		}
+	case *sql.NullFloat64:
+		if raw.Valid {
+			return &v1pb.RowValue{
+				Kind: &v1pb.RowValue_DoubleValue{
+					DoubleValue: raw.Float64,
+				},
+			}
+		}
+	case *mssqldb.NullUniqueIdentifier:
+		if raw.Valid {
+			return &v1pb.RowValue{
+				Kind: &v1pb.RowValue_StringValue{
+					StringValue: raw.UUID.String(),
+				},
+			}
+		}
+	case *sql.NullTime:
+		if raw.Valid {
+			if typeName == "DATETIME" || typeName == "DATETIME2" || typeName == "SMALLDATETIME" {
+				return &v1pb.RowValue{
+					Kind: &v1pb.RowValue_TimestampValue{
+						TimestampValue: timestamppb.New(raw.Time),
+					},
+				}
+			}
+			zone, offset := raw.Time.Zone()
+			return &v1pb.RowValue{
+				Kind: &v1pb.RowValue_TimestampTzValue{
+					TimestampTzValue: &v1pb.RowValue_TimestampTZ{
+						Timestamp: timestamppb.New(raw.Time),
+						Zone:      zone,
+						Offset:    int32(offset),
+					},
+				},
+			}
+		}
+	}
+	return util.NullRowValue
 }
 
 func getStatementWithResultLimit(statement string, limit int) string {

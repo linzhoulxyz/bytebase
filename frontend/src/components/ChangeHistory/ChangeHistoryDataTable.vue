@@ -21,6 +21,7 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { RouterLink } from "vue-router";
 import { useUserStore } from "@/store";
+import { getDateForPbTimestamp } from "@/types";
 import type { ChangeHistory } from "@/types/proto/v1/database_service";
 import {
   ChangeHistory_Status,
@@ -100,8 +101,7 @@ const columnList = computed(() => {
       resizable: true,
       render: (history) => {
         const historyType =
-          history.type === ChangeHistory_Type.BASELINE ||
-          history.type === ChangeHistory_Type.BRANCH ? (
+          history.type === ChangeHistory_Type.BASELINE ? (
             <span class="textinfolabel">
               ({changeHistory_TypeToJSON(history.type)})
             </span>
@@ -190,7 +190,9 @@ const columnList = computed(() => {
       resizable: true,
       ellipsis: true,
       render: (history) => {
-        return <HumanizeDate date={history.createTime} />;
+        return (
+          <HumanizeDate date={getDateForPbTimestamp(history.createTime)} />
+        );
       },
     },
     {

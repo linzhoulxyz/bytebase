@@ -411,6 +411,57 @@
         
           
           <li>
+            <a href="#v1%2frelease_service.proto">v1/release_service.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#bytebase.v1.CreateReleaseRequest"><span class="badge">M</span>CreateReleaseRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.GetReleaseRequest"><span class="badge">M</span>GetReleaseRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.ListReleasesRequest"><span class="badge">M</span>ListReleasesRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.ListReleasesResponse"><span class="badge">M</span>ListReleasesResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.Release"><span class="badge">M</span>Release</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.Release.File"><span class="badge">M</span>Release.File</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.Release.VCSSource"><span class="badge">M</span>Release.VCSSource</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.UpdateReleaseRequest"><span class="badge">M</span>UpdateReleaseRequest</a>
+                </li>
+              
+              
+                <li>
+                  <a href="#bytebase.v1.ReleaseFileType"><span class="badge">E</span>ReleaseFileType</a>
+                </li>
+              
+              
+              
+                <li>
+                  <a href="#bytebase.v1.ReleaseService"><span class="badge">S</span>ReleaseService</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
             <a href="#v1%2fdatabase_service.proto">v1/database_service.proto</a>
             <ul>
               
@@ -583,6 +634,14 @@
                 </li>
               
                 <li>
+                  <a href="#bytebase.v1.ListRevisionsRequest"><span class="badge">M</span>ListRevisionsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.ListRevisionsResponse"><span class="badge">M</span>ListRevisionsResponse</a>
+                </li>
+              
+                <li>
                   <a href="#bytebase.v1.ListSecretsRequest"><span class="badge">M</span>ListSecretsRequest</a>
                 </li>
               
@@ -603,11 +662,19 @@
                 </li>
               
                 <li>
+                  <a href="#bytebase.v1.PackageMetadata"><span class="badge">M</span>PackageMetadata</a>
+                </li>
+              
+                <li>
                   <a href="#bytebase.v1.ProcedureConfig"><span class="badge">M</span>ProcedureConfig</a>
                 </li>
               
                 <li>
                   <a href="#bytebase.v1.ProcedureMetadata"><span class="badge">M</span>ProcedureMetadata</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.Revision"><span class="badge">M</span>Revision</a>
                 </li>
               
                 <li>
@@ -1990,7 +2057,15 @@
                 </li>
               
                 <li>
+                  <a href="#bytebase.v1.Plan.ReleaseSource"><span class="badge">M</span>Plan.ReleaseSource</a>
+                </li>
+              
+                <li>
                   <a href="#bytebase.v1.Plan.Spec"><span class="badge">M</span>Plan.Spec</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.Plan.SpecReleaseSource"><span class="badge">M</span>Plan.SpecReleaseSource</a>
                 </li>
               
                 <li>
@@ -2015,6 +2090,14 @@
               
                 <li>
                   <a href="#bytebase.v1.PlanCheckRun.Result.SqlSummaryReport"><span class="badge">M</span>PlanCheckRun.Result.SqlSummaryReport</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.PreviewPlanRequest"><span class="badge">M</span>PreviewPlanRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.PreviewPlanResponse"><span class="badge">M</span>PreviewPlanResponse</a>
                 </li>
               
                 <li>
@@ -2615,14 +2698,6 @@
                 </li>
               
                 <li>
-                  <a href="#bytebase.v1.DifferPreviewRequest"><span class="badge">M</span>DifferPreviewRequest</a>
-                </li>
-              
-                <li>
-                  <a href="#bytebase.v1.DifferPreviewResponse"><span class="badge">M</span>DifferPreviewResponse</a>
-                </li>
-              
-                <li>
                   <a href="#bytebase.v1.ExecuteRequest"><span class="badge">M</span>ExecuteRequest</a>
                 </li>
               
@@ -2688,6 +2763,10 @@
               
                 <li>
                   <a href="#bytebase.v1.RowValue"><span class="badge">M</span>RowValue</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.RowValue.TimestampTZ"><span class="badge">M</span>RowValue.TimestampTZ</a>
                 </li>
               
                 <li>
@@ -4644,6 +4723,14 @@ Only READ_ONLY data source can be removed. </p></td>
 Format: instances/{instance} </p></td>
                 </tr>
               
+                <tr>
+                  <td>enable_full_sync</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>When full sync is enabled, all databases in the instance will be synchronized. Otherwise, only
+the instance metadata (such as the database list) and any newly discovered instances will be synced. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -5221,6 +5308,461 @@ Format: instances/{instance} </p></td>
                 <td>POST</td>
                 <td>/v1/{parent=projects/*}:syncSlowQueries</td>
                 <td>*</td>
+              </tr>
+              
+            
+            </tbody>
+          </table>
+          
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="v1/release_service.proto">v1/release_service.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="bytebase.v1.CreateReleaseRequest">CreateReleaseRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>parent</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Format: projects/{project} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>release</td>
+                  <td><a href="#bytebase.v1.Release">Release</a></td>
+                  <td></td>
+                  <td><p>The release to create. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.GetReleaseRequest">GetReleaseRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Format: projects/{project}/releases/{release} </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.ListReleasesRequest">ListReleasesRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>parent</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Format: projects/{project} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>The maximum number of change histories to return. The service may return fewer than this value.
+If unspecified, at most 10 change histories will be returned.
+The maximum value is 1000; values above 1000 will be coerced to 1000. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Not used. A page token, received from a previous `ListReleasesRequest` call.
+Provide this to retrieve the subsequent page.
+
+When paginating, all other parameters provided to `ListReleasesRequest` must match
+the call that provided the page token. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.ListReleasesResponse">ListReleasesResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>releases</td>
+                  <td><a href="#bytebase.v1.Release">Release</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>A token, which can be sent as `page_token` to retrieve the next page.
+If this field is omitted, there are no subsequent pages. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.Release">Release</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Format: projects/{project}/releases/{release} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>files</td>
+                  <td><a href="#bytebase.v1.Release.File">Release.File</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>vcs_source</td>
+                  <td><a href="#bytebase.v1.Release.VCSSource">Release.VCSSource</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>creator</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Format: users/hello@world.com </p></td>
+                </tr>
+              
+                <tr>
+                  <td>create_time</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.Release.File">Release.File</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The name of the file.
+Expressed as a path, e.g. `2.2/V0001_create_table.sql` </p></td>
+                </tr>
+              
+                <tr>
+                  <td>sheet</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The sheet that holds the content.
+Format: projects/{project}/sheets/{sheet} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>sheet_sha256</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The SHA256 hash value of the sheet. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>type</td>
+                  <td><a href="#bytebase.v1.ReleaseFileType">ReleaseFileType</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>statement</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The statement is used for preview purpose. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>statement_size</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.Release.VCSSource">Release.VCSSource</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>vcs_type</td>
+                  <td><a href="#bytebase.v1.VCSType">VCSType</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>pull_request_url</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.UpdateReleaseRequest">UpdateReleaseRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>release</td>
+                  <td><a href="#bytebase.v1.Release">Release</a></td>
+                  <td></td>
+                  <td><p>The release to update. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>update_mask</td>
+                  <td><a href="#google.protobuf.FieldMask">google.protobuf.FieldMask</a></td>
+                  <td></td>
+                  <td><p>The list of fields to be updated. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+        <h3 id="bytebase.v1.ReleaseFileType">ReleaseFileType</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>TYPE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>VERSIONED</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+
+      
+
+      
+        <h3 id="bytebase.v1.ReleaseService">ReleaseService</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>GetRelease</td>
+                <td><a href="#bytebase.v1.GetReleaseRequest">GetReleaseRequest</a></td>
+                <td><a href="#bytebase.v1.Release">Release</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ListReleases</td>
+                <td><a href="#bytebase.v1.ListReleasesRequest">ListReleasesRequest</a></td>
+                <td><a href="#bytebase.v1.ListReleasesResponse">ListReleasesResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>CreateRelease</td>
+                <td><a href="#bytebase.v1.CreateReleaseRequest">CreateReleaseRequest</a></td>
+                <td><a href="#bytebase.v1.Release">Release</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>UpdateRelease</td>
+                <td><a href="#bytebase.v1.UpdateReleaseRequest">UpdateReleaseRequest</a></td>
+                <td><a href="#bytebase.v1.Release">Release</a></td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+          
+          
+          <h4>Methods with HTTP bindings</h4>
+          <table>
+            <thead>
+              <tr>
+                <td>Method Name</td>
+                <td>Method</td>
+                <td>Pattern</td>
+                <td>Body</td>
+              </tr>
+            </thead>
+            <tbody>
+            
+              
+              
+              <tr>
+                <td>GetRelease</td>
+                <td>GET</td>
+                <td>/v1/{name=projects/*/releases/*}</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListReleases</td>
+                <td>GET</td>
+                <td>/v1/{parent=projects/*}/releases</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>CreateRelease</td>
+                <td>POST</td>
+                <td>/v1/{parent=projects/*}/releases</td>
+                <td>release</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>UpdateRelease</td>
+                <td>PATCH</td>
+                <td>/v1/{release.name=projects/*/releases/*}</td>
+                <td>release</td>
               </tr>
               
             
@@ -7170,6 +7712,83 @@ If this field is omitted, there are no subsequent pages. </p></td>
 
         
       
+        <h3 id="bytebase.v1.ListRevisionsRequest">ListRevisionsRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>parent</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The parent of the revisions.
+Format: instances/{instance}/databases/{database} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>The maximum number of revisions to return. The service may return fewer than this value.
+If unspecified, at most 10 revisions will be returned.
+The maximum value is 1000; values above 1000 will be coerced to 1000. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>A page token, received from a previous `ListRevisions` call.
+Provide this to retrieve the subsequent page.
+
+When paginating, all other parameters provided to `ListRevisions` must match
+the call that provided the page token. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.ListRevisionsResponse">ListRevisionsResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>revisions</td>
+                  <td><a href="#bytebase.v1.Revision">Revision</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>A token, which can be sent as `page_token` to retrieve the next page.
+If this field is omitted, there are no subsequent pages. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="bytebase.v1.ListSecretsRequest">ListSecretsRequest</h3>
         <p></p>
 
@@ -7370,6 +7989,37 @@ Default: order by average_query_time desc. </p></td>
 
         
       
+        <h3 id="bytebase.v1.PackageMetadata">PackageMetadata</h3>
+        <p>PackageMetadata is the metadata for packages.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The name is the name of a package. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>definition</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The definition is the definition of a package. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="bytebase.v1.ProcedureConfig">ProcedureConfig</h3>
         <p></p>
 
@@ -7439,6 +8089,122 @@ Format: projcets/{project}/branches/{branch} </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>The definition is the definition of a procedure. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.Revision">Revision</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Format: instances/{instance}/databases/{database}/revisions/{revision} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>release</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Format: projects/{project}/releases/{release}
+Can be empty. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>creator</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Format: users/hello@world.com </p></td>
+                </tr>
+              
+                <tr>
+                  <td>create_time</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>sheet</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The sheet that holds the content.
+Format: projects/{project}/sheets/{sheet} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>sheet_sha256</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The SHA256 hash value of the sheet. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>statement</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The statement is used for preview purpose. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>statement_size</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>type</td>
+                  <td><a href="#bytebase.v1.ReleaseFileType">ReleaseFileType</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>file</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The name of the file in the release.
+Expressed as a path, e.g. `2.2/V0001_create_table.sql`
+Can be empty. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>issue</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The issue associated with the revision.
+Can be empty.
+Format: projects/{project}/issues/{issue} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>task_run</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The task run associated with the revision.
+Can be empty.
+Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task}/taskRuns/{taskRun} </p></td>
                 </tr>
               
             </tbody>
@@ -7573,6 +8339,13 @@ It is an empty string for databases without such concept such as MySQL. </p></td
                   <td><a href="#bytebase.v1.MaterializedViewMetadata">MaterializedViewMetadata</a></td>
                   <td>repeated</td>
                   <td><p>The materialized_views is the list of materialized views in a schema. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>packages</td>
+                  <td><a href="#bytebase.v1.PackageMetadata">PackageMetadata</a></td>
+                  <td>repeated</td>
+                  <td><p>The packages is the list of packages in a schema. </p></td>
                 </tr>
               
             </tbody>
@@ -8607,12 +9380,6 @@ Format: projcets/{project}/branches/{branch} </p></td>
               </tr>
             
               <tr>
-                <td>BRANCH</td>
-                <td>5</td>
-                <td><p></p></td>
-              </tr>
-            
-              <tr>
                 <td>DATA</td>
                 <td>6</td>
                 <td><p></p></td>
@@ -8993,6 +9760,13 @@ The API will default to the BASIC view.</p></td>
                 <td><p></p></td>
               </tr>
             
+              <tr>
+                <td>ListRevisions</td>
+                <td><a href="#bytebase.v1.ListRevisionsRequest">ListRevisionsRequest</a></td>
+                <td><a href="#bytebase.v1.ListRevisionsResponse">ListRevisionsResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
           </tbody>
         </table>
 
@@ -9191,6 +9965,16 @@ The API will default to the BASIC view.</p></td>
                 <td>GetChangeHistory</td>
                 <td>GET</td>
                 <td>/v1/{name=instances/*/databases/*/changeHistories/*}</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListRevisions</td>
+                <td>GET</td>
+                <td>/v1/{parent=instances/*/databases/*}/revisions</td>
                 <td></td>
               </tr>
               
@@ -14279,7 +15063,7 @@ If the condition evaluates to false, then this binding does not apply to the cur
               
                 <tr>
                   <td>parsed_expr</td>
-                  <td><a href="#google.api.expr.v1alpha1.ParsedExpr">google.api.expr.v1alpha1.ParsedExpr</a></td>
+                  <td><a href="#google.api.expr.v1alpha1.Expr">google.api.expr.v1alpha1.Expr</a></td>
                   <td></td>
                   <td><p>The parsed expression of the condition. </p></td>
                 </tr>
@@ -16640,7 +17424,7 @@ The API will default to the BASIC view.</p></td>
               
                 <tr>
                   <td>expressions</td>
-                  <td><a href="#google.api.expr.v1alpha1.ParsedExpr">google.api.expr.v1alpha1.ParsedExpr</a></td>
+                  <td><a href="#google.api.expr.v1alpha1.Expr">google.api.expr.v1alpha1.Expr</a></td>
                   <td>repeated</td>
                   <td><p> </p></td>
                 </tr>
@@ -16712,7 +17496,7 @@ The API will default to the BASIC view.</p></td>
               
                 <tr>
                   <td>expressions</td>
-                  <td><a href="#google.api.expr.v1alpha1.ParsedExpr">google.api.expr.v1alpha1.ParsedExpr</a></td>
+                  <td><a href="#google.api.expr.v1alpha1.Expr">google.api.expr.v1alpha1.Expr</a></td>
                   <td>repeated</td>
                   <td><p> </p></td>
                 </tr>
@@ -18177,6 +18961,14 @@ Format: environments/{environment} </p></td>
                   <td><p>The group to create. </p></td>
                 </tr>
               
+                <tr>
+                  <td>group_email</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The email to use for the group, which will become the final component
+of the group&#39;s resource name. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -18430,6 +19222,14 @@ Format: groups/{email} </p></td>
                   <td><a href="#google.protobuf.FieldMask">google.protobuf.FieldMask</a></td>
                   <td></td>
                   <td><p>The list of fields to update. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>allow_missing</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>If set to true, and the group is not found, a new group will be created.
+In this situation, `update_mask` is ignored. </p></td>
                 </tr>
               
             </tbody>
@@ -19528,7 +20328,7 @@ Database resource name: instances/instance-id/databases/database-name. </p></td>
         
       
         <h3 id="bytebase.v1.DataSourceQueryPolicy">DataSourceQueryPolicy</h3>
-        <p></p>
+        <p>DataSourceQueryPolicy is the policy configuration for running statements in the SQL editor.</p>
 
         
           <table class="field-table">
@@ -19542,6 +20342,20 @@ Database resource name: instances/instance-id/databases/database-name. </p></td>
                   <td><a href="#bytebase.v1.DataSourceQueryPolicy.Restriction">DataSourceQueryPolicy.Restriction</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>enable_ddl</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Allow running DDL statements in the SQL editor. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>enable_dml</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Allow running DML statements in the SQL editor. </p></td>
                 </tr>
               
             </tbody>
@@ -21135,6 +21949,13 @@ Keys are:
 - ERROR </p></td>
                 </tr>
               
+                <tr>
+                  <td>release_source</td>
+                  <td><a href="#bytebase.v1.Plan.ReleaseSource">Plan.ReleaseSource</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -21454,6 +22275,31 @@ Leave it empty if no needs to encrypt the zip file. </p></td>
 
         
       
+        <h3 id="bytebase.v1.Plan.ReleaseSource">Plan.ReleaseSource</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>release</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The release.
+Format: projects/{project}/releases/{release} </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="bytebase.v1.Plan.Spec">Plan.Spec</h3>
         <p></p>
 
@@ -21487,6 +22333,13 @@ Must be a subset of the specs in the same step. </p></td>
                 </tr>
               
                 <tr>
+                  <td>spec_release_source</td>
+                  <td><a href="#bytebase.v1.Plan.SpecReleaseSource">Plan.SpecReleaseSource</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
                   <td>create_database_config</td>
                   <td><a href="#bytebase.v1.Plan.CreateDatabaseConfig">Plan.CreateDatabaseConfig</a></td>
                   <td></td>
@@ -21505,6 +22358,31 @@ Must be a subset of the specs in the same step. </p></td>
                   <td><a href="#bytebase.v1.Plan.ExportDataConfig">Plan.ExportDataConfig</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.Plan.SpecReleaseSource">Plan.SpecReleaseSource</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>file</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Format: projects/{project}/releases/{release}/files/{file}
+{file} is URL path escaped. </p></td>
                 </tr>
               
             </tbody>
@@ -21813,6 +22691,96 @@ To supersede `line` and `column` above. </p></td>
                   <td><a href="#bytebase.v1.ChangedResources">ChangedResources</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.PreviewPlanRequest">PreviewPlanRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>project</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The name of the project.
+Format: projects/{project} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>release</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The release used for preview. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>targets</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>The targets to deploy.
+Can be database or databaseGroup.
+Format:
+projects/{project}/databaseGroups/{databaseGroup}
+instances/{instance}/databases/{database} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>allow_out_of_order</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.PreviewPlanResponse">PreviewPlanResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>plan</td>
+                  <td><a href="#bytebase.v1.Plan">Plan</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>out_of_order_files</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>Format: projects/{project}/releases/{release}/files/{path}
+Example: `projects/tnt/releases/0801/files/2.2/V0001_create_table.sql` </p></td>
+                </tr>
+              
+                <tr>
+                  <td>applied_but_modified_files</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>Format: projects/{project}/releases/{release}/files/{path}
+Example: `projects/tnt/releases/0801/files/2.2/V0001_create_table.sql` </p></td>
                 </tr>
               
             </tbody>
@@ -22217,6 +23185,13 @@ The plan creator and the user with bb.plans.update permission on the project can
                 <td><p></p></td>
               </tr>
             
+              <tr>
+                <td>PreviewPlan</td>
+                <td><a href="#bytebase.v1.PreviewPlanRequest">PreviewPlanRequest</a></td>
+                <td><a href="#bytebase.v1.PreviewPlanResponse">PreviewPlanResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
           </tbody>
         </table>
 
@@ -22311,6 +23286,16 @@ The plan creator and the user with bb.plans.update permission on the project can
                 <td>BatchCancelPlanCheckRuns</td>
                 <td>POST</td>
                 <td>/v1/{parent=projects/*/plans/*}/planCheckRuns:batchCancel</td>
+                <td>*</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>PreviewPlan</td>
+                <td>POST</td>
+                <td>/v1/{project=projects/*}:previewPlan</td>
                 <td>*</td>
               </tr>
               
@@ -24836,6 +25821,13 @@ If this field is omitted, there are no subsequent pages. </p></td>
                   <td><a href="#google.protobuf.FieldMask">google.protobuf.FieldMask</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>allow_missing</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>If set to true, and the role is not found, a new role will be created. </p></td>
                 </tr>
               
             </tbody>
@@ -27774,68 +28766,6 @@ If not provided, the database metadata will be fetched from the database. </p></
 
         
       
-        <h3 id="bytebase.v1.DifferPreviewRequest">DifferPreviewRequest</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>engine</td>
-                  <td><a href="#bytebase.v1.Engine">Engine</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>old_schema</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>new_metadata</td>
-                  <td><a href="#bytebase.v1.DatabaseMetadata">DatabaseMetadata</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="bytebase.v1.DifferPreviewResponse">DifferPreviewResponse</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>schema</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
         <h3 id="bytebase.v1.ExecuteRequest">ExecuteRequest</h3>
         <p></p>
 
@@ -28720,7 +29650,57 @@ The types come from the Golang SQL driver. </p></td>
                   <td>timestamp_value</td>
                   <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
                   <td></td>
+                  <td><p>timestamp_value is used for the timestamp without time zone data type, meaning it only includes the timestamp without any time zone or location info.
+Although it may be expressed as a UTC value, it should be seen as a timestamp missing location context. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>timestamp_tz_value</td>
+                  <td><a href="#bytebase.v1.RowValue.TimestampTZ">RowValue.TimestampTZ</a></td>
+                  <td></td>
+                  <td><p>timestamp_tz_value is used for the timestamptz data type, which accurately represents the timestamp with location information. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.RowValue.TimestampTZ">RowValue.TimestampTZ</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>timestamp</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>zone</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Zone is the time zone abbreviations in timezone database such as &#34;PDT&#34;, &#34;PST&#34;.
+https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+We retrieve the time zone information from the timestamptz field in the database.
+A timestamp is in UTC or epoch time, and with zone info, we can convert it to a local time string.
+Zone and offset are returned by time.Time.Zone() </p></td>
+                </tr>
+              
+                <tr>
+                  <td>offset</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>The offset is in seconds east of UTC </p></td>
                 </tr>
               
             </tbody>

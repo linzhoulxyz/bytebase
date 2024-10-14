@@ -88,7 +88,7 @@ func newIgnoredTokens() map[int]bool {
 
 func newPreferredRules() map[int]bool {
 	return map[int]bool{
-		plsql.PlSqlParserRULE_general_element_part:     true,
+		plsql.PlSqlParserRULE_general_element:          true,
 		plsql.PlSqlParserRULE_tableview_name:           true,
 		plsql.PlSqlParserRULE_column_name:              true,
 		plsql.PlSqlParserRULE_identifier:               true,
@@ -264,7 +264,7 @@ func (c *Completer) completion() ([]base.Candidate, error) {
 	candidates := c.core.CollectCandidates(caretIndex, context)
 
 	for ruleName := range candidates.Rules {
-		if ruleName == plsql.PlSqlParserRULE_general_element_part {
+		if ruleName == plsql.PlSqlParserRULE_general_element {
 			c.collectLeadingTableReferences(caretIndex)
 			c.takeReferencesSnapshot()
 			c.collectRemainingTableReferences()
@@ -336,6 +336,38 @@ func (m CompletionMap) insertTables(c *Completer, schemas map[string]bool) {
 	}
 }
 
+func (m CompletionMap) insertAllColumns(c *Completer) {
+	for _, schema := range c.listAllDatabases() {
+		if _, exists := c.metadataCache[schema]; !exists {
+			_, metadata, err := c.getMetadata(c.ctx, c.instanceID, schema)
+			if err != nil || metadata == nil {
+				continue
+			}
+			c.metadataCache[schema] = metadata
+		}
+		schemaMeta := c.metadataCache[schema].GetSchema("")
+		for _, table := range schemaMeta.ListTableNames() {
+			tableMeta := schemaMeta.GetTable(table)
+			if tableMeta == nil {
+				continue
+			}
+			for _, column := range tableMeta.GetColumns() {
+				definition := fmt.Sprintf("%s.%s | %s", schema, table, column.Type)
+				if !column.Nullable {
+					definition += ", NOT NULL"
+				}
+				comment := column.UserComment
+				m.Insert(base.Candidate{
+					Type:       base.CandidateTypeColumn,
+					Text:       c.quotedIdentifierIfNeeded(column.Name),
+					Definition: definition,
+					Comment:    comment,
+				})
+			}
+		}
+	}
+}
+
 func (m CompletionMap) insertColumns(c *Completer, schemas, tables map[string]bool) {
 	for schema := range schemas {
 		if len(schema) == 0 {
@@ -366,7 +398,7 @@ func (m CompletionMap) insertColumns(c *Completer, schemas, tables map[string]bo
 				continue
 			}
 			for _, column := range tableMeta.GetColumns() {
-				definition := fmt.Sprintf("%s | %s", table, column.Type)
+				definition := fmt.Sprintf("%s.%s | %s", schema, table, column.Type)
 				if !column.Nullable {
 					definition += ", NOT NULL"
 				}
@@ -489,7 +521,7 @@ func (c *Completer) convertCandidates(candidates *base.CandidatesCollection) ([]
 				tableEntries.insertTables(c, schemas)
 				viewEntries.insertViews(c, schemas)
 			}
-		case plsql.PlSqlParserRULE_general_element_part:
+		case plsql.PlSqlParserRULE_general_element:
 			schema, table, flags := c.determineGeneralElementPartCandidates()
 			if flags&ObjectFlagsShowSchemas != 0 {
 				schemaEntries.insertDatabases(c)
@@ -599,6 +631,9 @@ func (c *Completer) convertCandidates(candidates *base.CandidatesCollection) ([]
 							}
 						}
 					}
+				} else {
+					// User didn't specify the table, so we return all columns from all tables.
+					columnEntries.insertAllColumns(c)
 				}
 
 				if len(tables) > 0 {
@@ -1085,7 +1120,7 @@ func skipHeadingSQLs(statement string, caretLine int, caretOffset int) (string, 
 			start = i
 			if i == 0 {
 				// The caret is in the first SQL statement, so we don't need to skip any SQL statement.
-				continue
+				break
 			}
 			newCaretLine = caretLine - list[i-1].LastLine + 1 // Convert to 1-based.
 			if caretLine == list[i-1].LastLine {

@@ -22,10 +22,15 @@ import (
 // generateOnboardingData generates onboarding data after the first signup.
 func (s *Server) generateOnboardingData(ctx context.Context, user *store.UserMessage) error {
 	userID := user.ID
+	setting := &storepb.Project{
+		AllowModifyStatement: true,
+		AutoResolveIssue:     true,
+	}
 	project, err := s.store.CreateProjectV2(ctx, &store.ProjectMessage{
 		ResourceID: "project-sample",
 		Title:      "Sample Project",
 		Key:        "SAM",
+		Setting:    setting,
 	}, userID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create onboarding project")
@@ -56,7 +61,7 @@ func (s *Server) generateOnboardingData(ctx context.Context, user *store.UserMes
 	}
 
 	// Sync the instance schema so we can transfer the sample database later.
-	if _, err := s.schemaSyncer.SyncInstance(ctx, testInstance); err != nil {
+	if _, _, err := s.schemaSyncer.SyncInstance(ctx, testInstance); err != nil {
 		return errors.Wrapf(err, "failed to sync test onboarding instance")
 	}
 
@@ -115,7 +120,7 @@ func (s *Server) generateOnboardingData(ctx context.Context, user *store.UserMes
 	}
 
 	// Sync the instance schema so we can transfer the sample database later.
-	if _, err := s.schemaSyncer.SyncInstance(ctx, prodInstance); err != nil {
+	if _, _, err := s.schemaSyncer.SyncInstance(ctx, prodInstance); err != nil {
 		return errors.Wrapf(err, "failed to sync prod onboarding instance")
 	}
 

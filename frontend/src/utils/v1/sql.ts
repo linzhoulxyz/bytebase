@@ -1,5 +1,6 @@
 import dayjs from "dayjs";
 import Long from "long";
+import { getDateForPbTimestamp } from "@/types";
 import { NullValue } from "@/types/proto/google/protobuf/struct";
 import { Engine } from "@/types/proto/v1/common";
 import { RowValue } from "@/types/proto/v1/sql_service";
@@ -45,6 +46,47 @@ export const extractSQLRowValue = (
     return {
       plain: binaryString,
       raw: byteArray,
+    };
+  }
+  if (value.timestampValue) {
+    // Timezone-less timestamps are converted using UTC but they are not UTC timestamps.
+    const fullDayjs = dayjs(getDateForPbTimestamp(value.timestampValue)).utc();
+    const microseconds = Math.floor(value.timestampValue.nanos / 1000);
+    // Format the timestamp into a human-readable string, including microseconds if present
+    const formattedTimestamp =
+      microseconds > 0
+        ? // If there are microseconds, append them to the formatted string with 6 digits.
+          // Example: 2021-01-01 00:00:00.123456
+          `${fullDayjs.format("YYYY-MM-DD HH:mm:ss")}.${microseconds.toString().padStart(6, "0")}`
+        : // Otherwise, just format the date and time without microseconds
+          // Example: 2021-01-01 00:00:00
+          `${fullDayjs.format("YYYY-MM-DD HH:mm:ss")}`;
+
+    return {
+      plain: formattedTimestamp,
+      raw: value.timestampValue,
+    };
+  }
+  if (value.timestampTzValue && value.timestampTzValue.timestamp) {
+    const fullDayjs = dayjs(getDateForPbTimestamp(value.timestampTzValue.timestamp));
+    const microseconds = Math.floor(value.timestampTzValue.timestamp.nanos / 1000);
+    let timezoneOffset = fullDayjs.format("Z");
+    if (timezoneOffset.endsWith(":00")) {
+      timezoneOffset = timezoneOffset.slice(0, -3);
+    }
+    // Format the timestamp into a human-readable string, including microseconds if present
+    const formattedTimestamp =
+      microseconds > 0
+        ? // If there are microseconds, append them to the formatted string with 6 digits.
+          // Example: 2021-01-01 00:00:00.123456-07
+          `${fullDayjs.format("YYYY-MM-DD HH:mm:ss")}.${microseconds.toString().padStart(6, "0")}${timezoneOffset}`
+        : // Otherwise, just format the date and time without microseconds
+          // Example: 2021-01-01 00:00:00-07
+          `${fullDayjs.format("YYYY-MM-DD HH:mm:ss")}${timezoneOffset}`;
+
+    return {
+      plain: formattedTimestamp,
+      raw: value.timestampTzValue,
     };
   }
   const key = keys[0];

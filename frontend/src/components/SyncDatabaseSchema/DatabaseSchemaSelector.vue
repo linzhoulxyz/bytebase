@@ -93,7 +93,12 @@ import {
   useSubscriptionV1Store,
   useDBSchemaV1Store,
 } from "@/store";
-import { UNKNOWN_ID, isValidDatabaseName, isValidProjectName } from "@/types";
+import {
+  UNKNOWN_ID,
+  getDateForPbTimestamp,
+  isValidDatabaseName,
+  isValidProjectName,
+} from "@/types";
 import { Engine } from "@/types/proto/v1/common";
 import type { ChangeHistory } from "@/types/proto/v1/database_service";
 import {
@@ -159,7 +164,6 @@ const hasSyncSchemaFeature = computed(() => {
 const allowedMigrationTypeList: ChangeHistory_Type[] = [
   ChangeHistory_Type.BASELINE,
   ChangeHistory_Type.MIGRATE,
-  ChangeHistory_Type.BRANCH,
 ];
 
 const allowedEngineTypeList: Engine[] = [
@@ -273,7 +277,7 @@ const renderSchemaVersionLabel = (option: SelectOption) => {
   if (updateTime) {
     children.push(
       h(HumanizeDate, {
-        date: updateTime,
+        date: getDateForPbTimestamp(updateTime),
         class: "text-control-light",
       })
     );
@@ -414,15 +418,17 @@ watch(
           allowedMigrationTypeList.includes(changeHistory.type)
         );
 
-        if (changeHistoryList.length > 0) {
-          // Default select the first migration history.
-          state.changeHistoryName = head(changeHistoryList)?.name;
-        } else {
-          // If database has no migration history, we will use its latest schema.
-          state.changeHistoryName = mockLatestSchemaChangeHistory(
-            database,
-            undefined
-          ).name;
+        if (!state.changeHistoryName) {
+          if (changeHistoryList.length > 0) {
+            // Default select the first migration history.
+            state.changeHistoryName = head(changeHistoryList)?.name;
+          } else {
+            // If database has no migration history, we will use its latest schema.
+            state.changeHistoryName = mockLatestSchemaChangeHistory(
+              database,
+              undefined
+            ).name;
+          }
         }
       } finally {
         isPreparingSchemaVersionOptions.value = false;
@@ -430,7 +436,8 @@ watch(
     } else {
       state.changeHistoryName = undefined;
     }
-  }
+  },
+  { immediate: true }
 );
 
 watch(

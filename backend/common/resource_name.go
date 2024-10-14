@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -49,6 +50,9 @@ const (
 	AuditLogPrefix             = "auditLogs/"
 	GroupPrefix                = "groups/"
 	ReviewConfigPrefix         = "reviewConfigs/"
+	ReleaseNamePrefix          = "releases/"
+	FileNamePrefix             = "files/"
+	RevisionNamePrefix         = "revisions/"
 
 	SchemaSuffix     = "/schema"
 	MetadataSuffix   = "/metadata"
@@ -522,6 +526,35 @@ func GetReviewConfigID(name string) (string, error) {
 	return tokens[0], nil
 }
 
+func GetReleaseUID(name string) (int64, error) {
+	tokens, err := GetNameParentTokens(name, ProjectNamePrefix, ReleaseNamePrefix)
+	if err != nil {
+		return 0, err
+	}
+	releaseUID, err := strconv.ParseInt(tokens[1], 10, 64)
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to convert %q to int64", tokens[1])
+	}
+	return releaseUID, nil
+}
+
+// The returned File is path unescaped.
+func GetProjectReleaseUIDFile(name string) (string, int64, string, error) {
+	tokens, err := GetNameParentTokens(name, ProjectNamePrefix, ReleaseNamePrefix, FileNamePrefix)
+	if err != nil {
+		return "", 0, "", err
+	}
+	releaseUID, err := strconv.ParseInt(tokens[1], 10, 64)
+	if err != nil {
+		return "", 0, "", errors.Wrapf(err, "failed to convert %q to int64", tokens[1])
+	}
+	file, err := url.PathUnescape(tokens[2])
+	if err != nil {
+		return "", 0, "", errors.Wrapf(err, "failed to path unescape file %v", tokens[2])
+	}
+	return tokens[0], releaseUID, file, nil
+}
+
 var branchRegexp = regexp.MustCompile("^projects/([^/]+)/branches/(.+)$")
 
 // GetProjectAndBranchID returns the project and branch ID from a resource name.
@@ -641,6 +674,14 @@ func FormatTask(projectID string, pipelineUID, stageUID, taskUID int) string {
 	return fmt.Sprintf("%s%s/%s%d/%s%d/%s%d", ProjectNamePrefix, projectID, RolloutPrefix, pipelineUID, StagePrefix, stageUID, TaskPrefix, taskUID)
 }
 
+func FormatTaskRun(projectID string, pipelineUID, stageUID, taskUID, taskRunUID int) string {
+	return fmt.Sprintf("%s%s/%s%d/%s%d/%s%d/%s%d", ProjectNamePrefix, projectID, RolloutPrefix, pipelineUID, StagePrefix, stageUID, TaskPrefix, taskUID, TaskRunPrefix, taskRunUID)
+}
+
 func FormatBranchResourceID(projectID string, branchID string) string {
 	return fmt.Sprintf("%s%s/%s%s", ProjectNamePrefix, projectID, BranchPrefix, branchID)
+}
+
+func FormatReleaseName(projectID string, releaseUID int64) string {
+	return fmt.Sprintf("%s%s/%s%d", ProjectNamePrefix, projectID, ReleaseNamePrefix, releaseUID)
 }

@@ -755,6 +755,14 @@ paths:
             tags:
                 - GroupService
             operationId: GroupService_CreateGroup
+            parameters:
+                - name: groupEmail
+                  in: query
+                  description: |-
+                    The email to use for the group, which will become the final component
+                     of the group's resource name.
+                  schema:
+                    type: string
             requestBody:
                 content:
                     application/json:
@@ -840,6 +848,13 @@ paths:
                   schema:
                     type: string
                     format: field-mask
+                - name: allowMissing
+                  in: query
+                  description: |-
+                    If set to true, and the group is not found, a new group will be created.
+                     In this situation, `update_mask` is ignored.
+                  schema:
+                    type: boolean
             requestBody:
                 content:
                     application/json:
@@ -1897,6 +1912,56 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Policy'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/instances/{instance}/databases/{database}/revisions:
+        get:
+            tags:
+                - DatabaseService
+            operationId: DatabaseService_ListRevisions
+            parameters:
+                - name: instance
+                  in: path
+                  description: The instance id.
+                  required: true
+                  schema:
+                    type: string
+                - name: database
+                  in: path
+                  description: The database id.
+                  required: true
+                  schema:
+                    type: string
+                - name: pageSize
+                  in: query
+                  description: |-
+                    The maximum number of revisions to return. The service may return fewer than this value.
+                     If unspecified, at most 10 revisions will be returned.
+                     The maximum value is 1000; values above 1000 will be coerced to 1000.
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  description: |-
+                    A page token, received from a previous `ListRevisions` call.
+                     Provide this to retrieve the subsequent page.
+
+                     When paginating, all other parameters provided to `ListRevisions` must match
+                     the call that provided the page token.
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListRevisionsResponse'
                 default:
                     description: Default error response
                     content:
@@ -5252,6 +5317,153 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/projects/{project}/releases:
+        get:
+            tags:
+                - ReleaseService
+            operationId: ReleaseService_ListReleases
+            parameters:
+                - name: project
+                  in: path
+                  description: The project id.
+                  required: true
+                  schema:
+                    type: string
+                - name: pageSize
+                  in: query
+                  description: |-
+                    The maximum number of change histories to return. The service may return fewer than this value.
+                     If unspecified, at most 10 change histories will be returned.
+                     The maximum value is 1000; values above 1000 will be coerced to 1000.
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  description: |-
+                    Not used. A page token, received from a previous `ListReleasesRequest` call.
+                     Provide this to retrieve the subsequent page.
+
+                     When paginating, all other parameters provided to `ListReleasesRequest` must match
+                     the call that provided the page token.
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListReleasesResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        post:
+            tags:
+                - ReleaseService
+            operationId: ReleaseService_CreateRelease
+            parameters:
+                - name: project
+                  in: path
+                  description: The project id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/Release'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Release'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/projects/{project}/releases/{release}:
+        get:
+            tags:
+                - ReleaseService
+            operationId: ReleaseService_GetRelease
+            parameters:
+                - name: project
+                  in: path
+                  description: The project id.
+                  required: true
+                  schema:
+                    type: string
+                - name: release
+                  in: path
+                  description: The release id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Release'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        patch:
+            tags:
+                - ReleaseService
+            operationId: ReleaseService_UpdateRelease
+            parameters:
+                - name: project
+                  in: path
+                  description: The project id.
+                  required: true
+                  schema:
+                    type: string
+                - name: release
+                  in: path
+                  description: The release id.
+                  required: true
+                  schema:
+                    type: string
+                - name: updateMask
+                  in: query
+                  description: The list of fields to be updated.
+                  schema:
+                    type: string
+                    format: field-mask
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/Release'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Release'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/projects/{project}/rollouts:
         post:
             tags:
@@ -6158,6 +6370,37 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/projects/{project}:previewPlan:
+        post:
+            tags:
+                - PlanService
+            operationId: PlanService_PreviewPlan
+            parameters:
+                - name: project
+                  in: path
+                  description: The project id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/PreviewPlanRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/PreviewPlanResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/projects/{project}:previewRollout:
         post:
             tags:
@@ -6733,6 +6976,11 @@ paths:
                   schema:
                     type: string
                     format: field-mask
+                - name: allowMissing
+                  in: query
+                  description: If set to true, and the role is not found, a new role will be created.
+                  schema:
+                    type: boolean
             requestBody:
                 content:
                     application/json:
@@ -8333,7 +8581,7 @@ components:
                 expressions:
                     type: array
                     items:
-                        $ref: '#/components/schemas/ParsedExpr'
+                        $ref: '#/components/schemas/Expr'
         BatchDeparseResponse:
             type: object
             properties:
@@ -8368,7 +8616,7 @@ components:
                 expressions:
                     type: array
                     items:
-                        $ref: '#/components/schemas/ParsedExpr'
+                        $ref: '#/components/schemas/Expr'
         BatchRunTasksRequest:
             type: object
             properties:
@@ -8510,7 +8758,7 @@ components:
                 parsedExpr:
                     readOnly: true
                     allOf:
-                        - $ref: '#/components/schemas/ParsedExpr'
+                        - $ref: '#/components/schemas/Expr'
                     description: The parsed expression of the condition.
         Branch:
             type: object
@@ -8652,7 +8900,6 @@ components:
                         - MIGRATE
                         - MIGRATE_SDL
                         - MIGRATE_GHOST
-                        - BRANCH
                         - DATA
                     type: string
                     format: enum
@@ -9158,6 +9405,13 @@ components:
                         - DISALLOW
                     type: string
                     format: enum
+                enableDdl:
+                    type: boolean
+                    description: Allow running DDL statements in the SQL editor.
+                enableDml:
+                    type: boolean
+                    description: Allow running DML statements in the SQL editor.
+            description: DataSourceQueryPolicy is the policy configuration for running statements in the SQL editor.
         DataSource_Address:
             type: object
             properties:
@@ -10697,6 +10951,18 @@ components:
                     description: |-
                         A token, which can be sent as `page_token` to retrieve the next page.
                          If this field is omitted, there are no subsequent pages.
+        ListReleasesResponse:
+            type: object
+            properties:
+                releases:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Release'
+                nextPageToken:
+                    type: string
+                    description: |-
+                        A token, which can be sent as `page_token` to retrieve the next page.
+                         If this field is omitted, there are no subsequent pages.
         ListReviewConfigsResponse:
             type: object
             properties:
@@ -10705,6 +10971,18 @@ components:
                     items:
                         $ref: '#/components/schemas/ReviewConfig'
                     description: The sql review from the specified request.
+                nextPageToken:
+                    type: string
+                    description: |-
+                        A token, which can be sent as `page_token` to retrieve the next page.
+                         If this field is omitted, there are no subsequent pages.
+        ListRevisionsResponse:
+            type: object
+            properties:
+                revisions:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Revision'
                 nextPageToken:
                     type: string
                     description: |-
@@ -11084,18 +11362,6 @@ components:
                     type: array
                     items:
                         type: string
-        ParsedExpr:
-            type: object
-            properties:
-                expr:
-                    allOf:
-                        - $ref: '#/components/schemas/Expr'
-                    description: The parsed expression.
-                sourceInfo:
-                    allOf:
-                        - $ref: '#/components/schemas/SourceInfo'
-                    description: The source info derived from input that generated the parsed `expr`.
-            description: An expression together with source information as returned by the parser.
         PasswordRestrictionSetting:
             type: object
             properties:
@@ -11175,6 +11441,8 @@ components:
                          - SUCCESS
                          - WARNING
                          - ERROR
+                releaseSource:
+                    $ref: '#/components/schemas/Plan_ReleaseSource'
         PlanCheckRun:
             type: object
             properties:
@@ -11345,6 +11613,14 @@ components:
                     description: |-
                         The zip password provide by users.
                          Leave it empty if no needs to encrypt the zip file.
+        Plan_ReleaseSource:
+            type: object
+            properties:
+                release:
+                    type: string
+                    description: |-
+                        The release.
+                         Format: projects/{project}/releases/{release}
         Plan_Spec:
             type: object
             properties:
@@ -11362,12 +11638,22 @@ components:
                     description: |-
                         IDs of the specs that this spec depends on.
                          Must be a subset of the specs in the same step.
+                specReleaseSource:
+                    $ref: '#/components/schemas/Plan_SpecReleaseSource'
                 createDatabaseConfig:
                     $ref: '#/components/schemas/Plan_CreateDatabaseConfig'
                 changeDatabaseConfig:
                     $ref: '#/components/schemas/Plan_ChangeDatabaseConfig'
                 exportDataConfig:
                     $ref: '#/components/schemas/Plan_ExportDataConfig'
+        Plan_SpecReleaseSource:
+            type: object
+            properties:
+                file:
+                    type: string
+                    description: |-
+                        Format: projects/{project}/releases/{release}/files/{file}
+                         {file} is URL path escaped.
         Plan_Step:
             type: object
             properties:
@@ -11553,6 +11839,52 @@ components:
                 expectedSchema:
                     type: string
                     description: The expected SDL schema after normalizing.
+        PreviewPlanRequest:
+            required:
+                - project
+                - release
+                - targets
+            type: object
+            properties:
+                project:
+                    type: string
+                    description: |-
+                        The name of the project.
+                         Format: projects/{project}
+                release:
+                    type: string
+                    description: The release used for preview.
+                targets:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        The targets to deploy.
+                         Can be database or databaseGroup.
+                         Format:
+                         projects/{project}/databaseGroups/{databaseGroup}
+                         instances/{instance}/databases/{database}
+                allowOutOfOrder:
+                    type: boolean
+        PreviewPlanResponse:
+            type: object
+            properties:
+                plan:
+                    $ref: '#/components/schemas/Plan'
+                outOfOrderFiles:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        Format: projects/{project}/releases/{release}/files/{path}
+                         Example: `projects/tnt/releases/0801/files/2.2/V0001_create_table.sql`
+                appliedButModifiedFiles:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        Format: projects/{project}/releases/{release}/files/{path}
+                         Example: `projects/tnt/releases/0801/files/2.2/V0001_create_table.sql`
         PreviewRolloutRequest:
             required:
                 - project
@@ -11881,6 +12213,74 @@ components:
                          Format: projects/{project}/issues/{issue}
                 comment:
                     type: string
+        Release:
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: 'Format: projects/{project}/releases/{release}'
+                title:
+                    type: string
+                files:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Release_File'
+                vcsSource:
+                    $ref: '#/components/schemas/Release_VCSSource'
+                creator:
+                    readOnly: true
+                    type: string
+                    description: 'Format: users/hello@world.com'
+                createTime:
+                    readOnly: true
+                    type: string
+                    format: date-time
+        Release_File:
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: |-
+                        The name of the file.
+                         Expressed as a path, e.g. `2.2/V0001_create_table.sql`
+                sheet:
+                    type: string
+                    description: |-
+                        The sheet that holds the content.
+                         Format: projects/{project}/sheets/{sheet}
+                sheetSha256:
+                    readOnly: true
+                    type: string
+                    description: The SHA256 hash value of the sheet.
+                type:
+                    enum:
+                        - TYPE_UNSPECIFIED
+                        - VERSIONED
+                    type: string
+                    format: enum
+                version:
+                    type: string
+                statement:
+                    readOnly: true
+                    type: string
+                    description: The statement is used for preview purpose.
+                statementSize:
+                    readOnly: true
+                    type: string
+        Release_VCSSource:
+            type: object
+            properties:
+                vcsType:
+                    enum:
+                        - VCS_TYPE_UNSPECIFIED
+                        - GITHUB
+                        - GITLAB
+                        - BITBUCKET
+                        - AZURE_DEVOPS
+                    type: string
+                    format: enum
+                pullRequestUrl:
+                    type: string
         RemoveDataSourceRequest:
             required:
                 - name
@@ -12019,6 +12419,67 @@ components:
                     description: |-
                         resources using the config.
                          Format: {resurce}/{resource id}, for example, environments/test.
+        Revision:
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: 'Format: instances/{instance}/databases/{database}/revisions/{revision}'
+                release:
+                    type: string
+                    description: |-
+                        Format: projects/{project}/releases/{release}
+                         Can be empty.
+                creator:
+                    readOnly: true
+                    type: string
+                    description: 'Format: users/hello@world.com'
+                createTime:
+                    readOnly: true
+                    type: string
+                    format: date-time
+                sheet:
+                    type: string
+                    description: |-
+                        The sheet that holds the content.
+                         Format: projects/{project}/sheets/{sheet}
+                sheetSha256:
+                    readOnly: true
+                    type: string
+                    description: The SHA256 hash value of the sheet.
+                statement:
+                    readOnly: true
+                    type: string
+                    description: The statement is used for preview purpose.
+                statementSize:
+                    readOnly: true
+                    type: string
+                type:
+                    enum:
+                        - TYPE_UNSPECIFIED
+                        - VERSIONED
+                    type: string
+                    format: enum
+                version:
+                    type: string
+                file:
+                    type: string
+                    description: |-
+                        The name of the file in the release.
+                         Expressed as a path, e.g. `2.2/V0001_create_table.sql`
+                         Can be empty.
+                issue:
+                    type: string
+                    description: |-
+                        The issue associated with the revision.
+                         Can be empty.
+                         Format: projects/{project}/issues/{issue}
+                taskRun:
+                    type: string
+                    description: |-
+                        The task run associated with the revision.
+                         Can be empty.
+                         Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task}/taskRuns/{taskRun}
         Risk:
             type: object
             properties:
@@ -12138,7 +12599,32 @@ components:
                     description: value_value is used for Spanner and TUPLE ARRAY MAP in Clickhouse only.
                 timestampValue:
                     type: string
+                    description: |-
+                        timestamp_value is used for the timestamp without time zone data type, meaning it only includes the timestamp without any time zone or location info.
+                         Although it may be expressed as a UTC value, it should be seen as a timestamp missing location context.
                     format: date-time
+                timestampTzValue:
+                    allOf:
+                        - $ref: '#/components/schemas/RowValue_TimestampTZ'
+                    description: timestamp_tz_value is used for the timestamptz data type, which accurately represents the timestamp with location information.
+        RowValue_TimestampTZ:
+            type: object
+            properties:
+                timestamp:
+                    type: string
+                    format: date-time
+                zone:
+                    type: string
+                    description: |-
+                        Zone is the time zone abbreviations in timezone database such as "PDT", "PST".
+                         https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+                         We retrieve the time zone information from the timestamptz field in the database.
+                         A timestamp is in UTC or epoch time, and with zone info, we can convert it to a local time string.
+                         Zone and offset are returned by time.Time.Zone()
+                offset:
+                    type: integer
+                    description: The offset is in seconds east of UTC
+                    format: int32
         RunPlanChecksRequest:
             required:
                 - name
@@ -13045,54 +13531,6 @@ components:
                         $ref: '#/components/schemas/SlowQueryDetails'
                     description: Samples are details of the sample slow query logs with the same fingerprint.
             description: SlowQueryStatistics is the statistics of the slow query log.
-        SourceInfo:
-            type: object
-            properties:
-                syntaxVersion:
-                    type: string
-                    description: The syntax version of the source, e.g. `cel1`.
-                location:
-                    type: string
-                    description: |-
-                        The location name. All position information attached to an expression is
-                         relative to this location.
-
-                         The location could be a file, UI element, or similar. For example,
-                         `acme/app/AnvilPolicy.cel`.
-                lineOffsets:
-                    type: array
-                    items:
-                        type: integer
-                        format: int32
-                    description: |-
-                        Monotonically increasing list of code point offsets where newlines
-                         `\n` appear.
-
-                         The line number of a given position is the index `i` where for a given
-                         `id` the `line_offsets[i] < id_positions[id] < line_offsets[i+1]`. The
-                         column may be derivd from `id_positions[id] - line_offsets[i]`.
-                positions:
-                    type: object
-                    additionalProperties:
-                        type: integer
-                        format: int32
-                    description: |-
-                        A map from the parse node id (e.g. `Expr.id`) to the code point offset
-                         within the source.
-                macroCalls:
-                    type: object
-                    additionalProperties:
-                        $ref: '#/components/schemas/Expr'
-                    description: |-
-                        A map from the parse node id where a macro replacement was made to the
-                         call `Expr` that resulted in a macro expansion.
-
-                         For example, `has(value.field)` is a function call that is replaced by a
-                         `test_only` field selection in the AST. Likewise, the call
-                         `list.exists(e, e > 10)` translates to a comprehension expression. The key
-                         in the map corresponds to the expression id of the expanded macro, and the
-                         value is the call `Expr` that was replaced.
-            description: Source information collected at parse time.
         Stage:
             type: object
             properties:
@@ -13224,6 +13662,11 @@ components:
                     description: |-
                         The name of instance.
                          Format: instances/{instance}
+                enableFullSync:
+                    type: boolean
+                    description: |-
+                        When full sync is enabled, all databases in the instance will be synchronized. Otherwise, only
+                         the instance metadata (such as the database list) and any newly discovered instances will be synced.
         SyncInstanceResponse:
             type: object
             properties: {}
@@ -14279,7 +14722,7 @@ components:
             type: object
             properties:
                 expression:
-                    $ref: '#/components/schemas/ParsedExpr'
+                    $ref: '#/components/schemas/Expr'
                 template:
                     $ref: '#/components/schemas/ApprovalTemplate'
                 condition:
@@ -14383,6 +14826,7 @@ tags:
     - name: OrgPolicyService
     - name: PlanService
     - name: ProjectService
+    - name: ReleaseService
     - name: ReviewConfigService
     - name: RiskService
     - name: RoleService

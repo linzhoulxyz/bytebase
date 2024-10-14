@@ -2,7 +2,11 @@ import Emittery from "emittery";
 import { head, isEmpty } from "lodash-es";
 import { Status } from "nice-grpc-common";
 import { markRaw, reactive } from "vue";
-import { parseSQL } from "@/components/MonacoEditor/sqlParser";
+import {
+  parseSQL,
+  isDDLStatement,
+  isDMLStatement,
+} from "@/components/MonacoEditor/sqlParser";
 import { sqlServiceClient } from "@/grpcweb";
 import { t } from "@/plugins/i18n";
 import {
@@ -13,6 +17,7 @@ import {
   useSQLStore,
   useSQLEditorQueryHistoryStore,
   useAppFeature,
+  usePolicyV1Store,
 } from "@/store";
 import type {
   ComposedDatabase,
@@ -22,6 +27,7 @@ import type {
   SQLEditorTab,
 } from "@/types";
 import { isValidDatabaseName } from "@/types";
+import { PolicyType } from "@/types/proto/v1/org_policy_service";
 import {
   Advice,
   Advice_Status,
@@ -56,7 +62,9 @@ const useExecuteSQL = () => {
   const databaseStore = useDatabaseV1Store();
   const tabStore = useSQLEditorTabStore();
   const sqlEditorStore = useSQLEditorStore();
+  const policyStore = usePolicyV1Store();
   const sqlCheckStyle = useAppFeature("bb.feature.sql-editor.sql-check-style");
+
   const changeMode =
     useAppFeature("bb.feature.database-change-mode").value === "EDITOR"
       ? "RW"
@@ -307,9 +315,27 @@ const useExecuteSQL = () => {
         continue;
       }
 
+      const policy = await policyStore.getOrFetchPolicyByParentAndType({
+        parentPath: database.effectiveEnvironment,
+        policyType: PolicyType.DATA_SOURCE_QUERY,
+      });
+
       try {
         let resultSet: SQLResultSetV1;
+
         if (changeMode === "RO") {
+          const isDDL = isDDLStatement(data, "some");
+          const isDML = isDMLStatement(data, "some");
+
+          if (
+            (isDDL && !policy?.dataSourceQueryPolicy?.enableDdl) ||
+            (isDML && !policy?.dataSourceQueryPolicy?.enableDml)
+          ) {
+            sqlEditorStore.isShowExecutingHint = true;
+            sqlEditorStore.executingHintDatabase = database;
+            return cleanup();
+          }
+
           const instance = isValidDatabaseName(database.name)
             ? database.instance
             : params.connection.instance;
@@ -358,10 +384,12 @@ const useExecuteSQL = () => {
             const database = databaseStore.getDatabaseByName(
               params.connection.database
             );
+
             // Show a tips to navigate to issue creation
             // if the user is allowed to create issue in the project.
             if (hasPermissionToCreateChangeDatabaseIssue(database)) {
               sqlEditorStore.isShowExecutingHint = true;
+              sqlEditorStore.executingHintDatabase = database;
               cleanup();
             }
             fail(database, resultSet);

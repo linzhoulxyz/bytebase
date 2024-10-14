@@ -64,6 +64,20 @@
   
     - [InstanceService](#bytebase-v1-InstanceService)
   
+- [v1/release_service.proto](#v1_release_service-proto)
+    - [CreateReleaseRequest](#bytebase-v1-CreateReleaseRequest)
+    - [GetReleaseRequest](#bytebase-v1-GetReleaseRequest)
+    - [ListReleasesRequest](#bytebase-v1-ListReleasesRequest)
+    - [ListReleasesResponse](#bytebase-v1-ListReleasesResponse)
+    - [Release](#bytebase-v1-Release)
+    - [Release.File](#bytebase-v1-Release-File)
+    - [Release.VCSSource](#bytebase-v1-Release-VCSSource)
+    - [UpdateReleaseRequest](#bytebase-v1-UpdateReleaseRequest)
+  
+    - [ReleaseFileType](#bytebase-v1-ReleaseFileType)
+  
+    - [ReleaseService](#bytebase-v1-ReleaseService)
+  
 - [v1/database_service.proto](#v1_database_service-proto)
     - [AdviseIndexRequest](#bytebase-v1-AdviseIndexRequest)
     - [AdviseIndexResponse](#bytebase-v1-AdviseIndexResponse)
@@ -107,13 +121,17 @@
     - [ListDatabasesResponse](#bytebase-v1-ListDatabasesResponse)
     - [ListInstanceDatabasesRequest](#bytebase-v1-ListInstanceDatabasesRequest)
     - [ListInstanceDatabasesResponse](#bytebase-v1-ListInstanceDatabasesResponse)
+    - [ListRevisionsRequest](#bytebase-v1-ListRevisionsRequest)
+    - [ListRevisionsResponse](#bytebase-v1-ListRevisionsResponse)
     - [ListSecretsRequest](#bytebase-v1-ListSecretsRequest)
     - [ListSecretsResponse](#bytebase-v1-ListSecretsResponse)
     - [ListSlowQueriesRequest](#bytebase-v1-ListSlowQueriesRequest)
     - [ListSlowQueriesResponse](#bytebase-v1-ListSlowQueriesResponse)
     - [MaterializedViewMetadata](#bytebase-v1-MaterializedViewMetadata)
+    - [PackageMetadata](#bytebase-v1-PackageMetadata)
     - [ProcedureConfig](#bytebase-v1-ProcedureConfig)
     - [ProcedureMetadata](#bytebase-v1-ProcedureMetadata)
+    - [Revision](#bytebase-v1-Revision)
     - [SchemaConfig](#bytebase-v1-SchemaConfig)
     - [SchemaMetadata](#bytebase-v1-SchemaMetadata)
     - [Secret](#bytebase-v1-Secret)
@@ -476,13 +494,17 @@
     - [Plan.CreateDatabaseConfig.LabelsEntry](#bytebase-v1-Plan-CreateDatabaseConfig-LabelsEntry)
     - [Plan.ExportDataConfig](#bytebase-v1-Plan-ExportDataConfig)
     - [Plan.PlanCheckRunStatusCountEntry](#bytebase-v1-Plan-PlanCheckRunStatusCountEntry)
+    - [Plan.ReleaseSource](#bytebase-v1-Plan-ReleaseSource)
     - [Plan.Spec](#bytebase-v1-Plan-Spec)
+    - [Plan.SpecReleaseSource](#bytebase-v1-Plan-SpecReleaseSource)
     - [Plan.Step](#bytebase-v1-Plan-Step)
     - [Plan.VCSSource](#bytebase-v1-Plan-VCSSource)
     - [PlanCheckRun](#bytebase-v1-PlanCheckRun)
     - [PlanCheckRun.Result](#bytebase-v1-PlanCheckRun-Result)
     - [PlanCheckRun.Result.SqlReviewReport](#bytebase-v1-PlanCheckRun-Result-SqlReviewReport)
     - [PlanCheckRun.Result.SqlSummaryReport](#bytebase-v1-PlanCheckRun-Result-SqlSummaryReport)
+    - [PreviewPlanRequest](#bytebase-v1-PreviewPlanRequest)
+    - [PreviewPlanResponse](#bytebase-v1-PreviewPlanResponse)
     - [RunPlanChecksRequest](#bytebase-v1-RunPlanChecksRequest)
     - [RunPlanChecksResponse](#bytebase-v1-RunPlanChecksResponse)
     - [SearchPlansRequest](#bytebase-v1-SearchPlansRequest)
@@ -639,8 +661,6 @@
     - [Advice](#bytebase-v1-Advice)
     - [CheckRequest](#bytebase-v1-CheckRequest)
     - [CheckResponse](#bytebase-v1-CheckResponse)
-    - [DifferPreviewRequest](#bytebase-v1-DifferPreviewRequest)
-    - [DifferPreviewResponse](#bytebase-v1-DifferPreviewResponse)
     - [ExecuteRequest](#bytebase-v1-ExecuteRequest)
     - [ExecuteResponse](#bytebase-v1-ExecuteResponse)
     - [ExportRequest](#bytebase-v1-ExportRequest)
@@ -658,6 +678,7 @@
     - [QueryResult.PostgresError](#bytebase-v1-QueryResult-PostgresError)
     - [QueryRow](#bytebase-v1-QueryRow)
     - [RowValue](#bytebase-v1-RowValue)
+    - [RowValue.TimestampTZ](#bytebase-v1-RowValue-TimestampTZ)
     - [SearchQueryHistoriesRequest](#bytebase-v1-SearchQueryHistoriesRequest)
     - [SearchQueryHistoriesResponse](#bytebase-v1-SearchQueryHistoriesResponse)
     - [StringifyMetadataRequest](#bytebase-v1-StringifyMetadataRequest)
@@ -1359,6 +1380,7 @@ When paginating, all other parameters provided to `ListInstances` must match the
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | The name of instance. Format: instances/{instance} |
+| enable_full_sync | [bool](#bool) |  | When full sync is enabled, all databases in the instance will be synchronized. Otherwise, only the instance metadata (such as the database list) and any newly discovered instances will be synced. |
 
 
 
@@ -1547,6 +1569,186 @@ The instance&#39;s `name` field is used to identify the instance to update. Form
 | RemoveDataSource | [RemoveDataSourceRequest](#bytebase-v1-RemoveDataSourceRequest) | [Instance](#bytebase-v1-Instance) |  |
 | UpdateDataSource | [UpdateDataSourceRequest](#bytebase-v1-UpdateDataSourceRequest) | [Instance](#bytebase-v1-Instance) |  |
 | SyncSlowQueries | [SyncSlowQueriesRequest](#bytebase-v1-SyncSlowQueriesRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
+
+ 
+
+
+
+<a name="v1_release_service-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/release_service.proto
+
+
+
+<a name="bytebase-v1-CreateReleaseRequest"></a>
+
+### CreateReleaseRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| parent | [string](#string) |  | Format: projects/{project} |
+| release | [Release](#bytebase-v1-Release) |  | The release to create. |
+
+
+
+
+
+
+<a name="bytebase-v1-GetReleaseRequest"></a>
+
+### GetReleaseRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Format: projects/{project}/releases/{release} |
+
+
+
+
+
+
+<a name="bytebase-v1-ListReleasesRequest"></a>
+
+### ListReleasesRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| parent | [string](#string) |  | Format: projects/{project} |
+| page_size | [int32](#int32) |  | The maximum number of change histories to return. The service may return fewer than this value. If unspecified, at most 10 change histories will be returned. The maximum value is 1000; values above 1000 will be coerced to 1000. |
+| page_token | [string](#string) |  | Not used. A page token, received from a previous `ListReleasesRequest` call. Provide this to retrieve the subsequent page.
+
+When paginating, all other parameters provided to `ListReleasesRequest` must match the call that provided the page token. |
+
+
+
+
+
+
+<a name="bytebase-v1-ListReleasesResponse"></a>
+
+### ListReleasesResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| releases | [Release](#bytebase-v1-Release) | repeated |  |
+| next_page_token | [string](#string) |  | A token, which can be sent as `page_token` to retrieve the next page. If this field is omitted, there are no subsequent pages. |
+
+
+
+
+
+
+<a name="bytebase-v1-Release"></a>
+
+### Release
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Format: projects/{project}/releases/{release} |
+| title | [string](#string) |  |  |
+| files | [Release.File](#bytebase-v1-Release-File) | repeated |  |
+| vcs_source | [Release.VCSSource](#bytebase-v1-Release-VCSSource) |  |  |
+| creator | [string](#string) |  | Format: users/hello@world.com |
+| create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-Release-File"></a>
+
+### Release.File
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the file. Expressed as a path, e.g. `2.2/V0001_create_table.sql` |
+| sheet | [string](#string) |  | The sheet that holds the content. Format: projects/{project}/sheets/{sheet} |
+| sheet_sha256 | [string](#string) |  | The SHA256 hash value of the sheet. |
+| type | [ReleaseFileType](#bytebase-v1-ReleaseFileType) |  |  |
+| version | [string](#string) |  |  |
+| statement | [string](#string) |  | The statement is used for preview purpose. |
+| statement_size | [int64](#int64) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-Release-VCSSource"></a>
+
+### Release.VCSSource
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| vcs_type | [VCSType](#bytebase-v1-VCSType) |  |  |
+| pull_request_url | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-UpdateReleaseRequest"></a>
+
+### UpdateReleaseRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| release | [Release](#bytebase-v1-Release) |  | The release to update. |
+| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | The list of fields to be updated. |
+
+
+
+
+
+ 
+
+
+<a name="bytebase-v1-ReleaseFileType"></a>
+
+### ReleaseFileType
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| TYPE_UNSPECIFIED | 0 |  |
+| VERSIONED | 1 |  |
+
+
+ 
+
+ 
+
+
+<a name="bytebase-v1-ReleaseService"></a>
+
+### ReleaseService
+
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetRelease | [GetReleaseRequest](#bytebase-v1-GetReleaseRequest) | [Release](#bytebase-v1-Release) |  |
+| ListReleases | [ListReleasesRequest](#bytebase-v1-ListReleasesRequest) | [ListReleasesResponse](#bytebase-v1-ListReleasesResponse) |  |
+| CreateRelease | [CreateReleaseRequest](#bytebase-v1-CreateReleaseRequest) | [Release](#bytebase-v1-Release) |  |
+| UpdateRelease | [UpdateReleaseRequest](#bytebase-v1-UpdateReleaseRequest) | [Release](#bytebase-v1-Release) |  |
 
  
 
@@ -2322,6 +2524,41 @@ When paginating, all other parameters provided to `ListDatabases` must match the
 
 
 
+<a name="bytebase-v1-ListRevisionsRequest"></a>
+
+### ListRevisionsRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| parent | [string](#string) |  | The parent of the revisions. Format: instances/{instance}/databases/{database} |
+| page_size | [int32](#int32) |  | The maximum number of revisions to return. The service may return fewer than this value. If unspecified, at most 10 revisions will be returned. The maximum value is 1000; values above 1000 will be coerced to 1000. |
+| page_token | [string](#string) |  | A page token, received from a previous `ListRevisions` call. Provide this to retrieve the subsequent page.
+
+When paginating, all other parameters provided to `ListRevisions` must match the call that provided the page token. |
+
+
+
+
+
+
+<a name="bytebase-v1-ListRevisionsResponse"></a>
+
+### ListRevisionsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| revisions | [Revision](#bytebase-v1-Revision) | repeated |  |
+| next_page_token | [string](#string) |  | A token, which can be sent as `page_token` to retrieve the next page. If this field is omitted, there are no subsequent pages. |
+
+
+
+
+
+
 <a name="bytebase-v1-ListSecretsRequest"></a>
 
 ### ListSecretsRequest
@@ -2407,6 +2644,22 @@ MaterializedViewMetadata is the metadata for materialized views.
 
 
 
+<a name="bytebase-v1-PackageMetadata"></a>
+
+### PackageMetadata
+PackageMetadata is the metadata for packages.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name is the name of a package. |
+| definition | [string](#string) |  | The definition is the definition of a package. |
+
+
+
+
+
+
 <a name="bytebase-v1-ProcedureConfig"></a>
 
 ### ProcedureConfig
@@ -2435,6 +2688,33 @@ ProcedureMetadata is the metadata for procedures.
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | The name is the name of a procedure. |
 | definition | [string](#string) |  | The definition is the definition of a procedure. |
+
+
+
+
+
+
+<a name="bytebase-v1-Revision"></a>
+
+### Revision
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Format: instances/{instance}/databases/{database}/revisions/{revision} |
+| release | [string](#string) |  | Format: projects/{project}/releases/{release} Can be empty. |
+| creator | [string](#string) |  | Format: users/hello@world.com |
+| create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| sheet | [string](#string) |  | The sheet that holds the content. Format: projects/{project}/sheets/{sheet} |
+| sheet_sha256 | [string](#string) |  | The SHA256 hash value of the sheet. |
+| statement | [string](#string) |  | The statement is used for preview purpose. |
+| statement_size | [int64](#int64) |  |  |
+| type | [ReleaseFileType](#bytebase-v1-ReleaseFileType) |  |  |
+| version | [string](#string) |  |  |
+| file | [string](#string) |  | The name of the file in the release. Expressed as a path, e.g. `2.2/V0001_create_table.sql` Can be empty. |
+| issue | [string](#string) |  | The issue associated with the revision. Can be empty. Format: projects/{project}/issues/{issue} |
+| task_run | [string](#string) |  | The task run associated with the revision. Can be empty. Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task}/taskRuns/{taskRun} |
 
 
 
@@ -2478,6 +2758,7 @@ This is the concept of schema in Postgres, but it&#39;s a no-op for MySQL.
 | streams | [StreamMetadata](#bytebase-v1-StreamMetadata) | repeated | The streams is the list of streams in a schema, currently, only used for Snowflake. |
 | tasks | [TaskMetadata](#bytebase-v1-TaskMetadata) | repeated | The routines is the list of routines in a schema, currently, only used for Snowflake. |
 | materialized_views | [MaterializedViewMetadata](#bytebase-v1-MaterializedViewMetadata) | repeated | The materialized_views is the list of materialized views in a schema. |
+| packages | [PackageMetadata](#bytebase-v1-PackageMetadata) | repeated | The packages is the list of packages in a schema. |
 
 
 
@@ -2839,7 +3120,6 @@ ViewMetadata is the metadata for views.
 | MIGRATE | 2 |  |
 | MIGRATE_SDL | 3 |  |
 | MIGRATE_GHOST | 4 |  |
-| BRANCH | 5 |  |
 | DATA | 6 |  |
 
 
@@ -2973,6 +3253,7 @@ PostgreSQL: RANGE, LIST, HASH (https://www.postgresql.org/docs/current/ddl-parti
 | AdviseIndex | [AdviseIndexRequest](#bytebase-v1-AdviseIndexRequest) | [AdviseIndexResponse](#bytebase-v1-AdviseIndexResponse) |  |
 | ListChangeHistories | [ListChangeHistoriesRequest](#bytebase-v1-ListChangeHistoriesRequest) | [ListChangeHistoriesResponse](#bytebase-v1-ListChangeHistoriesResponse) |  |
 | GetChangeHistory | [GetChangeHistoryRequest](#bytebase-v1-GetChangeHistoryRequest) | [ChangeHistory](#bytebase-v1-ChangeHistory) |  |
+| ListRevisions | [ListRevisionsRequest](#bytebase-v1-ListRevisionsRequest) | [ListRevisionsResponse](#bytebase-v1-ListRevisionsResponse) |  |
 
  
 
@@ -4995,7 +5276,7 @@ DATABASE_CONNECTION is the anomaly type for database connection, e.g. the databa
 | role | [string](#string) |  | The role that is assigned to the members. Format: roles/{role} |
 | members | [string](#string) | repeated | Specifies the principals requesting access for a Bytebase resource. For users, the member should be: user:{email} For groups, the member should be: group:{email} |
 | condition | [google.type.Expr](#google-type-Expr) |  | The condition that is associated with this binding. If the condition evaluates to true, then this binding applies to the current request. If the condition evaluates to false, then this binding does not apply to the current request. However, a different role binding might grant the same role to one or more of the principals in this binding. |
-| parsed_expr | [google.api.expr.v1alpha1.ParsedExpr](#google-api-expr-v1alpha1-ParsedExpr) |  | The parsed expression of the condition. |
+| parsed_expr | [google.api.expr.v1alpha1.Expr](#google-api-expr-v1alpha1-Expr) |  | The parsed expression of the condition. |
 
 
 
@@ -5885,7 +6166,7 @@ The branch&#39;s `name` field is used to identify the branch to update. Format: 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| expressions | [google.api.expr.v1alpha1.ParsedExpr](#google-api-expr-v1alpha1-ParsedExpr) | repeated |  |
+| expressions | [google.api.expr.v1alpha1.Expr](#google-api-expr-v1alpha1-Expr) | repeated |  |
 
 
 
@@ -5930,7 +6211,7 @@ The branch&#39;s `name` field is used to identify the branch to update. Format: 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| expressions | [google.api.expr.v1alpha1.ParsedExpr](#google-api-expr-v1alpha1-ParsedExpr) | repeated |  |
+| expressions | [google.api.expr.v1alpha1.Expr](#google-api-expr-v1alpha1-Expr) | repeated |  |
 
 
 
@@ -6504,6 +6785,7 @@ The environment&#39;s `name` field is used to identify the environment to update
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | group | [Group](#bytebase-v1-Group) |  | The group to create. |
+| group_email | [string](#string) |  | The email to use for the group, which will become the final component of the group&#39;s resource name. |
 
 
 
@@ -6625,6 +6907,7 @@ When paginating, all other parameters provided to `ListGroups` must match the ca
 
 The group&#39;s `name` field is used to identify the group to update. Format: groups/{email} |
 | update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | The list of fields to update. |
+| allow_missing | [bool](#bool) |  | If set to true, and the group is not found, a new group will be created. In this situation, `update_mask` is ignored. |
 
 
 
@@ -7039,12 +7322,14 @@ The identity provider&#39;s `name` field is used to identify the identity provid
 <a name="bytebase-v1-DataSourceQueryPolicy"></a>
 
 ### DataSourceQueryPolicy
-
+DataSourceQueryPolicy is the policy configuration for running statements in the SQL editor.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | admin_data_source_restriction | [DataSourceQueryPolicy.Restriction](#bytebase-v1-DataSourceQueryPolicy-Restriction) |  |  |
+| enable_ddl | [bool](#bool) |  | Allow running DDL statements in the SQL editor. |
+| enable_dml | [bool](#bool) |  | Allow running DML statements in the SQL editor. |
 
 
 
@@ -7632,6 +7917,7 @@ When paginating, all other parameters provided to `ListPlans` must match the cal
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | plan_check_run_status_count | [Plan.PlanCheckRunStatusCountEntry](#bytebase-v1-Plan-PlanCheckRunStatusCountEntry) | repeated | The status count of the latest plan check runs. Keys are: - SUCCESS - WARNING - ERROR |
+| release_source | [Plan.ReleaseSource](#bytebase-v1-Plan-ReleaseSource) |  |  |
 
 
 
@@ -7762,6 +8048,21 @@ When paginating, all other parameters provided to `ListPlans` must match the cal
 
 
 
+<a name="bytebase-v1-Plan-ReleaseSource"></a>
+
+### Plan.ReleaseSource
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| release | [string](#string) |  | The release. Format: projects/{project}/releases/{release} |
+
+
+
+
+
+
 <a name="bytebase-v1-Plan-Spec"></a>
 
 ### Plan.Spec
@@ -7773,9 +8074,25 @@ When paginating, all other parameters provided to `ListPlans` must match the cal
 | earliest_allowed_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | earliest_allowed_time the earliest execution time of the change. |
 | id | [string](#string) |  | A UUID4 string that uniquely identifies the Spec. |
 | depends_on_specs | [string](#string) | repeated | IDs of the specs that this spec depends on. Must be a subset of the specs in the same step. |
+| spec_release_source | [Plan.SpecReleaseSource](#bytebase-v1-Plan-SpecReleaseSource) |  |  |
 | create_database_config | [Plan.CreateDatabaseConfig](#bytebase-v1-Plan-CreateDatabaseConfig) |  |  |
 | change_database_config | [Plan.ChangeDatabaseConfig](#bytebase-v1-Plan-ChangeDatabaseConfig) |  |  |
 | export_data_config | [Plan.ExportDataConfig](#bytebase-v1-Plan-ExportDataConfig) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-Plan-SpecReleaseSource"></a>
+
+### Plan.SpecReleaseSource
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| file | [string](#string) |  | Format: projects/{project}/releases/{release}/files/{file} {file} is URL path escaped. |
 
 
 
@@ -7889,6 +8206,41 @@ When paginating, all other parameters provided to `ListPlans` must match the cal
 | statement_types | [string](#string) | repeated | statement_types are the types of statements that are found in the sql. |
 | affected_rows | [int32](#int32) |  |  |
 | changed_resources | [ChangedResources](#bytebase-v1-ChangedResources) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-PreviewPlanRequest"></a>
+
+### PreviewPlanRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| project | [string](#string) |  | The name of the project. Format: projects/{project} |
+| release | [string](#string) |  | The release used for preview. |
+| targets | [string](#string) | repeated | The targets to deploy. Can be database or databaseGroup. Format: projects/{project}/databaseGroups/{databaseGroup} instances/{instance}/databases/{database} |
+| allow_out_of_order | [bool](#bool) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-PreviewPlanResponse"></a>
+
+### PreviewPlanResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| plan | [Plan](#bytebase-v1-Plan) |  |  |
+| out_of_order_files | [string](#string) | repeated | Format: projects/{project}/releases/{release}/files/{path} Example: `projects/tnt/releases/0801/files/2.2/V0001_create_table.sql` |
+| applied_but_modified_files | [string](#string) | repeated | Format: projects/{project}/releases/{release}/files/{path} Example: `projects/tnt/releases/0801/files/2.2/V0001_create_table.sql` |
 
 
 
@@ -8056,6 +8408,7 @@ Type is the database change type.
 | ListPlanCheckRuns | [ListPlanCheckRunsRequest](#bytebase-v1-ListPlanCheckRunsRequest) | [ListPlanCheckRunsResponse](#bytebase-v1-ListPlanCheckRunsResponse) |  |
 | RunPlanChecks | [RunPlanChecksRequest](#bytebase-v1-RunPlanChecksRequest) | [RunPlanChecksResponse](#bytebase-v1-RunPlanChecksResponse) |  |
 | BatchCancelPlanCheckRuns | [BatchCancelPlanCheckRunsRequest](#bytebase-v1-BatchCancelPlanCheckRunsRequest) | [BatchCancelPlanCheckRunsResponse](#bytebase-v1-BatchCancelPlanCheckRunsResponse) |  |
+| PreviewPlan | [PreviewPlanRequest](#bytebase-v1-PreviewPlanRequest) | [PreviewPlanResponse](#bytebase-v1-PreviewPlanResponse) |  |
 
  
 
@@ -9058,6 +9411,7 @@ When paginating, all other parameters provided to `ListRoles` must match the cal
 | ----- | ---- | ----- | ----------- |
 | role | [Role](#bytebase-v1-Role) |  |  |
 | update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  |  |
+| allow_missing | [bool](#bool) |  | If set to true, and the role is not found, a new role will be created. |
 
 
 
@@ -10189,38 +10543,6 @@ Type of the SheetPayload.
 
 
 
-<a name="bytebase-v1-DifferPreviewRequest"></a>
-
-### DifferPreviewRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| engine | [Engine](#bytebase-v1-Engine) |  |  |
-| old_schema | [string](#string) |  |  |
-| new_metadata | [DatabaseMetadata](#bytebase-v1-DatabaseMetadata) |  |  |
-
-
-
-
-
-
-<a name="bytebase-v1-DifferPreviewResponse"></a>
-
-### DifferPreviewResponse
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| schema | [string](#string) |  |  |
-
-
-
-
-
-
 <a name="bytebase-v1-ExecuteRequest"></a>
 
 ### ExecuteRequest
@@ -10537,7 +10859,25 @@ for field description.
 | uint32_value | [uint32](#uint32) |  |  |
 | uint64_value | [uint64](#uint64) |  |  |
 | value_value | [google.protobuf.Value](#google-protobuf-Value) |  | value_value is used for Spanner and TUPLE ARRAY MAP in Clickhouse only. |
-| timestamp_value | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| timestamp_value | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | timestamp_value is used for the timestamp without time zone data type, meaning it only includes the timestamp without any time zone or location info. Although it may be expressed as a UTC value, it should be seen as a timestamp missing location context. |
+| timestamp_tz_value | [RowValue.TimestampTZ](#bytebase-v1-RowValue-TimestampTZ) |  | timestamp_tz_value is used for the timestamptz data type, which accurately represents the timestamp with location information. |
+
+
+
+
+
+
+<a name="bytebase-v1-RowValue-TimestampTZ"></a>
+
+### RowValue.TimestampTZ
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| timestamp | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| zone | [string](#string) |  | Zone is the time zone abbreviations in timezone database such as &#34;PDT&#34;, &#34;PST&#34;. https://en.wikipedia.org/wiki/List_of_tz_database_time_zones We retrieve the time zone information from the timestamptz field in the database. A timestamp is in UTC or epoch time, and with zone info, we can convert it to a local time string. Zone and offset are returned by time.Time.Zone() |
+| offset | [int32](#int32) |  | The offset is in seconds east of UTC |
 
 
 

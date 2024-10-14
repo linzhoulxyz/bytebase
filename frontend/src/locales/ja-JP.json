@@ -225,7 +225,7 @@
     "will-lose-unsaved-data": "これにより、現在保存されていないデータはすべて失われます。",
     "deleted": "削除されました",
     "will-override-current-data": "現在のデータは上書きされます。",
-    "rollout": "リリース",
+    "roll-out": "リリース",
     "uploading": "アップロードする",
     "active": "オンにする",
     "added": "作成した",
@@ -290,7 +290,9 @@
     "back-to-workspace": "ワークスペースに戻る",
     "override": "オーバーライド",
     "encoding": "エンコーディング",
-    "finish": "仕上げる"
+    "finish": "仕上げる",
+    "title": "タイトル",
+    "hide": "隠れる"
   },
   "error-page": {
     "go-back-home": "ホームページに戻る"
@@ -489,7 +491,7 @@
       "email": "メールアドレス",
       "role": "役割",
       "phone": "電話番号",
-      "phone-tips": "国コードを必ず含めてください",
+      "phone-tips": "国コードを必ず含めてください +81xxxxxx",
       "country-code": "国または地域コード",
       "password": "パスワード",
       "password-hint": "パスワードは制限設定に従う必要があります",
@@ -773,12 +775,12 @@
           "self": "データベース変更モード",
           "description": "ユーザーがデータベース スキーマの移行を実行する方法を制御します",
           "issue-mode": {
-            "self": "作業モード（チーム）",
-            "description": "作業を使用して、データベースの変更をリクエスト、レビュー、ロールアウト、バージョン管理します。チームコラボレーションに適しています。。"
+            "self": "作業モード（ガバナンス）",
+            "description": "データベースの変更をリクエスト、レビュー、展開、バージョン管理するためにIssueを使用します。チームでの協力および本番環境に適しています。"
           },
           "sql-editor-mode": {
-            "self": "SQL エディター モード (個人)",
-            "description": "SQL エディタを使用してデータベースの変更を直接実行します。個人に適しています。"
+            "self": "SQL エディター モード (直接)",
+            "description": "SQLエディターを使用してデータベースの変更を直接実行します。個人利用および非本番環境に適しています。"
           },
           "can-be-changed-later": "この設定は後でいつでも変更できます。",
           "default-view-changed-to-sql-editor": "ワークスペースのデフォルトのビューが SQL エディターに変更されました。",
@@ -1047,6 +1049,11 @@
     "waiting-rollout": "リリース待ち",
     "opened-by-at": "{id} は {creator} から {time} まで始まりました",
     "commit-by-at": "{id} {title} は {time} に {author} によって送信されました",
+    "status": {
+      "open": "開ける",
+      "done": "終わり",
+      "canceled": "キャンセル"
+    },
     "status-transition": {
       "modal": {
         "resolve": "作業指示は完了しましたか?",
@@ -1270,7 +1277,7 @@
         "admin": "{environment}環境には SQL 監査ポリシーが構成されていません。 {link}",
         "developer": "{environment} 環境には SQL 監査ポリシーが構成されていません。DBA に構成を依頼してください。"
       },
-      "statement-is-too-large": "ステートメントが大きすぎます",
+      "statement-is-too-large": "現在のステートメント サイズが 1MB を超えているため、SQL チェックはスキップされます。",
       "back-to-edit": "編集に戻る",
       "continue-anyway": "まだ続く",
       "sql-review-violations": "SQL監査ルール違反"
@@ -1414,6 +1421,12 @@
     "select-database-user": "データベースユーザーの選択",
     "new-database": "@:common.new@:common.database",
     "syncing": "同期中 ...",
+    "sync": {
+      "self": "同期インスタンス",
+      "sync-all": "すべてのデータベースを同期する",
+      "sync-new": "新しいデータベースのみを同期する",
+      "sync-all-tip": "データベースの同期は非同期で、数秒から数分かかる場合があります。"
+    },
     "selected-n-instances": "{n} 個のインスタンスが選択されました",
     "create-migration-schema": "@:common.create@:common.migration @:{'common.schema'}",
     "missing-migration-schema": "@:common.migration @:common.schema がありません",
@@ -1620,11 +1633,16 @@
     "access-control": {
       "title": "アクセス制御",
       "disable-copy-data-from-sql-editor": "SQL エディタにおけるデータコピーの制限 (管理者/DBA はコピー可能)",
-      "restrict-admin-data-sources": {
-        "self": "管理者データソースを制限する",
-        "disallow": "管理データソースからのデータのクエリを禁止する",
-        "fallback": "読み取り専用データソースが利用できない場合は、管理データソースにフォールバックします。"
+      "restrict-admin-connection": {
+        "self": "管理者接続のクエリ制限",
+        "disallow": "管理者接続からのデータクエリを禁止する",
+        "fallback": "読み取り専用接続が利用できない場合、管理者接続にフォールバックする"
       }
+    },
+    "statement-execution": {
+      "title": "ステートメントの実行",
+      "allow-ddl": "SQLエディタでDDL文を実行できるようにする",
+      "allow-dml": "SQL エディタで DML ステートメントを実行できるようにする"
     }
   },
   "quick-start": {
@@ -1676,7 +1694,7 @@
     "password-forgot": "パスワードを忘れる",
     "password-reset": {
       "title": "あなたのパスワードをリセット",
-      "content": "パスワードをリセットするリンクをメールに送信します",
+      "content": "パスワード制限ポリシーに従ってパスワードをリセットする必要があります。",
       "send-reset-link": "リセットリンクを送信する",
       "return-to-sign-in": "ログインに戻る"
     },
@@ -1695,15 +1713,9 @@
       "info": "このオプションは、データベースへの変更を公開するときに手動で公開する必要があるかどうかを制御します。",
       "auto": "自動公開",
       "auto-info": "すべての事前チェックに合格すると、自動的にリリースされ、変更が実装されます。",
-      "manual-by-project-owner": "プロジェクトオーナー",
-      "manual-by-project-releaser": "プロジェクトの発行者",
-      "manual-by-issue-creator": "チケットの作成者",
       "manual-by-last-approver": "カスタム承認の最終承認者が公開されます",
       "manual-by-dedicated-roles": "特定の役割の手動リリース",
-      "manual-by-dedicated-roles-info": "以下の選択したロールのいずれかを許可し、「公開」ボタンをクリックして変更を実行します。",
-      "manual-by-dba": "DBA",
-      "manual-by-workspace-admin": "バイトベースワークスペース管理者",
-      "manual-by-custom-project-roles": "カスタムプロジェクトロール"
+      "manual-by-dedicated-roles-info": "以下の選択したロールのいずれかを許可し、「公開」ボタンをクリックして変更を実行します。"
     },
     "environment-tier": {
       "name": "環境レベル",
@@ -1745,12 +1757,12 @@
     "all-tables": "すべてのテーブル",
     "affected-tables": "影響を受けるテーブル",
     "select-affection-tables": "影響を受けるテーブルを選択",
-    "view-full": "すべて見る"
+    "view-full": "すべて見る",
+    "rollback-tip": "ロールバックする特定の DDL 履歴を選択します。"
   },
   "database": {
     "sync-database": "データベースを同期",
     "select": "データベースの選択",
-    "the-list-might-be-out-of-date-and-is-refreshed-roughly-every-10-minutes": "表は約10分ごとに更新されるため、表示される情報は最新ではない場合があります。",
     "no-anomalies-detected": "例外は検出されませんでした",
     "sync-status": "同期ステータス",
     "last-successful-sync": "最後に成功した同期",
@@ -2365,6 +2377,7 @@
     "no-data-available": "データなし",
     "download-as-file": "{file} 形式でダウンロード",
     "only-select-allowed": "{select} ステートメントのみが実行を許可されます",
+    "enable-ddl-for-environment": "環境 {environment} に対して DDL/DML ステートメントを有効にすることができます。",
     "want-to-action": "{want} が必要な場合は、「{action}」ボタン {reaction} をクリックしてください。",
     "and-submit-an-issue": "そしてチケットを提出してください",
     "to-enable-admin-mode": "管理者モードを有効にするには",
@@ -2759,7 +2772,7 @@
         "title": "バッチモード",
         "desc": "異なるテナントまたはデータベース シャードに属するデータベースのグループに対するバッチ変更。"
       },
-      "bb-feature-approval-policy": {
+      "bb-feature-rollout-policy": {
         "title": "リリース戦略",
         "desc": "「リリース戦略」は、データベーススキーマへの変更を手動でリリースする必要があるかどうかを制御できます。"
       },
@@ -3212,7 +3225,22 @@
       "dont-show-again": "再び表示しない",
       "text2sql": "Text2SQL",
       "disable-text2sql": "Text2SQLを閉じる",
-      "enable-text2sql": "Text2SQLを開く"
+      "enable-text2sql": "Text2SQLを開く",
+      "actions": {
+        "chat": "チャット",
+        "explain-code": "コードの説明",
+        "find-problems": "問題を見つける",
+        "new-chat": "新しいチャット",
+        "insert-at-caret": "キャレットに挿入"
+      },
+      "send": "送信",
+      "new-line": "改行",
+      "ai-assistant": "AI助手",
+      "not-configured": {
+        "self": "AI アシスタントが設定されていません。",
+        "contact-admin-to-configure": "組織の管理者に問い合わせてください。",
+        "go-to-configure": "設定に移動"
+      }
     }
   },
   "custom-approval": {
@@ -3470,12 +3498,16 @@
     "select-role": "役割の選択",
     "expired-tip": "役割の有効期限が切れている可能性があります。",
     "import-from-role": "ロールからインポート",
-    "workspace-roles": "ワークスペースの役割",
+    "workspace-roles": {
+      "self": "ワークスペースの役割"
+    },
     "project-roles": {
       "self": "プロジェクトの役割",
       "apply-to-all-projects": "すべてのプロジェクトに適用する"
     },
-    "custom-roles": "カスタムロール",
+    "custom-roles": {
+      "self": "カスタムロール"
+    },
     "workspace-admin": {
       "self": "ワークスペース管理者",
       "description": "ワークスペース内のすべての権限。"
@@ -3511,6 +3543,9 @@
     "project-viewer": {
       "self": "プロジェクトビューア",
       "description": "基本的なプロジェクト情報を表示し、独自にデータ クエリとデータ エクスポート リクエストを開始できます。"
+    },
+    "issue-creator": {
+      "self": "チケットの作成者"
     }
   },
   "database-group": {

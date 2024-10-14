@@ -25,9 +25,17 @@
         </div>
       </template>
       <template #default>
-        <div class="inline-flex gap-1">
-          <span>Language server</span>
-          <span>{{ connectionStateText }}</span>
+        <div class="flex flex-col gap-1">
+          <div class="inline-flex gap-1">
+            <span>Language server</span>
+            <span>{{ connectionStateText }}</span>
+          </div>
+          <div
+            v-if="connectionHeartbeatText"
+            class="text-xs text-control-placeholder"
+          >
+            {{ connectionHeartbeatText }}
+          </div>
         </div>
       </template>
     </NPopover>
@@ -35,6 +43,7 @@
 </template>
 
 <script lang="ts" setup>
+import dayjs from "dayjs";
 import { NPopover } from "naive-ui";
 import {
   onMounted,
@@ -66,6 +75,7 @@ import {
   useLineHighlights,
   useLSPConnectionState,
   useOverrideSuggestIcons,
+  type FormatContentOptions,
 } from "./composables";
 import monaco, { createMonacoEditor } from "./editor";
 import type {
@@ -89,6 +99,7 @@ const props = withDefaults(
     advices?: AdviceOption[];
     lineHighlights?: LineHighlightOption[];
     options?: IStandaloneEditorConstructionOptions;
+    formatContentOptions?: FormatContentOptions;
     placeholder?: string;
   }>(),
   {
@@ -101,6 +112,7 @@ const props = withDefaults(
     advices: () => [],
     lineHighlights: () => [],
     options: undefined,
+    formatContentOptions: undefined,
     placeholder: undefined,
   }
 );
@@ -117,7 +129,7 @@ const containerRef = ref<HTMLDivElement>();
 const editorRef = shallowRef<IStandaloneCodeEditor>();
 const ready = ref(false);
 const contentRef = ref("");
-const { connectionState } = useLSPConnectionState();
+const { connectionState, connectionHeartbeat } = useLSPConnectionState();
 const connectionStateIndicatorClass = computed(() => {
   const state = connectionState.value;
   if (state === "ready") {
@@ -137,6 +149,13 @@ const connectionStateText = computed(() => {
     return "connecting";
   }
   return "disconnected";
+});
+const connectionHeartbeatText = computed(() => {
+  if (connectionState.value !== "ready") return "";
+  const timestamp = connectionHeartbeat.value?.timestamp;
+  if (!timestamp) return "";
+  const time = dayjs(timestamp).format("YYYY-MM-DD HH:mm:ss.SSS UTCZZ");
+  return `Last heartbeat at ${time}`;
 });
 
 onMounted(async () => {
@@ -165,7 +184,12 @@ onMounted(async () => {
     useOptions(monaco, editor, toRef(props, "options"));
     useModel(monaco, editor, toRef(props, "model"));
     useSuggestOptionByLanguage(monaco, editor);
-    useFormatContent(monaco, editor, toRef(props, "dialect"));
+    useFormatContent(
+      monaco,
+      editor,
+      toRef(props, "dialect"),
+      toRef(props, "formatContentOptions")
+    );
     const content = useContent(monaco, editor);
     const selectedContent = useSelectedContent(monaco, editor);
     const selection = useSelection(monaco, editor);
@@ -224,5 +248,11 @@ defineExpose({
   font-size: 14px;
   left: 52px;
   top: 8px;
+}
+.bb-monaco-editor :deep(.monaco-editor .peekview-title .filename) {
+  display: none !important;
+}
+.bb-monaco-editor :deep(.monaco-editor .peekview-title .dirname) {
+  margin-left: 0 !important;
 }
 </style>

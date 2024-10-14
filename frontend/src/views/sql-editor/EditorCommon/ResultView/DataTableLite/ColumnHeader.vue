@@ -1,6 +1,6 @@
 <template>
   <div
-    class="relative px-2 py-2 min-w-[2rem] text-left bg-gray-50 dark:bg-gray-700 text-xs font-medium text-gray-500 dark:text-gray-300 tracking-wider"
+    class="relative px-2 py-2 min-w-[2rem] whitespace-nowrap text-left bg-gray-50 dark:bg-gray-700 text-xs font-medium text-gray-500 dark:text-gray-300 tracking-wider"
   >
     <div
       class="flex items-center overflow-hidden cursor-pointer"
@@ -38,6 +38,7 @@
     <div
       class="group absolute w-[8px] right-0 top-0 bottom-0 cursor-col-resize"
       @pointerdown="$emit('start-resizing')"
+      @dblclick="$emit('auto-resize')"
     >
       <div
         class="absolute w-[3px] right-0 top-0 bottom-0 group-hover:bg-accent/30"
@@ -63,6 +64,7 @@ defineProps<{
 
 defineEmits<{
   (event: "start-resizing"): void;
+  (event: "auto-resize"): void;
 }>();
 
 const hasSensitiveFeature = featureToRef("bb.feature.sensitive-data");

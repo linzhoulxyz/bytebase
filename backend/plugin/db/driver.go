@@ -101,9 +101,6 @@ const (
 	// MigrateSDL is the migration type via state-based schema migration.
 	// Used for schema change including CREATE DATABASE.
 	MigrateSDL MigrationType = "MIGRATE_SDL"
-	// Branch is the migration type for BRANCH.
-	// Used when restoring from a backup (the restored database branched from the original backup).
-	Branch MigrationType = "BRANCH"
 	// Data is the migration type for DATA.
 	// Used for DML change.
 	Data MigrationType = "DATA"
@@ -167,6 +164,9 @@ type MigrationInfo struct {
 	Creator        string
 	// Payload contains JSON-encoded string of VCS push event if the migration is triggered by a VCS push event.
 	Payload *storepb.InstanceChangeHistoryPayload
+
+	SheetUID *int
+	Sheet    *string
 }
 
 // ConnectionConfig is the configuration for connections.
@@ -247,8 +247,9 @@ type QueryContext struct {
 	// Mainly used for the search path of PostgreSQL.
 	Schema string
 	// Limit is the maximum row count returned. No limit enforced if limit <= 0
-	Limit   int
-	Explain bool
+	Limit         int
+	Explain       bool
+	OperatorEmail string
 }
 
 // DatabaseRoleMessage is the API message for database role.

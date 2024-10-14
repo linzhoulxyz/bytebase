@@ -27,7 +27,12 @@
         <div class="flex flex-col gap-y-1">
           <div class="textlabel flex flex-row gap-x-1">
             <span>{{ $t("policy.rollout.manual-by-dedicated-roles") }}</span>
-            <FeatureBadge feature="bb.feature.approval-policy" />
+            <FeatureBadge feature="bb.feature.rollout-policy" />
+            <FeatureBadgeForInstanceLicense
+              :show="hasRolloutPolicyFeature"
+              feature="bb.feature.rollout-policy"
+              :tooltip="$t('subscription.instance-assignment.require-license')"
+            />
           </div>
           <div class="textinfolabel">
             {{ $t("policy.rollout.manual-by-dedicated-roles-info") }}
@@ -46,7 +51,7 @@
           "
         >
           <div class="textlabel">
-            {{ $t("policy.rollout.manual-by-workspace-admin") }}
+            {{ $t("role.workspace-admin.self") }}
           </div>
         </NCheckbox>
         <NCheckbox
@@ -60,7 +65,7 @@
           "
         >
           <div class="textlabel">
-            {{ $t("policy.rollout.manual-by-dba") }}
+            {{ $t("role.workspace-dba.self") }}
           </div>
         </NCheckbox>
         <NCheckbox
@@ -74,7 +79,7 @@
           "
         >
           <div class="textlabel">
-            {{ $t("policy.rollout.manual-by-project-owner") }}
+            {{ $t("role.project-owner.self") }}
           </div>
         </NCheckbox>
         <NCheckbox
@@ -88,7 +93,7 @@
           "
         >
           <div class="textlabel">
-            {{ $t("policy.rollout.manual-by-project-releaser") }}
+            {{ $t("role.project-releaser.self") }}
           </div>
         </NCheckbox>
         <NCheckbox
@@ -100,7 +105,7 @@
           "
         >
           <div class="textlabel">
-            {{ $t("policy.rollout.manual-by-issue-creator") }}
+            {{ $t("role.issue-creator.self") }}
           </div>
         </NCheckbox>
         <div class="flex flex-col gap-y-1">
@@ -111,7 +116,7 @@
             @update:checked="toggleCustomProjectRoles($event)"
           >
             <div class="textlabel">
-              {{ $t("policy.rollout.manual-by-custom-project-roles") }}
+              {{ $t("role.custom-roles.self") }}
             </div>
           </NCheckbox>
           <div v-if="customProjectRoles.checked" class="pl-8">
@@ -142,6 +147,11 @@
         <div class="textlabel flex flex-row gap-x-1">
           <span>{{ $t("policy.rollout.manual-by-last-approver") }}</span>
           <FeatureBadge feature="bb.feature.custom-approval" />
+          <FeatureBadgeForInstanceLicense
+            :show="hasRolloutPolicyFeature"
+            feature="bb.feature.rollout-policy"
+            :tooltip="$t('subscription.instance-assignment.require-license')"
+          />
         </div>
       </NRadio>
     </div>
@@ -153,11 +163,13 @@ import { cloneDeep, pull } from "lodash-es";
 import { NCheckbox, NRadio } from "naive-ui";
 import { ref, watch } from "vue";
 import { computed } from "vue";
+import { featureToRef } from "@/store";
 import { PresetRoleType, VirtualRoleType } from "@/types";
 import type { Policy } from "@/types/proto/v1/org_policy_service";
 import { RolloutPolicy } from "@/types/proto/v1/org_policy_service";
 import type { Role } from "@/types/proto/v1/role_service";
 import FeatureBadge from "../FeatureGuard/FeatureBadge.vue";
+import FeatureBadgeForInstanceLicense from "../FeatureGuard/FeatureBadgeForInstanceLicense.vue";
 import { ProjectRoleSelect } from "../v2";
 
 const props = defineProps<{
@@ -173,6 +185,8 @@ const PresetProjectRoles: string[] = [
   PresetRoleType.PROJECT_OWNER,
   PresetRoleType.PROJECT_RELEASER,
 ];
+
+const hasRolloutPolicyFeature = featureToRef("bb.feature.rollout-policy");
 
 const isAutomaticRolloutChecked = computed(() => {
   return rolloutPolicy.value.automatic && !customProjectRoles.value.checked;

@@ -12,7 +12,6 @@ export * from "./notification";
 export * from "./oauth";
 export * from "./plan";
 export * from "./member";
-export * from "./sqlAdvice";
 export * from "./store";
 export * from "./vcs";
 export * from "./sqlEditor";
@@ -31,5 +30,7 @@ export * from "./semanticTypes";
 export * from "./iam";
 export * from "./misc";
 export * from "./appProfile";
+export * from "./release";
 
 export * from "./v1";
+export * from "./timestamp";
