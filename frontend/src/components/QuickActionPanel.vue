@@ -78,6 +78,15 @@
       "
       @close="state.quickActionType = undefined"
     />
+    <GrantAccessDrawer
+      v-if="
+        project &&
+        state.quickActionType === 'quickaction.bb.database.masking-access'
+      "
+      :column-list="[]"
+      :project-name="project.name"
+      @close="state.quickActionType = undefined"
+    />
   </template>
 
   <FeatureModal
@@ -97,6 +106,7 @@ import {
   ChevronsDownIcon,
   FileSearchIcon,
   FileDownIcon,
+  ShieldCheckIcon,
 } from "lucide-vue-next";
 import { NButton, NEllipsis } from "naive-ui";
 import type { PropType, VNode } from "vue";
@@ -111,6 +121,7 @@ import {
   Buttons as InstanceFormButtons,
 } from "@/components/InstanceForm/";
 import ProjectCreatePanel from "@/components/Project/ProjectCreatePanel.vue";
+import GrantAccessDrawer from "@/components/SensitiveData/GrantAccessDrawer.vue";
 import { TransferDatabaseForm } from "@/components/TransferDatabaseForm";
 import { Drawer, DrawerContent } from "@/components/v2";
 import { PROJECT_V1_ROUTE_DATABASE_GROUP_DETAIL } from "@/router/dashboard/projectV1";
@@ -168,6 +179,10 @@ const databaseChangeMode = useAppFeature("bb.feature.database-change-mode");
 
 const hasDBAWorkflowFeature = computed(() => {
   return subscriptionStore.hasFeature("bb.feature.dba-workflow");
+});
+
+const hasSensitiveDataFeature = computed(() => {
+  return subscriptionStore.hasFeature("bb.feature.sensitive-data");
 });
 
 const state = reactive<LocalState>({
@@ -306,6 +321,14 @@ const availableQuickActionList = computed((): QuickAction[] => {
       action: () =>
         (state.quickActionType = "quickaction.bb.issue.grant.request.exporter"),
       icon: h(FileDownIcon),
+    },
+    {
+      type: "quickaction.bb.database.masking-access",
+      title: t("project.masking-access.grant-access"),
+      hide: !hasSensitiveDataFeature.value,
+      action: () =>
+        (state.quickActionType = "quickaction.bb.database.masking-access"),
+      icon: h(ShieldCheckIcon),
     },
   ];
 

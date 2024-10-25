@@ -124,6 +124,14 @@
         }
       }
     },
+    "table-require-charset": {
+      "title": "需要指定字符集",
+      "description": "必须指定表格的字符集。建议错误级别：警告"
+    },
+    "table-require-collation": {
+      "title": "需要指定排序规则",
+      "description": "必须指定表的排序规则。建议错误级别：警告"
+    },
     "naming-fully-qualified": {
       "title": "完全限定对象名称",
       "description": "强制使用完全限定的对象名称。例如 “schema.table”，建议错误级别：警告"
@@ -360,6 +368,14 @@
       "title": "禁止在列上设置易变的默认值",
       "description": "易变函数（例如，clock_timestamp()）会在执行 ALTER TABLE 时更新每一行的值，可能导致更新操作时间过长。"
     },
+    "column-require-charset": {
+      "title": "要求列设置字符集",
+      "description": "必须指定字符数据类型的列的字符集。建议错误级别：警告"
+    },
+    "column-require-collation": {
+      "title": "要求对列设置排序规则",
+      "description": "必须指定字符数据类型的列的排序规则。建议错误级别：警告"
+    },
     "statement-select-no-select-all": {
       "title": "禁止使用 \"SELECT *\"",
       "description": "SELECT * 拉取整行数据可能造成不必要的资源开销，同时一旦表增减列，也可能造成应用出现不符合预期的结果。建议错误等级：错误"
@@ -523,6 +539,14 @@
       "title": "禁止混合 DDL 和 DML 操作",
       "description": "为了获得最佳性能和数据完整性，请避免在同一个脚本中混合使用 DDL 和 DML 语句。"
     },
+    "statement-disallow-mix-in-ddl": {
+      "title": "禁止在 schema 更新 (DDL) 任务中混合语句",
+      "description": "为了获得最佳性能和数据完整性，请避免在同一脚本中组合 DDL 和 DML 语句。"
+    },
+    "statement-disallow-mix-in-dml": {
+      "title": "禁止在数据更新 (DML) 任务中混合语句",
+      "description": "为了获得最佳性能和数据完整性，请避免在同一脚本中组合 DDL 和 DML 语句。"
+    },
     "statement-prior-backup-check": {
       "title": "检查能否预先备份数据",
       "description": "此规则将检查是否可以在数据更改前创建备份。该规则要求备份目标数据库存在且不存在DDL语句。"
@@ -546,6 +570,14 @@
     "statement-max-execution-time": {
       "title": "最大执行时间",
       "description": "设置SQL语句的最大执行时间，如果执行时间超过限制，语句将被终止。建议错误级别：错误"
+    },
+    "statement-require-algorithm-option": {
+      "title": "需要在 ALTER TABLE 语句中指定 ALGORITHM 选项",
+      "description": "在 ALTER TABLE 语句中指定 ALGORITHM 选项可确保更好地控制表更改的应用方式，通过避免全表复制或锁定来最大限度地减少潜在的中断。它有助于优化性能并减少 ALTER TABLE 操作的停机时间。建议的错误级别：警告。"
+    },
+    "statement-require-lock-option": {
+      "title": "需要在 ALTER TABLE 语句中指定 LOCK 选项",
+      "description": "ALTER TABLE 语句中的 LOCK 选项允许您控制架构更改期间的锁定级别，有助于防止不必要的表锁定并确保更好的并发性。正确使用此选项可以显著减少 ALTER TABLE 操作对活动查询的影响。建议的错误级别：警告。"
     },
     "database-drop-empty-database": {
       "title": "禁止删除非空数据库",
@@ -679,6 +711,10 @@
     "builtin-prior-backup-check": {
       "title": "事先备份可行性检查",
       "description": "此规则检查是否可以在数据更改之前创建备份。它会验证备份目标数据库是否存在，并禁止不支持的方案。它是内置的，无法跳过。"
+    },
+    "builtin-object-owner-check": {
+      "title": "对象所有者检查",
+      "description": "此规则检查 DDL 的对象所有者是否与当前用户相同。内置规则，无法跳过。"
     }
   },
   "level": {

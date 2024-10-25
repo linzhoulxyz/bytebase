@@ -62,7 +62,10 @@
     </div>
   </div>
   <div
-    v-if="isDev() && databaseChangeMode === 'PIPELINE'"
+    v-if="
+      databaseChangeMode === 'PIPELINE' &&
+      resource.startsWith(environmentNamePrefix)
+    "
     class="flex flex-col gap-y-2"
   >
     <div class="textlabel flex items-center space-x-2">
@@ -115,12 +118,13 @@ import {
   usePolicyV1Store,
   useAppFeature,
 } from "@/store";
+import { environmentNamePrefix } from "@/store/modules/v1/common";
 import {
   DataSourceQueryPolicy,
   DataSourceQueryPolicy_Restriction,
   PolicyType,
 } from "@/types/proto/v1/org_policy_service";
-import { hasWorkspacePermissionV2, isDev } from "@/utils";
+import { hasWorkspacePermissionV2 } from "@/utils";
 import { FeatureBadge } from "../FeatureGuard";
 import { Switch } from "../v2";
 

@@ -39,6 +39,7 @@ const (
 	SchemaNamePrefix           = "schemas/"
 	TableNamePrefix            = "tables/"
 	ChangeHistoryPrefix        = "changeHistories/"
+	ChangelogPrefix            = "changelogs/"
 	IssueNamePrefix            = "issues/"
 	IssueCommentNamePrefix     = "issueComments/"
 	PipelineNamePrefix         = "pipelines/"
@@ -205,6 +206,19 @@ func GetInstanceDatabaseIDSecretName(name string) (string, string, string, error
 		return "", "", "", err
 	}
 	return tokens[0], tokens[1], tokens[2], nil
+}
+
+// GetInstanceDatabaseRevisionID returns the instance ID, database ID, and revision UID from a resource name.
+func GetInstanceDatabaseRevisionID(name string) (string, string, int64, error) {
+	tokens, err := GetNameParentTokens(name, InstanceNamePrefix, DatabaseIDPrefix, RevisionNamePrefix)
+	if err != nil {
+		return "", "", 0, err
+	}
+	revisionUID, err := strconv.ParseInt(tokens[2], 10, 64)
+	if err != nil {
+		return "", "", 0, errors.Wrapf(err, "failed to convert %q to int64", tokens[2])
+	}
+	return tokens[0], tokens[1], revisionUID, nil
 }
 
 // GetUserID returns the user ID from a resource name.
@@ -684,4 +698,19 @@ func FormatBranchResourceID(projectID string, branchID string) string {
 
 func FormatReleaseName(projectID string, releaseUID int64) string {
 	return fmt.Sprintf("%s%s/%s%d", ProjectNamePrefix, projectID, ReleaseNamePrefix, releaseUID)
+}
+
+// input release=`projects/{project}/releases/{release}` and file=`{path}`.
+// return the file resource name `projects/{project}/releases/{release}/files/{path}`,
+// {path} is URL path escaped.
+func FormatReleaseFile(release string, file string) string {
+	return fmt.Sprintf("%s/%s%s", release, FileNamePrefix, url.PathEscape(file))
+}
+
+func FormatRevision(instanceID, databaseID string, revisionUID int64) string {
+	return fmt.Sprintf("%s/%s%d", FormatDatabase(instanceID, databaseID), RevisionNamePrefix, revisionUID)
+}
+
+func FormatChangelog(instanceID, databaseID string, changelogUID int64) string {
+	return fmt.Sprintf("%s/%s%d", FormatDatabase(instanceID, databaseID), ChangelogPrefix, changelogUID)
 }

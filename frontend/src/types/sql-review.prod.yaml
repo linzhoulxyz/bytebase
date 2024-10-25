@@ -137,6 +137,24 @@ ruleList:
       required: true
       maxLength: 64
     engine: MARIADB
+  - type: table.comment
+    level: ERROR
+    payload:
+      required: true
+      maxLength: 64
+    engine: POSTGRES
+  - type: table.comment
+    level: ERROR
+    payload:
+      required: true
+      maxLength: 64
+    engine: ORACLE
+  - type: table.comment
+    level: ERROR
+    payload:
+      required: true
+      maxLength: 64
+    engine: OCEANBASE_ORACLE
   - type: table.no-duplicate-index
     level: WARNING
     engine: MYSQL
@@ -158,6 +176,12 @@ ruleList:
     level: WARNING
     payload:
       number: 10000000
+    engine: MYSQL
+  - type: table.require-charset
+    level: WARNING
+    engine: MYSQL
+  - type: table.require-collation
+    level: WARNING
     engine: MYSQL
   - type: statement.select.no-select-all
     level: ERROR
@@ -497,19 +521,34 @@ ruleList:
   - type: statement.join-strict-column-attrs
     level: WARNING
     engine: MYSQL
-  - type: statement.disallow-mix-ddl-dml
+  - type: statement.disallow-mix-in-ddl
     level: WARNING
     engine: MYSQL
-  - type: statement.disallow-mix-ddl-dml
-    level: WARNING
-    engine: POSTGRES
-  - type: statement.disallow-mix-ddl-dml
+  - type: statement.disallow-mix-in-ddl
     level: WARNING
     engine: TIDB
-  - type: statement.disallow-mix-ddl-dml
+  - type: statement.disallow-mix-in-ddl
+    level: WARNING
+    engine: POSTGRES
+  - type: statement.disallow-mix-in-ddl
     level: WARNING
     engine: ORACLE
-  - type: statement.disallow-mix-ddl-dml
+  - type: statement.disallow-mix-in-ddl
+    level: WARNING
+    engine: MSSQL
+  - type: statement.disallow-mix-in-dml
+    level: WARNING
+    engine: MYSQL
+  - type: statement.disallow-mix-in-dml
+    level: WARNING
+    engine: TIDB
+  - type: statement.disallow-mix-in-dml
+    level: WARNING
+    engine: POSTGRES
+  - type: statement.disallow-mix-in-dml
+    level: WARNING
+    engine: ORACLE
+  - type: statement.disallow-mix-in-dml
     level: WARNING
     engine: MSSQL
   - type: statement.add-column-without-position
@@ -525,6 +564,18 @@ ruleList:
     level: ERROR
     engine: MYSQL
   - type: statement.max-execution-time
+    level: ERROR
+    engine: MARIADB
+  - type: statement.require-algorithm-option
+    level: ERROR
+    engine: MYSQL
+  - type: statement.require-algorithm-option
+    level: ERROR
+    engine: MARIADB
+  - type: statement.require-lock-option
+    level: ERROR
+    engine: MYSQL
+  - type: statement.require-lock-option
     level: ERROR
     engine: MARIADB
   - type: naming.fully-qualified
@@ -1090,6 +1141,24 @@ ruleList:
       required: true
       maxLength: 64
     engine: MARIADB
+  - type: column.comment
+    level: ERROR
+    payload:
+      required: true
+      maxLength: 64
+    engine: POSTGRES
+  - type: column.comment
+    level: ERROR
+    payload:
+      required: true
+      maxLength: 64
+    engine: ORACLE
+  - type: column.comment
+    level: ERROR
+    payload:
+      required: true
+      maxLength: 64
+    engine: OCEANBASE_ORACLE
   - type: column.maximum-character-length
     level: WARNING
     payload:
@@ -1224,6 +1293,12 @@ ruleList:
   - type: column.default-disallow-volatile
     level: WARNING
     engine: POSTGRES
+  - type: column.require-charset
+    level: WARNING
+    engine: MYSQL
+  - type: column.require-collation
+    level: WARNING
+    engine: MYSQL
   - type: schema.backward-compatibility
     level: WARNING
     engine: MYSQL

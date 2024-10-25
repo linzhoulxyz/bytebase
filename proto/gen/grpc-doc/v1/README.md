@@ -66,12 +66,14 @@
   
 - [v1/release_service.proto](#v1_release_service-proto)
     - [CreateReleaseRequest](#bytebase-v1-CreateReleaseRequest)
+    - [DeleteReleaseRequest](#bytebase-v1-DeleteReleaseRequest)
     - [GetReleaseRequest](#bytebase-v1-GetReleaseRequest)
     - [ListReleasesRequest](#bytebase-v1-ListReleasesRequest)
     - [ListReleasesResponse](#bytebase-v1-ListReleasesResponse)
     - [Release](#bytebase-v1-Release)
     - [Release.File](#bytebase-v1-Release-File)
     - [Release.VCSSource](#bytebase-v1-Release-VCSSource)
+    - [UndeleteReleaseRequest](#bytebase-v1-UndeleteReleaseRequest)
     - [UpdateReleaseRequest](#bytebase-v1-UpdateReleaseRequest)
   
     - [ReleaseFileType](#bytebase-v1-ReleaseFileType)
@@ -91,6 +93,7 @@
     - [ChangedResourceTable](#bytebase-v1-ChangedResourceTable)
     - [ChangedResourceView](#bytebase-v1-ChangedResourceView)
     - [ChangedResources](#bytebase-v1-ChangedResources)
+    - [Changelog](#bytebase-v1-Changelog)
     - [CheckConstraintMetadata](#bytebase-v1-CheckConstraintMetadata)
     - [ColumnConfig](#bytebase-v1-ColumnConfig)
     - [ColumnConfig.LabelsEntry](#bytebase-v1-ColumnConfig-LabelsEntry)
@@ -100,6 +103,7 @@
     - [DatabaseConfig](#bytebase-v1-DatabaseConfig)
     - [DatabaseMetadata](#bytebase-v1-DatabaseMetadata)
     - [DatabaseSchema](#bytebase-v1-DatabaseSchema)
+    - [DeleteRevisionRequest](#bytebase-v1-DeleteRevisionRequest)
     - [DeleteSecretRequest](#bytebase-v1-DeleteSecretRequest)
     - [DependentColumn](#bytebase-v1-DependentColumn)
     - [DiffSchemaRequest](#bytebase-v1-DiffSchemaRequest)
@@ -111,12 +115,16 @@
     - [FunctionMetadata](#bytebase-v1-FunctionMetadata)
     - [GenerationMetadata](#bytebase-v1-GenerationMetadata)
     - [GetChangeHistoryRequest](#bytebase-v1-GetChangeHistoryRequest)
+    - [GetChangelogRequest](#bytebase-v1-GetChangelogRequest)
     - [GetDatabaseMetadataRequest](#bytebase-v1-GetDatabaseMetadataRequest)
     - [GetDatabaseRequest](#bytebase-v1-GetDatabaseRequest)
     - [GetDatabaseSchemaRequest](#bytebase-v1-GetDatabaseSchemaRequest)
+    - [GetRevisionRequest](#bytebase-v1-GetRevisionRequest)
     - [IndexMetadata](#bytebase-v1-IndexMetadata)
     - [ListChangeHistoriesRequest](#bytebase-v1-ListChangeHistoriesRequest)
     - [ListChangeHistoriesResponse](#bytebase-v1-ListChangeHistoriesResponse)
+    - [ListChangelogsRequest](#bytebase-v1-ListChangelogsRequest)
+    - [ListChangelogsResponse](#bytebase-v1-ListChangelogsResponse)
     - [ListDatabasesRequest](#bytebase-v1-ListDatabasesRequest)
     - [ListDatabasesResponse](#bytebase-v1-ListDatabasesResponse)
     - [ListInstanceDatabasesRequest](#bytebase-v1-ListInstanceDatabasesRequest)
@@ -155,6 +163,8 @@
     - [ChangeHistory.Status](#bytebase-v1-ChangeHistory-Status)
     - [ChangeHistory.Type](#bytebase-v1-ChangeHistory-Type)
     - [ChangeHistoryView](#bytebase-v1-ChangeHistoryView)
+    - [Changelog.Status](#bytebase-v1-Changelog-Status)
+    - [ChangelogView](#bytebase-v1-ChangelogView)
     - [DatabaseMetadataView](#bytebase-v1-DatabaseMetadataView)
     - [GenerationMetadata.Type](#bytebase-v1-GenerationMetadata-Type)
     - [StreamMetadata.Mode](#bytebase-v1-StreamMetadata-Mode)
@@ -505,6 +515,7 @@
     - [PlanCheckRun.Result.SqlSummaryReport](#bytebase-v1-PlanCheckRun-Result-SqlSummaryReport)
     - [PreviewPlanRequest](#bytebase-v1-PreviewPlanRequest)
     - [PreviewPlanResponse](#bytebase-v1-PreviewPlanResponse)
+    - [PreviewPlanResponse.DatabaseFiles](#bytebase-v1-PreviewPlanResponse-DatabaseFiles)
     - [RunPlanChecksRequest](#bytebase-v1-RunPlanChecksRequest)
     - [RunPlanChecksResponse](#bytebase-v1-RunPlanChecksResponse)
     - [SearchPlansRequest](#bytebase-v1-SearchPlansRequest)
@@ -599,6 +610,7 @@
     - [CreateRolloutRequest](#bytebase-v1-CreateRolloutRequest)
     - [GetRolloutRequest](#bytebase-v1-GetRolloutRequest)
     - [GetTaskRunLogRequest](#bytebase-v1-GetTaskRunLogRequest)
+    - [GetTaskRunRequest](#bytebase-v1-GetTaskRunRequest)
     - [GetTaskRunSessionRequest](#bytebase-v1-GetTaskRunSessionRequest)
     - [ListTaskRunsRequest](#bytebase-v1-ListTaskRunsRequest)
     - [ListTaskRunsResponse](#bytebase-v1-ListTaskRunsResponse)
@@ -1597,6 +1609,21 @@ The instance&#39;s `name` field is used to identify the instance to update. Form
 
 
 
+<a name="bytebase-v1-DeleteReleaseRequest"></a>
+
+### DeleteReleaseRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the release to delete. Format: projects/{project}/releases/{release} |
+
+
+
+
+
+
 <a name="bytebase-v1-GetReleaseRequest"></a>
 
 ### GetReleaseRequest
@@ -1704,6 +1731,21 @@ When paginating, all other parameters provided to `ListReleasesRequest` must mat
 
 
 
+<a name="bytebase-v1-UndeleteReleaseRequest"></a>
+
+### UndeleteReleaseRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the deleted release. Format: projects/{project}/releases/{release} |
+
+
+
+
+
+
 <a name="bytebase-v1-UpdateReleaseRequest"></a>
 
 ### UpdateReleaseRequest
@@ -1749,6 +1791,8 @@ When paginating, all other parameters provided to `ListReleasesRequest` must mat
 | ListReleases | [ListReleasesRequest](#bytebase-v1-ListReleasesRequest) | [ListReleasesResponse](#bytebase-v1-ListReleasesResponse) |  |
 | CreateRelease | [CreateReleaseRequest](#bytebase-v1-CreateReleaseRequest) | [Release](#bytebase-v1-Release) |  |
 | UpdateRelease | [UpdateReleaseRequest](#bytebase-v1-UpdateReleaseRequest) | [Release](#bytebase-v1-Release) |  |
+| DeleteRelease | [DeleteReleaseRequest](#bytebase-v1-DeleteReleaseRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
+| UndeleteRelease | [UndeleteReleaseRequest](#bytebase-v1-UndeleteReleaseRequest) | [Release](#bytebase-v1-Release) |  |
 
  
 
@@ -1974,6 +2018,36 @@ AdviseIndexResponse is the response of advising index.
 
 
 
+<a name="bytebase-v1-Changelog"></a>
+
+### Changelog
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Format: instances/{instance}/databases/{database}/changelogs/{changelog} |
+| creator | [string](#string) |  | Format: users/hello@world.com |
+| create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| status | [Changelog.Status](#bytebase-v1-Changelog-Status) |  |  |
+| statement | [string](#string) |  | The statement is used for preview purpose. |
+| statement_size | [int64](#int64) |  |  |
+| statement_sheet | [string](#string) |  | The name of the sheet resource. Format: projects/{project}/sheets/{sheet} |
+| schema | [string](#string) |  |  |
+| schema_size | [int64](#int64) |  |  |
+| prev_schema | [string](#string) |  |  |
+| prev_schema_size | [int64](#int64) |  |  |
+| issue | [string](#string) |  | Format: projects/{project}/issues/{issue} |
+| task_run | [string](#string) |  | Could be empty TODO(p0ny): We will migrate ChangeHistory to Changelog, and they won&#39;t have task_run. |
+| version | [string](#string) |  | Could be empty |
+| revision | [string](#string) |  | Could be empty Or present but not found if deleted |
+| changed_resources | [ChangedResources](#bytebase-v1-ChangedResources) |  |  |
+
+
+
+
+
+
 <a name="bytebase-v1-CheckConstraintMetadata"></a>
 
 ### CheckConstraintMetadata
@@ -2125,6 +2199,7 @@ Format: instances/{instance}/databases/{database}/metadata |
 | collation | [string](#string) |  | The collation is the collation of a database. |
 | extensions | [ExtensionMetadata](#bytebase-v1-ExtensionMetadata) | repeated | The extensions is the list of extensions in a database. |
 | schema_configs | [SchemaConfig](#bytebase-v1-SchemaConfig) | repeated | The schema_configs is the list of configs for schemas in a database. |
+| owner | [string](#string) |  |  |
 
 
 
@@ -2140,6 +2215,21 @@ DatabaseSchema is the metadata for databases.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | schema | [string](#string) |  | The schema dump from database. |
+
+
+
+
+
+
+<a name="bytebase-v1-DeleteRevisionRequest"></a>
+
+### DeleteRevisionRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the revision to delete. Format: instances/{instance}/databases/{database}/revisions/{revision} |
 
 
 
@@ -2297,6 +2387,7 @@ FunctionMetadata is the metadata for functions.
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | The name is the name of a function. |
 | definition | [string](#string) |  | The definition is the definition of a function. |
+| signature | [string](#string) |  | The signature is the name with the number and type of input arguments the function takes. |
 
 
 
@@ -2330,7 +2421,25 @@ FunctionMetadata is the metadata for functions.
 | name | [string](#string) |  | The name of the change history to retrieve. Format: instances/{instance}/databases/{database}/changeHistories/{changeHistory} |
 | view | [ChangeHistoryView](#bytebase-v1-ChangeHistoryView) |  |  |
 | sdl_format | [bool](#bool) |  | Format the schema dump into SDL format. |
-| concise | [bool](#bool) |  | When true, the schema dump will be concise. |
+| concise | [bool](#bool) |  | When true, the schema dump will be concise. For Oracle, there will be tables and indexes only for Sync Schema. For Postgres, we&#39;ll filter the backup schema. |
+
+
+
+
+
+
+<a name="bytebase-v1-GetChangelogRequest"></a>
+
+### GetChangelogRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the changelog to retrieve. Format: instances/{instance}/databases/{database}/changelogs/{changelog} |
+| view | [ChangeHistoryView](#bytebase-v1-ChangeHistoryView) |  |  |
+| sdl_format | [bool](#bool) |  | Format the schema dump into SDL format. |
+| concise | [bool](#bool) |  | When true, the schema dump will be concise. For Oracle, there will be tables and indexes only for Sync Schema. For Postgres, we&#39;ll filter the backup schema. |
 
 
 
@@ -2379,7 +2488,22 @@ FunctionMetadata is the metadata for functions.
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | The name of the database to retrieve schema. Format: instances/{instance}/databases/{database}/schema |
 | sdl_format | [bool](#bool) |  | Format the schema dump into SDL format. |
-| concise | [bool](#bool) |  | When true, the schema dump will be concise. For Oracle, there will be tables and indexes only for Sync Schema. |
+| concise | [bool](#bool) |  | When true, the schema dump will be concise. For Oracle, there will be tables and indexes only for Sync Schema. For Postgres, we&#39;ll filter the backup schema. |
+
+
+
+
+
+
+<a name="bytebase-v1-GetRevisionRequest"></a>
+
+### GetRevisionRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the revision. Format: instances/{instance}/databases/{database}/revisions/{revision} |
 
 
 
@@ -2446,6 +2570,49 @@ Combine multiple functions with &#34;&amp;&amp;&#34; and &#34;||&#34;, we MUST u
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | change_histories | [ChangeHistory](#bytebase-v1-ChangeHistory) | repeated | The list of change histories. |
+| next_page_token | [string](#string) |  | A token, which can be sent as `page_token` to retrieve the next page. If this field is omitted, there are no subsequent pages. |
+
+
+
+
+
+
+<a name="bytebase-v1-ListChangelogsRequest"></a>
+
+### ListChangelogsRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| parent | [string](#string) |  | The parent of the changelogs. Format: instances/{instance}/databases/{database} |
+| page_size | [int32](#int32) |  | The maximum number of changelogs to return. The service may return fewer than this value. If unspecified, at most 10 changelogs will be returned. The maximum value is 1000; values above 1000 will be coerced to 1000. |
+| page_token | [string](#string) |  | A page token, received from the previous call. Provide this to retrieve the subsequent page.
+
+When paginating, all other parameters provided must match the call that provided the page token. |
+| view | [ChangelogView](#bytebase-v1-ChangelogView) |  |  |
+| filter | [string](#string) |  | The filter of the changelogs. follow the [ebnf](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form) syntax. Support filter by type, source or table. For example: table = &#34;tableExists(&#39;{database}&#39;, &#39;{schema}&#39;, &#39;{table}&#39;)&#34; table = &#34;tableExists(&#39;db&#39;, &#39;public&#39;, &#39;table1&#39;) || tableExists(&#39;db&#39;, &#39;public&#39;, &#39;table2&#39;)&#34; type = &#34;MIGRATE | DATA&#34; source = &#34;UI&#34; source = &#34;VCS&#34;
+
+The table filter follow the CEL syntax. currently, we have one function for CEL: - tableExists(database, schema, table): return true if the table exists in changed resources.
+
+examples: Use tableExists(&#34;db&#34;, &#34;public&#34;, &#34;table1&#34;) to filter the changelogs which have the table &#34;table1&#34; in the schema &#34;public&#34; of the database &#34;db&#34;. For MySQL, the schema is always &#34;&#34;, such as tableExists(&#34;db&#34;, &#34;&#34;, &#34;table1&#34;).
+
+Combine multiple functions with &#34;&amp;&amp;&#34; and &#34;||&#34;, we MUST use the Disjunctive Normal Form(DNF). In other words, the CEL expression consists of several parts connected by OR operators. For example, the following expression is valid: ( tableExists(&#34;db&#34;, &#34;public&#34;, &#34;table1&#34;) &amp;&amp; tableExists(&#34;db&#34;, &#34;public&#34;, &#34;table2&#34;) ) || ( tableExists(&#34;db&#34;, &#34;public&#34;, &#34;table3&#34;) ) |
+
+
+
+
+
+
+<a name="bytebase-v1-ListChangelogsResponse"></a>
+
+### ListChangelogsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| changelogs | [Changelog](#bytebase-v1-Changelog) | repeated | The list of changelogs. |
 | next_page_token | [string](#string) |  | A token, which can be sent as `page_token` to retrieve the next page. If this field is omitted, there are no subsequent pages. |
 
 
@@ -2759,6 +2926,7 @@ This is the concept of schema in Postgres, but it&#39;s a no-op for MySQL.
 | tasks | [TaskMetadata](#bytebase-v1-TaskMetadata) | repeated | The routines is the list of routines in a schema, currently, only used for Snowflake. |
 | materialized_views | [MaterializedViewMetadata](#bytebase-v1-MaterializedViewMetadata) | repeated | The materialized_views is the list of materialized views in a schema. |
 | packages | [PackageMetadata](#bytebase-v1-PackageMetadata) | repeated | The packages is the list of packages in a schema. |
+| owner | [string](#string) |  |  |
 
 
 
@@ -2938,6 +3106,7 @@ TableMetadata is the metadata for tables.
 | foreign_keys | [ForeignKeyMetadata](#bytebase-v1-ForeignKeyMetadata) | repeated | The foreign_keys is the list of foreign keys in a table. |
 | partitions | [TablePartitionMetadata](#bytebase-v1-TablePartitionMetadata) | repeated | The partitions is the list of partitions in a table. |
 | check_constraints | [CheckConstraintMetadata](#bytebase-v1-CheckConstraintMetadata) | repeated | The check_constraints is the list of check constraints in a table. |
+| owner | [string](#string) |  |  |
 
 
 
@@ -3137,6 +3306,33 @@ ViewMetadata is the metadata for views.
 
 
 
+<a name="bytebase-v1-Changelog-Status"></a>
+
+### Changelog.Status
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| STATUS_UNSPECIFIED | 0 |  |
+| PENDING | 1 |  |
+| DONE | 2 |  |
+| FAILED | 3 |  |
+
+
+
+<a name="bytebase-v1-ChangelogView"></a>
+
+### ChangelogView
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| CHANGELOG_VIEW_UNSPECIFIED | 0 | The default / unset value. The API will default to the BASIC view. |
+| CHANGELOG_VIEW_BASIC | 1 |  |
+| CHANGELOG_VIEW_FULL | 2 |  |
+
+
+
 <a name="bytebase-v1-DatabaseMetadataView"></a>
 
 ### DatabaseMetadataView
@@ -3254,6 +3450,10 @@ PostgreSQL: RANGE, LIST, HASH (https://www.postgresql.org/docs/current/ddl-parti
 | ListChangeHistories | [ListChangeHistoriesRequest](#bytebase-v1-ListChangeHistoriesRequest) | [ListChangeHistoriesResponse](#bytebase-v1-ListChangeHistoriesResponse) |  |
 | GetChangeHistory | [GetChangeHistoryRequest](#bytebase-v1-GetChangeHistoryRequest) | [ChangeHistory](#bytebase-v1-ChangeHistory) |  |
 | ListRevisions | [ListRevisionsRequest](#bytebase-v1-ListRevisionsRequest) | [ListRevisionsResponse](#bytebase-v1-ListRevisionsResponse) |  |
+| GetRevision | [GetRevisionRequest](#bytebase-v1-GetRevisionRequest) | [Revision](#bytebase-v1-Revision) |  |
+| DeleteRevision | [DeleteRevisionRequest](#bytebase-v1-DeleteRevisionRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
+| ListChangelogs | [ListChangelogsRequest](#bytebase-v1-ListChangelogsRequest) | [ListChangelogsResponse](#bytebase-v1-ListChangelogsResponse) |  |
+| GetChangelog | [GetChangelogRequest](#bytebase-v1-GetChangelogRequest) | [Changelog](#bytebase-v1-Changelog) |  |
 
  
 
@@ -8239,8 +8439,24 @@ When paginating, all other parameters provided to `ListPlans` must match the cal
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | plan | [Plan](#bytebase-v1-Plan) |  |  |
-| out_of_order_files | [string](#string) | repeated | Format: projects/{project}/releases/{release}/files/{path} Example: `projects/tnt/releases/0801/files/2.2/V0001_create_table.sql` |
-| applied_but_modified_files | [string](#string) | repeated | Format: projects/{project}/releases/{release}/files/{path} Example: `projects/tnt/releases/0801/files/2.2/V0001_create_table.sql` |
+| out_of_order_files | [PreviewPlanResponse.DatabaseFiles](#bytebase-v1-PreviewPlanResponse-DatabaseFiles) | repeated | The out of order files of each database. |
+| applied_but_modified_files | [PreviewPlanResponse.DatabaseFiles](#bytebase-v1-PreviewPlanResponse-DatabaseFiles) | repeated | The applied but modified files of each database. |
+
+
+
+
+
+
+<a name="bytebase-v1-PreviewPlanResponse-DatabaseFiles"></a>
+
+### PreviewPlanResponse.DatabaseFiles
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| database | [string](#string) |  |  |
+| files | [string](#string) | repeated | Format: projects/{project}/releases/{release}/files/{path} {path} is URL path escaped. Example: `projects/tnt/releases/0801/files/2.2%2FV0001_create_table.sql` |
 
 
 
@@ -8696,6 +8912,7 @@ When paginating, all other parameters provided to `ListProjects` must match the 
 | enforce_issue_title | [bool](#bool) |  | Enforce issue title created by user instead of generated by Bytebase. |
 | auto_enable_backup | [bool](#bool) |  | Whether to automatically enable backup. |
 | skip_backup_errors | [bool](#bool) |  | Whether to skip backup errors and continue the data migration. |
+| postgres_database_tenant_mode | [bool](#bool) |  | Whether to enable the database tenant mode for PostgreSQL. If enabled, the issue will be created with the pre-appended &#34;set role &lt;db_owner&gt;&#34; statement. |
 
 
 
@@ -9574,6 +9791,21 @@ When paginating, all other parameters provided to `ListRoles` must match the cal
 
 
 
+<a name="bytebase-v1-GetTaskRunRequest"></a>
+
+### GetTaskRunRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task}/taskRuns/{taskRun} |
+
+
+
+
+
+
 <a name="bytebase-v1-GetTaskRunSessionRequest"></a>
 
 ### GetTaskRunSessionRequest
@@ -10287,6 +10519,7 @@ Read from `pg_stat_activity`
 | CreateRollout | [CreateRolloutRequest](#bytebase-v1-CreateRolloutRequest) | [Rollout](#bytebase-v1-Rollout) |  |
 | PreviewRollout | [PreviewRolloutRequest](#bytebase-v1-PreviewRolloutRequest) | [Rollout](#bytebase-v1-Rollout) |  |
 | ListTaskRuns | [ListTaskRunsRequest](#bytebase-v1-ListTaskRunsRequest) | [ListTaskRunsResponse](#bytebase-v1-ListTaskRunsResponse) |  |
+| GetTaskRun | [GetTaskRunRequest](#bytebase-v1-GetTaskRunRequest) | [TaskRun](#bytebase-v1-TaskRun) |  |
 | GetTaskRunLog | [GetTaskRunLogRequest](#bytebase-v1-GetTaskRunLogRequest) | [TaskRunLog](#bytebase-v1-TaskRunLog) |  |
 | GetTaskRunSession | [GetTaskRunSessionRequest](#bytebase-v1-GetTaskRunSessionRequest) | [TaskRunSession](#bytebase-v1-TaskRunSession) |  |
 | BatchRunTasks | [BatchRunTasksRequest](#bytebase-v1-BatchRunTasksRequest) | [BatchRunTasksResponse](#bytebase-v1-BatchRunTasksResponse) | BatchRunTasks creates task runs for the specified tasks. DataExport issue only allows the creator to run the task. Users with &#34;bb.taskRuns.create&#34; permission can run the task, e.g. Workspace Admin and DBA. Follow role-based rollout policy for the environment. |

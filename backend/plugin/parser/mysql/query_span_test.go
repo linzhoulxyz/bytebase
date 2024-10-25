@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -31,13 +32,20 @@ func TestGetQuerySpan(t *testing.T) {
 	var (
 		record        = false
 		testDataPaths = []string{
+			"test-data/query-span/query_type.yaml",
 			"test-data/query-span/standard.yaml",
 			"test-data/query-span/case_insensitive.yaml",
+			"test-data/query-span/starrocks.yaml",
 		}
 	)
 
 	a := require.New(t)
 	for _, testDataPath := range testDataPaths {
+		engine := storepb.Engine_MYSQL
+		if strings.Contains(testDataPath, "starrocks") {
+			engine = storepb.Engine_STARROCKS
+		}
+
 		testDataPath := testDataPath
 
 		yamlFile, err := os.Open(testDataPath)
@@ -56,6 +64,7 @@ func TestGetQuerySpan(t *testing.T) {
 			result, err := GetQuerySpan(context.TODO(), base.GetQuerySpanContext{
 				GetDatabaseMetadataFunc: databaseMetadataGetter,
 				ListDatabaseNamesFunc:   databaseNameLister,
+				Engine:                  engine,
 			}, tc.Statement, tc.DefaultDatabase, "", tc.IgnoreCaseSensitve)
 			a.NoErrorf(err, "statement: %s", tc.Statement)
 			resultYaml := result.ToYaml()

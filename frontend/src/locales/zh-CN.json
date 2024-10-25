@@ -278,6 +278,7 @@
     "connection": "连接",
     "permission-denied": "您没有权限执行此操作",
     "resource": "资源",
+    "resources": "资源",
     "closed": "已关闭",
     "options": "配置项",
     "reset": "重置",
@@ -593,6 +594,7 @@
       "grant-access": "授予访问权限",
       "select-user": "选择用户 | 选择用户",
       "select-group": "选择组 | 选择组",
+      "select-in-project": "选择 {project} 内的用户或群组",
       "select-role": "选择角色 | 选择角色",
       "assign-role": "分配角色 | 分配角色"
     },
@@ -1642,7 +1644,7 @@
     "statement-execution": {
       "title": "语句执行",
       "allow-ddl": "允许在 SQL 编辑器中运行 DDL 语句",
-      "allow-dml": "允许在 SQL 编辑器中运行 DML 语句"
+      "allow-dml": "允许在 SQL 编辑器中运行修改数据的 DML 语句"
     }
   },
   "quick-start": {
@@ -1925,7 +1927,16 @@
     "foreign-key": {
       "reference": "引用"
     },
-    "create-target-database-or-schema-for-backup": "请先创建备份的目标数据库或 Schema"
+    "create-target-database-or-schema-for-backup": "请先创建备份的目标数据库或 Schema",
+    "revision": {
+      "self": "修改",
+      "applied-at": "应用时间",
+      "filename": "文件名",
+      "delete-confirm-dialog": {
+        "title": "确定要删除吗？",
+        "content": "这将删除这些已应用的修改，但不会影响数据库 Schema。此操作无法撤消。"
+      }
+    }
   },
   "repository": {
     "our-webhook-link": "Bytebase 创建的 webhook 可以在 {webhookLink} 中找到。",
@@ -2146,6 +2157,10 @@
         "skip-backup-errors": {
           "self": "跳过备份失败的错误",
           "description": "当备份失败时，跳过错误并且变更数据任务将继续执行。"
+        },
+        "postgres-database-tenant-mode": {
+          "self": "Postgres 数据库租户模式",
+          "description": "Postgres 数据库租户模式。如果启用，工单将以数据库所有者角色执行。"
         }
       }
     },
@@ -2194,6 +2209,11 @@
       "update-success": "GitOps 连接已更新",
       "create-success": "GitOps 连接已创建",
       "delete-success": "GitOps 连接已删除"
+    },
+    "masking-access": {
+      "self": "数据访问",
+      "grant-access": "授予访问权限",
+      "revoke-access-title": "是否删除 {member} 的导出和查询访问权限？"
     }
   },
   "gitops": {
@@ -2299,7 +2319,6 @@
     "search-name-database": "搜索名称，数据库",
     "successfully-created-data-source-datasource-name": "成功创建数据源 '{0}'。",
     "select-database-first": "先选择数据库",
-    "select-data-source": "选择数据源",
     "search-user": "搜索用户",
     "user-list": "用户列表",
     "revoke-access": "您确定要取消 '{0}' 对 '{1}' 的访问权限？",
@@ -2350,7 +2369,8 @@
     "replica-set": "副本集",
     "admin": "管理员",
     "read-only": "只读",
-    "direct-connection": "Direct Connection"
+    "direct-connection": "Direct Connection",
+    "select-query-data-source": "选择查询数据源"
   },
   "setting": {
     "project": {
@@ -2528,7 +2548,8 @@
       "not-member-of-any-projects": "你不是任何项目的成员。",
       "go-to-create": "去创建",
       "contact-the-admin-to-grant-access": "联系管理员以授予访问权限。"
-    }
+    },
+    "upload-file": "上传文件"
   },
   "schema-editor": {
     "self": "Schema 编辑器",
@@ -3705,6 +3726,18 @@
       "optional-upload-sql-or-zip-file": "（可选）上传 .sql 或 .zip 文件"
     },
     "change-type": "更改类型"
+  },
+  "release": {
+    "self": "发布",
+    "releases": "发布",
+    "files": "文件",
+    "tasks-to-apply": "待应用的任务",
+    "out-of-order-files": "无序文件",
+    "applied-but-modifed-files": "已应用但已修改的文件",
+    "allow-out-of-order": "允许无序文件",
+    "no-tasks-to-apply": {
+      "self": "没有可应用的任务"
+    }
   },
   "export-data": {
     "export-rows": "导出行数",

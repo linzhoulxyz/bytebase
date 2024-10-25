@@ -10,6 +10,7 @@ import (
 
 	parsererror "github.com/bytebase/bytebase/backend/plugin/parser/errors"
 	"github.com/bytebase/bytebase/backend/store/model"
+	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 
 	"github.com/bytebase/bytebase/backend/plugin/parser/base"
 )
@@ -66,7 +67,6 @@ func (q *querySpanExtractor) getQuerySpan(ctx context.Context, stmt string) (*ba
 	}
 	tree := parseResults[0].Tree
 
-	q.ctx = ctx
 	accessTables := getAccessTables(q.defaultDatabase, tree)
 	// We do not support simultaneous access to the system table and the user table
 	// because we do not synchronize the schema of the system table.
@@ -76,13 +76,22 @@ func (q *querySpanExtractor) getQuerySpan(ctx context.Context, stmt string) (*ba
 	if mixed {
 		return nil, base.MixUserSystemTablesError
 	}
-	if allSystems {
+
+	queryTypeListener := &queryTypeListener{
+		allSystems: allSystems,
+		result:     base.QueryTypeUnknown,
+	}
+	antlr.ParseTreeWalkerDefault.Walk(queryTypeListener, tree)
+
+	if queryTypeListener.result != base.Select {
 		return &base.QuerySpan{
+			Type:          queryTypeListener.result,
 			SourceColumns: base.SourceColumnSet{},
 			Results:       []base.QuerySpanResult{},
 		}, nil
 	}
 
+	q.ctx = ctx
 	// We assumes the caller had handled the statement type case,
 	// so we only need to handle the determined statement type here.
 	// In order to decrease the maintenance cost, we use listener to handle
@@ -94,6 +103,7 @@ func (q *querySpanExtractor) getQuerySpan(ctx context.Context, stmt string) (*ba
 		var resourceNotFound *parsererror.ResourceNotFoundError
 		if errors.As(err, &resourceNotFound) {
 			return &base.QuerySpan{
+				Type:          base.Select,
 				SourceColumns: accessTables,
 				Results:       []base.QuerySpanResult{},
 				NotFoundError: resourceNotFound,
@@ -103,6 +113,7 @@ func (q *querySpanExtractor) getQuerySpan(ctx context.Context, stmt string) (*ba
 		return nil, err
 	}
 	return &base.QuerySpan{
+		Type:          base.Select,
 		SourceColumns: accessTables,
 		Results:       listener.querySpan.Results,
 	}, nil
@@ -1197,6 +1208,7 @@ func (q *querySpanExtractor) getAllTableColumnSources(databaseName, tableName st
 }
 
 func (q *querySpanExtractor) getFieldColumnSource(databaseName, tableName, fieldName string) (base.SourceColumnSet, error) {
+	databaseName = q.filterClusterName(databaseName)
 	findInTableSource := func(tableSource base.TableSource) (base.SourceColumnSet, bool) {
 		if q.ignoreCaseSensitive {
 			if databaseName != "" && !strings.EqualFold(databaseName, tableSource.GetDatabaseName()) {
@@ -1263,6 +1275,18 @@ func (q *querySpanExtractor) getFieldColumnSource(databaseName, tableName, field
 	}
 }
 
+func (q *querySpanExtractor) filterClusterName(databaseName string) string {
+	if q.gCtx.Engine == storepb.Engine_STARROCKS {
+		// For StarRocks, user can use `cluster_name:database_name` as the database name.
+		// But for the query span in Bytebase, we only care about the database name.
+		list := strings.Split(databaseName, ":")
+		if len(list) > 1 {
+			databaseName = list[len(list)-1]
+		}
+	}
+	return databaseName
+}
+
 func (q *querySpanExtractor) findTableSchema(databaseName, tableName string) (base.TableSource, error) {
 	// Each CTE name in one WITH clause must be unique, but we can use the same name in the different level CTE, such as:
 	//
@@ -1285,6 +1309,8 @@ func (q *querySpanExtractor) findTableSchema(databaseName, tableName string) (ba
 	if databaseName == "" {
 		databaseName = q.defaultDatabase
 	}
+
+	databaseName = q.filterClusterName(databaseName)
 
 	var dbSchema *model.DatabaseMetadata
 	allDatabaseNames, err := q.gCtx.ListDatabaseNamesFunc(q.ctx, q.gCtx.InstanceID)

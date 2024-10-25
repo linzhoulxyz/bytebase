@@ -11,7 +11,7 @@
 
 <script lang="ts" setup>
 import type { DataTableColumn } from "naive-ui";
-import { NDataTable } from "naive-ui";
+import { NCheckbox, NDataTable } from "naive-ui";
 import type { PropType } from "vue";
 import { computed } from "vue";
 import { h } from "vue";
@@ -113,6 +113,7 @@ const showSensitiveColumn = computed(() => {
       engine.value === Engine.ORACLE ||
       engine.value === Engine.SNOWFLAKE ||
       engine.value === Engine.MSSQL ||
+      engine.value === Engine.BIGQUERY ||
       engine.value === Engine.RISINGWAVE)
   );
 });
@@ -246,7 +247,10 @@ const columns = computed(() => {
       resizable: true,
       width: 140,
       render: (column) => {
-        return column.nullable;
+        return h(NCheckbox, {
+          checked: column.nullable,
+          readonly: true,
+        });
       },
     },
     {

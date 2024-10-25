@@ -8,6 +8,26 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/bytebase/bytebase/backend/store/model"
+	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
+)
+
+// QueryType is the type of a query.
+// The query type determines the permission to use.
+type QueryType int
+
+const (
+	// The read-only query.
+	QueryTypeUnknown QueryType = iota
+	// The read-only select query.
+	Select
+	// The explain query.
+	Explain
+	// The read-only select query for reading information schema and system objects.
+	SelectInfoSchema
+	// The DDL query that changes schema.
+	DDL
+	// The DML query that changes table data.
+	DML
 )
 
 var (
@@ -33,6 +53,7 @@ func MergeSourceColumnSet(m, n SourceColumnSet) (SourceColumnSet, bool) {
 
 // QuerySpan is the span for a query.
 type QuerySpan struct {
+	Type QueryType
 	// Results are the result columns of a query span.
 	// Currently, SourceColumns in the QuerySpanResult are only for the fields in the Query.
 	Results []QuerySpanResult
@@ -287,6 +308,14 @@ type GetQuerySpanContext struct {
 	GetDatabaseMetadataFunc       GetDatabaseMetadataFunc
 	ListDatabaseNamesFunc         ListDatabaseNamesFunc
 	GetLinkedDatabaseMetadataFunc GetLinkedDatabaseMetadataFunc
+
+	// Adding the engine information here is a trade-off between the copy-pasted and shared code.
+	// For engines with more different, we implement the getQuerySpan separately.
+	// For some similar engines, we can share the same getQuerySpan implementation.
+	// But they may have some differences, so we need to pass the engine information here.
+	// No need to set this field when call GetQuerySpan, because the base.GetQuerySpan already has the engine information.
+	// We'll deal this field in the base.GetQuerySpan.
+	Engine storepb.Engine
 }
 
 // GetDatabaseMetadataFunc is the function to get database metadata.
@@ -299,6 +328,7 @@ type GetLinkedDatabaseMetadataFunc func(context.Context, string, string, string)
 
 func (s *QuerySpan) ToYaml() *YamlQuerySpan {
 	y := &YamlQuerySpan{
+		Type:          s.Type,
 		Results:       []YamlQuerySpanResult{},
 		SourceColumns: []ColumnResource{},
 	}
@@ -327,6 +357,7 @@ func (s *QuerySpan) ToYaml() *YamlQuerySpan {
 }
 
 type YamlQuerySpan struct {
+	Type          QueryType
 	Results       []YamlQuerySpanResult
 	SourceColumns []ColumnResource
 }

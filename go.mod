@@ -2,6 +2,10 @@ module github.com/bytebase/bytebase
 
 go 1.23.2
 
+// workaround mssql-docker default TLS cert negative serial number problem
+// https://github.com/microsoft/mssql-docker/issues/895
+godebug x509negativeserial=1
+
 require (
 	cloud.google.com/go/bigquery v1.63.1
 	cloud.google.com/go/cloudsqlconn v1.12.1
@@ -19,7 +23,7 @@ require (
 	github.com/beltran/gohive v1.7.0
 	github.com/blang/semver/v4 v4.0.0
 	github.com/buger/jsonparser v1.1.1
-	github.com/bytebase/bq-parser v0.0.0-20240529032606-614a0230b8f7
+	github.com/bytebase/google-sql-parser v0.0.0-20241023112038-76da71baef63
 	github.com/bytebase/mysql-parser v0.0.0-20240810145851-ab2c11629c24
 	github.com/bytebase/plsql-parser v0.0.0-20240929073008-6b57c2e2525d
 	github.com/bytebase/postgresql-parser v0.0.0-20241008085234-a95eacac994a
@@ -345,7 +349,7 @@ replace github.com/pingcap/tidb => github.com/bytebase/tidb2 v0.0.0-202311290022
 
 replace github.com/pingcap/tidb/pkg/parser => github.com/bytebase/tidb2/pkg/parser v0.0.0-20231129002249-5bbb6bb83940
 
-replace github.com/pganalyze/pg_query_go/v5 => github.com/bytebase/pg_query_go2/v5 v5.0.0-20240429070353-41837024e3d6
+replace github.com/pganalyze/pg_query_go/v5 => github.com/bytebase/pg_query_go2/v5 v5.0.0-20241024030058-bbe7104c5b4b
 
 replace github.com/mattn/go-oci8 => github.com/bytebase/go-obo v0.0.0-20231026081615-705a7fffbfd2
 

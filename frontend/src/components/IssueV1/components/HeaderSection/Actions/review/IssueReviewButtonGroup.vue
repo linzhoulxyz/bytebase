@@ -30,7 +30,7 @@ import {
   taskRolloutActionDisplayName,
   useIssueContext,
 } from "@/components/IssueV1";
-import { useCurrentUserV1, useAppFeature } from "@/store";
+import { useCurrentUserV1, useAppFeature, extractUserEmail } from "@/store";
 import { PresetRoleType } from "@/types";
 import {
   IssueStatus,
@@ -59,6 +59,11 @@ const shouldShowApproveOrReject = computed(() => {
     issue.value.status === IssueStatus.CANCELED ||
     issue.value.status === IssueStatus.DONE
   ) {
+    return false;
+  }
+
+  // Do not show review actions for the creator.
+  if (currentUser.value.email === extractUserEmail(issue.value.creator)) {
     return false;
   }
 
@@ -154,7 +159,7 @@ const forceRolloutActionList = computed((): ExtraActionOption[] => {
 });
 
 const displayMode = computed(() => {
-  if (forceRolloutActionList.value.length > 0) return "DROPDOWN";
+  if (hideIssueReviewActions.value) return "BUTTON";
   return issueReviewActionList.value.length > 0 ? "DROPDOWN" : "BUTTON";
 });
 </script>

@@ -419,6 +419,10 @@
                 </li>
               
                 <li>
+                  <a href="#bytebase.v1.DeleteReleaseRequest"><span class="badge">M</span>DeleteReleaseRequest</a>
+                </li>
+              
+                <li>
                   <a href="#bytebase.v1.GetReleaseRequest"><span class="badge">M</span>GetReleaseRequest</a>
                 </li>
               
@@ -440,6 +444,10 @@
               
                 <li>
                   <a href="#bytebase.v1.Release.VCSSource"><span class="badge">M</span>Release.VCSSource</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.UndeleteReleaseRequest"><span class="badge">M</span>UndeleteReleaseRequest</a>
                 </li>
               
                 <li>
@@ -514,6 +522,10 @@
                 </li>
               
                 <li>
+                  <a href="#bytebase.v1.Changelog"><span class="badge">M</span>Changelog</a>
+                </li>
+              
+                <li>
                   <a href="#bytebase.v1.CheckConstraintMetadata"><span class="badge">M</span>CheckConstraintMetadata</a>
                 </li>
               
@@ -547,6 +559,10 @@
               
                 <li>
                   <a href="#bytebase.v1.DatabaseSchema"><span class="badge">M</span>DatabaseSchema</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.DeleteRevisionRequest"><span class="badge">M</span>DeleteRevisionRequest</a>
                 </li>
               
                 <li>
@@ -594,6 +610,10 @@
                 </li>
               
                 <li>
+                  <a href="#bytebase.v1.GetChangelogRequest"><span class="badge">M</span>GetChangelogRequest</a>
+                </li>
+              
+                <li>
                   <a href="#bytebase.v1.GetDatabaseMetadataRequest"><span class="badge">M</span>GetDatabaseMetadataRequest</a>
                 </li>
               
@@ -606,6 +626,10 @@
                 </li>
               
                 <li>
+                  <a href="#bytebase.v1.GetRevisionRequest"><span class="badge">M</span>GetRevisionRequest</a>
+                </li>
+              
+                <li>
                   <a href="#bytebase.v1.IndexMetadata"><span class="badge">M</span>IndexMetadata</a>
                 </li>
               
@@ -615,6 +639,14 @@
               
                 <li>
                   <a href="#bytebase.v1.ListChangeHistoriesResponse"><span class="badge">M</span>ListChangeHistoriesResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.ListChangelogsRequest"><span class="badge">M</span>ListChangelogsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.ListChangelogsResponse"><span class="badge">M</span>ListChangelogsResponse</a>
                 </li>
               
                 <li>
@@ -764,6 +796,14 @@
               
                 <li>
                   <a href="#bytebase.v1.ChangeHistoryView"><span class="badge">E</span>ChangeHistoryView</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.Changelog.Status"><span class="badge">E</span>Changelog.Status</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.ChangelogView"><span class="badge">E</span>ChangelogView</a>
                 </li>
               
                 <li>
@@ -2101,6 +2141,10 @@
                 </li>
               
                 <li>
+                  <a href="#bytebase.v1.PreviewPlanResponse.DatabaseFiles"><span class="badge">M</span>PreviewPlanResponse.DatabaseFiles</a>
+                </li>
+              
+                <li>
                   <a href="#bytebase.v1.RunPlanChecksRequest"><span class="badge">M</span>RunPlanChecksRequest</a>
                 </li>
               
@@ -2457,6 +2501,10 @@
               
                 <li>
                   <a href="#bytebase.v1.GetTaskRunLogRequest"><span class="badge">M</span>GetTaskRunLogRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.GetTaskRunRequest"><span class="badge">M</span>GetTaskRunRequest</a>
                 </li>
               
                 <li>
@@ -5354,6 +5402,31 @@ Format: instances/{instance} </p></td>
 
         
       
+        <h3 id="bytebase.v1.DeleteReleaseRequest">DeleteReleaseRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The name of the release to delete.
+Format: projects/{project}/releases/{release} </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="bytebase.v1.GetReleaseRequest">GetReleaseRequest</h3>
         <p></p>
 
@@ -5612,6 +5685,31 @@ Format: projects/{project}/sheets/{sheet} </p></td>
 
         
       
+        <h3 id="bytebase.v1.UndeleteReleaseRequest">UndeleteReleaseRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The name of the deleted release.
+Format: projects/{project}/releases/{release} </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="bytebase.v1.UpdateReleaseRequest">UpdateReleaseRequest</h3>
         <p></p>
 
@@ -5708,6 +5806,20 @@ Format: projects/{project}/sheets/{sheet} </p></td>
                 <td><p></p></td>
               </tr>
             
+              <tr>
+                <td>DeleteRelease</td>
+                <td><a href="#bytebase.v1.DeleteReleaseRequest">DeleteReleaseRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>UndeleteRelease</td>
+                <td><a href="#bytebase.v1.UndeleteReleaseRequest">UndeleteReleaseRequest</a></td>
+                <td><a href="#bytebase.v1.Release">Release</a></td>
+                <td><p></p></td>
+              </tr>
+            
           </tbody>
         </table>
 
@@ -5763,6 +5875,26 @@ Format: projects/{project}/sheets/{sheet} </p></td>
                 <td>PATCH</td>
                 <td>/v1/{release.name=projects/*/releases/*}</td>
                 <td>release</td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>DeleteRelease</td>
+                <td>DELETE</td>
+                <td>/v1/{name=projects/*/releases/*}</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>UndeleteRelease</td>
+                <td>POST</td>
+                <td>/v1/{name=projects/*/releases/*}:undelete</td>
+                <td></td>
               </tr>
               
             
@@ -6302,6 +6434,138 @@ Format: projects/{project}/sheets/{sheet} </p></td>
 
         
       
+        <h3 id="bytebase.v1.Changelog">Changelog</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Format: instances/{instance}/databases/{database}/changelogs/{changelog} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>creator</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Format: users/hello@world.com </p></td>
+                </tr>
+              
+                <tr>
+                  <td>create_time</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>status</td>
+                  <td><a href="#bytebase.v1.Changelog.Status">Changelog.Status</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>statement</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The statement is used for preview purpose. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>statement_size</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>statement_sheet</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The name of the sheet resource.
+Format: projects/{project}/sheets/{sheet} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>schema</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>schema_size</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>prev_schema</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>prev_schema_size</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>issue</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Format: projects/{project}/issues/{issue} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>task_run</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Could be empty
+TODO(p0ny): We will migrate ChangeHistory to Changelog, and they won&#39;t have task_run. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Could be empty </p></td>
+                </tr>
+              
+                <tr>
+                  <td>revision</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Could be empty
+Or present but not found if deleted </p></td>
+                </tr>
+              
+                <tr>
+                  <td>changed_resources</td>
+                  <td><a href="#bytebase.v1.ChangedResources">ChangedResources</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="bytebase.v1.CheckConstraintMetadata">CheckConstraintMetadata</h3>
         <p>CheckConstraintMetadata is the metadata for check constraints.</p>
 
@@ -6742,6 +7006,13 @@ Format: instances/{instance}/databases/{database}/metadata </p></td>
                   <td><p>The schema_configs is the list of configs for schemas in a database. </p></td>
                 </tr>
               
+                <tr>
+                  <td>owner</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -6764,6 +7035,31 @@ Format: instances/{instance}/databases/{database}/metadata </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>The schema dump from database. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.DeleteRevisionRequest">DeleteRevisionRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The name of the revision to delete.
+Format: instances/{instance}/databases/{database}/revisions/{revision} </p></td>
                 </tr>
               
             </tbody>
@@ -7147,6 +7443,13 @@ Format: projcets/{project}/branches/{branch} </p></td>
                   <td><p>The definition is the definition of a function. </p></td>
                 </tr>
               
+                <tr>
+                  <td>signature</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The signature is the name with the number and type of input arguments the function takes. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -7221,7 +7524,57 @@ Format: instances/{instance}/databases/{database}/changeHistories/{changeHistory
                   <td>concise</td>
                   <td><a href="#bool">bool</a></td>
                   <td></td>
-                  <td><p>When true, the schema dump will be concise. </p></td>
+                  <td><p>When true, the schema dump will be concise.
+For Oracle, there will be tables and indexes only for Sync Schema.
+For Postgres, we&#39;ll filter the backup schema. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.GetChangelogRequest">GetChangelogRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The name of the changelog to retrieve.
+Format: instances/{instance}/databases/{database}/changelogs/{changelog} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>view</td>
+                  <td><a href="#bytebase.v1.ChangeHistoryView">ChangeHistoryView</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>sdl_format</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Format the schema dump into SDL format. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>concise</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>When true, the schema dump will be concise.
+For Oracle, there will be tables and indexes only for Sync Schema.
+For Postgres, we&#39;ll filter the backup schema. </p></td>
                 </tr>
               
             </tbody>
@@ -7327,7 +7680,33 @@ Format: instances/{instance}/databases/{database}/schema </p></td>
                   <td><a href="#bool">bool</a></td>
                   <td></td>
                   <td><p>When true, the schema dump will be concise.
-For Oracle, there will be tables and indexes only for Sync Schema. </p></td>
+For Oracle, there will be tables and indexes only for Sync Schema.
+For Postgres, we&#39;ll filter the backup schema. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.GetRevisionRequest">GetRevisionRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The name of the revision.
+Format: instances/{instance}/databases/{database}/revisions/{revision} </p></td>
                 </tr>
               
             </tbody>
@@ -7528,6 +7907,125 @@ For example, the following expression is valid:
                   <td><a href="#bytebase.v1.ChangeHistory">ChangeHistory</a></td>
                   <td>repeated</td>
                   <td><p>The list of change histories. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>next_page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>A token, which can be sent as `page_token` to retrieve the next page.
+If this field is omitted, there are no subsequent pages. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.ListChangelogsRequest">ListChangelogsRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>parent</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The parent of the changelogs.
+Format: instances/{instance}/databases/{database} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_size</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>The maximum number of changelogs to return. The service may return fewer than this value.
+If unspecified, at most 10 changelogs will be returned.
+The maximum value is 1000; values above 1000 will be coerced to 1000. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>page_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>A page token, received from the previous call.
+Provide this to retrieve the subsequent page.
+
+When paginating, all other parameters provided must match
+the call that provided the page token. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>view</td>
+                  <td><a href="#bytebase.v1.ChangelogView">ChangelogView</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>filter</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The filter of the changelogs.
+follow the [ebnf](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form) syntax.
+Support filter by type, source or table.
+For example:
+table = &#34;tableExists(&#39;{database}&#39;, &#39;{schema}&#39;, &#39;{table}&#39;)&#34;
+table = &#34;tableExists(&#39;db&#39;, &#39;public&#39;, &#39;table1&#39;) || tableExists(&#39;db&#39;, &#39;public&#39;, &#39;table2&#39;)&#34;
+type = &#34;MIGRATE | DATA&#34;
+source = &#34;UI&#34;
+source = &#34;VCS&#34;
+
+The table filter follow the CEL syntax.
+currently, we have one function for CEL:
+- tableExists(database, schema, table): return true if the table exists in changed resources.
+
+examples:
+Use
+  tableExists(&#34;db&#34;, &#34;public&#34;, &#34;table1&#34;)
+to filter the changelogs which have the table &#34;table1&#34; in the schema &#34;public&#34; of the database &#34;db&#34;.
+For MySQL, the schema is always &#34;&#34;, such as tableExists(&#34;db&#34;, &#34;&#34;, &#34;table1&#34;).
+
+Combine multiple functions with &#34;&amp;&amp;&#34; and &#34;||&#34;, we MUST use the Disjunctive Normal Form(DNF).
+In other words, the CEL expression consists of several parts connected by OR operators.
+For example, the following expression is valid:
+(
+ tableExists(&#34;db&#34;, &#34;public&#34;, &#34;table1&#34;) &amp;&amp;
+ tableExists(&#34;db&#34;, &#34;public&#34;, &#34;table2&#34;)
+) || (
+ tableExists(&#34;db&#34;, &#34;public&#34;, &#34;table3&#34;)
+) </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.ListChangelogsResponse">ListChangelogsResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>changelogs</td>
+                  <td><a href="#bytebase.v1.Changelog">Changelog</a></td>
+                  <td>repeated</td>
+                  <td><p>The list of changelogs. </p></td>
                 </tr>
               
                 <tr>
@@ -8348,6 +8846,13 @@ It is an empty string for databases without such concept such as MySQL. </p></td
                   <td><p>The packages is the list of packages in a schema. </p></td>
                 </tr>
               
+                <tr>
+                  <td>owner</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -8898,6 +9403,13 @@ classification and user_comment is parsed from the comment. </p></td>
                   <td><p>The check_constraints is the list of check constraints in a table. </p></td>
                 </tr>
               
+                <tr>
+                  <td>owner</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -9418,6 +9930,71 @@ The API will default to the BASIC view.</p></td>
           </tbody>
         </table>
       
+        <h3 id="bytebase.v1.Changelog.Status">Changelog.Status</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>STATUS_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PENDING</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>DONE</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>FAILED</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+        <h3 id="bytebase.v1.ChangelogView">ChangelogView</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>CHANGELOG_VIEW_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p>The default / unset value.
+The API will default to the BASIC view.</p></td>
+              </tr>
+            
+              <tr>
+                <td>CHANGELOG_VIEW_BASIC</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>CHANGELOG_VIEW_FULL</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
         <h3 id="bytebase.v1.DatabaseMetadataView">DatabaseMetadataView</h3>
         <p></p>
         <table class="enum-table">
@@ -9767,6 +10344,34 @@ The API will default to the BASIC view.</p></td>
                 <td><p></p></td>
               </tr>
             
+              <tr>
+                <td>GetRevision</td>
+                <td><a href="#bytebase.v1.GetRevisionRequest">GetRevisionRequest</a></td>
+                <td><a href="#bytebase.v1.Revision">Revision</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>DeleteRevision</td>
+                <td><a href="#bytebase.v1.DeleteRevisionRequest">DeleteRevisionRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ListChangelogs</td>
+                <td><a href="#bytebase.v1.ListChangelogsRequest">ListChangelogsRequest</a></td>
+                <td><a href="#bytebase.v1.ListChangelogsResponse">ListChangelogsResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>GetChangelog</td>
+                <td><a href="#bytebase.v1.GetChangelogRequest">GetChangelogRequest</a></td>
+                <td><a href="#bytebase.v1.Changelog">Changelog</a></td>
+                <td><p></p></td>
+              </tr>
+            
           </tbody>
         </table>
 
@@ -9975,6 +10580,46 @@ The API will default to the BASIC view.</p></td>
                 <td>ListRevisions</td>
                 <td>GET</td>
                 <td>/v1/{parent=instances/*/databases/*}/revisions</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>GetRevision</td>
+                <td>GET</td>
+                <td>/v1/{name=instances/*/databases/*/revisions/*}</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>DeleteRevision</td>
+                <td>DELETE</td>
+                <td>/v1/{name=instances/*/databases/*/revisions/*}</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>ListChangelogs</td>
+                <td>GET</td>
+                <td>/v1/{parent=instances/*/databases/*}/changelogs</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>GetChangelog</td>
+                <td>GET</td>
+                <td>/v1/{name=instances/*/databases/*/changelogs/*}</td>
                 <td></td>
               </tr>
               
@@ -22769,18 +23414,49 @@ instances/{instance}/databases/{database} </p></td>
               
                 <tr>
                   <td>out_of_order_files</td>
-                  <td><a href="#string">string</a></td>
+                  <td><a href="#bytebase.v1.PreviewPlanResponse.DatabaseFiles">PreviewPlanResponse.DatabaseFiles</a></td>
                   <td>repeated</td>
-                  <td><p>Format: projects/{project}/releases/{release}/files/{path}
-Example: `projects/tnt/releases/0801/files/2.2/V0001_create_table.sql` </p></td>
+                  <td><p>The out of order files of each database. </p></td>
                 </tr>
               
                 <tr>
                   <td>applied_but_modified_files</td>
+                  <td><a href="#bytebase.v1.PreviewPlanResponse.DatabaseFiles">PreviewPlanResponse.DatabaseFiles</a></td>
+                  <td>repeated</td>
+                  <td><p>The applied but modified files of each database. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.PreviewPlanResponse.DatabaseFiles">PreviewPlanResponse.DatabaseFiles</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>database</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>files</td>
                   <td><a href="#string">string</a></td>
                   <td>repeated</td>
                   <td><p>Format: projects/{project}/releases/{release}/files/{path}
-Example: `projects/tnt/releases/0801/files/2.2/V0001_create_table.sql` </p></td>
+{path} is URL path escaped.
+Example: `projects/tnt/releases/0801/files/2.2%2FV0001_create_table.sql` </p></td>
                 </tr>
               
             </tbody>
@@ -23901,6 +24577,14 @@ Format: projects/{project} </p></td>
                   <td><a href="#bool">bool</a></td>
                   <td></td>
                   <td><p>Whether to skip backup errors and continue the data migration. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>postgres_database_tenant_mode</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Whether to enable the database tenant mode for PostgreSQL.
+If enabled, the issue will be created with the pre-appended &#34;set role &lt;db_owner&gt;&#34; statement. </p></td>
                 </tr>
               
             </tbody>
@@ -26173,6 +26857,30 @@ TODO(d): check the resource_reference. </p></td>
 
         
       
+        <h3 id="bytebase.v1.GetTaskRunRequest">GetTaskRunRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task}/taskRuns/{taskRun} </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="bytebase.v1.GetTaskRunSessionRequest">GetTaskRunSessionRequest</h3>
         <p></p>
 
@@ -27970,6 +28678,13 @@ Format: instances/{instance}/databases/{database} </p></td>
               </tr>
             
               <tr>
+                <td>GetTaskRun</td>
+                <td><a href="#bytebase.v1.GetTaskRunRequest">GetTaskRunRequest</a></td>
+                <td><a href="#bytebase.v1.TaskRun">TaskRun</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
                 <td>GetTaskRunLog</td>
                 <td><a href="#bytebase.v1.GetTaskRunLogRequest">GetTaskRunLogRequest</a></td>
                 <td><a href="#bytebase.v1.TaskRunLog">TaskRunLog</a></td>
@@ -28070,6 +28785,16 @@ The access is the same as BatchRunTasks().</p></td>
                 <td>ListTaskRuns</td>
                 <td>GET</td>
                 <td>/v1/{parent=projects/*/rollouts/*/stages/*/tasks/*}/taskRuns</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>GetTaskRun</td>
+                <td>GET</td>
+                <td>/v1/{name=projects/*/rollouts/*/stages/*/tasks/*/taskRuns/*}</td>
                 <td></td>
               </tr>
               
