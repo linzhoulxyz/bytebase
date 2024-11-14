@@ -264,7 +264,7 @@ type tableMap map[string]*resourceTable
 //
 // )
 // .
-func generateResourceFilter(filter string) (string, error) {
+func generateResourceFilter(filter string, jsonbFieldName string) (string, error) {
 	env, err := cel.NewEnv(
 		cel.Declarations(
 			decls.NewFunction("tableExists", decls.NewOverload("tableExists_string", []*exprpb.Type{decls.String, decls.String, decls.String}, decls.Bool)),
@@ -313,7 +313,7 @@ func generateResourceFilter(filter string) (string, error) {
 				return "", err
 			}
 		}
-		if _, err := buf.WriteString("(instance_change_history.payload @> '"); err != nil {
+		if _, err := buf.WriteString(fmt.Sprintf("(%s @> '", jsonbFieldName)); err != nil {
 			return "", err
 		}
 		if _, err := buf.WriteString(part); err != nil {
@@ -484,7 +484,7 @@ func (s *Store) ListInstanceChangeHistory(ctx context.Context, find *FindInstanc
 		where, args = append(where, fmt.Sprintf("instance_change_history.version = $%d", len(args)+1)), append(args, storedVersion)
 	}
 	if v := find.ResourcesFilter; v != nil {
-		text, err := generateResourceFilter(*v)
+		text, err := generateResourceFilter(*v, "instance_change_history.payload")
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to generate resource filter from %q", *v)
 		}
@@ -501,7 +501,7 @@ func (s *Store) ListInstanceChangeHistory(ctx context.Context, find *FindInstanc
 		where = append(where, fmt.Sprintf("instance_change_history.type IN (%s)", strings.Join(changeTypes, ",")))
 	}
 
-	statementField := "COALESCE(sheet.statement, instance_change_history.statement)"
+	statementField := "COALESCE(sheet_blob.content, instance_change_history.statement)"
 	if !find.ShowFull {
 		statementField = fmt.Sprintf("LEFT(%s, %d)", statementField, find.TruncateSize)
 	}
@@ -533,7 +533,7 @@ func (s *Store) ListInstanceChangeHistory(ctx context.Context, find *FindInstanc
 			instance_change_history.version,
 			instance_change_history.description,
 			%s,
-			OCTET_LENGTH(COALESCE(sheet.statement, instance_change_history.statement)),
+			OCTET_LENGTH(COALESCE(sheet_blob.content, instance_change_history.statement)),
 			%s,
 			OCTET_LENGTH(instance_change_history.schema),
 			%s,
@@ -545,6 +545,7 @@ func (s *Store) ListInstanceChangeHistory(ctx context.Context, find *FindInstanc
 			COALESCE(db.name, '')
 		FROM instance_change_history
 		LEFT JOIN sheet ON sheet.id = instance_change_history.sheet_id
+		LEFT JOIN sheet_blob ON sheet.sha256 = sheet_blob.sha256
 		LEFT JOIN instance on instance.id = instance_change_history.instance_id
 		LEFT JOIN db on db.id = instance_change_history.database_id
 		WHERE `+strings.Join(where, " AND ")+` ORDER BY instance_change_history.instance_id, instance_change_history.database_id, instance_change_history.sequence DESC`,

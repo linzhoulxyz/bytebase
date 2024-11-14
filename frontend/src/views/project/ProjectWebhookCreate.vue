@@ -1,15 +1,9 @@
 <template>
-  <div class="space-y-4 divide-y divide-block-border">
-    <div class="text-xl leading-6 font-medium text-main">
-      {{ $t("project.webhook.creation.title") }}
-    </div>
-    <ProjectWebhookForm
-      class="pt-4"
-      :create="true"
-      :project="project"
-      :webhook="defaultNewWebhook"
-    />
-  </div>
+  <ProjectWebhookForm
+    :create="true"
+    :project="project"
+    :webhook="defaultNewWebhook"
+  />
 </template>
 
 <script lang="ts" setup>

@@ -293,9 +293,10 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of environments to return. The service may return fewer than
+                    Not used.
+                     The maximum number of environments to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 environments will be returned.
+                     If unspecified, at most 10 environments will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -303,7 +304,8 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `ListEnvironments` call.
+                    Not used.
+                     A page token, received from a previous `ListEnvironments` call.
                      Provide this to retrieve the subsequent page.
 
                      When paginating, all other parameters provided to `ListEnvironments` must match
@@ -470,14 +472,16 @@ paths:
                         - RESTRICT_ISSUE_CREATION_FOR_SQL_REVIEW
                         - TAG
                         - DATA_SOURCE_QUERY
+                        - DATA_EXPORT
                     type: string
                     format: enum
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of policies to return. The service may return fewer than
+                    Not used.
+                     The maximum number of policies to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 policies will be returned.
+                     If unspecified, at most 10 policies will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -485,10 +489,11 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `GetPolicies` call.
+                    Not used.
+                     A page token, received from a previous `ListPolicies` call.
                      Provide this to retrieve the subsequent page.
 
-                     When paginating, all other parameters provided to `GetPolicies` must match
+                     When paginating, all other parameters provided to `ListPolicies` must match
                      the call that provided the page token.
                   schema:
                     type: string
@@ -535,6 +540,7 @@ paths:
                         - RESTRICT_ISSUE_CREATION_FOR_SQL_REVIEW
                         - TAG
                         - DATA_SOURCE_QUERY
+                        - DATA_EXPORT
                     type: string
                     format: enum
             requestBody:
@@ -721,9 +727,10 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of groups to return. The service may return fewer than
+                    Not used.
+                     The maximum number of groups to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 groups will be returned.
+                     If unspecified, at most 10 groups will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -731,7 +738,8 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `ListGroups` call.
+                    Not used.
+                     A page token, received from a previous `ListGroups` call.
                      Provide this to retrieve the subsequent page.
 
                      When paginating, all other parameters provided to `ListGroups` must match
@@ -883,9 +891,10 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of identity providers to return. The service may return fewer than
+                    Not used.
+                     The maximum number of identity providers to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 will be returned.
+                     If unspecified, at most 10 will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -893,7 +902,8 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `ListIdentityProviders` call.
+                    Not used.
+                     A page token, received from a previous `ListIdentityProviders` call.
                      Provide this to retrieve the subsequent page.
 
                      When paginating, all other parameters provided to `ListIdentityProviders` must match
@@ -1098,9 +1108,10 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of instances to return. The service may return fewer than
+                    Not used.
+                     The maximum number of instances to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 instances will be returned.
+                     If unspecified, at most 10 instances will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -1108,7 +1119,8 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `ListInstances` call.
+                    Not used.
+                     A page token, received from a previous `ListInstances` call.
                      Provide this to retrieve the subsequent page.
 
                      When paginating, all other parameters provided to `ListInstances` must match
@@ -1276,18 +1288,17 @@ paths:
                   description: |-
                     The maximum number of databases to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 databases will be returned.
-                     The maximum value is 1000; values above 1000 will be coerced to 1000.
+                     If unspecified, at most 10 databases will be returned.
                   schema:
                     type: integer
                     format: int32
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `ListDatabases` call.
+                    A page token, received from a previous `ListInstanceDatabases` call.
                      Provide this to retrieve the subsequent page.
 
-                     When paginating, all other parameters provided to `ListDatabases` must match
+                     When paginating, all other parameters provided to `ListInstanceDatabases` must match
                      the call that provided the page token.
                   schema:
                     type: string
@@ -1416,7 +1427,7 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    Not used. A page token, received from a previous `ListChangeHistories` call.
+                    A page token, received from a previous `ListChangeHistories` call.
                      Provide this to retrieve the subsequent page.
 
                      When paginating, all other parameters provided to `ListChangeHistories` must match
@@ -1702,9 +1713,9 @@ paths:
                   in: query
                   schema:
                     enum:
-                        - CHANGE_HISTORY_VIEW_UNSPECIFIED
-                        - CHANGE_HISTORY_VIEW_BASIC
-                        - CHANGE_HISTORY_VIEW_FULL
+                        - CHANGELOG_VIEW_UNSPECIFIED
+                        - CHANGELOG_VIEW_BASIC
+                        - CHANGELOG_VIEW_FULL
                     type: string
                     format: enum
                 - name: sdlFormat
@@ -1856,14 +1867,16 @@ paths:
                         - RESTRICT_ISSUE_CREATION_FOR_SQL_REVIEW
                         - TAG
                         - DATA_SOURCE_QUERY
+                        - DATA_EXPORT
                     type: string
                     format: enum
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of policies to return. The service may return fewer than
+                    Not used.
+                     The maximum number of policies to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 policies will be returned.
+                     If unspecified, at most 10 policies will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -1871,10 +1884,11 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `GetPolicies` call.
+                    Not used.
+                     A page token, received from a previous `ListPolicies` call.
                      Provide this to retrieve the subsequent page.
 
-                     When paginating, all other parameters provided to `GetPolicies` must match
+                     When paginating, all other parameters provided to `ListPolicies` must match
                      the call that provided the page token.
                   schema:
                     type: string
@@ -1927,6 +1941,7 @@ paths:
                         - RESTRICT_ISSUE_CREATION_FOR_SQL_REVIEW
                         - TAG
                         - DATA_SOURCE_QUERY
+                        - DATA_EXPORT
                     type: string
                     format: enum
             requestBody:
@@ -2123,6 +2138,42 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+        post:
+            tags:
+                - DatabaseService
+            operationId: DatabaseService_CreateRevision
+            parameters:
+                - name: instance
+                  in: path
+                  description: The instance id.
+                  required: true
+                  schema:
+                    type: string
+                - name: database
+                  in: path
+                  description: The database id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/Revision'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Revision'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/instances/{instance}/databases/{database}/revisions/{revision}:
         get:
             tags:
@@ -2258,9 +2309,10 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    Not used. The maximum number of databases to return. The service may return fewer than
+                    Not used.
+                     The maximum number of secrets to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 databases will be returned.
+                     If unspecified, at most 10 secrets will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -2268,7 +2320,8 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    Not used. A page token, received from a previous `ListSecrets` call.
+                    Not used.
+                     A page token, received from a previous `ListSecrets` call.
                      Provide this to retrieve the subsequent page.
 
                      When paginating, all other parameters provided to `ListSecrets` must match
@@ -2442,43 +2495,6 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/DiffSchemaResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
-    /v1/instances/{instance}/databases/{database}:execute:
-        post:
-            tags:
-                - SQLService
-            operationId: SQLService_Execute
-            parameters:
-                - name: instance
-                  in: path
-                  description: The instance id.
-                  required: true
-                  schema:
-                    type: string
-                - name: database
-                  in: path
-                  description: The database id.
-                  required: true
-                  schema:
-                    type: string
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/ExecuteRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ExecuteResponse'
                 default:
                     description: Default error response
                     content:
@@ -2691,14 +2707,16 @@ paths:
                         - RESTRICT_ISSUE_CREATION_FOR_SQL_REVIEW
                         - TAG
                         - DATA_SOURCE_QUERY
+                        - DATA_EXPORT
                     type: string
                     format: enum
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of policies to return. The service may return fewer than
+                    Not used.
+                     The maximum number of policies to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 policies will be returned.
+                     If unspecified, at most 10 policies will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -2706,10 +2724,11 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `GetPolicies` call.
+                    Not used.
+                     A page token, received from a previous `ListPolicies` call.
                      Provide this to retrieve the subsequent page.
 
-                     When paginating, all other parameters provided to `GetPolicies` must match
+                     When paginating, all other parameters provided to `ListPolicies` must match
                      the call that provided the page token.
                   schema:
                     type: string
@@ -2756,6 +2775,7 @@ paths:
                         - RESTRICT_ISSUE_CREATION_FOR_SQL_REVIEW
                         - TAG
                         - DATA_SOURCE_QUERY
+                        - DATA_EXPORT
                     type: string
                     format: enum
             requestBody:
@@ -2899,9 +2919,10 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of roles to return. The service may return fewer than
+                    Not used.
+                     The maximum number of roles to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 roles will be returned.
+                     If unspecified, at most 10 roles will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -2909,10 +2930,11 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `ListRoles` call.
+                    Not used.
+                     A page token, received from a previous `ListInstanceRoles` call.
                      Provide this to retrieve the subsequent page.
 
-                     When paginating, all other parameters provided to `ListRoles` must match
+                     When paginating, all other parameters provided to `ListInstanceRoles` must match
                      the call that provided the page token.
                   schema:
                     type: string
@@ -3261,14 +3283,16 @@ paths:
                         - RESTRICT_ISSUE_CREATION_FOR_SQL_REVIEW
                         - TAG
                         - DATA_SOURCE_QUERY
+                        - DATA_EXPORT
                     type: string
                     format: enum
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of policies to return. The service may return fewer than
+                    Not used.
+                     The maximum number of policies to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 policies will be returned.
+                     If unspecified, at most 10 policies will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -3276,10 +3300,11 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `GetPolicies` call.
+                    Not used.
+                     A page token, received from a previous `ListPolicies` call.
                      Provide this to retrieve the subsequent page.
 
-                     When paginating, all other parameters provided to `GetPolicies` must match
+                     When paginating, all other parameters provided to `ListPolicies` must match
                      the call that provided the page token.
                   schema:
                     type: string
@@ -3330,6 +3355,7 @@ paths:
                         - RESTRICT_ISSUE_CREATION_FOR_SQL_REVIEW
                         - TAG
                         - DATA_SOURCE_QUERY
+                        - DATA_EXPORT
                     type: string
                     format: enum
             requestBody:
@@ -3449,9 +3475,10 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of projects to return. The service may return fewer than
+                    Not used.
+                     The maximum number of projects to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 projects will be returned.
+                     If unspecified, at most 10 projects will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -3459,7 +3486,8 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `ListProjects` call.
+                    Not used.
+                     A page token, received from a previous `ListProjects` call.
                      Provide this to retrieve the subsequent page.
 
                      When paginating, all other parameters provided to `ListProjects` must match
@@ -3726,7 +3754,8 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of branches to return. The service may return fewer than
+                    Not used.
+                     The maximum number of branches to return. The service may return fewer than
                      this value.
                      If unspecified, at most 50 branches will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
@@ -3736,7 +3765,8 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `ListBranches` call.
+                    Not used.
+                     A page token, received from a previous `ListBranches` call.
                      Provide this to retrieve the subsequent page.
 
                      When paginating, all other parameters provided to `ListBranches` must match
@@ -4017,7 +4047,8 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of databases to return. The service may return fewer than
+                    Not used.
+                     The maximum number of databases to return. The service may return fewer than
                      this value.
                      If unspecified, at most 50 databases will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
@@ -4027,7 +4058,8 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `ListDatabases` call.
+                    Not used.
+                     A page token, received from a previous `ListDatabases` call.
                      Provide this to retrieve the subsequent page.
 
                      When paginating, all other parameters provided to `ListDatabases` must match
@@ -4202,9 +4234,10 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    Not used. The maximum number of anomalies to return. The service may return fewer than
+                    Not used.
+                     The maximum number of database groups to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 anomalies will be returned.
+                     If unspecified, at most 50 database groups will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -4212,7 +4245,8 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    Not used. A page token, received from a previous `ListDatabaseGroups` call.
+                    Not used.
+                     A page token, received from a previous `ListDatabaseGroups` call.
                      Provide this to retrieve the subsequent page.
 
                      When paginating, all other parameters provided to `ListDatabaseGroups` must match
@@ -4404,8 +4438,7 @@ paths:
                   description: |-
                     The maximum number of databases to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 databases will be returned.
-                     The maximum value is 1000; values above 1000 will be coerced to 1000.
+                     If unspecified, at most 10 databases will be returned.
                   schema:
                     type: integer
                     format: int32
@@ -4516,7 +4549,7 @@ paths:
                   description: |-
                     The maximum number of issues to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 issues will be returned.
+                     If unspecified, at most 10 issues will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -4682,9 +4715,9 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of issues to return. The service may return fewer than
+                    The maximum number of issue comments to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 issues will be returned.
+                     If unspecified, at most 10 issue comments will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -4692,10 +4725,10 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `ListIssues` call.
+                    A page token, received from a previous `ListIssueComments` call.
                      Provide this to retrieve the subsequent page.
 
-                     When paginating, all other parameters provided to `ListIssues` must match
+                     When paginating, all other parameters provided to `ListIssueComments` must match
                      the call that provided the page token.
                   schema:
                     type: string
@@ -5028,7 +5061,7 @@ paths:
                   description: |-
                     The maximum number of plans to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 plans will be returned.
+                     If unspecified, at most 10 plans will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -5183,9 +5216,10 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of plan check runs to return. The service may return fewer than
+                    Not used.
+                     The maximum number of plan check runs to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 plans will be returned.
+                     If unspecified, at most 10 plan check runs will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -5193,7 +5227,8 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `ListPlanCheckRuns` call.
+                    Not used.
+                     A page token, received from a previous `ListPlanCheckRuns` call.
                      Provide this to retrieve the subsequent page.
 
                      When paginating, all other parameters provided to `ListPlanCheckRuns` must match
@@ -5350,14 +5385,16 @@ paths:
                         - RESTRICT_ISSUE_CREATION_FOR_SQL_REVIEW
                         - TAG
                         - DATA_SOURCE_QUERY
+                        - DATA_EXPORT
                     type: string
                     format: enum
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of policies to return. The service may return fewer than
+                    Not used.
+                     The maximum number of policies to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 policies will be returned.
+                     If unspecified, at most 10 policies will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -5365,10 +5402,11 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `GetPolicies` call.
+                    Not used.
+                     A page token, received from a previous `ListPolicies` call.
                      Provide this to retrieve the subsequent page.
 
-                     When paginating, all other parameters provided to `GetPolicies` must match
+                     When paginating, all other parameters provided to `ListPolicies` must match
                      the call that provided the page token.
                   schema:
                     type: string
@@ -5415,6 +5453,7 @@ paths:
                         - RESTRICT_ISSUE_CREATION_FOR_SQL_REVIEW
                         - TAG
                         - DATA_SOURCE_QUERY
+                        - DATA_EXPORT
                     type: string
                     format: enum
             requestBody:
@@ -5558,8 +5597,8 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of change histories to return. The service may return fewer than this value.
-                     If unspecified, at most 10 change histories will be returned.
+                    The maximum number of releases to return. The service may return fewer than this value.
+                     If unspecified, at most 10 releases will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -5567,10 +5606,11 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    Not used. A page token, received from a previous `ListReleasesRequest` call.
+                    Not used.
+                     A page token, received from a previous `ListReleases` call.
                      Provide this to retrieve the subsequent page.
 
-                     When paginating, all other parameters provided to `ListReleasesRequest` must match
+                     When paginating, all other parameters provided to `ListReleases` must match
                      the call that provided the page token.
                   schema:
                     type: string
@@ -5754,6 +5794,50 @@ paths:
                             schema:
                                 $ref: '#/components/schemas/Status'
     /v1/projects/{project}/rollouts:
+        get:
+            tags:
+                - RolloutService
+            operationId: RolloutService_ListRollouts
+            parameters:
+                - name: project
+                  in: path
+                  description: The project id.
+                  required: true
+                  schema:
+                    type: string
+                - name: pageSize
+                  in: query
+                  description: |-
+                    The maximum number of rollouts to return. The service may return fewer than
+                     this value.
+                     If unspecified, at most 10 rollouts will be returned.
+                     The maximum value is 1000; values above 1000 will be coerced to 1000.
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  description: |-
+                    A page token, received from a previous `ListRollouts` call.
+                     Provide this to retrieve the subsequent page.
+
+                     When paginating, all other parameters provided to `ListRollouts` must match
+                     the call that provided the page token.
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListRolloutsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
         post:
             tags:
                 - RolloutService
@@ -5848,9 +5932,10 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of taskRuns to return. The service may return fewer than
+                    Not used.
+                     The maximum number of taskRuns to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 taskRuns will be returned.
+                     If unspecified, at most 10 taskRuns will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -5858,10 +5943,11 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `ListRolloutTaskRuns` call.
+                    Not used.
+                     A page token, received from a previous `ListTaskRuns` call.
                      Provide this to retrieve the subsequent page.
 
-                     When paginating, all other parameters provided to `ListRolloutTaskRuns` must match
+                     When paginating, all other parameters provided to `ListTaskRuns` must match
                      the call that provided the page token.
                   schema:
                     type: string
@@ -6341,6 +6427,37 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/projects/{project}/sheets:batchCreate:
+        post:
+            tags:
+                - SheetService
+            operationId: SheetService_BatchCreateSheet
+            parameters:
+                - name: project
+                  in: path
+                  description: The project id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/BatchCreateSheetRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BatchCreateSheetResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/projects/{project}/slowQueries:
         get:
             tags:
@@ -6408,9 +6525,10 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of databases to return. The service may return fewer than
+                    Not used.
+                     The maximum number of vcs connectors to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 databases will be returned.
+                     If unspecified, at most 10 vcs connectors will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -6418,10 +6536,11 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `ListDatabases` call.
+                    Not used.
+                     A page token, received from a previous `ListVCSConnectors` call.
                      Provide this to retrieve the subsequent page.
 
-                     When paginating, all other parameters provided to `ListDatabases` must match
+                     When paginating, all other parameters provided to `ListVCSConnectors` must match
                      the call that provided the page token.
                   schema:
                     type: string
@@ -6949,9 +7068,10 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of sql review to return. The service may return fewer than
+                    Not used.
+                     The maximum number of sql review to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 sql review will be returned.
+                     If unspecified, at most 10 sql review will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -6959,9 +7079,10 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, provide this to retrieve the subsequent page.
+                    Not used.
+                     A page token, provide this to retrieve the subsequent page.
 
-                     When paginating, all other parameters provided to `ListSQLReviews` must match
+                     When paginating, all other parameters provided to `ListReviewConfigs` must match
                      the call that provided the page token.
                   schema:
                     type: string
@@ -7064,6 +7185,13 @@ paths:
                   schema:
                     type: string
                     format: field-mask
+                - name: allowMissing
+                  in: query
+                  description: |-
+                    If set to true, and the config is not found, a new config will be created.
+                     In this situation, `update_mask` is ignored.
+                  schema:
+                    type: boolean
             requestBody:
                 content:
                     application/json:
@@ -7092,9 +7220,10 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of risks to return. The service may return fewer than
+                    Not used.
+                     The maximum number of risks to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 risks will be returned.
+                     If unspecified, at most 10 risks will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -7102,7 +7231,8 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `ListRisks` call.
+                    Not used.
+                     A page token, received from a previous `ListRisks` call.
                      Provide this to retrieve the subsequent page.
 
                      When paginating, all other parameters provided to `LiskRisks` must match
@@ -7212,9 +7342,10 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of roles to return. The service may return fewer than
+                    Not used.
+                     The maximum number of roles to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 reviews will be returned.
+                     If unspecified, at most 10 reviews will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -7222,7 +7353,8 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `ListRoles` call.
+                    Not used.
+                     A page token, received from a previous `ListRoles` call.
                      Provide this to retrieve the subsequent page.
 
                      When paginating, all other parameters provided to `ListRoles` must match
@@ -7395,9 +7527,10 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of settings to return. The service may return fewer than
+                    Not used.
+                     The maximum number of settings to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 settings will be returned.
+                     If unspecified, at most 10 settings will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -7405,7 +7538,8 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `ListSettings` call.
+                    Not used.
+                     A page token, received from a previous `ListSettings` call.
                      Provide this to retrieve the subsequent page.
 
                      When paginating, all other parameters provided to `ListSettings` must match
@@ -7621,7 +7755,8 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    The maximum number of users to return. The service may return fewer than
+                    Not used.
+                     The maximum number of users to return. The service may return fewer than
                      this value.
                      If unspecified, at most 50 users will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
@@ -7631,7 +7766,8 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `ListUsers` call.
+                    Not used.
+                     A page token, received from a previous `ListUsers` call.
                      Provide this to retrieve the subsequent page.
 
                      When paginating, all other parameters provided to `ListUsers` must match
@@ -7830,8 +7966,9 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    Not used. The maximum number of vcs provider to return. The service may return fewer than this value.
-                     If unspecified, at most 100 vcs provider will be returned.
+                    Not used.
+                     The maximum number of vcs provider to return. The service may return fewer than this value.
+                     If unspecified, at most 10 vcs provider will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -7839,7 +7976,8 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    Not used. A page token, received from a previous `ListVCSProviders` call.
+                    Not used.
+                     A page token, received from a previous `ListVCSProviders` call.
                      Provide this to retrieve the subsequent page.
                   schema:
                     type: string
@@ -8247,8 +8385,7 @@ paths:
                   description: |-
                     The maximum number of databases to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 databases will be returned.
-                     The maximum value is 1000; values above 1000 will be coerced to 1000.
+                     If unspecified, at most 10 databases will be returned.
                   schema:
                     type: integer
                     format: int32
@@ -8463,6 +8600,9 @@ components:
                     description: disallow_password_signin is the flag to disallow user signin with email&password. (except workspace admins)
                 passwordRestriction:
                     $ref: '#/components/schemas/PasswordRestrictionSetting'
+                docker:
+                    type: boolean
+                    description: docker flag means if the Bytebase instance is running in docker.
             description: |-
                 ServerInfo is the API message for server info.
                  Actuator concept is similar to the Spring Boot Actuator.
@@ -8913,6 +9053,28 @@ components:
         BatchCancelTaskRunsResponse:
             type: object
             properties: {}
+        BatchCreateSheetRequest:
+            required:
+                - parent
+                - requests
+            type: object
+            properties:
+                parent:
+                    type: string
+                    description: |-
+                        The parent resource where all sheets will be created.
+                         Format: projects/{project}
+                requests:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/CreateSheetRequest'
+        BatchCreateSheetResponse:
+            type: object
+            properties:
+                sheets:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Sheet'
         BatchDeparseRequest:
             type: object
             properties:
@@ -9555,6 +9717,21 @@ components:
                         - $ref: '#/components/schemas/GenerationMetadata'
                     description: The generation is the generation of a column.
             description: ColumnMetadata is the metadata for columns.
+        CreateSheetRequest:
+            required:
+                - parent
+                - sheet
+            type: object
+            properties:
+                parent:
+                    type: string
+                    description: |-
+                        The parent resource where this sheet will be created.
+                         Format: projects/{project}
+                sheet:
+                    allOf:
+                        - $ref: '#/components/schemas/Sheet'
+                    description: The sheet to create.
         DataClassificationConfig_DataClassification:
             type: object
             properties:
@@ -9799,12 +9976,12 @@ components:
                         - DISALLOW
                     type: string
                     format: enum
-                enableDdl:
+                disallowDdl:
                     type: boolean
-                    description: Allow running DDL statements in the SQL editor.
-                enableDml:
+                    description: Disallow running DDL statements in the SQL editor.
+                disallowDml:
                     type: boolean
-                    description: Allow running DML statements in the SQL editor.
+                    description: Disallow running DML statements in the SQL editor.
             description: DataSourceQueryPolicy is the policy configuration for running statements in the SQL editor.
         DataSource_Address:
             type: object
@@ -9929,6 +10106,8 @@ components:
                 lastSyncTime:
                     type: string
                     format: date-time
+                backupAvailable:
+                    type: boolean
             description: DatabaseMetadata is the metadata for databases.
         DatabaseSchema:
             type: object
@@ -10069,43 +10248,8 @@ components:
                         - UNPROTECTED
                     type: string
                     format: enum
-        ExecuteRequest:
-            required:
-                - name
-            type: object
-            properties:
-                name:
+                color:
                     type: string
-                    description: |-
-                        The name is the instance name to execute the query against.
-                         Format: instances/{instance}/databases/{databaseName}
-                statement:
-                    type: string
-                    description: The SQL statement to execute.
-                limit:
-                    type: integer
-                    description: The maximum number of rows to return.
-                    format: int32
-                timeout:
-                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
-                    type: string
-                    description: The timeout for the request.
-                schema:
-                    type: string
-                    description: The default schema to execute the statement. Equals to the current schema in Oracle and search path in Postgres.
-        ExecuteResponse:
-            type: object
-            properties:
-                results:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/QueryResult'
-                    description: The execute results.
-                advices:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/Advice'
-                    description: The execute advices.
         ExportAuditLogsRequest:
             required:
                 - parent
@@ -10140,12 +10284,36 @@ components:
                     type: string
                     description: The export format.
                     format: enum
+                pageSize:
+                    type: integer
+                    description: |-
+                        The maximum number of logs to return.
+                         The service may return fewer than this value.
+                         If unspecified, at most 10 log entries will be returned.
+                         The maximum value is 5000; values above 5000 will be coerced to 5000.
+                    format: int32
+                pageToken:
+                    type: string
+                    description: |-
+                        A page token, received from a previous `ExportAuditLogs` call.
+                         Provide this to retrieve the subsequent page.
         ExportAuditLogsResponse:
             type: object
             properties:
                 content:
                     type: string
                     format: bytes
+                nextPageToken:
+                    type: string
+                    description: |-
+                        A token to retrieve next page of log entities.
+                         Pass this value in the page_token field in the subsequent call
+                         to retrieve the next page of log entities.
+        ExportDataPolicy:
+            type: object
+            properties:
+                disable:
+                    type: boolean
         ExportRequest:
             required:
                 - name
@@ -11419,6 +11587,19 @@ components:
                     description: |-
                         A token, which can be sent as `page_token` to retrieve the next page.
                          If this field is omitted, there are no subsequent pages.
+        ListRolloutsResponse:
+            type: object
+            properties:
+                rollouts:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Rollout'
+                    description: The rollouts from the specified request.
+                nextPageToken:
+                    type: string
+                    description: |-
+                        A token, which can be sent as `page_token` to retrieve the next page.
+                         If this field is omitted, there are no subsequent pages.
         ListSecretsResponse:
             type: object
             properties:
@@ -11515,8 +11696,6 @@ components:
                         Not used. A token, which can be sent as `page_token` to retrieve the next page.
                          If this field is omitted, there are no subsequent pages.
         LoginRequest:
-            required:
-                - idpName
             type: object
             properties:
                 email:
@@ -11553,6 +11732,10 @@ components:
                     type: string
                 requireResetPassword:
                     type: boolean
+                user:
+                    allOf:
+                        - $ref: '#/components/schemas/User'
+                    description: The user of successful login.
         LogoutRequest:
             type: object
             properties: {}
@@ -12116,6 +12299,7 @@ components:
                         - RESTRICT_ISSUE_CREATION_FOR_SQL_REVIEW
                         - TAG
                         - DATA_SOURCE_QUERY
+                        - DATA_EXPORT
                     type: string
                     format: enum
                 rolloutPolicy:
@@ -12136,6 +12320,8 @@ components:
                     $ref: '#/components/schemas/TagPolicy'
                 dataSourceQueryPolicy:
                     $ref: '#/components/schemas/DataSourceQueryPolicy'
+                exportDataPolicy:
+                    $ref: '#/components/schemas/ExportDataPolicy'
                 enforce:
                     type: boolean
                 resourceType:
@@ -12297,10 +12483,7 @@ components:
                     type: array
                     items:
                         type: string
-                    description: |-
-                        Format: projects/{project}/releases/{release}/files/{path}
-                         {path} is URL path escaped.
-                         Example: `projects/tnt/releases/0801/files/2.2%2FV0001_create_table.sql`
+                    description: 'Format: projects/{project}/releases/{release}/files/{file_id}'
         PreviewRolloutRequest:
             required:
                 - project
@@ -12666,11 +12849,13 @@ components:
         Release_File:
             type: object
             properties:
-                name:
+                id:
+                    readOnly: true
                     type: string
-                    description: |-
-                        The name of the file.
-                         Expressed as a path, e.g. `2.2/V0001_create_table.sql`
+                    description: The unique identifier for the file.
+                path:
+                    type: string
+                    description: The path of the file. e.g. `2.2/V0001_create_table.sql`.
                 sheet:
                     type: string
                     description: |-
@@ -12866,6 +13051,13 @@ components:
                     readOnly: true
                     type: string
                     format: date-time
+                file:
+                    type: string
+                    description: |-
+                        Format: projects/{project}/releases/{release}/files/{id}
+                         Can be empty.
+                version:
+                    type: string
                 sheet:
                     type: string
                     description: |-
@@ -12882,20 +13074,6 @@ components:
                 statementSize:
                     readOnly: true
                     type: string
-                type:
-                    enum:
-                        - TYPE_UNSPECIFIED
-                        - VERSIONED
-                    type: string
-                    format: enum
-                version:
-                    type: string
-                file:
-                    type: string
-                    description: |-
-                        The name of the file in the release.
-                         Expressed as a path, e.g. `2.2/V0001_create_table.sql`
-                         Can be empty.
                 issue:
                     type: string
                     description: |-
@@ -12970,6 +13148,24 @@ components:
                     items:
                         $ref: '#/components/schemas/Stage'
                     description: stages and thus tasks of the rollout.
+                creator:
+                    readOnly: true
+                    type: string
+                    description: 'Format: users/hello@world.com'
+                createTime:
+                    readOnly: true
+                    type: string
+                    format: date-time
+                updateTime:
+                    readOnly: true
+                    type: string
+                    format: date-time
+                issue:
+                    readOnly: true
+                    type: string
+                    description: |-
+                        The issue associated with the rollout. Could be empty.
+                         Format: projects/{project}/issues/{issue}
         RolloutPolicy:
             type: object
             properties:
@@ -13370,15 +13566,17 @@ components:
                 pageSize:
                     type: integer
                     description: |-
-                        Not used. The maximum number of anomalies to return. The service may return fewer than
+                        Not used.
+                         The maximum number of anomalies to return. The service may return fewer than
                          this value.
-                         If unspecified, at most 50 anomalies will be returned.
+                         If unspecified, at most 10 anomalies will be returned.
                          The maximum value is 1000; values above 1000 will be coerced to 1000.
                     format: int32
                 pageToken:
                     type: string
                     description: |-
-                        Not used. A page token, received from a previous `SearchAnomalies` call.
+                        Not used.
+                         A page token, received from a previous `SearchAnomalies` call.
                          Provide this to retrieve the subsequent page.
 
                          When paginating, all other parameters provided to `SearchAnomalies` must match
@@ -13425,8 +13623,8 @@ components:
                     description: |-
                         The maximum number of logs to return.
                          The service may return fewer than this value.
-                         If unspecified, at most 100 log entries will be returned.
-                         The maximum value is 1000; values above 1000 will be coerced to 1000.
+                         If unspecified, at most 10 log entries will be returned.
+                         The maximum value is 5000; values above 5000 will be coerced to 5000.
                     format: int32
                 pageToken:
                     type: string
@@ -13462,16 +13660,16 @@ components:
                     description: |-
                         The maximum number of issues to return. The service may return fewer than
                          this value.
-                         If unspecified, at most 50 issues will be returned.
+                         If unspecified, at most 10 issues will be returned.
                          The maximum value is 1000; values above 1000 will be coerced to 1000.
                     format: int32
                 pageToken:
                     type: string
                     description: |-
-                        A page token, received from a previous `ListIssues` call.
+                        A page token, received from a previous `SearchIssues` call.
                          Provide this to retrieve the subsequent page.
 
-                         When paginating, all other parameters provided to `ListIssues` must match
+                         When paginating, all other parameters provided to `SearchIssues` must match
                          the call that provided the page token.
                 filter:
                     type: string
@@ -13508,16 +13706,16 @@ components:
                     description: |-
                         The maximum number of plans to return. The service may return fewer than
                          this value.
-                         If unspecified, at most 50 plans will be returned.
+                         If unspecified, at most 10 plans will be returned.
                          The maximum value is 1000; values above 1000 will be coerced to 1000.
                     format: int32
                 pageToken:
                     type: string
                     description: |-
-                        A page token, received from a previous `ListPlans` call.
+                        A page token, received from a previous `SearchPlans` call.
                          Provide this to retrieve the subsequent page.
 
-                         When paginating, all other parameters provided to `ListPlans` must match
+                         When paginating, all other parameters provided to `SearchPlans` must match
                          the call that provided the page token.
                 filter:
                     type: string
@@ -13555,15 +13753,15 @@ components:
                 pageSize:
                     type: integer
                     description: |-
-                        Not used. The maximum number of histories to return.
+                        The maximum number of histories to return.
                          The service may return fewer than this value.
-                         If unspecified, at most 100 history entries will be returned.
+                         If unspecified, at most 10 history entries will be returned.
                          The maximum value is 1000; values above 1000 will be coerced to 1000.
                     format: int32
                 pageToken:
                     type: string
                     description: |-
-                        Not used. A page token, received from a previous `ListQueryHistory` call.
+                        A page token, received from a previous `ListQueryHistory` call.
                          Provide this to retrieve the subsequent page.
                 filter:
                     type: string
@@ -13625,15 +13823,17 @@ components:
                 pageSize:
                     type: integer
                     description: |-
-                        Not used. The maximum number of worksheets to return. The service may return fewer than
+                        Not used.
+                         The maximum number of worksheets to return. The service may return fewer than
                          this value.
-                         If unspecified, at most 50 worksheets will be returned.
+                         If unspecified, at most 10 worksheets will be returned.
                          The maximum value is 1000; values above 1000 will be coerced to 1000.
                     format: int32
                 pageToken:
                     type: string
                     description: |-
-                        Not used. A page token, received from a previous `SearchWorksheets` call.
+                        Not used.
+                         A page token, received from a previous `SearchWorksheets` call.
                          Provide this to retrieve the subsequent page.
 
                          When paginating, all other parameters provided to `SearchWorksheets` must match
@@ -13755,12 +13955,6 @@ components:
                         The name of the sheet resource, generated by the server.
                          Canonical parent is project.
                          Format: projects/{project}/sheets/{sheet}
-                database:
-                    type: string
-                    description: |-
-                        The database resource name.
-                         Format: instances/{instance}/databases/{database}
-                         If the database parent doesn't exist, the database field is empty.
                 title:
                     type: string
                     description: The title of the sheet.
@@ -14037,6 +14231,10 @@ components:
         Subscription:
             type: object
             properties:
+                seatCount:
+                    readOnly: true
+                    type: integer
+                    format: int32
                 instanceCount:
                     readOnly: true
                     type: integer

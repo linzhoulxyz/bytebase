@@ -25,7 +25,11 @@ type ChangelogMessage struct {
 }
 
 type FindChangelogMessage struct {
-	DatabaseUID int
+	UID         *int64
+	DatabaseUID *int
+
+	TypeList        []string
+	ResourcesFilter *string
 
 	Limit  *int
 	Offset *int
@@ -121,7 +125,28 @@ func (s *Store) UpdateChangelog(ctx context.Context, update *UpdateChangelogMess
 }
 
 func (s *Store) ListChangelogs(ctx context.Context, find *FindChangelogMessage) ([]*ChangelogMessage, error) {
-	query := `
+	where, args := []string{"TRUE"}, []any{}
+	if v := find.UID; v != nil {
+		where, args = append(where, fmt.Sprintf("changelog.id = $%d", len(args)+1)), append(args, *v)
+	}
+	if v := find.DatabaseUID; v != nil {
+		where, args = append(where, fmt.Sprintf("changelog.database_id = $%d", len(args)+1)), append(args, *v)
+	}
+	if v := find.ResourcesFilter; v != nil {
+		text, err := generateResourceFilter(*v, "(changelog.payload->'task')")
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to generate resource filter from %q", *v)
+		}
+		if text != "" {
+			where = append(where, text)
+		}
+	}
+	if len(find.TypeList) > 0 {
+		where = append(where, fmt.Sprintf("changelog.payload->'task'->>'type' = ANY($%d)", len(args)+1))
+		args = append(args, find.TypeList)
+	}
+
+	query := fmt.Sprintf(`
 		SELECT
 			changelog.id,
 			changelog.creator_id,
@@ -129,10 +154,9 @@ func (s *Store) ListChangelogs(ctx context.Context, find *FindChangelogMessage) 
 			changelog.database_id,
 			payload
 		FROM changelog
-		WHERE changelog.database_id = $1
+		WHERE %s
 		ORDER BY changelog.id DESC
-	`
-
+	`, strings.Join(where, " AND "))
 	if v := find.Limit; v != nil {
 		query += fmt.Sprintf(" LIMIT %d", *v)
 	}
@@ -140,7 +164,7 @@ func (s *Store) ListChangelogs(ctx context.Context, find *FindChangelogMessage) 
 		query += fmt.Sprintf(" OFFSET %d", *v)
 	}
 
-	rows, err := s.db.db.QueryContext(ctx, query, find.DatabaseUID)
+	rows, err := s.db.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query")
 	}
@@ -175,4 +199,20 @@ func (s *Store) ListChangelogs(ctx context.Context, find *FindChangelogMessage) 
 	}
 
 	return changelogs, nil
+}
+
+func (s *Store) GetChangelog(ctx context.Context, uid int64) (*ChangelogMessage, error) {
+	changelogs, err := s.ListChangelogs(ctx, &FindChangelogMessage{
+		UID: &uid,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(changelogs) == 0 {
+		return nil, nil
+	}
+	if len(changelogs) > 1 {
+		return nil, errors.Errorf("found %d changelogs with UID %d, expect 1", len(changelogs), uid)
+	}
+	return changelogs[0], nil
 }

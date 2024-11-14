@@ -76,13 +76,15 @@ export interface GetEnvironmentRequest {
 
 export interface ListEnvironmentsRequest {
   /**
+   * Not used.
    * The maximum number of environments to return. The service may return fewer than
    * this value.
-   * If unspecified, at most 50 environments will be returned.
+   * If unspecified, at most 10 environments will be returned.
    * The maximum value is 1000; values above 1000 will be coerced to 1000.
    */
   pageSize: number;
   /**
+   * Not used.
    * A page token, received from a previous `ListEnvironments` call.
    * Provide this to retrieve the subsequent page.
    *
@@ -159,6 +161,7 @@ export interface Environment {
   title: string;
   order: number;
   tier: EnvironmentTier;
+  color: string;
 }
 
 function createBaseGetEnvironmentRequest(): GetEnvironmentRequest {
@@ -656,6 +659,7 @@ function createBaseEnvironment(): Environment {
     title: "",
     order: 0,
     tier: EnvironmentTier.ENVIRONMENT_TIER_UNSPECIFIED,
+    color: "",
   };
 }
 
@@ -675,6 +679,9 @@ export const Environment: MessageFns<Environment> = {
     }
     if (message.tier !== EnvironmentTier.ENVIRONMENT_TIER_UNSPECIFIED) {
       writer.uint32(48).int32(environmentTierToNumber(message.tier));
+    }
+    if (message.color !== "") {
+      writer.uint32(58).string(message.color);
     }
     return writer;
   },
@@ -721,6 +728,13 @@ export const Environment: MessageFns<Environment> = {
 
           message.tier = environmentTierFromJSON(reader.int32());
           continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.color = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -737,6 +751,7 @@ export const Environment: MessageFns<Environment> = {
       title: isSet(object.title) ? globalThis.String(object.title) : "",
       order: isSet(object.order) ? globalThis.Number(object.order) : 0,
       tier: isSet(object.tier) ? environmentTierFromJSON(object.tier) : EnvironmentTier.ENVIRONMENT_TIER_UNSPECIFIED,
+      color: isSet(object.color) ? globalThis.String(object.color) : "",
     };
   },
 
@@ -757,6 +772,9 @@ export const Environment: MessageFns<Environment> = {
     if (message.tier !== EnvironmentTier.ENVIRONMENT_TIER_UNSPECIFIED) {
       obj.tier = environmentTierToJSON(message.tier);
     }
+    if (message.color !== "") {
+      obj.color = message.color;
+    }
     return obj;
   },
 
@@ -770,6 +788,7 @@ export const Environment: MessageFns<Environment> = {
     message.title = object.title ?? "";
     message.order = object.order ?? 0;
     message.tier = object.tier ?? EnvironmentTier.ENVIRONMENT_TIER_UNSPECIFIED;
+    message.color = object.color ?? "";
     return message;
   },
 };

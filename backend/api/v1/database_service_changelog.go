@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -10,7 +11,11 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/bytebase/bytebase/backend/common"
+	"github.com/bytebase/bytebase/backend/plugin/parser/pg"
+	"github.com/bytebase/bytebase/backend/plugin/parser/plsql"
+	"github.com/bytebase/bytebase/backend/plugin/parser/sql/transform"
 	"github.com/bytebase/bytebase/backend/store"
+	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
@@ -40,17 +45,40 @@ func (s *DatabaseService) ListChangelogs(ctx context.Context, request *v1pb.List
 		return nil, status.Errorf(codes.NotFound, "database %q not found", databaseName)
 	}
 
-	limit, offset, err := parseLimitAndOffset(request.PageToken, int(request.PageSize))
+	offset, err := parseLimitAndOffset(&pageSize{
+		token:   request.PageToken,
+		limit:   int(request.PageSize),
+		maximum: 1000,
+	})
 	if err != nil {
 		return nil, err
 	}
-	limitPlusOne := limit + 1
+	limitPlusOne := offset.limit + 1
 
-	// TODO(p0ny): support view and filter
+	// TODO(p0ny): support view.
 	find := &store.FindChangelogMessage{
-		DatabaseUID: database.UID,
+		DatabaseUID: &database.UID,
 		Limit:       &limitPlusOne,
-		Offset:      &offset,
+		Offset:      &offset.offset,
+	}
+
+	filters, err := ParseFilter(request.Filter)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	for _, expr := range filters {
+		if expr.Operator != ComparatorTypeEqual {
+			return nil, status.Errorf(codes.InvalidArgument, `only support "=" operation for filter`)
+		}
+		switch expr.Key {
+		case "type":
+			find.TypeList = strings.Split(expr.Value, " | ")
+		case "table":
+			resourcesFilter := expr.Value
+			find.ResourcesFilter = &resourcesFilter
+		default:
+			return nil, status.Errorf(codes.InvalidArgument, "invalid filter key %q", expr.Key)
+		}
 	}
 
 	changelogs, err := s.store.ListChangelogs(ctx, find)
@@ -60,22 +88,98 @@ func (s *DatabaseService) ListChangelogs(ctx context.Context, request *v1pb.List
 
 	nextPageToken := ""
 	if len(changelogs) == limitPlusOne {
-		nextPageToken, err = getPageToken(limit, offset+limit)
-		if err != nil {
+		if nextPageToken, err = offset.getPageToken(); err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get next page token, error: %v", err)
 		}
-		changelogs = changelogs[:limit]
+		changelogs = changelogs[:offset.limit]
 	}
 
 	// no subsequent pages
 	converted, err := s.convertToChangelogs(ctx, database, changelogs)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to convert change histories, error: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to convert changelogs, error: %v", err)
 	}
 	return &v1pb.ListChangelogsResponse{
 		Changelogs:    converted,
 		NextPageToken: nextPageToken,
 	}, nil
+}
+
+func (s *DatabaseService) GetChangelog(ctx context.Context, request *v1pb.GetChangelogRequest) (*v1pb.Changelog, error) {
+	instanceID, databaseName, changelogUID, err := common.GetInstanceDatabaseChangelogUID(request.Name)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	// TODO(p0ny): support view.
+	changelog, err := s.store.GetChangelog(ctx, changelogUID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to list changelogs, errors: %v", err)
+	}
+	if changelog == nil {
+		return nil, status.Errorf(codes.NotFound, "changelog %q not found", changelogUID)
+	}
+
+	// Get related database to convert changelog from store.
+	instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{
+		ResourceID: &instanceID,
+	})
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if instance == nil {
+		return nil, status.Errorf(codes.NotFound, "instance %q not found", instanceID)
+	}
+	database, err := s.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{
+		InstanceID:          &instanceID,
+		DatabaseName:        &databaseName,
+		IgnoreCaseSensitive: store.IgnoreDatabaseAndTableCaseSensitive(instance),
+	})
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if database == nil {
+		return nil, status.Errorf(codes.NotFound, "database %q not found", databaseName)
+	}
+
+	converted, err := s.convertToChangelog(ctx, database, changelog)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to convert changelog, error: %v", err)
+	}
+	if request.SdlFormat {
+		switch instance.Engine {
+		case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
+			sdlSchema, err := transform.SchemaTransform(storepb.Engine_MYSQL, converted.Schema)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "failed to convert schema to sdl format, error %v", err.Error())
+			}
+			converted.Schema = sdlSchema
+			sdlSchema, err = transform.SchemaTransform(storepb.Engine_MYSQL, converted.PrevSchema)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "failed to convert previous schema to sdl format, error %v", err.Error())
+			}
+			converted.PrevSchema = sdlSchema
+		}
+	}
+	if request.Concise {
+		switch instance.Engine {
+		case storepb.Engine_ORACLE:
+			conciseSchema, err := plsql.GetConciseSchema(converted.Schema)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "failed to get concise schema, error %v", err.Error())
+			}
+			converted.Schema = conciseSchema
+		case storepb.Engine_POSTGRES:
+			conciseSchema, err := pg.FilterBackupSchema(converted.Schema)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "failed to filter the backup schema, error %v", err.Error())
+			}
+			converted.Schema = conciseSchema
+		default:
+			return nil, status.Errorf(codes.Unimplemented, "concise schema is not supported for engine %q", instance.Engine.String())
+		}
+	}
+	return converted, nil
 }
 
 func (s *DatabaseService) convertToChangelogs(ctx context.Context, d *store.DatabaseMessage, cs []*store.ChangelogMessage) ([]*v1pb.Changelog, error) {

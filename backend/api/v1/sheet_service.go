@@ -66,38 +66,7 @@ func (s *SheetService) CreateSheet(ctx context.Context, request *v1pb.CreateShee
 		return nil, status.Errorf(codes.NotFound, "project with resource id %q had deleted", projectResourceID)
 	}
 
-	var databaseUID *int
-	if request.Sheet.Database != "" {
-		instanceResourceID, databaseName, err := common.GetInstanceDatabaseID(request.Sheet.Database)
-		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
-		}
-		instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{
-			ResourceID: &instanceResourceID,
-		})
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get instance with resource id %q, err: %v", instanceResourceID, err)
-		}
-		if instance == nil {
-			return nil, status.Errorf(codes.NotFound, "instance with resource id %q not found", instanceResourceID)
-		}
-
-		find := &store.FindDatabaseMessage{
-			ProjectID:           &projectResourceID,
-			InstanceID:          &instanceResourceID,
-			DatabaseName:        &databaseName,
-			IgnoreCaseSensitive: store.IgnoreDatabaseAndTableCaseSensitive(instance),
-		}
-		database, err := s.store.GetDatabaseV2(ctx, find)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get database with name %q, err: %s", databaseName, err)
-		}
-		if database == nil {
-			return nil, status.Errorf(codes.NotFound, "database with name %q not found in project %q instance %q", databaseName, projectResourceID, instanceResourceID)
-		}
-		databaseUID = &database.UID
-	}
-	storeSheetCreate, err := convertToStoreSheetMessage(ctx, project.UID, databaseUID, principalID, request.Sheet)
+	storeSheetCreate, err := convertToStoreSheetMessage(ctx, project.UID, principalID, request.Sheet)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to convert sheet: %v", err)
 	}
@@ -110,6 +79,61 @@ func (s *SheetService) CreateSheet(ctx context.Context, request *v1pb.CreateShee
 		return nil, err
 	}
 	return v1pbSheet, nil
+}
+
+func (s *SheetService) BatchCreateSheet(ctx context.Context, request *v1pb.BatchCreateSheetRequest) (*v1pb.BatchCreateSheetResponse, error) {
+	if len(request.Requests) == 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "requests must be set")
+	}
+	user, ok := ctx.Value(common.UserContextKey).(*store.UserMessage)
+	if !ok {
+		return nil, status.Errorf(codes.Internal, "user not found")
+	}
+
+	projectResourceID, err := common.GetProjectID(request.Parent)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	project, err := s.store.GetProjectV2(ctx, &store.FindProjectMessage{
+		ResourceID: &projectResourceID,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get project with resource id %q, err: %v", projectResourceID, err)
+	}
+	if project == nil {
+		return nil, status.Errorf(codes.NotFound, "project with resource id %q not found", projectResourceID)
+	}
+	if project.Deleted {
+		return nil, status.Errorf(codes.NotFound, "project with resource id %q had deleted", projectResourceID)
+	}
+
+	var sheetCreates []*store.SheetMessage
+	for _, r := range request.Requests {
+		if r.Parent != "" && r.Parent != request.Parent {
+			return nil, status.Errorf(codes.InvalidArgument, "Sheet Parent %q does not match BatchCreateSheetRequest.Parent %q", r.Parent, request.Parent)
+		}
+
+		storeSheetCreate, err := convertToStoreSheetMessage(ctx, project.UID, user.ID, r.Sheet)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "failed to convert sheet: %v", err)
+		}
+
+		sheetCreates = append(sheetCreates, storeSheetCreate)
+	}
+
+	sheets, err := s.sheetManager.BatchCreateSheet(ctx, sheetCreates, project.UID, user.ID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to create sheet: %v", err)
+	}
+	response := &v1pb.BatchCreateSheetResponse{}
+	for _, sheet := range sheets {
+		v1pbSheet, err := s.convertToAPISheetMessage(ctx, sheet)
+		if err != nil {
+			return nil, err
+		}
+		response.Sheets = append(response.Sheets, v1pbSheet)
+	}
+	return response, nil
 }
 
 // GetSheet returns the requested sheet, cutoff the content if the content is too long and the `raw` flag in request is false.
@@ -238,20 +262,6 @@ func (s *SheetService) findSheet(ctx context.Context, find *store.FindSheetMessa
 }
 
 func (s *SheetService) convertToAPISheetMessage(ctx context.Context, sheet *store.SheetMessage) (*v1pb.Sheet, error) {
-	databaseParent := ""
-	if sheet.DatabaseUID != nil {
-		database, err := s.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{
-			UID: sheet.DatabaseUID,
-		})
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get database: %v", err)
-		}
-		if database == nil {
-			return nil, status.Errorf(codes.NotFound, "database with id %d not found", *sheet.DatabaseUID)
-		}
-		databaseParent = fmt.Sprintf("%s%s/%s%s", common.InstanceNamePrefix, database.InstanceID, common.DatabaseIDPrefix, database.DatabaseName)
-	}
-
 	creator, err := s.store.GetUserByID(ctx, sheet.CreatorID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get creator: %v", err)
@@ -283,7 +293,6 @@ func (s *SheetService) convertToAPISheetMessage(ctx context.Context, sheet *stor
 
 	return &v1pb.Sheet{
 		Name:        fmt.Sprintf("%s%s/%s%d", common.ProjectNamePrefix, project.ResourceID, common.SheetIDPrefix, sheet.UID),
-		Database:    databaseParent,
 		Title:       sheet.Title,
 		Creator:     fmt.Sprintf("users/%s", creator.Email),
 		CreateTime:  timestamppb.New(sheet.CreatedTime),
@@ -295,14 +304,13 @@ func (s *SheetService) convertToAPISheetMessage(ctx context.Context, sheet *stor
 	}, nil
 }
 
-func convertToStoreSheetMessage(ctx context.Context, projectUID int, databaseUID *int, creatorID int, sheet *v1pb.Sheet) (*store.SheetMessage, error) {
+func convertToStoreSheetMessage(ctx context.Context, projectUID int, creatorID int, sheet *v1pb.Sheet) (*store.SheetMessage, error) {
 	sheetMessage := &store.SheetMessage{
-		ProjectUID:  projectUID,
-		DatabaseUID: databaseUID,
-		CreatorID:   creatorID,
-		Title:       sheet.Title,
-		Statement:   string(sheet.Content),
-		Payload:     &storepb.SheetPayload{},
+		ProjectUID: projectUID,
+		CreatorID:  creatorID,
+		Title:      sheet.Title,
+		Statement:  string(sheet.Content),
+		Payload:    &storepb.SheetPayload{},
 	}
 	sheetMessage.Payload.Engine = convertEngine(sheet.Engine)
 	if sheet.Payload != nil {

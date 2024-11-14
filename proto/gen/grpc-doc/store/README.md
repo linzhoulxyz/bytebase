@@ -110,6 +110,7 @@
   
     - [ChangelogRevision.Op](#bytebase-store-ChangelogRevision-Op)
     - [ChangelogTask.Status](#bytebase-store-ChangelogTask-Status)
+    - [ChangelogTask.Type](#bytebase-store-ChangelogTask-Type)
   
 - [store/data_source.proto](#store_data_source-proto)
     - [DataSourceExternalSecret](#bytebase-store-DataSourceExternalSecret)
@@ -202,6 +203,7 @@
     - [DataSourceQueryPolicy](#bytebase-store-DataSourceQueryPolicy)
     - [DisableCopyDataPolicy](#bytebase-store-DisableCopyDataPolicy)
     - [EnvironmentTierPolicy](#bytebase-store-EnvironmentTierPolicy)
+    - [ExportDataPolicy](#bytebase-store-ExportDataPolicy)
     - [IamPolicy](#bytebase-store-IamPolicy)
     - [MaskData](#bytebase-store-MaskData)
     - [MaskingExceptionPolicy](#bytebase-store-MaskingExceptionPolicy)
@@ -982,6 +984,7 @@ DatabaseMetadata is the metadata for databases.
 | ----- | ---- | ----- | ----------- |
 | labels | [DatabaseMetadata.LabelsEntry](#bytebase-store-DatabaseMetadata-LabelsEntry) | repeated |  |
 | last_sync_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| backup_available | [bool](#bool) |  |  |
 
 
 
@@ -1900,15 +1903,16 @@ PostgreSQL: RANGE, LIST, HASH (https://www.postgresql.org/docs/current/ddl-parti
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| task_run | [string](#string) |  |  |
-| issue | [string](#string) |  |  |
-| revision | [int64](#int64) |  | optional |
+| task_run | [string](#string) |  | Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task}/taskruns/{taskrun} |
+| issue | [string](#string) |  | Format: projects/{project}/issues/{issue} |
+| revision | [int64](#int64) |  | The revision uid. optional |
 | changed_resources | [ChangedResources](#bytebase-store-ChangedResources) |  |  |
 | status | [ChangelogTask.Status](#bytebase-store-ChangelogTask-Status) |  |  |
 | prev_sync_history_id | [int64](#int64) |  |  |
 | sync_history_id | [int64](#int64) |  |  |
 | sheet | [string](#string) |  | The sheet that holds the content. Format: projects/{project}/sheets/{sheet} |
 | version | [string](#string) |  |  |
+| type | [ChangelogTask.Type](#bytebase-store-ChangelogTask-Type) |  |  |
 
 
 
@@ -1941,6 +1945,22 @@ PostgreSQL: RANGE, LIST, HASH (https://www.postgresql.org/docs/current/ddl-parti
 | PENDING | 1 |  |
 | DONE | 2 |  |
 | FAILED | 3 |  |
+
+
+
+<a name="bytebase-store-ChangelogTask-Type"></a>
+
+### ChangelogTask.Type
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| TYPE_UNSPECIFIED | 0 |  |
+| BASELINE | 1 |  |
+| MIGRATE | 2 |  |
+| MIGRATE_SDL | 3 |  |
+| MIGRATE_GHOST | 4 |  |
+| DATA | 6 |  |
 
 
  
@@ -3099,7 +3119,7 @@ InstanceRole is the API message for instance role.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| file | [string](#string) |  | Format: projects/{project}/releases/{release}/files/{file} {file} is URL path escaped. |
+| file | [string](#string) |  | Format: projects/{project}/releases/{release}/files/{id} |
 
 
 
@@ -3198,8 +3218,8 @@ DataSourceQueryPolicy is the policy configuration for running statements in the 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | admin_data_source_restriction | [DataSourceQueryPolicy.Restriction](#bytebase-store-DataSourceQueryPolicy-Restriction) |  |  |
-| enable_ddl | [bool](#bool) |  | Allow running DDL statements in the SQL editor. |
-| enable_dml | [bool](#bool) |  | Allow running DML statements in the SQL editor. |
+| disallow_ddl | [bool](#bool) |  | Disallow running DDL statements in the SQL editor. |
+| disallow_dml | [bool](#bool) |  | Disallow running DML statements in the SQL editor. |
 
 
 
@@ -3230,6 +3250,22 @@ EnvironmentTierPolicy is the tier of an environment.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | environment_tier | [EnvironmentTierPolicy.EnvironmentTier](#bytebase-store-EnvironmentTierPolicy-EnvironmentTier) |  |  |
+| color | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="bytebase-store-ExportDataPolicy"></a>
+
+### ExportDataPolicy
+ExportDataPolicy is the policy configuration for export data.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| disable | [bool](#bool) |  |  |
 
 
 
@@ -3663,7 +3699,8 @@ SlowQueryPolicy is the policy configuration for slow query.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | The name of the file. Expressed as a path, e.g. `2.2/V0001_create_table.sql` |
+| id | [string](#string) |  | The unique identifier for the file. |
+| path | [string](#string) |  | The path of the file. e.g. `2.2/V0001_create_table.sql`. |
 | sheet | [string](#string) |  | The sheet that holds the content. Format: projects/{project}/sheets/{sheet} |
 | sheet_sha256 | [string](#string) |  | The SHA256 hash value of the sheet. |
 | type | [ReleaseFileType](#bytebase-store-ReleaseFileType) |  |  |
@@ -3758,11 +3795,10 @@ SlowQueryPolicy is the policy configuration for slow query.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | release | [string](#string) |  | Format: projects/{project}/releases/{release} Can be empty. |
+| file | [string](#string) |  | Format: projects/{project}/releases/{release}/files/{id} Can be empty. |
+| version | [string](#string) |  |  |
 | sheet | [string](#string) |  | The sheet that holds the content. Format: projects/{project}/sheets/{sheet} |
 | sheet_sha256 | [string](#string) |  | The SHA256 hash value of the sheet. |
-| type | [ReleaseFileType](#bytebase-store-ReleaseFileType) |  |  |
-| version | [string](#string) |  |  |
-| file | [string](#string) |  | The name of the file in the release. Expressed as a path, e.g. `2.2/V0001_create_table.sql` Can be empty. |
 | task_run | [string](#string) |  | The task run associated with the revision. Can be empty. Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task}/taskRuns/{taskRun} |
 
 
@@ -4709,7 +4745,7 @@ TaskDatabaseUpdatePayload is the task payload for updating database (DDL &amp; D
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| file | [string](#string) |  | Format: projects/{project}/releases/{release}/files/{file} {file} is URL path escaped. |
+| file | [string](#string) |  | Format: projects/{project}/releases/{release}/files/{id} |
 
 
 

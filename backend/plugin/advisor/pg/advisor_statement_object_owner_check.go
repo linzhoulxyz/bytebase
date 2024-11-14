@@ -12,21 +12,21 @@ import (
 )
 
 var (
-	_ advisor.Advisor = (*BuiltinObjectOwnerCheckAdvisor)(nil)
+	_ advisor.Advisor = (*StatementObjectOwnerCheckAdvisor)(nil)
 )
 
 func init() {
-	advisor.Register(storepb.Engine_POSTGRES, advisor.PostgreSQLBuiltinObjectOwnerCheck, &BuiltinObjectOwnerCheckAdvisor{})
+	advisor.Register(storepb.Engine_POSTGRES, advisor.PostgreSQLStatementObjectOwnerCheck, &StatementObjectOwnerCheckAdvisor{})
 }
 
 const (
 	pgDatabaseOwner = "pg_database_owner"
 )
 
-type BuiltinObjectOwnerCheckAdvisor struct {
+type StatementObjectOwnerCheckAdvisor struct {
 }
 
-func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*storepb.Advice, error) {
+func (*StatementObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*storepb.Advice, error) {
 	var adviceList []*storepb.Advice
 	stmtList, ok := ctx.AST.([]ast.Node)
 	if !ok {
@@ -71,7 +71,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 					Status:  level,
 					Title:   title,
 					Content: fmt.Sprintf("Sequence \"%s\" is owned by \"%s\", but the current role is \"%s\".", n.Name.Name, owner, currentRole),
-					Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+					Code:    advisor.StatementObjectOwnerCheck.Int32(),
 					StartPosition: &storepb.Position{
 						Line: int32(stmt.LastLine()),
 					},
@@ -102,7 +102,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 					Status:  level,
 					Title:   title,
 					Content: fmt.Sprintf("Table \"%s\" is owned by \"%s\", but the current role is \"%s\".", n.Table.Name, owner, currentRole),
-					Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+					Code:    advisor.StatementObjectOwnerCheck.Int32(),
 					StartPosition: &storepb.Position{
 						Line: int32(stmt.LastLine()),
 					},
@@ -130,7 +130,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 					Status:  level,
 					Title:   title,
 					Content: fmt.Sprintf("Type \"%s\" is owned by \"%s\", but the current role is \"%s\".", n.Type.Name, owner, currentRole),
-					Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+					Code:    advisor.StatementObjectOwnerCheck.Int32(),
 					StartPosition: &storepb.Position{
 						Line: int32(stmt.LastLine()),
 					},
@@ -154,7 +154,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 					Status:  level,
 					Title:   title,
 					Content: fmt.Sprintf("Schema \"%s\" is owned by \"%s\", but the current role is \"%s\".", schemaName, owner, currentRole),
-					Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+					Code:    advisor.StatementObjectOwnerCheck.Int32(),
 					StartPosition: &storepb.Position{
 						Line: int32(stmt.LastLine()),
 					},
@@ -181,7 +181,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 					Status:  level,
 					Title:   title,
 					Content: fmt.Sprintf("Schema \"%s\" is owned by \"%s\", but the current role is \"%s\".", schemaName, owner, currentRole),
-					Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+					Code:    advisor.StatementObjectOwnerCheck.Int32(),
 					StartPosition: &storepb.Position{
 						Line: int32(stmt.LastLine()),
 					},
@@ -208,7 +208,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 					Status:  level,
 					Title:   title,
 					Content: fmt.Sprintf("Schema \"%s\" is owned by \"%s\", but the current role is \"%s\".", schemaName, owner, currentRole),
-					Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+					Code:    advisor.StatementObjectOwnerCheck.Int32(),
 					StartPosition: &storepb.Position{
 						Line: int32(stmt.LastLine()),
 					},
@@ -221,7 +221,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 					Status:  level,
 					Title:   title,
 					Content: fmt.Sprintf("Database \"%s\" is owned by \"%s\", but the current role is \"%s\".", dbMetadata.GetName(), owner, currentRole),
-					Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+					Code:    advisor.StatementObjectOwnerCheck.Int32(),
 					StartPosition: &storepb.Position{
 						Line: int32(stmt.LastLine()),
 					},
@@ -248,7 +248,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 					Status:  level,
 					Title:   title,
 					Content: fmt.Sprintf("Schema \"%s\" is owned by \"%s\", but the current role is \"%s\".", schemaName, owner, currentRole),
-					Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+					Code:    advisor.StatementObjectOwnerCheck.Int32(),
 					StartPosition: &storepb.Position{
 						Line: int32(stmt.LastLine()),
 					},
@@ -275,7 +275,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 					Status:  level,
 					Title:   title,
 					Content: fmt.Sprintf("Schema \"%s\" is owned by \"%s\", but the current role is \"%s\".", schemaName, owner, currentRole),
-					Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+					Code:    advisor.StatementObjectOwnerCheck.Int32(),
 					StartPosition: &storepb.Position{
 						Line: int32(stmt.LastLine()),
 					},
@@ -302,7 +302,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 					Status:  level,
 					Title:   title,
 					Content: fmt.Sprintf("Schema \"%s\" is owned by \"%s\", but the current role is \"%s\".", schemaName, owner, currentRole),
-					Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+					Code:    advisor.StatementObjectOwnerCheck.Int32(),
 					StartPosition: &storepb.Position{
 						Line: int32(stmt.LastLine()),
 					},
@@ -329,7 +329,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 					Status:  level,
 					Title:   title,
 					Content: fmt.Sprintf("Schema \"%s\" is owned by \"%s\", but the current role is \"%s\".", schemaName, owner, currentRole),
-					Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+					Code:    advisor.StatementObjectOwnerCheck.Int32(),
 					StartPosition: &storepb.Position{
 						Line: int32(stmt.LastLine()),
 					},
@@ -356,7 +356,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 					Status:  level,
 					Title:   title,
 					Content: fmt.Sprintf("Schema \"%s\" is owned by \"%s\", but the current role is \"%s\".", schemaName, owner, currentRole),
-					Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+					Code:    advisor.StatementObjectOwnerCheck.Int32(),
 					StartPosition: &storepb.Position{
 						Line: int32(stmt.LastLine()),
 					},
@@ -384,7 +384,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 						Status:  level,
 						Title:   title,
 						Content: fmt.Sprintf("Schema \"%s\" is owned by \"%s\", but the current role is \"%s\".", schemaName, owner, currentRole),
-						Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+						Code:    advisor.StatementObjectOwnerCheck.Int32(),
 						StartPosition: &storepb.Position{
 							Line: int32(stmt.LastLine()),
 						},
@@ -413,7 +413,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 						Status:  level,
 						Title:   title,
 						Content: fmt.Sprintf("Schema \"%s\" is owned by \"%s\", but the current role is \"%s\".", schemaName, owner, currentRole),
-						Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+						Code:    advisor.StatementObjectOwnerCheck.Int32(),
 						StartPosition: &storepb.Position{
 							Line: int32(stmt.LastLine()),
 						},
@@ -435,7 +435,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 						Status:  level,
 						Title:   title,
 						Content: fmt.Sprintf("Schema \"%s\" is owned by \"%s\", but the current role is \"%s\".", schemaName, owner, currentRole),
-						Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+						Code:    advisor.StatementObjectOwnerCheck.Int32(),
 						StartPosition: &storepb.Position{
 							Line: int32(stmt.LastLine()),
 						},
@@ -464,7 +464,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 						Status:  level,
 						Title:   title,
 						Content: fmt.Sprintf("Schema \"%s\" is owned by \"%s\", but the current role is \"%s\".", schemaName, owner, currentRole),
-						Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+						Code:    advisor.StatementObjectOwnerCheck.Int32(),
 						StartPosition: &storepb.Position{
 							Line: int32(stmt.LastLine()),
 						},
@@ -484,21 +484,44 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 				if schemaMeta == nil {
 					continue
 				}
-				tableMeta := schemaMeta.GetTable(table.Name)
-				owner := tableMeta.GetOwner()
-				if owner == pgDatabaseOwner {
-					owner = dbMetadata.GetOwner()
-				}
-				if owner != currentRole {
-					adviceList = append(adviceList, &storepb.Advice{
-						Status:  level,
-						Title:   title,
-						Content: fmt.Sprintf("Table \"%s\" is owned by \"%s\", but the current role is \"%s\".", table.Name, owner, currentRole),
-						Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
-						StartPosition: &storepb.Position{
-							Line: int32(stmt.LastLine()),
-						},
-					})
+				switch table.Type {
+				case ast.TableTypeBaseTable:
+					tableMeta := schemaMeta.GetTable(table.Name)
+					if tableMeta == nil {
+						continue
+					}
+					owner := tableMeta.GetOwner()
+					if owner == pgDatabaseOwner {
+						owner = dbMetadata.GetOwner()
+					}
+					if owner != currentRole {
+						adviceList = append(adviceList, &storepb.Advice{
+							Status:  level,
+							Title:   title,
+							Content: fmt.Sprintf("Table \"%s\" is owned by \"%s\", but the current role is \"%s\".", table.Name, owner, currentRole),
+							Code:    advisor.StatementObjectOwnerCheck.Int32(),
+							StartPosition: &storepb.Position{
+								Line: int32(stmt.LastLine()),
+							},
+						})
+					}
+				default:
+					// todo: use view owner instead of schema owner
+					owner := schemaMeta.GetOwner()
+					if owner == pgDatabaseOwner {
+						owner = dbMetadata.GetOwner()
+					}
+					if owner != currentRole {
+						adviceList = append(adviceList, &storepb.Advice{
+							Status:  level,
+							Title:   title,
+							Content: fmt.Sprintf("Schema \"%s\" is owned by \"%s\", but the current role is \"%s\".", schemaName, owner, currentRole),
+							Code:    advisor.StatementObjectOwnerCheck.Int32(),
+							StartPosition: &storepb.Position{
+								Line: int32(stmt.LastLine()),
+							},
+						})
+					}
 				}
 			}
 		case *ast.DropTriggerStmt:
@@ -522,7 +545,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 					Status:  level,
 					Title:   title,
 					Content: fmt.Sprintf("Schema \"%s\" is owned by \"%s\", but the current role is \"%s\".", schemaName, owner, currentRole),
-					Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+					Code:    advisor.StatementObjectOwnerCheck.Int32(),
 					StartPosition: &storepb.Position{
 						Line: int32(stmt.LastLine()),
 					},
@@ -550,7 +573,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 						Status:  level,
 						Title:   title,
 						Content: fmt.Sprintf("Schema \"%s\" is owned by \"%s\", but the current role is \"%s\".", schemaName, owner, currentRole),
-						Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+						Code:    advisor.StatementObjectOwnerCheck.Int32(),
 						StartPosition: &storepb.Position{
 							Line: int32(stmt.LastLine()),
 						},
@@ -575,7 +598,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 					Status:  level,
 					Title:   title,
 					Content: fmt.Sprintf("Schema \"%s\" is owned by \"%s\", but the current role is \"%s\".", schemaName, owner, currentRole),
-					Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+					Code:    advisor.StatementObjectOwnerCheck.Int32(),
 					StartPosition: &storepb.Position{
 						Line: int32(stmt.LastLine()),
 					},
@@ -595,7 +618,7 @@ func (*BuiltinObjectOwnerCheckAdvisor) Check(ctx advisor.Context, _ string) ([]*
 					Status:  level,
 					Title:   title,
 					Content: fmt.Sprintf("Schema \"%s\" is owned by \"%s\", but the current role is \"%s\".", n.Schema, owner, currentRole),
-					Code:    advisor.BuiltinObjectOwnerCheck.Int32(),
+					Code:    advisor.StatementObjectOwnerCheck.Int32(),
 					StartPosition: &storepb.Position{
 						Line: int32(stmt.LastLine()),
 					},

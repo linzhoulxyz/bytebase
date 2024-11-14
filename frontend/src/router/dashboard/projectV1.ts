@@ -6,9 +6,12 @@ import { PROJECT_V1_ROUTE_DASHBOARD } from "./workspaceRoutes";
 export const PROJECT_V1_ROUTE_DETAIL = `${PROJECT_V1_ROUTE_DASHBOARD}.detail`;
 export const PROJECT_V1_ROUTE_DATABASES = `${PROJECT_V1_ROUTE_DASHBOARD}.database`;
 export const PROJECT_V1_ROUTE_MASKING_ACCESS = `${PROJECT_V1_ROUTE_DASHBOARD}.masking-access`;
+export const PROJECT_V1_ROUTE_MASKING_ACCESS_CREATE = `${PROJECT_V1_ROUTE_DASHBOARD}.masking-access.create`;
 export const PROJECT_V1_ROUTE_DATABASE_DETAIL = `${PROJECT_V1_ROUTE_DASHBOARD}.database.detail`;
 export const PROJECT_V1_ROUTE_DATABASE_CHANGE_HISTORY_DETAIL = `${PROJECT_V1_ROUTE_DASHBOARD}.database.change-history.detail`;
+export const PROJECT_V1_ROUTE_DATABASE_REVISION_DETAIL = `${PROJECT_V1_ROUTE_DASHBOARD}.database.revision.detail`;
 export const PROJECT_V1_ROUTE_DATABASE_GROUPS = `${PROJECT_V1_ROUTE_DASHBOARD}.database-group`;
+export const PROJECT_V1_ROUTE_DATABASE_GROUPS_CREATE = `${PROJECT_V1_ROUTE_DASHBOARD}.database-group.create`;
 export const PROJECT_V1_ROUTE_DATABASE_GROUP_DETAIL = `${PROJECT_V1_ROUTE_DASHBOARD}.database-group.detail`;
 export const PROJECT_V1_ROUTE_DEPLOYMENT_CONFIG = `${PROJECT_V1_ROUTE_DASHBOARD}.deployment-config`;
 export const PROJECT_V1_ROUTE_BRANCHES = `${PROJECT_V1_ROUTE_DASHBOARD}.branch`;
@@ -35,8 +38,12 @@ export const PROJECT_V1_ROUTE_MEMBERS = `${PROJECT_V1_ROUTE_DASHBOARD}.members`;
 export const PROJECT_V1_ROUTE_SETTINGS = `${PROJECT_V1_ROUTE_DASHBOARD}.settings`;
 export const PROJECT_V1_ROUTE_EXPORT_CENTER = `${PROJECT_V1_ROUTE_DASHBOARD}.export-center`;
 export const PROJECT_V1_ROUTE_REVIEW_CENTER = `${PROJECT_V1_ROUTE_DASHBOARD}.review-center`;
-export const PROJECT_V1_ROUTE_RELEASES = `${PROJECT_V1_ROUTE_DASHBOARD}.releases`;
+export const PROJECT_V1_ROUTE_RELEASES = `${PROJECT_V1_ROUTE_DASHBOARD}.release`;
+export const PROJECT_V1_ROUTE_RELEASE_CREATE = `${PROJECT_V1_ROUTE_DASHBOARD}.release.create`;
 export const PROJECT_V1_ROUTE_RELEASE_DETAIL = `${PROJECT_V1_ROUTE_DASHBOARD}.release.detail`;
+export const PROJECT_V1_ROUTE_ROLLOUTS = `${PROJECT_V1_ROUTE_DASHBOARD}.rollout`;
+export const PROJECT_V1_ROUTE_ROLLOUT_DETAIL = `${PROJECT_V1_ROUTE_ROLLOUTS}.detail`;
+export const PROJECT_V1_ROUTE_ROLLOUT_DETAIL_TASK_DETAIL = `${PROJECT_V1_ROUTE_ROLLOUT_DETAIL}.task.detail`;
 
 const projectV1Routes: RouteRecordRaw[] = [
   {
@@ -69,7 +76,6 @@ const projectV1Routes: RouteRecordRaw[] = [
       },
       {
         path: "masking-access",
-        name: PROJECT_V1_ROUTE_MASKING_ACCESS,
         meta: {
           overrideTitle: true,
           requiredProjectPermissionList: () => [
@@ -78,9 +84,26 @@ const projectV1Routes: RouteRecordRaw[] = [
             "bb.policies.get",
           ],
         },
-        component: () =>
-          import("@/views/project/ProjectDatabaseMaskingAccess.vue"),
         props: true,
+        children: [
+          {
+            path: "",
+            name: PROJECT_V1_ROUTE_MASKING_ACCESS,
+            component: () =>
+              import("@/views/project/ProjectDatabaseMaskingAccess.vue"),
+            props: true,
+          },
+          {
+            path: "create",
+            name: PROJECT_V1_ROUTE_MASKING_ACCESS_CREATE,
+            component: () =>
+              import("@/views/project/ProjectDatabaseMaskingAccessCreate.vue"),
+            props: true,
+            meta: {
+              requiredProjectPermissionList: () => ["bb.policies.create"],
+            },
+          },
+        ],
       },
       {
         path: "database-groups",
@@ -101,9 +124,21 @@ const projectV1Routes: RouteRecordRaw[] = [
             props: true,
           },
           {
+            path: "create",
+            name: PROJECT_V1_ROUTE_DATABASE_GROUPS_CREATE,
+            meta: {
+              overrideTitle: true,
+              requiredProjectPermissionList: () => ["bb.projects.update"],
+            },
+            component: () =>
+              import("@/views/project/ProjectDatabaseGroupCreate.vue"),
+            props: true,
+          },
+          {
             path: ":databaseGroupName",
             name: PROJECT_V1_ROUTE_DATABASE_GROUP_DETAIL,
-            component: () => import("@/views/DatabaseGroupDetail.vue"),
+            component: () =>
+              import("@/views/project/ProjectDatabaseGroupDetail.vue"),
             props: true,
           },
         ],
@@ -444,7 +479,7 @@ const projectV1Routes: RouteRecordRaw[] = [
             meta: {
               overrideTitle: true,
             },
-            component: () => import("@/views/DatabaseDetail.vue"),
+            component: () => import("@/views/DatabaseDetail"),
             props: true,
           },
           {
@@ -458,13 +493,34 @@ const projectV1Routes: RouteRecordRaw[] = [
                 "bb.changeHistories.get",
               ],
             },
-            component: () => import("@/views/ChangeHistoryDetail.vue"),
+            component: () =>
+              import("@/views/DatabaseDetail/ChangeHistoryDetail.vue"),
             props: (route) => ({
               ...route.params,
               project: `projects/${route.params.projectId}`,
               instance: `instances/${route.params.instanceId}`,
               database: `instances/${route.params.instanceId}/databases/${route.params.databaseName}`,
               changeHistoryId: route.params.changeHistoryId,
+            }),
+          },
+          {
+            path: "revisions/:revisionId",
+            name: PROJECT_V1_ROUTE_DATABASE_REVISION_DETAIL,
+            meta: {
+              overrideTitle: true,
+              requiredProjectPermissionList: () => [
+                "bb.projects.get",
+                "bb.databases.get",
+              ],
+            },
+            component: () =>
+              import("@/views/DatabaseDetail/RevisionDetail.vue"),
+            props: (route) => ({
+              ...route.params,
+              project: `projects/${route.params.projectId}`,
+              instance: `instances/${route.params.instanceId}`,
+              database: `instances/${route.params.instanceId}/databases/${route.params.databaseName}`,
+              revision: `instances/${route.params.instanceId}/databases/${route.params.databaseName}/revisions/${route.params.revisionId}`,
             }),
           },
         ],
@@ -519,6 +575,16 @@ const projectV1Routes: RouteRecordRaw[] = [
             props: true,
           },
           {
+            path: "new",
+            name: PROJECT_V1_ROUTE_RELEASE_CREATE,
+            meta: {
+              title: () => t("release.create"),
+              requiredProjectPermissionList: () => ["bb.projects.get"],
+            },
+            component: () => import("@/components/Release/ReleaseCreate/"),
+            props: true,
+          },
+          {
             path: ":releaseId",
             name: PROJECT_V1_ROUTE_RELEASE_DETAIL,
             meta: {
@@ -527,6 +593,56 @@ const projectV1Routes: RouteRecordRaw[] = [
             },
             component: () => import("@/components/Release/ReleaseDetail/"),
             props: true,
+          },
+        ],
+      },
+      {
+        path: "rollouts",
+        meta: {
+          overrideTitle: true,
+        },
+        props: true,
+        children: [
+          {
+            path: "",
+            name: PROJECT_V1_ROUTE_ROLLOUTS,
+            meta: {
+              overrideTitle: true,
+              requiredProjectPermissionList: () => ["bb.projects.get"],
+            },
+            component: () =>
+              import("@/views/project/ProjectRolloutDashboard.vue"),
+            props: true,
+          },
+          {
+            path: ":rolloutId",
+            component: () =>
+              import(
+                "@/components/Rollout/RolloutDetail/RolloutDetailLayout.vue"
+              ),
+            props: true,
+            children: [
+              {
+                path: "",
+                name: PROJECT_V1_ROUTE_ROLLOUT_DETAIL,
+                meta: {
+                  overrideTitle: true,
+                  requiredProjectPermissionList: () => ["bb.projects.get"],
+                },
+                component: () => import("@/components/Rollout/RolloutDetail/"),
+                props: true,
+              },
+              {
+                path: "stages/:stageId/tasks/:taskId",
+                name: PROJECT_V1_ROUTE_ROLLOUT_DETAIL_TASK_DETAIL,
+                meta: {
+                  overrideTitle: true,
+                },
+                component: () =>
+                  import("@/components/Rollout/RolloutDetail/TaskDetail/"),
+                props: true,
+              },
+            ],
           },
         ],
       },

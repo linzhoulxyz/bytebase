@@ -28,6 +28,8 @@ roles:
       - bb.databases.getSchema
       - bb.databases.list
       - bb.databases.query
+      - bb.databases.queryDDL
+      - bb.databases.queryDML
       - bb.databases.queryExplain
       - bb.databases.queryInfo
       - bb.databases.sync
@@ -92,6 +94,7 @@ roles:
       - bb.roles.update
       - bb.rollouts.create
       - bb.rollouts.get
+      - bb.rollouts.list
       - bb.rollouts.preview
       - bb.settings.get
       - bb.settings.list
@@ -154,6 +157,8 @@ roles:
       - bb.databases.getSchema
       - bb.databases.list
       - bb.databases.query
+      - bb.databases.queryDDL
+      - bb.databases.queryDML
       - bb.databases.queryExplain
       - bb.databases.queryInfo
       - bb.databases.sync
@@ -218,6 +223,7 @@ roles:
       - bb.roles.update
       - bb.rollouts.create
       - bb.rollouts.get
+      - bb.rollouts.list
       - bb.rollouts.preview
       - bb.settings.get
       - bb.settings.list
@@ -292,6 +298,8 @@ roles:
       - bb.databases.getSchema
       - bb.databases.list
       - bb.databases.query
+      - bb.databases.queryDDL
+      - bb.databases.queryDML
       - bb.databases.queryExplain
       - bb.databases.queryInfo
       - bb.databases.sync
@@ -315,6 +323,7 @@ roles:
       - bb.projects.update
       - bb.rollouts.create
       - bb.rollouts.get
+      - bb.rollouts.list
       - bb.rollouts.preview
       - bb.sheets.create
       - bb.sheets.get
@@ -363,6 +372,7 @@ roles:
       - bb.projects.getIamPolicy
       - bb.rollouts.create
       - bb.rollouts.get
+      - bb.rollouts.list
       - bb.rollouts.preview
       - bb.sheets.create
       - bb.sheets.get
@@ -379,6 +389,8 @@ roles:
       - bb.databases.getSchema
       - bb.databases.list
       - bb.databases.query
+      - bb.databases.queryDDL
+      - bb.databases.queryDML
       - bb.databases.queryExplain
       - bb.databases.queryInfo
       - bb.projects.get
@@ -416,6 +428,7 @@ roles:
       - bb.projects.get
       - bb.projects.getIamPolicy
       - bb.rollouts.get
+      - bb.rollouts.list
       - bb.sheets.get
       - bb.taskRuns.list
   - name: roles/projectViewer

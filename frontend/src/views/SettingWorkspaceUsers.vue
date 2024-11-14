@@ -10,7 +10,7 @@
       <NTabPane name="USERS">
         <template #tab>
           <div class="flex-1 flex space-x-2">
-            <p class="text-lg font-medium leading-7 text-main">
+            <p class="text-base font-medium leading-7 text-main">
               <span>{{ $t("common.users") }}</span>
               <span class="ml-1 font-normal text-control-light">
                 ({{ userStore.activeUserList.length }})
@@ -31,7 +31,7 @@
       <NTabPane name="GROUPS">
         <template #tab>
           <div>
-            <p class="text-lg font-medium leading-7 text-main">
+            <p class="text-base font-medium leading-7 text-main">
               <span>{{ $t("settings.members.groups.self") }}</span>
               <span class="ml-1 font-normal text-control-light">
                 ({{ groupStore.groupList.length }})
@@ -42,7 +42,6 @@
 
         <UserDataTableByGroup
           :groups="filteredGroupList"
-          :allow-edit="allowEditGroup"
           :on-click-user="onClickUser"
           @update-group="handleUpdateGroup"
         />
@@ -53,7 +52,7 @@
           <SearchBox v-model:value="state.activeUserFilterText" />
 
           <NButton
-            v-if="allowGetSCIMSetting"
+            v-if="allowGetSCIMSetting && allowCreateUser"
             class="capitalize"
             @click="
               () => {
@@ -177,6 +176,7 @@ import CreateUserDrawer from "@/components/User/Settings/CreateUserDrawer.vue";
 import UserDataTable from "@/components/User/Settings/UserDataTable/index.vue";
 import UserDataTableByGroup from "@/components/User/Settings/UserDataTableByGroup/index.vue";
 import { SearchBox } from "@/components/v2";
+import { WORKSPACE_ROUTE_USER_PROFILE } from "@/router/dashboard/workspaceRoutes";
 import {
   useSubscriptionV1Store,
   useUserStore,
@@ -193,7 +193,7 @@ import {
 } from "@/types";
 import { UserType, type User } from "@/types/proto/v1/auth_service";
 import { State } from "@/types/proto/v1/common";
-import type { Group } from "@/types/proto/v1/group";
+import type { Group } from "@/types/proto/v1/group_service";
 import { WorkspaceProfileSetting } from "@/types/proto/v1/setting_service";
 import { hasWorkspacePermissionV2, hasWorkspaceLevelRole } from "@/utils";
 
@@ -279,10 +279,6 @@ const allowCreateGroup = computed(() =>
 
 const allowCreateUser = computed(() => {
   return hasWorkspaceLevelRole(PresetRoleType.WORKSPACE_ADMIN);
-});
-
-const allowEditGroup = computed(() => {
-  return hasWorkspacePermissionV2("bb.groups.update");
 });
 
 onMounted(() => {
@@ -384,7 +380,11 @@ const handleCreateUser = () => {
 };
 
 const handleUpdateUser = (user: User) => {
-  state.editingUser = user;
-  state.showCreateUserDrawer = true;
+  router.push({
+    name: WORKSPACE_ROUTE_USER_PROFILE,
+    params: {
+      principalEmail: user.email,
+    },
+  });
 };
 </script>

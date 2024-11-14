@@ -29,7 +29,7 @@ import { useI18n } from "vue-i18n";
 import { BBAlert } from "@/bbkit";
 import { useAppFeature, useUserStore, useWorkspaceV1Store } from "@/store";
 import { type User } from "@/types/proto/v1/auth_service";
-import type { Group } from "@/types/proto/v1/group";
+import type { Group } from "@/types/proto/v1/group_service";
 import { copyServiceKeyToClipboardIfNeeded } from "../common";
 import GroupsCell from "./cells/GroupsCell.vue";
 import UserNameCell from "./cells/UserNameCell.vue";
@@ -110,8 +110,12 @@ const columns = computed(() => {
       render: (user: User) => {
         return h(UserOperationsCell, {
           user,
-          "onUpdate-user": () => {
-            emit("update-user", user);
+          "onClick-user": (user: User, e: MouseEvent) => {
+            if (props.onClickUser) {
+              props.onClickUser(user, e);
+            } else {
+              emit("update-user", user);
+            }
           },
         });
       },

@@ -76,12 +76,12 @@
     <div>
       <div class="w-full inline-flex items-center gap-x-2">
         <Switch
-          :value="dataSourceQueryPolicy?.enableDdl"
+          :value="!dataSourceQueryPolicy?.disallowDdl"
           :text="true"
           :disabled="!allowUpdatePolicy"
           @update:value="
             (on: boolean) => {
-              updateAdminDataSourceQueryRestrctionPolicy({ enableDdl: on });
+              updateAdminDataSourceQueryRestrctionPolicy({ disallowDdl: !on });
             }
           "
         />
@@ -91,12 +91,12 @@
       </div>
       <div class="w-full inline-flex items-center gap-x-2">
         <Switch
-          :value="dataSourceQueryPolicy?.enableDml"
+          :value="!dataSourceQueryPolicy?.disallowDml"
           :text="true"
           :disabled="!allowUpdatePolicy"
           @update:value="
             (on: boolean) => {
-              updateAdminDataSourceQueryRestrctionPolicy({ enableDml: on });
+              updateAdminDataSourceQueryRestrctionPolicy({ disallowDml: !on });
             }
           "
         />
@@ -187,10 +187,13 @@ const allowUpdatePolicy = computed(() => {
 });
 
 const updateDisableCopyDataPolicy = async (on: boolean) => {
-  await policyStore.createPolicy(props.resource, {
-    type: PolicyType.DISABLE_COPY_DATA,
-    disableCopyDataPolicy: {
-      active: on,
+  await policyStore.upsertPolicy({
+    parentPath: props.resource,
+    policy: {
+      type: PolicyType.DISABLE_COPY_DATA,
+      disableCopyDataPolicy: {
+        active: on,
+      },
     },
   });
   pushNotification({
@@ -220,7 +223,6 @@ const updateAdminDataSourceQueryRestrctionPolicy = async (
         ...policy,
       }),
     },
-    updateMask: ["payload"],
   });
   pushNotification({
     module: "bytebase",

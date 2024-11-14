@@ -119,6 +119,7 @@ message EnvironmentTierPolicy {
   }
 
   EnvironmentTier environment_tier = 1;
+  string color = 2;
 }
 
 // SlowQueryPolicy is the policy configuration for slow query.
@@ -129,6 +130,11 @@ message SlowQueryPolicy {
 // DisableCopyDataPolicy is the policy configuration for disabling copying data.
 message DisableCopyDataPolicy {
   bool active = 1;
+}
+
+// ExportDataPolicy is the policy configuration for export data.
+message ExportDataPolicy {
+  bool disable = 1;
 }
 
 // RestrictIssueCreationForSQLReviewPolicy is the policy configuration for restricting issue creation for SQL review.
@@ -147,8 +153,8 @@ message DataSourceQueryPolicy {
   }
   Restriction admin_data_source_restriction = 1;
 
-  // Allow running DDL statements in the SQL editor.
-  bool enable_ddl = 2;
-  // Allow running DML statements in the SQL editor.
-  bool enable_dml = 3;
+  // Disallow running DDL statements in the SQL editor.
+  bool disallow_ddl = 2;
+  // Disallow running DML statements in the SQL editor.
+  bool disallow_dml = 3;
 }

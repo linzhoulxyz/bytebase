@@ -454,14 +454,14 @@ export interface StringifyMetadataResponse {
 
 export interface SearchQueryHistoriesRequest {
   /**
-   * Not used. The maximum number of histories to return.
+   * The maximum number of histories to return.
    * The service may return fewer than this value.
-   * If unspecified, at most 100 history entries will be returned.
+   * If unspecified, at most 10 history entries will be returned.
    * The maximum value is 1000; values above 1000 will be coerced to 1000.
    */
   pageSize: number;
   /**
-   * Not used. A page token, received from a previous `ListQueryHistory` call.
+   * A page token, received from a previous `ListQueryHistory` call.
    * Provide this to retrieve the subsequent page.
    */
   pageToken: string;
@@ -3763,96 +3763,6 @@ export const SQLServiceDefinition = {
               101,
               114,
               121,
-            ]),
-          ],
-        },
-      },
-    },
-    execute: {
-      name: "Execute",
-      requestType: ExecuteRequest,
-      requestStream: false,
-      responseType: ExecuteResponse,
-      responseStream: false,
-      options: {
-        _unknownFields: {
-          800010: [
-            new Uint8Array([
-              20,
-              98,
-              98,
-              46,
-              100,
-              97,
-              116,
-              97,
-              98,
-              97,
-              115,
-              101,
-              115,
-              46,
-              101,
-              120,
-              101,
-              99,
-              117,
-              116,
-              101,
-            ]),
-          ],
-          800016: [new Uint8Array([1])],
-          800024: [new Uint8Array([1])],
-          578365826: [
-            new Uint8Array([
-              47,
-              58,
-              1,
-              42,
-              34,
-              42,
-              47,
-              118,
-              49,
-              47,
-              123,
-              110,
-              97,
-              109,
-              101,
-              61,
-              105,
-              110,
-              115,
-              116,
-              97,
-              110,
-              99,
-              101,
-              115,
-              47,
-              42,
-              47,
-              100,
-              97,
-              116,
-              97,
-              98,
-              97,
-              115,
-              101,
-              115,
-              47,
-              42,
-              125,
-              58,
-              101,
-              120,
-              101,
-              99,
-              117,
-              116,
-              101,
             ]),
           ],
         },

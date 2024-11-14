@@ -183,16 +183,18 @@ message ListPoliciesRequest {
 
   optional PolicyType policy_type = 2;
 
+  // Not used.
   // The maximum number of policies to return. The service may return fewer than
   // this value.
-  // If unspecified, at most 50 policies will be returned.
+  // If unspecified, at most 10 policies will be returned.
   // The maximum value is 1000; values above 1000 will be coerced to 1000.
   int32 page_size = 3;
 
-  // A page token, received from a previous `GetPolicies` call.
+  // Not used.
+  // A page token, received from a previous `ListPolicies` call.
   // Provide this to retrieve the subsequent page.
   //
-  // When paginating, all other parameters provided to `GetPolicies` must match
+  // When paginating, all other parameters provided to `ListPolicies` must match
   // the call that provided the page token.
   string page_token = 4;
 
@@ -243,6 +245,7 @@ message Policy {
     RestrictIssueCreationForSQLReviewPolicy restrict_issue_creation_for_sql_review_policy = 20;
     TagPolicy tag_policy = 21;
     DataSourceQueryPolicy data_source_query_policy = 22;
+    ExportDataPolicy export_data_policy = 23;
   }
 
   bool enforce = 13;
@@ -264,6 +267,7 @@ enum PolicyType {
   RESTRICT_ISSUE_CREATION_FOR_SQL_REVIEW = 12;
   TAG = 13;
   DATA_SOURCE_QUERY = 14;
+  DATA_EXPORT = 15;
 }
 
 enum PolicyResourceType {
@@ -290,6 +294,10 @@ message SlowQueryPolicy {
 
 message DisableCopyDataPolicy {
   bool active = 1;
+}
+
+message ExportDataPolicy {
+  bool disable = 1;
 }
 
 message MaskingPolicy {
@@ -380,8 +388,8 @@ message DataSourceQueryPolicy {
   }
   Restriction admin_data_source_restriction = 1;
 
-  // Allow running DDL statements in the SQL editor.
-  bool enable_ddl = 2;
-  // Allow running DML statements in the SQL editor.
-  bool enable_dml = 3;
+  // Disallow running DDL statements in the SQL editor.
+  bool disallow_ddl = 2;
+  // Disallow running DML statements in the SQL editor.
+  bool disallow_dml = 3;
 }

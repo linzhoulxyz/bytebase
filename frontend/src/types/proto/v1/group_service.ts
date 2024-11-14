@@ -2,7 +2,7 @@
 // versions:
 //   protoc-gen-ts_proto  v2.2.0
 //   protoc               unknown
-// source: v1/group.proto
+// source: v1/group_service.proto
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
@@ -23,13 +23,15 @@ export interface GetGroupRequest {
 
 export interface ListGroupsRequest {
   /**
+   * Not used.
    * The maximum number of groups to return. The service may return fewer than
    * this value.
-   * If unspecified, at most 50 groups will be returned.
+   * If unspecified, at most 10 groups will be returned.
    * The maximum value is 1000; values above 1000 will be coerced to 1000.
    */
   pageSize: number;
   /**
+   * Not used.
    * A page token, received from a previous `ListGroups` call.
    * Provide this to retrieve the subsequent page.
    *
@@ -969,7 +971,7 @@ export const GroupServiceDefinition = {
         _unknownFields: {
           8410: [new Uint8Array([4, 110, 97, 109, 101])],
           800010: [new Uint8Array([16, 98, 98, 46, 103, 114, 111, 117, 112, 115, 46, 100, 101, 108, 101, 116, 101])],
-          800016: [new Uint8Array([1])],
+          800016: [new Uint8Array([2])],
           578365826: [
             new Uint8Array([
               21,

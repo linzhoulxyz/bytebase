@@ -344,11 +344,11 @@ func (s *AuthService) UpdateUser(ctx context.Context, request *v1pb.UpdateUserRe
 			if err := validateEmail(request.User.Email, allowedDomains, user.Type == api.ServiceAccount); err != nil {
 				return nil, status.Errorf(codes.InvalidArgument, "invalid email %q, error: %v", request.User.Email, err)
 			}
-			user, err := s.store.GetUserByEmail(ctx, request.User.Email)
+			existedUser, err := s.store.GetUserByEmail(ctx, request.User.Email)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "failed to find user list, error: %v", err)
 			}
-			if user != nil {
+			if existedUser != nil && existedUser.ID != user.ID {
 				return nil, status.Errorf(codes.AlreadyExists, "email %s is already existed", request.User.Email)
 			}
 			patch.Email = &request.User.Email
@@ -802,6 +802,8 @@ func (s *AuthService) Login(ctx context.Context, request *v1pb.LoginRequest) (*v
 		slog.Error("failed to update user profile", log.BBError(err), slog.String("user", loginUser.Email))
 	}
 
+	response.User = convertToUser(loginUser)
+
 	s.metricReporter.Report(ctx, &metric.Metric{
 		Name:  metricapi.PrincipalLoginMetricName,
 		Value: 1,
@@ -1122,7 +1124,7 @@ func (s *AuthService) userCountGuard(ctx context.Context) error {
 	if err != nil {
 		return status.Error(codes.Internal, err.Error())
 	}
-	if int64(count) >= userLimit {
+	if count >= userLimit {
 		return status.Errorf(codes.ResourceExhausted, "reached the maximum user count %d", userLimit)
 	}
 	return nil

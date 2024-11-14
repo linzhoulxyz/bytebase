@@ -14,7 +14,8 @@
             ExportFormat.JSON,
             ExportFormat.XLSX,
           ]"
-          :disabled="!hasAuditLogFeature"
+          :tooltip="disableExportTip"
+          :disabled="!hasAuditLogFeature || !!disableExportTip"
           @export="handleExport"
         />
       </template>
@@ -23,7 +24,7 @@
     <PagedAuditLogTable
       v-if="hasAuditLogFeature"
       :search-audit-logs="searchAuditLogs"
-      session-key="bb.page-audit-log-table.settings-audit-log-v1-table"
+      :session-key="`bb.page-audit-log-table.settings-audit-log-v1-table.${projectId}`"
       :page-size="10"
     >
       <template #table="{ list }">
@@ -45,8 +46,10 @@
 </template>
 
 <script setup lang="ts">
+import dayjs from "dayjs";
 import type { BinaryLike } from "node:crypto";
 import { computed, reactive } from "vue";
+import { useI18n } from "vue-i18n";
 import AuditLogDataTable from "@/components/AuditLog/AuditLogDataTable.vue";
 import AuditLogSearch from "@/components/AuditLog/AuditLogSearch";
 import { buildSearchAuditLogParams } from "@/components/AuditLog/AuditLogSearch/utils";
@@ -54,7 +57,7 @@ import type { ExportOption } from "@/components/DataExportButton.vue";
 import DataExportButton from "@/components/DataExportButton.vue";
 import { FeatureAttention } from "@/components/FeatureGuard";
 import PagedAuditLogTable from "@/components/PagedAuditLogTable.vue";
-import { featureToRef, useAuditLogStore } from "@/store";
+import { featureToRef, useAuditLogStore, pushNotification } from "@/store";
 import { type SearchAuditLogsParams } from "@/types";
 import { ExportFormat } from "@/types/proto/v1/common";
 import type { SearchParams, SearchScope } from "@/utils";
@@ -82,7 +85,7 @@ const defaultSearchParams = () => {
 const state = reactive<LocalState>({
   params: defaultSearchParams(),
 });
-
+const { t } = useI18n();
 const hasAuditLogFeature = featureToRef("bb.feature.audit-log");
 
 const auditLogStore = useAuditLogStore();
@@ -94,14 +97,49 @@ const searchAuditLogs = computed((): SearchAuditLogsParams => {
   };
 });
 
+const disableExportTip = computed(() => {
+  if (
+    !searchAuditLogs.value.createdTsAfter ||
+    !searchAuditLogs.value.createdTsBefore
+  ) {
+    return t("audit-log.export-tooltip");
+  }
+  if (
+    searchAuditLogs.value.createdTsBefore -
+      searchAuditLogs.value.createdTsAfter >
+    30 * 24 * 60 * 60 * 1000
+  ) {
+    return t("audit-log.export-tooltip");
+  }
+  return "";
+});
+
 const handleExport = async (
   options: ExportOption,
-  callback: (content: BinaryLike | Blob, options: ExportOption) => void
+  callback: (content: BinaryLike | Blob, filename: string) => void
 ) => {
-  const content = await auditLogStore.exportAuditLogs(
-    searchAuditLogs.value,
-    options.format
-  );
-  callback(content, options);
+  let pageToken = "";
+  let i = 0;
+
+  while (i === 0 || pageToken !== "") {
+    i++;
+    const { content, nextPageToken } = await auditLogStore.exportAuditLogs({
+      search: searchAuditLogs.value,
+      format: options.format,
+      pageSize: 10000,
+    });
+    pageToken = nextPageToken;
+    callback(
+      content,
+      `audit-log${!pageToken && i === 1 ? "" : `.file${i}`}.${dayjs(new Date()).format("YYYY-MM-DDTHH-mm-ss")}`
+    );
+  }
+
+  pushNotification({
+    module: "bytebase",
+    style: "SUCCESS",
+    title: t("common.success"),
+    description: t("audit-log.export-finished"),
+  });
 };
 </script>

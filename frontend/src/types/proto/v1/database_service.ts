@@ -23,12 +23,6 @@ import {
   stateToNumber,
 } from "./common";
 import { InstanceResource } from "./instance_service";
-import {
-  ReleaseFileType,
-  releaseFileTypeFromJSON,
-  releaseFileTypeToJSON,
-  releaseFileTypeToNumber,
-} from "./release_service";
 
 export const protobufPackage = "bytebase.v1";
 
@@ -222,15 +216,14 @@ export interface ListInstanceDatabasesRequest {
   /**
    * The maximum number of databases to return. The service may return fewer than
    * this value.
-   * If unspecified, at most 50 databases will be returned.
-   * The maximum value is 1000; values above 1000 will be coerced to 1000.
+   * If unspecified, at most 10 databases will be returned.
    */
   pageSize: number;
   /**
-   * A page token, received from a previous `ListDatabases` call.
+   * A page token, received from a previous `ListInstanceDatabases` call.
    * Provide this to retrieve the subsequent page.
    *
-   * When paginating, all other parameters provided to `ListDatabases` must match
+   * When paginating, all other parameters provided to `ListInstanceDatabases` must match
    * the call that provided the page token.
    */
   pageToken: string;
@@ -263,8 +256,7 @@ export interface ListDatabasesRequest {
   /**
    * The maximum number of databases to return. The service may return fewer than
    * this value.
-   * If unspecified, at most 50 databases will be returned.
-   * The maximum value is 1000; values above 1000 will be coerced to 1000.
+   * If unspecified, at most 10 databases will be returned.
    */
   pageSize: number;
   /**
@@ -1361,14 +1353,16 @@ export interface ListSecretsRequest {
    */
   parent: string;
   /**
-   * Not used. The maximum number of databases to return. The service may return fewer than
+   * Not used.
+   * The maximum number of secrets to return. The service may return fewer than
    * this value.
-   * If unspecified, at most 50 databases will be returned.
+   * If unspecified, at most 10 secrets will be returned.
    * The maximum value is 1000; values above 1000 will be coerced to 1000.
    */
   pageSize: number;
   /**
-   * Not used. A page token, received from a previous `ListSecrets` call.
+   * Not used.
+   * A page token, received from a previous `ListSecrets` call.
    * Provide this to retrieve the subsequent page.
    *
    * When paginating, all other parameters provided to `ListSecrets` must match
@@ -1740,7 +1734,7 @@ export interface ListChangeHistoriesRequest {
    */
   pageSize: number;
   /**
-   * Not used. A page token, received from a previous `ListChangeHistories` call.
+   * A page token, received from a previous `ListChangeHistories` call.
    * Provide this to retrieve the subsequent page.
    *
    * When paginating, all other parameters provided to `ListChangeHistories` must match
@@ -1840,6 +1834,13 @@ export interface ListRevisionsResponse {
   nextPageToken: string;
 }
 
+export interface CreateRevisionRequest {
+  /** Format: instances/{instance}/databases/{database} */
+  parent: string;
+  /** The revision to create. */
+  revision: Revision | undefined;
+}
+
 export interface GetRevisionRequest {
   /**
    * The name of the revision.
@@ -1870,6 +1871,12 @@ export interface Revision {
     | Timestamp
     | undefined;
   /**
+   * Format: projects/{project}/releases/{release}/files/{id}
+   * Can be empty.
+   */
+  file: string;
+  version: string;
+  /**
    * The sheet that holds the content.
    * Format: projects/{project}/sheets/{sheet}
    */
@@ -1879,14 +1886,6 @@ export interface Revision {
   /** The statement is used for preview purpose. */
   statement: string;
   statementSize: Long;
-  type: ReleaseFileType;
-  version: string;
-  /**
-   * The name of the file in the release.
-   * Expressed as a path, e.g. `2.2/V0001_create_table.sql`
-   * Can be empty.
-   */
-  file: string;
   /**
    * The issue associated with the revision.
    * Can be empty.
@@ -1972,7 +1971,7 @@ export interface GetChangelogRequest {
    * Format: instances/{instance}/databases/{database}/changelogs/{changelog}
    */
   name: string;
-  view: ChangeHistoryView;
+  view: ChangelogView;
   /** Format the schema dump into SDL format. */
   sdlFormat: boolean;
   /**
@@ -9943,6 +9942,82 @@ export const ListRevisionsResponse: MessageFns<ListRevisionsResponse> = {
   },
 };
 
+function createBaseCreateRevisionRequest(): CreateRevisionRequest {
+  return { parent: "", revision: undefined };
+}
+
+export const CreateRevisionRequest: MessageFns<CreateRevisionRequest> = {
+  encode(message: CreateRevisionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.parent !== "") {
+      writer.uint32(10).string(message.parent);
+    }
+    if (message.revision !== undefined) {
+      Revision.encode(message.revision, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateRevisionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateRevisionRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.parent = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.revision = Revision.decode(reader, reader.uint32());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateRevisionRequest {
+    return {
+      parent: isSet(object.parent) ? globalThis.String(object.parent) : "",
+      revision: isSet(object.revision) ? Revision.fromJSON(object.revision) : undefined,
+    };
+  },
+
+  toJSON(message: CreateRevisionRequest): unknown {
+    const obj: any = {};
+    if (message.parent !== "") {
+      obj.parent = message.parent;
+    }
+    if (message.revision !== undefined) {
+      obj.revision = Revision.toJSON(message.revision);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateRevisionRequest>): CreateRevisionRequest {
+    return CreateRevisionRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateRevisionRequest>): CreateRevisionRequest {
+    const message = createBaseCreateRevisionRequest();
+    message.parent = object.parent ?? "";
+    message.revision = (object.revision !== undefined && object.revision !== null)
+      ? Revision.fromPartial(object.revision)
+      : undefined;
+    return message;
+  },
+};
+
 function createBaseGetRevisionRequest(): GetRevisionRequest {
   return { name: "" };
 }
@@ -10063,13 +10138,12 @@ function createBaseRevision(): Revision {
     release: "",
     creator: "",
     createTime: undefined,
+    file: "",
+    version: "",
     sheet: "",
     sheetSha256: "",
     statement: "",
     statementSize: Long.ZERO,
-    type: ReleaseFileType.TYPE_UNSPECIFIED,
-    version: "",
-    file: "",
     issue: "",
     taskRun: "",
   };
@@ -10089,32 +10163,29 @@ export const Revision: MessageFns<Revision> = {
     if (message.createTime !== undefined) {
       Timestamp.encode(message.createTime, writer.uint32(34).fork()).join();
     }
-    if (message.sheet !== "") {
-      writer.uint32(42).string(message.sheet);
-    }
-    if (message.sheetSha256 !== "") {
-      writer.uint32(50).string(message.sheetSha256);
-    }
-    if (message.statement !== "") {
-      writer.uint32(58).string(message.statement);
-    }
-    if (!message.statementSize.equals(Long.ZERO)) {
-      writer.uint32(64).int64(message.statementSize.toString());
-    }
-    if (message.type !== ReleaseFileType.TYPE_UNSPECIFIED) {
-      writer.uint32(72).int32(releaseFileTypeToNumber(message.type));
+    if (message.file !== "") {
+      writer.uint32(42).string(message.file);
     }
     if (message.version !== "") {
-      writer.uint32(82).string(message.version);
+      writer.uint32(50).string(message.version);
     }
-    if (message.file !== "") {
-      writer.uint32(90).string(message.file);
+    if (message.sheet !== "") {
+      writer.uint32(58).string(message.sheet);
+    }
+    if (message.sheetSha256 !== "") {
+      writer.uint32(66).string(message.sheetSha256);
+    }
+    if (message.statement !== "") {
+      writer.uint32(74).string(message.statement);
+    }
+    if (!message.statementSize.equals(Long.ZERO)) {
+      writer.uint32(80).int64(message.statementSize.toString());
     }
     if (message.issue !== "") {
-      writer.uint32(98).string(message.issue);
+      writer.uint32(90).string(message.issue);
     }
     if (message.taskRun !== "") {
-      writer.uint32(106).string(message.taskRun);
+      writer.uint32(98).string(message.taskRun);
     }
     return writer;
   },
@@ -10159,59 +10230,52 @@ export const Revision: MessageFns<Revision> = {
             break;
           }
 
-          message.sheet = reader.string();
+          message.file = reader.string();
           continue;
         case 6:
           if (tag !== 50) {
             break;
           }
 
-          message.sheetSha256 = reader.string();
+          message.version = reader.string();
           continue;
         case 7:
           if (tag !== 58) {
             break;
           }
 
-          message.statement = reader.string();
+          message.sheet = reader.string();
           continue;
         case 8:
-          if (tag !== 64) {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.sheetSha256 = reader.string();
+          continue;
+        case 9:
+          if (tag !== 74) {
+            break;
+          }
+
+          message.statement = reader.string();
+          continue;
+        case 10:
+          if (tag !== 80) {
             break;
           }
 
           message.statementSize = Long.fromString(reader.int64().toString());
-          continue;
-        case 9:
-          if (tag !== 72) {
-            break;
-          }
-
-          message.type = releaseFileTypeFromJSON(reader.int32());
-          continue;
-        case 10:
-          if (tag !== 82) {
-            break;
-          }
-
-          message.version = reader.string();
           continue;
         case 11:
           if (tag !== 90) {
             break;
           }
 
-          message.file = reader.string();
+          message.issue = reader.string();
           continue;
         case 12:
           if (tag !== 98) {
-            break;
-          }
-
-          message.issue = reader.string();
-          continue;
-        case 13:
-          if (tag !== 106) {
             break;
           }
 
@@ -10232,13 +10296,12 @@ export const Revision: MessageFns<Revision> = {
       release: isSet(object.release) ? globalThis.String(object.release) : "",
       creator: isSet(object.creator) ? globalThis.String(object.creator) : "",
       createTime: isSet(object.createTime) ? fromJsonTimestamp(object.createTime) : undefined,
+      file: isSet(object.file) ? globalThis.String(object.file) : "",
+      version: isSet(object.version) ? globalThis.String(object.version) : "",
       sheet: isSet(object.sheet) ? globalThis.String(object.sheet) : "",
       sheetSha256: isSet(object.sheetSha256) ? globalThis.String(object.sheetSha256) : "",
       statement: isSet(object.statement) ? globalThis.String(object.statement) : "",
       statementSize: isSet(object.statementSize) ? Long.fromValue(object.statementSize) : Long.ZERO,
-      type: isSet(object.type) ? releaseFileTypeFromJSON(object.type) : ReleaseFileType.TYPE_UNSPECIFIED,
-      version: isSet(object.version) ? globalThis.String(object.version) : "",
-      file: isSet(object.file) ? globalThis.String(object.file) : "",
       issue: isSet(object.issue) ? globalThis.String(object.issue) : "",
       taskRun: isSet(object.taskRun) ? globalThis.String(object.taskRun) : "",
     };
@@ -10258,6 +10321,12 @@ export const Revision: MessageFns<Revision> = {
     if (message.createTime !== undefined) {
       obj.createTime = fromTimestamp(message.createTime).toISOString();
     }
+    if (message.file !== "") {
+      obj.file = message.file;
+    }
+    if (message.version !== "") {
+      obj.version = message.version;
+    }
     if (message.sheet !== "") {
       obj.sheet = message.sheet;
     }
@@ -10269,15 +10338,6 @@ export const Revision: MessageFns<Revision> = {
     }
     if (!message.statementSize.equals(Long.ZERO)) {
       obj.statementSize = (message.statementSize || Long.ZERO).toString();
-    }
-    if (message.type !== ReleaseFileType.TYPE_UNSPECIFIED) {
-      obj.type = releaseFileTypeToJSON(message.type);
-    }
-    if (message.version !== "") {
-      obj.version = message.version;
-    }
-    if (message.file !== "") {
-      obj.file = message.file;
     }
     if (message.issue !== "") {
       obj.issue = message.issue;
@@ -10299,15 +10359,14 @@ export const Revision: MessageFns<Revision> = {
     message.createTime = (object.createTime !== undefined && object.createTime !== null)
       ? Timestamp.fromPartial(object.createTime)
       : undefined;
+    message.file = object.file ?? "";
+    message.version = object.version ?? "";
     message.sheet = object.sheet ?? "";
     message.sheetSha256 = object.sheetSha256 ?? "";
     message.statement = object.statement ?? "";
     message.statementSize = (object.statementSize !== undefined && object.statementSize !== null)
       ? Long.fromValue(object.statementSize)
       : Long.ZERO;
-    message.type = object.type ?? ReleaseFileType.TYPE_UNSPECIFIED;
-    message.version = object.version ?? "";
-    message.file = object.file ?? "";
     message.issue = object.issue ?? "";
     message.taskRun = object.taskRun ?? "";
     return message;
@@ -10510,7 +10569,7 @@ export const ListChangelogsResponse: MessageFns<ListChangelogsResponse> = {
 };
 
 function createBaseGetChangelogRequest(): GetChangelogRequest {
-  return { name: "", view: ChangeHistoryView.CHANGE_HISTORY_VIEW_UNSPECIFIED, sdlFormat: false, concise: false };
+  return { name: "", view: ChangelogView.CHANGELOG_VIEW_UNSPECIFIED, sdlFormat: false, concise: false };
 }
 
 export const GetChangelogRequest: MessageFns<GetChangelogRequest> = {
@@ -10518,8 +10577,8 @@ export const GetChangelogRequest: MessageFns<GetChangelogRequest> = {
     if (message.name !== "") {
       writer.uint32(10).string(message.name);
     }
-    if (message.view !== ChangeHistoryView.CHANGE_HISTORY_VIEW_UNSPECIFIED) {
-      writer.uint32(16).int32(changeHistoryViewToNumber(message.view));
+    if (message.view !== ChangelogView.CHANGELOG_VIEW_UNSPECIFIED) {
+      writer.uint32(16).int32(changelogViewToNumber(message.view));
     }
     if (message.sdlFormat !== false) {
       writer.uint32(24).bool(message.sdlFormat);
@@ -10549,7 +10608,7 @@ export const GetChangelogRequest: MessageFns<GetChangelogRequest> = {
             break;
           }
 
-          message.view = changeHistoryViewFromJSON(reader.int32());
+          message.view = changelogViewFromJSON(reader.int32());
           continue;
         case 3:
           if (tag !== 24) {
@@ -10577,9 +10636,7 @@ export const GetChangelogRequest: MessageFns<GetChangelogRequest> = {
   fromJSON(object: any): GetChangelogRequest {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
-      view: isSet(object.view)
-        ? changeHistoryViewFromJSON(object.view)
-        : ChangeHistoryView.CHANGE_HISTORY_VIEW_UNSPECIFIED,
+      view: isSet(object.view) ? changelogViewFromJSON(object.view) : ChangelogView.CHANGELOG_VIEW_UNSPECIFIED,
       sdlFormat: isSet(object.sdlFormat) ? globalThis.Boolean(object.sdlFormat) : false,
       concise: isSet(object.concise) ? globalThis.Boolean(object.concise) : false,
     };
@@ -10590,8 +10647,8 @@ export const GetChangelogRequest: MessageFns<GetChangelogRequest> = {
     if (message.name !== "") {
       obj.name = message.name;
     }
-    if (message.view !== ChangeHistoryView.CHANGE_HISTORY_VIEW_UNSPECIFIED) {
-      obj.view = changeHistoryViewToJSON(message.view);
+    if (message.view !== ChangelogView.CHANGELOG_VIEW_UNSPECIFIED) {
+      obj.view = changelogViewToJSON(message.view);
     }
     if (message.sdlFormat !== false) {
       obj.sdlFormat = message.sdlFormat;
@@ -10608,7 +10665,7 @@ export const GetChangelogRequest: MessageFns<GetChangelogRequest> = {
   fromPartial(object: DeepPartial<GetChangelogRequest>): GetChangelogRequest {
     const message = createBaseGetChangelogRequest();
     message.name = object.name ?? "";
-    message.view = object.view ?? ChangeHistoryView.CHANGE_HISTORY_VIEW_UNSPECIFIED;
+    message.view = object.view ?? ChangelogView.CHANGELOG_VIEW_UNSPECIFIED;
     message.sdlFormat = object.sdlFormat ?? false;
     message.concise = object.concise ?? false;
     return message;
@@ -12581,6 +12638,80 @@ export const DatabaseServiceDefinition = {
               47,
               42,
               125,
+            ]),
+          ],
+        },
+      },
+    },
+    createRevision: {
+      name: "CreateRevision",
+      requestType: CreateRevisionRequest,
+      requestStream: false,
+      responseType: Revision,
+      responseStream: false,
+      options: {
+        _unknownFields: {
+          578365826: [
+            new Uint8Array([
+              58,
+              58,
+              8,
+              114,
+              101,
+              118,
+              105,
+              115,
+              105,
+              111,
+              110,
+              34,
+              46,
+              47,
+              118,
+              49,
+              47,
+              123,
+              112,
+              97,
+              114,
+              101,
+              110,
+              116,
+              61,
+              105,
+              110,
+              115,
+              116,
+              97,
+              110,
+              99,
+              101,
+              115,
+              47,
+              42,
+              47,
+              100,
+              97,
+              116,
+              97,
+              98,
+              97,
+              115,
+              101,
+              115,
+              47,
+              42,
+              125,
+              47,
+              114,
+              101,
+              118,
+              105,
+              115,
+              105,
+              111,
+              110,
+              115,
             ]),
           ],
         },

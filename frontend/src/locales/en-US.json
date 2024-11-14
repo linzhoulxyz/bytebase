@@ -92,10 +92,12 @@
     "updated-at": "Updated",
     "commit": "Commit",
     "statement": "Statement",
+    "statement-size": "Statement size",
     "sql-statement": "SQL statement",
     "snapshot": "Snapshot",
     "status": "Status",
     "stage": "Stage",
+    "stages": "Stages",
     "task": "Task",
     "tasks": "Tasks",
     "blocking-task": "Blocking task",
@@ -227,6 +229,7 @@
     "will-override-current-data": "Will override current data.",
     "roll-out": "Roll out",
     "uploading": "Uploading",
+    "upload": "Upload",
     "active": "Active",
     "added": "Added",
     "revoke": "Revoke",
@@ -674,6 +677,10 @@
           "only-admin-can-edit": "Only workspace admin can update watermark setting.",
           "enable": "Enable watermark"
         },
+        "data-export": {
+          "enable": "Enable data export",
+          "description": "Allow users to export data"
+        },
         "disallow-signup": {
           "enable": "Disallow self-service signup",
           "description": "Users cannot self-service signup and can only be invited by the workspace admin."
@@ -780,11 +787,11 @@
           "description": "Control how users perform database changes",
           "issue-mode": {
             "self": "Issue Mode (Governed)",
-            "description": "Use issue to request, review, roll out, and version database changes. Suitable for team collaboration and prod environments."
+            "description": "Use issue to request, review, roll out, and version database changes."
           },
           "sql-editor-mode": {
             "self": "SQL Editor Mode (Direct)",
-            "description": "Use SQL Editor to execute database changes directly. Suitable for the individual and non-prod environments."
+            "description": "Use SQL Editor to execute database changes directly."
           },
           "can-be-changed-later": "This setting can be changed anytime later.",
           "default-view-changed-to-sql-editor": "The workspace's default view has been changed to SQL Editor.",
@@ -931,7 +938,7 @@
       },
       "masking-level": {
         "self": "Masking Level",
-        "selet-level": "Select level",
+        "selet-level": "Select masking level",
         "masking_level_unspecified": "Follow global rules",
         "none": "None",
         "partial": "Partial",
@@ -939,6 +946,7 @@
       },
       "action": {
         "self": "Action",
+        "selet-action": "Select action",
         "query": "Query",
         "export": "Export"
       },
@@ -1281,7 +1289,7 @@
         "admin": "{environment} environment has not configured SQL Review Policy. {link}",
         "developer": "{environment} environment has not configured SQL Review Policy. Please ask your DBA to configure."
       },
-      "statement-is-too-large": "As the current statement size exceeds 1MB, the SQL check will be skipped.",
+      "statement-is-too-large": "As the current statement size exceeds 2MB, the SQL check will be skipped.",
       "back-to-edit": "Back to edit",
       "continue-anyway": "Continue anyway",
       "sql-review-violations": "SQL Review Violations"
@@ -1418,7 +1426,8 @@
     "successfully-synced-schema": "Successfully synced schema",
     "create": "Create database",
     "procedures": "Procedures",
-    "partitions": "Partitions"
+    "partitions": "Partitions",
+    "packages": "Packages"
   },
   "instance": {
     "select": "Select instance",
@@ -2213,7 +2222,7 @@
       "delete-success": "The GitOps connector is removed"
     },
     "masking-access": {
-      "self": "Access Masking",
+      "self": "Masking Access",
       "grant-access": "Grant Access",
       "revoke-access-title": "Remove both export and query access for {member}?"
     }
@@ -2984,6 +2993,8 @@
     "no-policy-set": "No SQL review policy",
     "create-policy": "Create policy",
     "select-review": "Select SQL review",
+    "select-review-rules": "Select SQL review rules",
+    "select-all": "Select all",
     "select-review-label": "You can attach an existed SQL review policy to the resource, or {create}.",
     "duplicate-policy": "Duplicate SQL Review Policy",
     "configure-policy": "Configure policy",
@@ -2991,6 +3002,7 @@
     "policy-created": "Successfully created the review policy.",
     "policy-create-failed": "Failed to create the review policy.",
     "policy-updated": "Successfully updated the review policy.",
+    "policy-update-failed": "Failed to update the review policy.",
     "policy-duplicated": "Successfully duplicated the review policy.",
     "rules": "Rules",
     "add-rules": "Add rules",
@@ -3043,11 +3055,14 @@
     "enabled-rules": "Enabled rules",
     "rule-detail": "Rule detail",
     "view-definition": "View definition",
-    "other-engines": "Other engines"
+    "other-engines": "Other engines",
+    "all-checks-passed": "All checkes passed."
   },
   "audit-log": {
     "no-logs": "No audit logs",
     "audit-log-detail": "Audit Log Details",
+    "export-finished": "Export finished",
+    "export-tooltip": "Must select start time and end time within 30 days",
     "table": {
       "created-ts": "Time",
       "created-time": "Created Time",
@@ -3406,9 +3421,10 @@
       "re-request-review-issue": "Re-request review issue?",
       "sent-back-issue": "Sent back issue",
       "re-requested-review": "re-requested issue review",
-      "no-one-matches-role": "No one matches the role, contact project owner to assign one.",
+      "no-one-matched": "No one matched",
       "any-n-role-can-approve": "Any {role} can approve",
-      "approved-by-n": "Approved by {approver}"
+      "approved-by-n": "Approved by {approver}",
+      "issue-creators-cannot-approve-their-own-issue": "Issue creators cannot approve their own issue"
     },
     "send-back": "Send back"
   },
@@ -3733,14 +3749,26 @@
     "self": "Release",
     "releases": "Releases",
     "files": "Files",
+    "create": "Create release",
+    "select": "Select release",
     "tasks-to-apply": "Tasks to apply",
     "out-of-order-files": "Out of order files",
     "applied-but-modifed-files": "Applied but modified files",
     "allow-out-of-order": "Allow out of order",
     "show-archived": "Show archived",
     "archive-this-release": "Archive this release",
+    "total-files": "Total {count} files",
     "no-tasks-to-apply": {
       "self": "No tasks to apply"
+    },
+    "actions": {
+      "new-file": "New file",
+      "import-from-release": "Import from release"
+    },
+    "messages": {
+      "succeed-to-create-release": "Succeed to create release",
+      "files-will-always-be-sorted-and-executed-in-version-order": "The files will always be sorted and executed in version order.",
+      "cannot-modify-files-after-created": "You cannot modify files after the release is created."
     }
   },
   "export-data": {

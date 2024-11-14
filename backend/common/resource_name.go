@@ -2,7 +2,6 @@ package common
 
 import (
 	"fmt"
-	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -219,6 +218,20 @@ func GetInstanceDatabaseRevisionID(name string) (string, string, int64, error) {
 		return "", "", 0, errors.Wrapf(err, "failed to convert %q to int64", tokens[2])
 	}
 	return tokens[0], tokens[1], revisionUID, nil
+}
+
+// GetInstanceDatabaseChangelogUID returns the instance ID, database ID, and changelog UID from a resource name.
+func GetInstanceDatabaseChangelogUID(name string) (string, string, int64, error) {
+	// the name should be instances/{instance-id}/databases/{database-id}/changelogs/{changelog-id}
+	tokens, err := GetNameParentTokens(name, InstanceNamePrefix, DatabaseIDPrefix, ChangelogPrefix)
+	if err != nil {
+		return "", "", 0, err
+	}
+	changelogUID, err := strconv.ParseInt(tokens[2], 10, 64)
+	if err != nil {
+		return "", "", 0, errors.Wrapf(err, "failed to convert %q to int64", tokens[2])
+	}
+	return tokens[0], tokens[1], changelogUID, nil
 }
 
 // GetUserID returns the user ID from a resource name.
@@ -540,19 +553,18 @@ func GetReviewConfigID(name string) (string, error) {
 	return tokens[0], nil
 }
 
-func GetReleaseUID(name string) (int64, error) {
+func GetProjectReleaseUID(name string) (string, int64, error) {
 	tokens, err := GetNameParentTokens(name, ProjectNamePrefix, ReleaseNamePrefix)
 	if err != nil {
-		return 0, err
+		return "", 0, err
 	}
 	releaseUID, err := strconv.ParseInt(tokens[1], 10, 64)
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed to convert %q to int64", tokens[1])
+		return "", 0, errors.Wrapf(err, "failed to convert %q to int64", tokens[1])
 	}
-	return releaseUID, nil
+	return tokens[0], releaseUID, nil
 }
 
-// The returned File is path unescaped.
 func GetProjectReleaseUIDFile(name string) (string, int64, string, error) {
 	tokens, err := GetNameParentTokens(name, ProjectNamePrefix, ReleaseNamePrefix, FileNamePrefix)
 	if err != nil {
@@ -562,11 +574,7 @@ func GetProjectReleaseUIDFile(name string) (string, int64, string, error) {
 	if err != nil {
 		return "", 0, "", errors.Wrapf(err, "failed to convert %q to int64", tokens[1])
 	}
-	file, err := url.PathUnescape(tokens[2])
-	if err != nil {
-		return "", 0, "", errors.Wrapf(err, "failed to path unescape file %v", tokens[2])
-	}
-	return tokens[0], releaseUID, file, nil
+	return tokens[0], releaseUID, tokens[2], nil
 }
 
 var branchRegexp = regexp.MustCompile("^projects/([^/]+)/branches/(.+)$")
@@ -700,11 +708,8 @@ func FormatReleaseName(projectID string, releaseUID int64) string {
 	return fmt.Sprintf("%s%s/%s%d", ProjectNamePrefix, projectID, ReleaseNamePrefix, releaseUID)
 }
 
-// input release=`projects/{project}/releases/{release}` and file=`{path}`.
-// return the file resource name `projects/{project}/releases/{release}/files/{path}`,
-// {path} is URL path escaped.
-func FormatReleaseFile(release string, file string) string {
-	return fmt.Sprintf("%s/%s%s", release, FileNamePrefix, url.PathEscape(file))
+func FormatReleaseFile(release string, fileID string) string {
+	return fmt.Sprintf("%s/%s%s", release, FileNamePrefix, fileID)
 }
 
 func FormatRevision(instanceID, databaseID string, revisionUID int64) string {

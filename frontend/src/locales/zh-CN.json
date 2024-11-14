@@ -92,10 +92,12 @@
     "updated-at": "更新于",
     "commit": "提交",
     "statement": "语句",
+    "statement-size": "语句大小",
     "sql-statement": "SQL @:{'common.statement'}",
     "snapshot": "快照",
     "status": "状态",
     "stage": "阶段",
+    "stages": "阶段",
     "task": "任务",
     "tasks": "任务",
     "blocking-task": "阻塞任务",
@@ -227,6 +229,7 @@
     "will-override-current-data": "将会覆盖当前数据。",
     "roll-out": "发布",
     "uploading": "上传中",
+    "upload": "上传",
     "active": "开启",
     "added": "已创建",
     "revoke": "撤销",
@@ -674,6 +677,10 @@
           "only-admin-can-edit": "仅管理员可以更新水印设置",
           "enable": "开启水印"
         },
+        "data-export": {
+          "enable": "启用数据导出",
+          "description": "允许用户导出数据"
+        },
         "disallow-signup": {
           "enable": "禁用自助注册",
           "description": "禁用之后，新用户将无法自助注册，只能通过管理员邀请来创建账户。"
@@ -780,7 +787,7 @@
           "description": "控制用户如何变更数据库",
           "issue-mode": {
             "self": "工单模式（管控）",
-            "description": "使用工单来提交，审核，发布，版本化数据库变更。适合团队协同及需要管控的环境。"
+            "description": "使用工单来提交，审核，发布，版本化数据库变更。"
           },
           "sql-editor-mode": {
             "self": "SQL 编辑器模式（直接）",
@@ -931,7 +938,7 @@
       },
       "masking-level": {
         "self": "脱敏程度",
-        "selet-level": "选择脱敏程度",
+        "selet-level": "选择掩蔽级别",
         "masking_level_unspecified": "遵循全局",
         "none": "明文",
         "partial": "半脱敏",
@@ -939,6 +946,7 @@
       },
       "action": {
         "self": "操作类型",
+        "selet-action": "选择操作",
         "query": "查询",
         "export": "导出"
       },
@@ -1281,7 +1289,7 @@
         "admin": "{environment} 环境没有配置 SQL 审核策略。{link}",
         "developer": "{environment} 环境没有配置 SQL 审核策略，请让您的 DBA 配置。"
       },
-      "statement-is-too-large": "当前语句大小超过 1MB，将跳过 SQL 检查。",
+      "statement-is-too-large": "当前语句大小超过 2MB，将跳过 SQL 检查。",
       "back-to-edit": "返回编辑",
       "continue-anyway": "仍然继续",
       "sql-review-violations": "违反的 SQL 审核规则"
@@ -1418,7 +1426,8 @@
     "successfully-synced-schema": "Schema 同步完成",
     "create": "创建数据库",
     "procedures": "存储过程",
-    "partitions": "分区"
+    "partitions": "分区",
+    "packages": "包"
   },
   "instance": {
     "select": "选择实例",
@@ -2213,7 +2222,7 @@
       "delete-success": "GitOps 连接已删除"
     },
     "masking-access": {
-      "self": "数据访问",
+      "self": "脱敏管控",
       "grant-access": "授予访问权限",
       "revoke-access-title": "是否删除 {member} 的导出和查询访问权限？"
     }
@@ -2984,6 +2993,8 @@
     "no-policy-set": "没有 SQL 审核策略",
     "create-policy": "创建审核策略",
     "select-review": "选择 SQL 审核",
+    "select-review-rules": "选择 SQL 审核规则",
+    "select-all": "选择全部",
     "select-review-label": "您可以将现有的 SQL 审核策略附加到资源，或者 {create}。",
     "duplicate-policy": "复制审核策略",
     "configure-policy": "配置审核策略",
@@ -2991,6 +3002,7 @@
     "policy-created": "审核策略已创建",
     "policy-create-failed": "审核策略创建失败",
     "policy-updated": "审核策略已更新",
+    "policy-update-failed": "审核策略更新失败",
     "policy-duplicated": "审核策略已复制",
     "rules": "规则",
     "add-rules": "添加规则",
@@ -3043,11 +3055,14 @@
     "enabled-rules": "开启的规则数",
     "rule-detail": "规则详情",
     "view-definition": "查看定义",
-    "other-engines": "其他数据库类型"
+    "other-engines": "其他数据库类型",
+    "all-checks-passed": "所有检查都通过了。"
   },
   "audit-log": {
     "no-logs": "暂无审计日志",
     "audit-log-detail": "审计详情",
+    "export-finished": "导出完成",
+    "export-tooltip": "必须选择 30 天范围内的开始和结束日期",
     "table": {
       "created-ts": "时间",
       "created-time": "创建时间",
@@ -3406,9 +3421,10 @@
       "re-request-review-issue": "请求再次审批工单？",
       "sent-back-issue": "退回工单",
       "re-requested-review": "再次请求审批工单",
-      "no-one-matches-role": "没有符合这个角色的用户，请联系项目管理员分配角色。",
+      "no-one-matched": "没有匹配到用户",
       "any-n-role-can-approve": "任意 {role} 可审批",
-      "approved-by-n": "已由 {approver} 批准"
+      "approved-by-n": "已由 {approver} 批准",
+      "issue-creators-cannot-approve-their-own-issue": "工单创建者不能审批自己的工单"
     },
     "send-back": "退回"
   },
@@ -3733,14 +3749,26 @@
     "self": "发布",
     "releases": "发布",
     "files": "文件",
+    "create": "创建发布",
+    "select": "选择发布",
     "tasks-to-apply": "待应用的任务",
     "out-of-order-files": "无序文件",
     "applied-but-modifed-files": "已应用但已修改的文件",
     "allow-out-of-order": "允许无序文件",
     "show-archived": "显示已归档",
     "archive-this-release": "归档此发布",
+    "total-files": "共 {count} 个文件",
     "no-tasks-to-apply": {
       "self": "没有可应用的任务"
+    },
+    "actions": {
+      "new-file": "新建文件",
+      "import-from-release": "从发布导入"
+    },
+    "messages": {
+      "succeed-to-create-release": "成功创建发布",
+      "files-will-always-be-sorted-and-executed-in-version-order": "文件将始终按照版本顺序排序和执行。",
+      "cannot-modify-files-after-created": "发布创建后您无法修改文件。"
     }
   },
   "export-data": {

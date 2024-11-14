@@ -2,23 +2,28 @@
   <NDropdown
     trigger="hover"
     :options="exportDropdownOptions"
-    :disabled="viewMode === 'DRAWER'"
+    :disabled="viewMode === 'DRAWER' || disabled"
     @select="tryExportViaDropdown"
   >
-    <NButton
-      :quaternary="size === 'tiny'"
-      :size="size"
-      :loading="state.isRequesting"
-      :disabled="state.isRequesting || disabled"
-      @click="handleClickExportButton"
-    >
-      <template #icon>
-        <heroicons-outline:download class="h-5 w-5" />
+    <NTooltip :disabled="!tooltip">
+      <template #trigger>
+        <NButton
+          :quaternary="size === 'tiny'"
+          :size="size"
+          :loading="state.isRequesting"
+          :disabled="state.isRequesting || disabled"
+          @click="handleClickExportButton"
+        >
+          <template #icon>
+            <heroicons-outline:download class="h-5 w-5" />
+          </template>
+          <span v-if="size !== 'tiny'">
+            {{ t("common.export") }}
+          </span>
+        </NButton>
       </template>
-      <span v-if="size !== 'tiny'">
-        {{ t("common.export") }}
-      </span>
-    </NButton>
+      <span class="text-sm"> {{ tooltip }} </span>
+    </NTooltip>
   </NDropdown>
 
   <Drawer v-if="viewMode === 'DRAWER'" v-model:show="state.showDrawer">
@@ -107,7 +112,6 @@
 
 <script lang="ts" setup>
 import { asyncComputed } from "@vueuse/core";
-import dayjs from "dayjs";
 import type { FormInst, FormRules } from "naive-ui";
 import {
   NButton,
@@ -116,6 +120,7 @@ import {
   NFormItem,
   NRadio,
   NRadioGroup,
+  NTooltip,
 } from "naive-ui";
 import type { BinaryLike } from "node:crypto";
 import { computed, reactive, ref, watch } from "vue";
@@ -123,7 +128,7 @@ import { useI18n } from "vue-i18n";
 import { BBModal, BBTextField } from "@/bbkit";
 import { pushNotification } from "@/store";
 import { ExportFormat, exportFormatToJSON } from "@/types/proto/v1/common";
-import { defer, isNullOrUndefined } from "@/utils";
+import { isNullOrUndefined } from "@/utils";
 import MaxRowCountSelect from "./GrantRequestPanel/MaxRowCountSelect.vue";
 import { Drawer, DrawerContent, ErrorTipsButton } from "./v2";
 
@@ -146,11 +151,13 @@ const props = withDefaults(
     supportFormats: ExportFormat[];
     allowSpecifyRowCount?: boolean;
     fileType: "zip" | "raw";
+    tooltip?: string;
   }>(),
   {
     size: "small",
     disabled: false,
     allowSpecifyRowCount: false,
+    tooltip: undefined,
   }
 );
 
@@ -164,7 +171,7 @@ const emit = defineEmits<{
   (
     event: "export",
     options: ExportOption,
-    download: (content: BinaryLike | Blob, options: ExportOption) => void
+    download: (content: BinaryLike | Blob, filename: string) => void
   ): Promise<void>;
 }>();
 
@@ -252,33 +259,21 @@ const handleClickExportButton = (e: MouseEvent) => {
   state.showDrawer = true;
 };
 
-const emitExportEventAsPromise = (
-  options: ExportOption,
-  download: (content: BinaryLike | Blob, options: ExportOption) => void
-) => {
-  const d = defer<void>();
-
-  emit(
-    "export",
-    options,
-    (content: BinaryLike | Blob, options: ExportOption) => {
-      d.resolve();
-      download(content, options);
-    }
-  );
-
-  return d.promise;
-};
-
 const doExport = async () => {
   if (state.isRequesting) {
     return;
   }
 
   state.isRequesting = true;
-
+  const options = { ...formData.value };
   try {
-    await emitExportEventAsPromise({ ...formData.value }, doDownload);
+    await emit(
+      "export",
+      options,
+      (content: BinaryLike | Blob, filename: string) => {
+        doDownload(content, options, filename);
+      }
+    );
   } catch (error) {
     pushNotification({
       module: "bytebase",
@@ -309,7 +304,11 @@ const getExportFileType = (format: ExportFormat) => {
   }
 };
 
-const doDownload = (content: BinaryLike | Blob, options: ExportOption) => {
+const doDownload = (
+  content: BinaryLike | Blob,
+  options: ExportOption,
+  filename: string
+) => {
   const isZip = downloadFileAsZip(options);
   const fileType = isZip
     ? "application/zip"
@@ -320,8 +319,6 @@ const doDownload = (content: BinaryLike | Blob, options: ExportOption) => {
   const url = window.URL.createObjectURL(blob);
 
   const fileFormat = exportFormatToJSON(options.format).toLowerCase();
-  const formattedDateString = dayjs(new Date()).format("YYYY-MM-DDTHH-mm-ss");
-  const filename = `export-data-${formattedDateString}`;
   const link = document.createElement("a");
   link.download = `${filename}.${isZip ? "zip" : fileFormat}`;
   link.href = url;

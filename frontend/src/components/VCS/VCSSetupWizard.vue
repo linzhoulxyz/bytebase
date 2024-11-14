@@ -1,19 +1,25 @@
 <template>
-  <VCSProviderBasicInfoPanel :create="true" :config="state.config" />
-  <div class="pt-4 mt-6 flex border-t justify-end">
-    <div class="space-x-3">
-      <NButton @click.prevent="cancelSetup">
-        {{ $t("common.cancel") }}
-      </NButton>
-      <NButton
-        type="primary"
-        :disabled="!allowCreate"
-        @click.prevent="tryFinishSetup"
-      >
-        {{ $t("common.confirm-and-add") }}
-      </NButton>
-    </div>
-  </div>
+  <FormLayout>
+    <template #body>
+      <VCSProviderBasicInfoPanel :create="true" :config="state.config" />
+    </template>
+    <template #footer>
+      <div class="flex justify-end items-center">
+        <div class="space-x-3">
+          <NButton v-if="showCancel" @click.prevent="cancelSetup">
+            {{ $t("common.cancel") }}
+          </NButton>
+          <NButton
+            type="primary"
+            :disabled="!allowCreate"
+            @click.prevent="tryFinishSetup"
+          >
+            {{ $t("common.confirm-and-add") }}
+          </NButton>
+        </div>
+      </div>
+    </template>
+  </FormLayout>
 </template>
 
 <script lang="ts" setup>
@@ -21,6 +27,7 @@ import { NButton } from "naive-ui";
 import { reactive, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
+import FormLayout from "@/components/v2/Form/FormLayout.vue";
 import { WORKSPACE_ROUTE_GITOPS } from "@/router/dashboard/workspaceRoutes";
 import { pushNotification, useVCSProviderStore } from "@/store";
 import type { VCSConfig } from "@/types";
@@ -29,14 +36,9 @@ import type { VCSProvider } from "@/types/proto/v1/vcs_provider_service";
 import { hasWorkspacePermissionV2 } from "@/utils";
 import VCSProviderBasicInfoPanel from "./VCSProviderBasicInfoPanel.vue";
 
-withDefaults(
-  defineProps<{
-    showCancel?: boolean;
-  }>(),
-  {
-    showCancel: true,
-  }
-);
+defineProps<{
+  showCancel: boolean;
+}>();
 
 interface LocalState {
   config: VCSConfig;
@@ -90,8 +92,6 @@ const tryFinishSetup = () => {
 };
 
 const cancelSetup = () => {
-  router.push({
-    name: WORKSPACE_ROUTE_GITOPS,
-  });
+  router.back();
 };
 </script>

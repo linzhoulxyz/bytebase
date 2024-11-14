@@ -144,7 +144,6 @@ export const useProjectSidebar = (
             title: t("project.masking-access.self"),
             path: PROJECT_V1_ROUTE_MASKING_ACCESS,
             type: "div",
-            hide: !isDev(),
           },
           {
             title: t("common.groups"),
@@ -217,6 +216,7 @@ export const useProjectSidebar = (
         hide:
           isDefaultProject.value ||
           databaseChangeMode.value === DatabaseChangeMode.EDITOR,
+        expand: true,
         children: [
           {
             title: t("common.gitops"),

@@ -81,8 +81,8 @@ type migrateContext struct {
 		// The release
 		// Format: projects/{project}/releases/{release}
 		release string
-		// The file path
-		// e.g. `2.2/V001.sql`
+		// The file
+		// Format: projects/{project}/releases/{release}/files/{id}
 		file string
 	}
 
@@ -94,8 +94,10 @@ type migrateContext struct {
 }
 
 func getMigrationInfo(ctx context.Context, stores *store.Store, profile *config.Profile, syncer *schemasync.Syncer, task *store.TaskMessage, migrationType db.MigrationType, statement string, schemaVersion model.Version, sheetID *int, taskRunUID int) (*db.MigrationInfo, *migrateContext, error) {
-	if schemaVersion.Version == "" {
-		return nil, nil, errors.Errorf("empty schema version")
+	if !(common.IsDev() && profile.DevelopmentVersioned) {
+		if schemaVersion.Version == "" {
+			return nil, nil, errors.Errorf("empty schema version")
+		}
 	}
 	instance, err := stores.GetInstanceV2(ctx, &store.FindInstanceMessage{UID: &task.InstanceID})
 	if err != nil {
@@ -165,12 +167,12 @@ func getMigrationInfo(ctx context.Context, stores *store.Store, profile *config.
 		}
 
 		if f := p.TaskReleaseSource.GetFile(); f != "" {
-			project, release, file, err := common.GetProjectReleaseUIDFile(f)
+			project, release, _, err := common.GetProjectReleaseUIDFile(f)
 			if err != nil {
 				return nil, nil, errors.Wrapf(err, "failed to parse file %s", f)
 			}
 			mc.release.release = common.FormatReleaseName(project, release)
-			mc.release.file = file
+			mc.release.file = f
 		}
 	}
 
@@ -552,6 +554,7 @@ func beginMigration(ctx context.Context, stores *store.Store, mi *db.MigrationIn
 				SyncHistoryId:     0,
 				Sheet:             mc.sheetName,
 				Version:           mc.version,
+				Type:              convertTaskType(mc.task.Type),
 			},
 		}}, api.SystemBotID)
 		if err != nil {
@@ -624,13 +627,11 @@ func endMigration(ctx context.Context, storeInstance *store.Store, startedNs int
 						SheetSha256: "",
 						TaskRun:     mc.taskRunName,
 						Version:     mc.version,
-						// TODO(p0ny): maybe remove this field.
-						Type: storepb.ReleaseFileType_TYPE_UNSPECIFIED,
 					},
 				}
 				if mc.sheet != nil {
 					r.Payload.Sheet = mc.sheetName
-					r.Payload.SheetSha256 = mc.sheet.Sha256
+					r.Payload.SheetSha256 = mc.sheet.GetSha256Hex()
 				}
 
 				revision, err := storeInstance.CreateRevision(ctx, r, mc.task.CreatorID)
@@ -673,4 +674,24 @@ func endMigration(ctx context.Context, storeInstance *store.Store, startedNs int
 		update.Status = &status
 	}
 	return storeInstance.UpdateInstanceChangeHistory(ctx, update)
+}
+
+func convertTaskType(t api.TaskType) storepb.ChangelogTask_Type {
+	switch t {
+	case api.TaskDatabaseDataUpdate:
+		return storepb.ChangelogTask_DATA
+	case api.TaskDatabaseSchemaBaseline:
+		return storepb.ChangelogTask_BASELINE
+	case api.TaskDatabaseSchemaUpdate:
+		return storepb.ChangelogTask_MIGRATE
+	case api.TaskDatabaseSchemaUpdateSDL:
+		return storepb.ChangelogTask_MIGRATE_SDL
+	case api.TaskDatabaseSchemaUpdateGhostCutover, api.TaskDatabaseSchemaUpdateGhostSync:
+		return storepb.ChangelogTask_MIGRATE_GHOST
+
+	case api.TaskGeneral:
+	case api.TaskDatabaseCreate:
+	case api.TaskDatabaseDataExport:
+	}
+	return storepb.ChangelogTask_TYPE_UNSPECIFIED
 }

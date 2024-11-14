@@ -11,7 +11,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/transform"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
@@ -138,6 +142,37 @@ func (driver *Driver) getServerVariable(ctx context.Context, varName string) (st
 		return "", errors.Errorf("expecting variable %s, but got %s", varName, varNameFound)
 	}
 	return value, nil
+}
+
+func containsInvisibleChars(data []byte) bool {
+	// Iterate over the byte slice as runes
+	for len(data) > 0 {
+		r, size := utf8.DecodeRune(data)
+		if r == utf8.RuneError && size == 1 {
+			// If the byte slice contains invalid UTF-8 characters, treat it as invisible
+			return true
+		}
+		// Check if the rune is not printable
+		if !unicode.IsPrint(r) {
+			return true
+		}
+		// Move to the next rune
+		data = data[size:]
+	}
+	return false
+}
+
+func utf8ToISO88591(utf8Str string) (string, error) {
+	// Create a transformer that encodes UTF-8 to ISO-8859-1
+	encoder := charmap.ISO8859_1.NewEncoder()
+
+	// Transform the input UTF-8 string into ISO-8859-1
+	isoBytes, _, err := transform.String(encoder, utf8Str)
+	if err != nil {
+		return "", err
+	}
+
+	return isoBytes, nil
 }
 
 // SyncDBSchema syncs a single database schema.
@@ -275,7 +310,7 @@ func (driver *Driver) SyncDBSchema(ctx context.Context) (*storepb.DatabaseSchema
 			IFNULL(CHARACTER_SET_NAME, ''),
 			IFNULL(COLLATION_NAME, ''),
 			QUOTE(COLUMN_COMMENT),
-			GENERATION_EXPRESSION,
+			convert(GENERATION_EXPRESSION using BINARY),
 			EXTRA
 		FROM information_schema.COLUMNS
 		WHERE TABLE_SCHEMA = ?
@@ -308,7 +343,7 @@ func (driver *Driver) SyncDBSchema(ctx context.Context) (*storepb.DatabaseSchema
 		column := &storepb.ColumnMetadata{}
 		var tableName, nullable, extra, tp string
 		var defaultStr sql.NullString
-		var generationExpr sql.NullString
+		var generationExpr []byte
 		if err := columnRows.Scan(
 			&tableName,
 			&column.Name,
@@ -339,15 +374,21 @@ func (driver *Driver) SyncDBSchema(ctx context.Context) (*storepb.DatabaseSchema
 		setColumnMetadataDefault(column, defaultStr, nullableBool, extra)
 		key := db.TableKey{Schema: "", Table: tableName}
 		columnMap[key] = append(columnMap[key], column)
-		if extra != "" && strings.Contains(strings.ToUpper(extra), virtualGenerated) && generationExpr.Valid && generationExpr.String != "" {
+		invisible := containsInvisibleChars(generationExpr)
+		iso88591Text, convertedErr := utf8ToISO88591(string(generationExpr))
+		text := string(generationExpr)
+		if invisible && convertedErr == nil {
+			text = iso88591Text
+		}
+		if extra != "" && strings.Contains(strings.ToUpper(extra), virtualGenerated) && len(generationExpr) != 0 {
 			column.Generation = &storepb.GenerationMetadata{
 				Type:       storepb.GenerationMetadata_TYPE_VIRTUAL,
-				Expression: generationExpr.String,
+				Expression: text,
 			}
-		} else if extra != "" && strings.Contains(strings.ToUpper(extra), storedGenerated) && generationExpr.Valid && generationExpr.String != "" {
+		} else if extra != "" && strings.Contains(strings.ToUpper(extra), storedGenerated) && len(generationExpr) != 0 {
 			column.Generation = &storepb.GenerationMetadata{
 				Type:       storepb.GenerationMetadata_TYPE_STORED,
-				Expression: generationExpr.String,
+				Expression: text,
 			}
 		}
 	}
@@ -1017,22 +1058,25 @@ func convertToStorepbTablePartitionType(tp string) storepb.TablePartitionMetadat
 func (driver *Driver) getForeignKeyList(ctx context.Context, databaseName string) (map[db.TableKey][]*storepb.ForeignKeyMetadata, error) {
 	fkQuery := `
 		SELECT
-			fks.TABLE_NAME,
-			fks.CONSTRAINT_NAME,
-			kcu.COLUMN_NAME,
-			'',
-			fks.REFERENCED_TABLE_NAME,
-			kcu.REFERENCED_COLUMN_NAME,
-			fks.DELETE_RULE,
-			fks.UPDATE_RULE,
-			fks.MATCH_OPTION
-		FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS fks
-			JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
-			ON fks.CONSTRAINT_SCHEMA = kcu.TABLE_SCHEMA
-				AND fks.TABLE_NAME = kcu.TABLE_NAME
-				AND fks.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
-		WHERE kcu.POSITION_IN_UNIQUE_CONSTRAINT IS NOT NULL AND LOWER(fks.CONSTRAINT_SCHEMA) = ?
-		ORDER BY fks.TABLE_NAME, fks.CONSTRAINT_NAME, kcu.ORDINAL_POSITION;
+			TABLE_NAME,
+			CONSTRAINT_NAME,
+			REFERENCED_TABLE_NAME,
+			DELETE_RULE,
+			UPDATE_RULE,
+			MATCH_OPTION
+		FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS
+		WHERE LOWER(CONSTRAINT_SCHEMA) = ?;
+	`
+
+	kcuQuery := `
+		SELECT
+			TABLE_NAME,
+			CONSTRAINT_NAME,
+			COLUMN_NAME,
+			REFERENCED_COLUMN_NAME
+		FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+		WHERE POSITION_IN_UNIQUE_CONSTRAINT IS NOT NULL AND LOWER(CONSTRAINT_SCHEMA) = ?
+		ORDER BY TABLE_NAME, CONSTRAINT_NAME, ORDINAL_POSITION;
 	`
 
 	fkRows, err := driver.db.QueryContext(ctx, fkQuery, databaseName)
@@ -1040,54 +1084,65 @@ func (driver *Driver) getForeignKeyList(ctx context.Context, databaseName string
 		return nil, util.FormatErrorWithQuery(err, fkQuery)
 	}
 	defer fkRows.Close()
-	foreignKeysMap := make(map[db.TableKey][]*storepb.ForeignKeyMetadata)
-	var buildingFk *storepb.ForeignKeyMetadata
-	var buildingTable string
+	fkMap := make(map[db.IndexKey]*storepb.ForeignKeyMetadata)
 	for fkRows.Next() {
 		var tableName string
 		var fk storepb.ForeignKeyMetadata
-		var column, referencedColumn string
 		if err := fkRows.Scan(
 			&tableName,
 			&fk.Name,
-			&column,
-			&fk.ReferencedSchema,
 			&fk.ReferencedTable,
-			&referencedColumn,
 			&fk.OnDelete,
 			&fk.OnUpdate,
 			&fk.MatchType,
 		); err != nil {
 			return nil, err
 		}
-
-		fk.Columns = append(fk.Columns, column)
-		fk.ReferencedColumns = append(fk.ReferencedColumns, referencedColumn)
-		if buildingFk == nil {
-			buildingTable = tableName
-			buildingFk = &fk
-		} else {
-			if tableName == buildingTable && buildingFk.Name == fk.Name {
-				buildingFk.Columns = append(buildingFk.Columns, fk.Columns[0])
-				buildingFk.ReferencedColumns = append(buildingFk.ReferencedColumns, fk.ReferencedColumns[0])
-			} else {
-				key := db.TableKey{Schema: "", Table: buildingTable}
-				foreignKeysMap[key] = append(foreignKeysMap[key], buildingFk)
-				buildingTable = tableName
-				buildingFk = &fk
-			}
-		}
+		key := db.IndexKey{Schema: "", Table: tableName, Index: fk.Name}
+		fkMap[key] = &fk
 	}
 	if err := fkRows.Err(); err != nil {
 		return nil, util.FormatErrorWithQuery(err, fkQuery)
 	}
 
-	if buildingFk != nil {
-		key := db.TableKey{Schema: "", Table: buildingTable}
-		foreignKeysMap[key] = append(foreignKeysMap[key], buildingFk)
+	kcuQueryRows, err := driver.db.QueryContext(ctx, kcuQuery, databaseName)
+	if err != nil {
+		return nil, util.FormatErrorWithQuery(err, kcuQuery)
+	}
+	defer kcuQueryRows.Close()
+	for kcuQueryRows.Next() {
+		var tableName, fkName, column, referencedColumn string
+		if err := kcuQueryRows.Scan(
+			&tableName,
+			&fkName,
+			&column,
+			&referencedColumn,
+		); err != nil {
+			return nil, err
+		}
+		key := db.IndexKey{Schema: "", Table: tableName, Index: fkName}
+		if fk, ok := fkMap[key]; ok {
+			fk.Columns = append(fk.Columns, column)
+			fk.ReferencedColumns = append(fk.ReferencedColumns, referencedColumn)
+		}
+	}
+	if err := kcuQueryRows.Err(); err != nil {
+		return nil, util.FormatErrorWithQuery(err, kcuQuery)
+	}
+	unordered := make(map[db.TableKey][]*storepb.ForeignKeyMetadata)
+	for key, fk := range fkMap {
+		tableKey := db.TableKey{Schema: "", Table: key.Table}
+		unordered[tableKey] = append(unordered[tableKey], fk)
 	}
 
-	return foreignKeysMap, nil
+	orderedResult := make(map[db.TableKey][]*storepb.ForeignKeyMetadata)
+	for key, fks := range unordered {
+		sort.Slice(fks, func(i, j int) bool {
+			return fks[i].Name < fks[j].Name
+		})
+		orderedResult[key] = fks
+	}
+	return orderedResult, nil
 }
 
 type slowLog struct {

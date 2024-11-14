@@ -1,11 +1,20 @@
 <template>
-  <div class="flex flex-col gap-y-2">
+  <div class="w-full flex flex-col gap-y-2">
+    <div class="w-full flex flex-row justify-end items-center">
+      <router-link :to="`/${project.name}/releases/new`">
+        <NButton type="primary">
+          <template #icon>
+            <PlusIcon />
+          </template>
+          {{ $t("release.create") }}
+        </NButton>
+      </router-link>
+    </div>
     <PagedReleaseTable
       :key="project.name"
       :session-key="`project-${project.name}-releases`"
       :project="project.name"
       :page-size="50"
-      :show-deleted="state.showArchived"
     >
       <template #table="{ releaseList, loading }">
         <ReleaseDataTable
@@ -15,17 +24,12 @@
         />
       </template>
     </PagedReleaseTable>
-    <p>
-      <NCheckbox v-model:checked="state.showArchived">
-        <span class="textinfolabel">{{ $t("release.show-archived") }}</span>
-      </NCheckbox>
-    </p>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { NCheckbox } from "naive-ui";
-import { reactive } from "vue";
+import { PlusIcon } from "lucide-vue-next";
+import { NButton } from "naive-ui";
 import type { ComposedProject } from "@/types";
 import PagedReleaseTable from "../Release/PagedReleaseTable.vue";
 import ReleaseDataTable from "../Release/ReleaseDataTable.vue";
@@ -33,12 +37,4 @@ import ReleaseDataTable from "../Release/ReleaseDataTable.vue";
 defineProps<{
   project: ComposedProject;
 }>();
-
-interface LocalState {
-  showArchived: boolean;
-}
-
-const state = reactive<LocalState>({
-  showArchived: false,
-});
 </script>

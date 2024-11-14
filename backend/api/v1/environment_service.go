@@ -74,7 +74,7 @@ func (s *EnvironmentService) CreateEnvironment(ctx context.Context, request *v1p
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	maximumEnvironmentLimit := s.licenseService.GetPlanLimitValue(ctx, enterprise.PlanLimitMaximumEnvironment)
-	if int64(len(environments)) >= maximumEnvironmentLimit {
+	if len(environments) >= maximumEnvironmentLimit {
 		return nil, status.Errorf(codes.ResourceExhausted, "current plan can create up to %d environments.", maximumEnvironmentLimit)
 	}
 
@@ -83,8 +83,9 @@ func (s *EnvironmentService) CreateEnvironment(ctx context.Context, request *v1p
 		Title:      request.Environment.Title,
 		Order:      request.Environment.Order,
 		Protected:  request.Environment.Tier == v1pb.EnvironmentTier_PROTECTED,
+		Color:      request.Environment.Color,
 	}
-	if pendingCreate.Protected {
+	if pendingCreate.Protected || pendingCreate.Color != "" {
 		if err := s.licenseService.IsFeatureEnabled(api.FeatureEnvironmentTierPolicy); err != nil {
 			return nil, status.Error(codes.PermissionDenied, err.Error())
 		}
@@ -130,12 +131,15 @@ func (s *EnvironmentService) UpdateEnvironment(ctx context.Context, request *v1p
 			patch.Order = &request.Environment.Order
 		case "tier":
 			protected := request.Environment.Tier == v1pb.EnvironmentTier_PROTECTED
-			if protected {
-				if err := s.licenseService.IsFeatureEnabled(api.FeatureEnvironmentTierPolicy); err != nil {
-					return nil, status.Error(codes.PermissionDenied, err.Error())
-				}
-			}
 			patch.Protected = &protected
+		case "color":
+			patch.Color = &request.Environment.Color
+		}
+	}
+
+	if patch.Protected != nil || patch.Color != nil {
+		if err := s.licenseService.IsFeatureEnabled(api.FeatureEnvironmentTierPolicy); err != nil {
+			return nil, status.Error(codes.PermissionDenied, err.Error())
 		}
 	}
 
@@ -235,5 +239,6 @@ func convertToEnvironment(environment *store.EnvironmentMessage) *v1pb.Environme
 		Title: environment.Title,
 		Order: environment.Order,
 		Tier:  tier,
+		Color: environment.Color,
 	}
 }

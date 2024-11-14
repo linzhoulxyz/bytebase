@@ -24,6 +24,19 @@ export interface CreateSheetRequest {
   sheet: Sheet | undefined;
 }
 
+export interface BatchCreateSheetRequest {
+  /**
+   * The parent resource where all sheets will be created.
+   * Format: projects/{project}
+   */
+  parent: string;
+  requests: CreateSheetRequest[];
+}
+
+export interface BatchCreateSheetResponse {
+  sheets: Sheet[];
+}
+
 export interface GetSheetRequest {
   /**
    * The name of the sheet to retrieve.
@@ -62,12 +75,6 @@ export interface Sheet {
    * Format: projects/{project}/sheets/{sheet}
    */
   name: string;
-  /**
-   * The database resource name.
-   * Format: instances/{instance}/databases/{database}
-   * If the database parent doesn't exist, the database field is empty.
-   */
-  database: string;
   /** The title of the sheet. */
   title: string;
   /**
@@ -237,6 +244,139 @@ export const CreateSheetRequest: MessageFns<CreateSheetRequest> = {
   },
 };
 
+function createBaseBatchCreateSheetRequest(): BatchCreateSheetRequest {
+  return { parent: "", requests: [] };
+}
+
+export const BatchCreateSheetRequest: MessageFns<BatchCreateSheetRequest> = {
+  encode(message: BatchCreateSheetRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.parent !== "") {
+      writer.uint32(10).string(message.parent);
+    }
+    for (const v of message.requests) {
+      CreateSheetRequest.encode(v!, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BatchCreateSheetRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBatchCreateSheetRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.parent = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.requests.push(CreateSheetRequest.decode(reader, reader.uint32()));
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BatchCreateSheetRequest {
+    return {
+      parent: isSet(object.parent) ? globalThis.String(object.parent) : "",
+      requests: globalThis.Array.isArray(object?.requests)
+        ? object.requests.map((e: any) => CreateSheetRequest.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: BatchCreateSheetRequest): unknown {
+    const obj: any = {};
+    if (message.parent !== "") {
+      obj.parent = message.parent;
+    }
+    if (message.requests?.length) {
+      obj.requests = message.requests.map((e) => CreateSheetRequest.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BatchCreateSheetRequest>): BatchCreateSheetRequest {
+    return BatchCreateSheetRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BatchCreateSheetRequest>): BatchCreateSheetRequest {
+    const message = createBaseBatchCreateSheetRequest();
+    message.parent = object.parent ?? "";
+    message.requests = object.requests?.map((e) => CreateSheetRequest.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseBatchCreateSheetResponse(): BatchCreateSheetResponse {
+  return { sheets: [] };
+}
+
+export const BatchCreateSheetResponse: MessageFns<BatchCreateSheetResponse> = {
+  encode(message: BatchCreateSheetResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.sheets) {
+      Sheet.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BatchCreateSheetResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBatchCreateSheetResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sheets.push(Sheet.decode(reader, reader.uint32()));
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BatchCreateSheetResponse {
+    return { sheets: globalThis.Array.isArray(object?.sheets) ? object.sheets.map((e: any) => Sheet.fromJSON(e)) : [] };
+  },
+
+  toJSON(message: BatchCreateSheetResponse): unknown {
+    const obj: any = {};
+    if (message.sheets?.length) {
+      obj.sheets = message.sheets.map((e) => Sheet.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BatchCreateSheetResponse>): BatchCreateSheetResponse {
+    return BatchCreateSheetResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BatchCreateSheetResponse>): BatchCreateSheetResponse {
+    const message = createBaseBatchCreateSheetResponse();
+    message.sheets = object.sheets?.map((e) => Sheet.fromPartial(e)) || [];
+    return message;
+  },
+};
+
 function createBaseGetSheetRequest(): GetSheetRequest {
   return { name: "", raw: false };
 }
@@ -388,7 +528,6 @@ export const UpdateSheetRequest: MessageFns<UpdateSheetRequest> = {
 function createBaseSheet(): Sheet {
   return {
     name: "",
-    database: "",
     title: "",
     creator: "",
     createTime: undefined,
@@ -404,9 +543,6 @@ export const Sheet: MessageFns<Sheet> = {
   encode(message: Sheet, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.name !== "") {
       writer.uint32(10).string(message.name);
-    }
-    if (message.database !== "") {
-      writer.uint32(18).string(message.database);
     }
     if (message.title !== "") {
       writer.uint32(26).string(message.title);
@@ -448,13 +584,6 @@ export const Sheet: MessageFns<Sheet> = {
           }
 
           message.name = reader.string();
-          continue;
-        case 2:
-          if (tag !== 18) {
-            break;
-          }
-
-          message.database = reader.string();
           continue;
         case 3:
           if (tag !== 26) {
@@ -524,7 +653,6 @@ export const Sheet: MessageFns<Sheet> = {
   fromJSON(object: any): Sheet {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
-      database: isSet(object.database) ? globalThis.String(object.database) : "",
       title: isSet(object.title) ? globalThis.String(object.title) : "",
       creator: isSet(object.creator) ? globalThis.String(object.creator) : "",
       createTime: isSet(object.createTime) ? fromJsonTimestamp(object.createTime) : undefined,
@@ -540,9 +668,6 @@ export const Sheet: MessageFns<Sheet> = {
     const obj: any = {};
     if (message.name !== "") {
       obj.name = message.name;
-    }
-    if (message.database !== "") {
-      obj.database = message.database;
     }
     if (message.title !== "") {
       obj.title = message.title;
@@ -577,7 +702,6 @@ export const Sheet: MessageFns<Sheet> = {
   fromPartial(object: DeepPartial<Sheet>): Sheet {
     const message = createBaseSheet();
     message.name = object.name ?? "";
-    message.database = object.database ?? "";
     message.title = object.title ?? "";
     message.creator = object.creator ?? "";
     message.createTime = (object.createTime !== undefined && object.createTime !== null)
@@ -848,6 +972,71 @@ export const SheetServiceDefinition = {
               101,
               116,
               115,
+            ]),
+          ],
+        },
+      },
+    },
+    batchCreateSheet: {
+      name: "BatchCreateSheet",
+      requestType: BatchCreateSheetRequest,
+      requestStream: false,
+      responseType: BatchCreateSheetResponse,
+      responseStream: false,
+      options: {
+        _unknownFields: {
+          800010: [new Uint8Array([16, 98, 98, 46, 115, 104, 101, 101, 116, 115, 46, 99, 114, 101, 97, 116, 101])],
+          800016: [new Uint8Array([1])],
+          578365826: [
+            new Uint8Array([
+              47,
+              58,
+              1,
+              42,
+              34,
+              42,
+              47,
+              118,
+              49,
+              47,
+              123,
+              112,
+              97,
+              114,
+              101,
+              110,
+              116,
+              61,
+              112,
+              114,
+              111,
+              106,
+              101,
+              99,
+              116,
+              115,
+              47,
+              42,
+              125,
+              47,
+              115,
+              104,
+              101,
+              101,
+              116,
+              115,
+              58,
+              98,
+              97,
+              116,
+              99,
+              104,
+              67,
+              114,
+              101,
+              97,
+              116,
+              101,
             ]),
           ],
         },

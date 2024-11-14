@@ -85,6 +85,7 @@ export interface GetUserRequest {
 
 export interface ListUsersRequest {
   /**
+   * Not used.
    * The maximum number of users to return. The service may return fewer than
    * this value.
    * If unspecified, at most 50 users will be returned.
@@ -92,6 +93,7 @@ export interface ListUsersRequest {
    */
   pageSize: number;
   /**
+   * Not used.
    * A page token, received from a previous `ListUsers` call.
    * Provide this to retrieve the subsequent page.
    *
@@ -203,6 +205,8 @@ export interface LoginResponse {
   token: string;
   mfaTempToken?: string | undefined;
   requireResetPassword: boolean;
+  /** The user of successful login. */
+  user: User | undefined;
 }
 
 export interface LogoutRequest {
@@ -1119,7 +1123,7 @@ export const OIDCIdentityProviderContext: MessageFns<OIDCIdentityProviderContext
 };
 
 function createBaseLoginResponse(): LoginResponse {
-  return { token: "", mfaTempToken: undefined, requireResetPassword: false };
+  return { token: "", mfaTempToken: undefined, requireResetPassword: false, user: undefined };
 }
 
 export const LoginResponse: MessageFns<LoginResponse> = {
@@ -1132,6 +1136,9 @@ export const LoginResponse: MessageFns<LoginResponse> = {
     }
     if (message.requireResetPassword !== false) {
       writer.uint32(24).bool(message.requireResetPassword);
+    }
+    if (message.user !== undefined) {
+      User.encode(message.user, writer.uint32(34).fork()).join();
     }
     return writer;
   },
@@ -1164,6 +1171,13 @@ export const LoginResponse: MessageFns<LoginResponse> = {
 
           message.requireResetPassword = reader.bool();
           continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.user = User.decode(reader, reader.uint32());
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1180,6 +1194,7 @@ export const LoginResponse: MessageFns<LoginResponse> = {
       requireResetPassword: isSet(object.requireResetPassword)
         ? globalThis.Boolean(object.requireResetPassword)
         : false,
+      user: isSet(object.user) ? User.fromJSON(object.user) : undefined,
     };
   },
 
@@ -1194,6 +1209,9 @@ export const LoginResponse: MessageFns<LoginResponse> = {
     if (message.requireResetPassword !== false) {
       obj.requireResetPassword = message.requireResetPassword;
     }
+    if (message.user !== undefined) {
+      obj.user = User.toJSON(message.user);
+    }
     return obj;
   },
 
@@ -1205,6 +1223,7 @@ export const LoginResponse: MessageFns<LoginResponse> = {
     message.token = object.token ?? "";
     message.mfaTempToken = object.mfaTempToken ?? undefined;
     message.requireResetPassword = object.requireResetPassword ?? false;
+    message.user = (object.user !== undefined && object.user !== null) ? User.fromPartial(object.user) : undefined;
     return message;
   },
 };
@@ -1843,6 +1862,7 @@ export const AuthServiceDefinition = {
       options: {
         _unknownFields: {
           800000: [new Uint8Array([1])],
+          800024: [new Uint8Array([1])],
           578365826: [
             new Uint8Array([
               20,

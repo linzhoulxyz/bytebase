@@ -127,7 +127,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 // SKIP_CHECK_THRESHOLD is the MaxSheetCheckSize in the backend.
-const SKIP_CHECK_THRESHOLD = 1024 * 1024;
+const SKIP_CHECK_THRESHOLD = 2 * 1024 * 1024;
 const isRunning = ref(false);
 const showDetailPanel = ref(false);
 const allowForceContinue = ref(true);
@@ -215,7 +215,7 @@ const runChecks = async () => {
     rawAdvices.value = errors.map((err) =>
       Advice.fromPartial({
         title: "Pre check",
-        status: Advice_Status.ERROR,
+        status: Advice_Status.WARNING,
         content: err,
       })
     );
@@ -229,7 +229,7 @@ const runChecks = async () => {
   const { statement, errors, fatal } = await props.getStatement();
   allowForceContinue.value = !fatal;
 
-  if (statement.length > SKIP_CHECK_THRESHOLD) {
+  if (new Blob([statement]).size > SKIP_CHECK_THRESHOLD) {
     return handleErrors([t("issue.sql-check.statement-is-too-large")]);
   }
   if (errors.length > 0) {

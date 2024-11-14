@@ -1,14 +1,13 @@
 <template>
-  <div class="-my-4">
+  <div class="w-full h-full flex flex-col">
     <StepTab
       :sticky="true"
       :current-index="state.currentStep"
       :step-list="STEP_LIST"
       :allow-next="allowNext"
       :finish-title="$t(`common.confirm-and-${policy ? 'update' : 'add'}`)"
-      header-class="!-top-4"
-      footer-class="!-bottom-4 !pt-4"
-      pane-class="!mb-4"
+      class="flex-1 overflow-hidden flex flex-col"
+      pane-class="flex-1 overflow-y-auto"
       @update:current-index="changeStepIndex"
       @cancel="onCancel"
       @finish="tryFinishSetup"
@@ -221,43 +220,30 @@ const tryFinishSetup = async () => {
     });
   }
 
-  const upsert = {
-    title: state.name,
-    ruleList: convertRuleMapToPolicyRuleList(state.selectedRuleMapByEngine),
-  };
-
-  if (isUpdate.value) {
-    await store.updateReviewPolicy({
-      id: props.policy!.id,
-      ...upsert,
+  try {
+    const policy = await store.upsertReviewPolicy({
+      title: state.name,
+      ruleList: convertRuleMapToPolicyRuleList(state.selectedRuleMapByEngine),
+      resources: state.attachedResources,
+      id: `${reviewConfigNamePrefix}${state.resourceId}`,
+      enforce: isUpdate.value ? undefined : true,
     });
-
     pushNotification({
       module: "bytebase",
       style: "SUCCESS",
-      title: t("sql-review.policy-updated"),
+      title: isUpdate.value
+        ? t("sql-review.policy-updated")
+        : t("sql-review.policy-created"),
     });
-    onCancel();
-  } else {
-    try {
-      const policy = await store.createReviewPolicy({
-        ...upsert,
-        resources: state.attachedResources,
-        id: `${reviewConfigNamePrefix}${state.resourceId}`,
-      });
-      pushNotification({
-        module: "bytebase",
-        style: "SUCCESS",
-        title: t("sql-review.policy-created"),
-      });
-      onCancel(policy);
-    } catch {
-      pushNotification({
-        module: "bytebase",
-        style: "CRITICAL",
-        title: t("sql-review.policy-create-failed"),
-      });
-    }
+    onCancel(policy);
+  } catch {
+    pushNotification({
+      module: "bytebase",
+      style: "CRITICAL",
+      title: isUpdate.value
+        ? t("sql-review.policy-update-failed")
+        : t("sql-review.policy-create-failed"),
+    });
   }
 };
 

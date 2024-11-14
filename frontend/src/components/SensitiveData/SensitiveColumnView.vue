@@ -47,11 +47,18 @@
             :disabled="
               state.pendingGrantAccessColumn.length === 0 ||
               !hasPermission ||
-              !hasSensitiveDataFeature ||
               selectedProjects.size !== 1
             "
             @click="onGrantAccessButtonClick"
           >
+            <template #icon>
+              <ShieldCheckIcon v-if="hasSensitiveDataFeature" class="w-4" />
+              <FeatureBadge
+                v-else
+                feature="bb.feature.sensitive-data"
+                custom-class="text-white"
+              />
+            </template>
             {{ $t("settings.sensitive-data.grant-access") }}
           </NButton>
         </template>
@@ -130,10 +137,16 @@
 
 <script lang="ts" setup>
 import { uniq } from "lodash-es";
+import { ShieldCheckIcon } from "lucide-vue-next";
 import { NButton, NInputGroup, NTooltip } from "naive-ui";
 import { computed, reactive, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
+import {
+  FeatureModal,
+  FeatureBadge,
+  FeatureAttentionForInstanceLicense,
+} from "@/components/FeatureGuard";
 import {
   ProjectSelect,
   InstanceSelect,
@@ -170,8 +183,6 @@ import {
   PolicyResourceType,
 } from "@/types/proto/v1/org_policy_service";
 import { autoDatabaseRoute, hasWorkspacePermissionV2 } from "@/utils";
-import { FeatureAttentionForInstanceLicense } from "../FeatureGuard";
-import FeatureModal from "../FeatureGuard/FeatureModal.vue";
 import NoDataPlaceholder from "../misc/NoDataPlaceholder.vue";
 import { EnvironmentTabFilter } from "../v2";
 import GrantAccessDrawer from "./GrantAccessDrawer.vue";
@@ -231,7 +242,7 @@ const selectedProjects = computed(() => {
 
 const updateList = async () => {
   state.isLoading = true;
-  const distinctDatabaseNameList = uniq(
+  const distinctDatabaseNameList: string[] = uniq(
     policyList.value.map((policy) => {
       const [databaseName, _] = getPolicyResourceNameAndType(policy.name);
       return databaseName;
@@ -287,12 +298,15 @@ const removeSensitiveColumn = async (sensitiveColumn: SensitiveColumn) => {
     // so we don't need to re-fetch the whole list.
     maskData.splice(index, 1);
 
-    await policyStore.updatePolicy(["payload"], {
-      name: policy.name,
-      type: PolicyType.MASKING,
-      resourceType: PolicyResourceType.DATABASE,
-      maskingPolicy: {
-        maskData,
+    await policyStore.upsertPolicy({
+      parentPath: sensitiveColumn.database.name,
+      policy: {
+        name: policy.name,
+        type: PolicyType.MASKING,
+        resourceType: PolicyResourceType.DATABASE,
+        maskingPolicy: {
+          maskData,
+        },
       },
     });
     await removeMaskingExceptions(sensitiveColumn);
@@ -318,7 +332,10 @@ const removeMaskingExceptions = async (sensitiveColumn: SensitiveColumn) => {
     ...(policy.maskingExceptionPolicy ?? {}),
     maskingExceptions: exceptions,
   };
-  await policyStore.updatePolicy(["payload"], policy);
+  await policyStore.upsertPolicy({
+    parentPath: sensitiveColumn.database.project,
+    policy,
+  });
 };
 
 const onColumnRemove = async (column: SensitiveColumn) => {
@@ -440,6 +457,10 @@ const onDatabaseSelect = (name: string | undefined) => {
 };
 
 const onGrantAccessButtonClick = () => {
+  if (!hasSensitiveDataFeature.value) {
+    state.showFeatureModal = true;
+    return;
+  }
   const instance = findInstanceWithoutLicense(state.pendingGrantAccessColumn);
   if (instance) {
     state.showFeatureModal = true;

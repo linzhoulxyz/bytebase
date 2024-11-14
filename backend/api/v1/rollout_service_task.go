@@ -208,7 +208,6 @@ func getTaskCreatesFromCreateDatabaseConfig(ctx context.Context, s *store.Store,
 			ProjectUID: project.UID,
 			Title:      fmt.Sprintf("Sheet for creating database %v", databaseName),
 			Statement:  statement,
-
 			Payload: &storepb.SheetPayload{
 				Engine: instance.Engine,
 			},
@@ -680,6 +679,9 @@ func getCreateDatabaseStatement(dbType storepb.Engine, c *storepb.PlanConfig_Cre
 func getOrDefaultSchemaVersion(v string) string {
 	if v != "" {
 		return v
+	}
+	if common.IsDev() && getProfile().DevelopmentVersioned {
+		return ""
 	}
 	return common.DefaultMigrationVersion().Version
 }

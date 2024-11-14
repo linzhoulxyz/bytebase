@@ -17,12 +17,21 @@ type PipelineMessage struct {
 	Name      string
 	Stages    []*StageMessage
 	// Output only.
-	ID int
+	ID         int
+	CreatorUID int
+	CreatedTs  int64
+	UpdaterUID int
+	UpdatedTs  int64
+	IssueID    *int
 }
 
 // PipelineFind is the API message for finding pipelines.
 type PipelineFind struct {
-	ID *int
+	ID        *int
+	ProjectID *string
+
+	Limit  *int
+	Offset *int
 }
 
 // CreatePipelineV2 creates a pipeline.
@@ -46,10 +55,13 @@ func (s *Store) CreatePipelineV2(ctx context.Context, create *PipelineMessage, c
 			$3,
 			$4
 		)
-		RETURNING id, name
+		RETURNING id, created_ts
 	`
 	pipeline := &PipelineMessage{
-		ProjectID: create.ProjectID,
+		ProjectID:  create.ProjectID,
+		CreatorUID: creatorID,
+		UpdaterUID: creatorID,
+		Name:       create.Name,
 	}
 	if err := tx.QueryRowContext(ctx, query,
 		create.ProjectID,
@@ -58,7 +70,7 @@ func (s *Store) CreatePipelineV2(ctx context.Context, create *PipelineMessage, c
 		create.Name,
 	).Scan(
 		&pipeline.ID,
-		&pipeline.Name,
+		&pipeline.CreatedTs,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, common.FormatDBErrorEmptyRowWithQuery(query)
@@ -70,6 +82,7 @@ func (s *Store) CreatePipelineV2(ctx context.Context, create *PipelineMessage, c
 		return nil, err
 	}
 
+	pipeline.UpdatedTs = pipeline.CreatedTs
 	s.pipelineCache.Add(pipeline.ID, pipeline)
 	return pipeline, nil
 }
@@ -99,14 +112,30 @@ func (s *Store) ListPipelineV2(ctx context.Context, find *PipelineFind) ([]*Pipe
 	if v := find.ID; v != nil {
 		where, args = append(where, fmt.Sprintf("pipeline.id = $%d", len(args)+1)), append(args, *v)
 	}
+	if v := find.ProjectID; v != nil {
+		where, args = append(where, fmt.Sprintf("project.resource_id = $%d", len(args)+1)), append(args, *v)
+	}
 	query := fmt.Sprintf(`
 		SELECT
 			pipeline.id,
+			pipeline.creator_id,
+			pipeline.created_ts,
+			pipeline.updater_id,
+			pipeline.updated_ts,
 			project.resource_id,
-			pipeline.name
+			pipeline.name,
+			issue.id
 		FROM pipeline
 		LEFT JOIN project ON pipeline.project_id = project.id
-		WHERE %s`, strings.Join(where, " AND "))
+		LEFT JOIN issue ON pipeline.id = issue.pipeline_id
+		WHERE %s
+		ORDER BY pipeline.id DESC`, strings.Join(where, " AND "))
+	if v := find.Limit; v != nil {
+		query += fmt.Sprintf(" LIMIT %d", *v)
+	}
+	if v := find.Offset; v != nil {
+		query += fmt.Sprintf(" OFFSET %d", *v)
+	}
 
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
@@ -125,8 +154,13 @@ func (s *Store) ListPipelineV2(ctx context.Context, find *PipelineFind) ([]*Pipe
 		var pipeline PipelineMessage
 		if err := rows.Scan(
 			&pipeline.ID,
+			&pipeline.CreatorUID,
+			&pipeline.CreatedTs,
+			&pipeline.UpdaterUID,
+			&pipeline.UpdatedTs,
 			&pipeline.ProjectID,
 			&pipeline.Name,
+			&pipeline.IssueID,
 		); err != nil {
 			return nil, err
 		}

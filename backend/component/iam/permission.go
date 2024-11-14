@@ -29,6 +29,8 @@ const (
 	PermissionDatabasesGetSchema         Permission = "bb.databases.getSchema"
 	PermissionDatabasesList              Permission = "bb.databases.list"
 	PermissionDatabasesQuery             Permission = "bb.databases.query"
+	PermissionDatabasesQueryDDL          Permission = "bb.databases.queryDDL"
+	PermissionDatabasesQueryDML          Permission = "bb.databases.queryDML"
 	PermissionDatabasesQueryExplain      Permission = "bb.databases.queryExplain"
 	PermissionDatabasesQueryInfo         Permission = "bb.databases.queryInfo"
 	PermissionDatabasesSync              Permission = "bb.databases.sync"
@@ -93,6 +95,7 @@ const (
 	PermissionRolesUpdate                Permission = "bb.roles.update"
 	PermissionRolloutsCreate             Permission = "bb.rollouts.create"
 	PermissionRolloutsGet                Permission = "bb.rollouts.get"
+	PermissionRolloutsList               Permission = "bb.rollouts.list"
 	PermissionRolloutsPreview            Permission = "bb.rollouts.preview"
 	PermissionSettingsGet                Permission = "bb.settings.get"
 	PermissionSettingsList               Permission = "bb.settings.list"
@@ -155,6 +158,8 @@ var allPermissions = []Permission{
 	PermissionDatabasesGetSchema,
 	PermissionDatabasesList,
 	PermissionDatabasesQuery,
+	PermissionDatabasesQueryDDL,
+	PermissionDatabasesQueryDML,
 	PermissionDatabasesQueryExplain,
 	PermissionDatabasesQueryInfo,
 	PermissionDatabasesSync,
@@ -219,6 +224,7 @@ var allPermissions = []Permission{
 	PermissionRolesUpdate,
 	PermissionRolloutsCreate,
 	PermissionRolloutsGet,
+	PermissionRolloutsList,
 	PermissionRolloutsPreview,
 	PermissionSettingsGet,
 	PermissionSettingsList,
