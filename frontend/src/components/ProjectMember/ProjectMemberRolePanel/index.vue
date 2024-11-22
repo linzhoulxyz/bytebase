@@ -305,7 +305,7 @@ const allowRevokeMember = computed(() => {
 
 const isRoleShouldShowDatabaseRelatedColumns = (role: string) => {
   return (
-    role === PresetRoleType.PROJECT_QUERIER ||
+    role === PresetRoleType.SQL_EDITOR_USER ||
     role === PresetRoleType.PROJECT_EXPORTER
   );
 };
@@ -530,14 +530,14 @@ const extractDatabaseName = (databaseResource?: DatabaseResource) => {
     return "*";
   }
   const database = databaseStore.getDatabaseByName(
-    String(databaseResource.databaseName)
+    databaseResource.databaseFullName
   );
   return database.databaseName;
 };
 
 const extractDatabase = (databaseResource: DatabaseResource) => {
   const database = databaseStore.getDatabaseByName(
-    String(databaseResource.databaseName)
+    databaseResource.databaseFullName
   );
   return database;
 };

@@ -173,7 +173,14 @@ func (e *StatementAdviseExecutor) runReview(
 		return nil, common.Wrapf(err, common.Internal, "failed to create a catalog")
 	}
 
-	driver, err := e.dbFactory.GetAdminDatabaseDriver(ctx, instance, database, db.ConnectionContext{UseDatabaseOwner: true})
+	useDatabaseOwner := false
+	if changeType != storepb.PlanCheckRunConfig_SQL_EDITOR {
+		useDatabaseOwner, err = getUseDatabaseOwner(ctx, e.store, instance, database)
+		if err != nil {
+			return nil, common.Wrapf(err, common.Internal, "failed to get use database owner")
+		}
+	}
+	driver, err := e.dbFactory.GetAdminDatabaseDriver(ctx, instance, database, db.ConnectionContext{UseDatabaseOwner: useDatabaseOwner})
 	if err != nil {
 		return nil, err
 	}
@@ -186,16 +193,17 @@ func (e *StatementAdviseExecutor) runReview(
 	classificationConfig := v1api.GetClassificationByProject(ctx, e.store, database.ProjectID)
 
 	adviceList, err := advisor.SQLReviewCheck(e.sheetManager, renderedStatement, reviewConfig.SqlReviewRules, advisor.SQLReviewCheckContext{
-		Charset:               dbSchema.GetMetadata().CharacterSet,
-		Collation:             dbSchema.GetMetadata().Collation,
-		DBSchema:              dbSchema.GetMetadata(),
-		ChangeType:            changeType,
-		DbType:                instance.Engine,
-		Catalog:               catalog,
-		Driver:                connection,
-		Context:               ctx,
-		PreUpdateBackupDetail: preUpdateBackupDetail,
-		ClassificationConfig:  classificationConfig,
+		Charset:                  dbSchema.GetMetadata().CharacterSet,
+		Collation:                dbSchema.GetMetadata().Collation,
+		DBSchema:                 dbSchema.GetMetadata(),
+		ChangeType:               changeType,
+		DbType:                   instance.Engine,
+		Catalog:                  catalog,
+		Driver:                   connection,
+		Context:                  ctx,
+		PreUpdateBackupDetail:    preUpdateBackupDetail,
+		ClassificationConfig:     classificationConfig,
+		UsePostgresDatabaseOwner: useDatabaseOwner,
 	})
 	if err != nil {
 		return nil, err

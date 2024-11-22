@@ -17,7 +17,7 @@
             @update:checked="toggleEngineCheck(item)"
           >
             <div class="flex items-center gap-x-1 text-sm text-gray-600">
-              <EngineIcon :engine="item" class="ml-0 mr-1" />
+              <EngineIcon :engine="item" custom-class="ml-0 mr-1" />
               <span
                 class="items-center text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-800"
               >
@@ -40,6 +40,9 @@
           :disabled="readonly"
           @click="createSchemaTemplate"
         >
+          <template #icon>
+            <PlusIcon class="h-4 w-4" />
+          </template>
           {{ $t("common.add") }}
         </NButton>
       </div>
@@ -63,6 +66,7 @@
 </template>
 
 <script lang="ts" setup>
+import { PlusIcon } from "lucide-vue-next";
 import { NButton, NCheckbox } from "naive-ui";
 import { v1 as uuidv1 } from "uuid";
 import { reactive, computed, onMounted } from "vue";

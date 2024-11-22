@@ -8,6 +8,9 @@
     </div>
     <div class="flex flex-row items-center justify-end gap-x-2">
       <NButton v-if="allowCreate" type="primary" @click="createConnector">
+        <template #icon>
+          <PlusIcon class="h-4 w-4" />
+        </template>
         {{ $t("project.gitops-connector.add") }}
       </NButton>
     </div>
@@ -21,6 +24,7 @@
 </template>
 
 <script setup lang="ts">
+import { PlusIcon } from "lucide-vue-next";
 import { NButton, NDataTable } from "naive-ui";
 import type { DataTableColumn } from "naive-ui";
 import { computed, h, watchEffect } from "vue";
@@ -37,7 +41,7 @@ import {
   useVCSProviderStore,
   useProjectByName,
 } from "@/store";
-import { projectNamePrefix } from "@/store/modules/v1/common";
+import { getProjectNameAndDatabaseGroupName, projectNamePrefix } from "@/store/modules/v1/common";
 import { getVCSConnectorId } from "@/store/modules/v1/common";
 import { VCSType } from "@/types/proto/v1/common";
 import type { VCSConnector } from "@/types/proto/v1/vcs_connector_service";
@@ -93,6 +97,12 @@ const columnList = computed((): DataTableColumn<VCSConnector>[] => {
       render: (connector) => getVCSConnectorId(connector.name).vcsConnectorId,
     },
     {
+      key: "databaseGroup",
+      title: t("database-group.self"),
+      resizable: true,
+      render: (connector) => getProjectNameAndDatabaseGroupName(connector.databaseGroup)[1] || '-',
+    },
+    {
       key: "repository",
       title: t("common.repository"),
       resizable: true,
@@ -102,6 +112,11 @@ const columnList = computed((): DataTableColumn<VCSConnector>[] => {
       key: "branch",
       title: t("common.branch"),
       render: (connector) => connector.branch,
+    },
+    {
+      key: "baseDirectory",
+      title: t("repository.base-directory"),
+      render: (connector) => connector.baseDirectory,
     },
   ];
 

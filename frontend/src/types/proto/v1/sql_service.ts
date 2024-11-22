@@ -25,31 +25,6 @@ import { DatabaseMetadata } from "./database_service";
 
 export const protobufPackage = "bytebase.v1";
 
-export interface ExecuteRequest {
-  /**
-   * The name is the instance name to execute the query against.
-   * Format: instances/{instance}/databases/{databaseName}
-   */
-  name: string;
-  /** The SQL statement to execute. */
-  statement: string;
-  /** The maximum number of rows to return. */
-  limit: number;
-  /** The timeout for the request. */
-  timeout:
-    | Duration
-    | undefined;
-  /** The default schema to execute the statement. Equals to the current schema in Oracle and search path in Postgres. */
-  schema?: string | undefined;
-}
-
-export interface ExecuteResponse {
-  /** The execute results. */
-  results: QueryResult[];
-  /** The execute advices. */
-  advices: Advice[];
-}
-
 export interface AdminExecuteRequest {
   /**
    * The name is the instance name to execute the query against.
@@ -97,6 +72,7 @@ export interface QueryRequest {
   explain: boolean;
   /** The default schema to search objects. Equals to the current schema in Oracle and search path in Postgres. */
   schema?: string | undefined;
+  queryOption: QueryOption | undefined;
 }
 
 export interface QueryResponse {
@@ -106,6 +82,64 @@ export interface QueryResponse {
   advices: Advice[];
   /** The query is allowed to be exported or not. */
   allowExport: boolean;
+}
+
+export interface QueryOption {
+  redisRunCommandsOn: QueryOption_RedisRunCommandsOn;
+}
+
+export enum QueryOption_RedisRunCommandsOn {
+  /** REDIS_RUN_COMMANDS_ON_UNSPECIFIED - UNSPECIFIED defaults to SINGLE_NODE. */
+  REDIS_RUN_COMMANDS_ON_UNSPECIFIED = "REDIS_RUN_COMMANDS_ON_UNSPECIFIED",
+  SINGLE_NODE = "SINGLE_NODE",
+  ALL_NODES = "ALL_NODES",
+  UNRECOGNIZED = "UNRECOGNIZED",
+}
+
+export function queryOption_RedisRunCommandsOnFromJSON(object: any): QueryOption_RedisRunCommandsOn {
+  switch (object) {
+    case 0:
+    case "REDIS_RUN_COMMANDS_ON_UNSPECIFIED":
+      return QueryOption_RedisRunCommandsOn.REDIS_RUN_COMMANDS_ON_UNSPECIFIED;
+    case 1:
+    case "SINGLE_NODE":
+      return QueryOption_RedisRunCommandsOn.SINGLE_NODE;
+    case 2:
+    case "ALL_NODES":
+      return QueryOption_RedisRunCommandsOn.ALL_NODES;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return QueryOption_RedisRunCommandsOn.UNRECOGNIZED;
+  }
+}
+
+export function queryOption_RedisRunCommandsOnToJSON(object: QueryOption_RedisRunCommandsOn): string {
+  switch (object) {
+    case QueryOption_RedisRunCommandsOn.REDIS_RUN_COMMANDS_ON_UNSPECIFIED:
+      return "REDIS_RUN_COMMANDS_ON_UNSPECIFIED";
+    case QueryOption_RedisRunCommandsOn.SINGLE_NODE:
+      return "SINGLE_NODE";
+    case QueryOption_RedisRunCommandsOn.ALL_NODES:
+      return "ALL_NODES";
+    case QueryOption_RedisRunCommandsOn.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export function queryOption_RedisRunCommandsOnToNumber(object: QueryOption_RedisRunCommandsOn): number {
+  switch (object) {
+    case QueryOption_RedisRunCommandsOn.REDIS_RUN_COMMANDS_ON_UNSPECIFIED:
+      return 0;
+    case QueryOption_RedisRunCommandsOn.SINGLE_NODE:
+      return 1;
+    case QueryOption_RedisRunCommandsOn.ALL_NODES:
+      return 2;
+    case QueryOption_RedisRunCommandsOn.UNRECOGNIZED:
+    default:
+      return -1;
+  }
 }
 
 export interface QueryResult {
@@ -588,201 +622,6 @@ export interface GenerateRestoreSQLResponse {
   statement: string;
 }
 
-function createBaseExecuteRequest(): ExecuteRequest {
-  return { name: "", statement: "", limit: 0, timeout: undefined, schema: undefined };
-}
-
-export const ExecuteRequest: MessageFns<ExecuteRequest> = {
-  encode(message: ExecuteRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.name !== "") {
-      writer.uint32(10).string(message.name);
-    }
-    if (message.statement !== "") {
-      writer.uint32(18).string(message.statement);
-    }
-    if (message.limit !== 0) {
-      writer.uint32(24).int32(message.limit);
-    }
-    if (message.timeout !== undefined) {
-      Duration.encode(message.timeout, writer.uint32(34).fork()).join();
-    }
-    if (message.schema !== undefined) {
-      writer.uint32(42).string(message.schema);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ExecuteRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseExecuteRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1:
-          if (tag !== 10) {
-            break;
-          }
-
-          message.name = reader.string();
-          continue;
-        case 2:
-          if (tag !== 18) {
-            break;
-          }
-
-          message.statement = reader.string();
-          continue;
-        case 3:
-          if (tag !== 24) {
-            break;
-          }
-
-          message.limit = reader.int32();
-          continue;
-        case 4:
-          if (tag !== 34) {
-            break;
-          }
-
-          message.timeout = Duration.decode(reader, reader.uint32());
-          continue;
-        case 5:
-          if (tag !== 42) {
-            break;
-          }
-
-          message.schema = reader.string();
-          continue;
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ExecuteRequest {
-    return {
-      name: isSet(object.name) ? globalThis.String(object.name) : "",
-      statement: isSet(object.statement) ? globalThis.String(object.statement) : "",
-      limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
-      timeout: isSet(object.timeout) ? Duration.fromJSON(object.timeout) : undefined,
-      schema: isSet(object.schema) ? globalThis.String(object.schema) : undefined,
-    };
-  },
-
-  toJSON(message: ExecuteRequest): unknown {
-    const obj: any = {};
-    if (message.name !== "") {
-      obj.name = message.name;
-    }
-    if (message.statement !== "") {
-      obj.statement = message.statement;
-    }
-    if (message.limit !== 0) {
-      obj.limit = Math.round(message.limit);
-    }
-    if (message.timeout !== undefined) {
-      obj.timeout = Duration.toJSON(message.timeout);
-    }
-    if (message.schema !== undefined) {
-      obj.schema = message.schema;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<ExecuteRequest>): ExecuteRequest {
-    return ExecuteRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<ExecuteRequest>): ExecuteRequest {
-    const message = createBaseExecuteRequest();
-    message.name = object.name ?? "";
-    message.statement = object.statement ?? "";
-    message.limit = object.limit ?? 0;
-    message.timeout = (object.timeout !== undefined && object.timeout !== null)
-      ? Duration.fromPartial(object.timeout)
-      : undefined;
-    message.schema = object.schema ?? undefined;
-    return message;
-  },
-};
-
-function createBaseExecuteResponse(): ExecuteResponse {
-  return { results: [], advices: [] };
-}
-
-export const ExecuteResponse: MessageFns<ExecuteResponse> = {
-  encode(message: ExecuteResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.results) {
-      QueryResult.encode(v!, writer.uint32(10).fork()).join();
-    }
-    for (const v of message.advices) {
-      Advice.encode(v!, writer.uint32(18).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ExecuteResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseExecuteResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1:
-          if (tag !== 10) {
-            break;
-          }
-
-          message.results.push(QueryResult.decode(reader, reader.uint32()));
-          continue;
-        case 2:
-          if (tag !== 18) {
-            break;
-          }
-
-          message.advices.push(Advice.decode(reader, reader.uint32()));
-          continue;
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ExecuteResponse {
-    return {
-      results: globalThis.Array.isArray(object?.results) ? object.results.map((e: any) => QueryResult.fromJSON(e)) : [],
-      advices: globalThis.Array.isArray(object?.advices) ? object.advices.map((e: any) => Advice.fromJSON(e)) : [],
-    };
-  },
-
-  toJSON(message: ExecuteResponse): unknown {
-    const obj: any = {};
-    if (message.results?.length) {
-      obj.results = message.results.map((e) => QueryResult.toJSON(e));
-    }
-    if (message.advices?.length) {
-      obj.advices = message.advices.map((e) => Advice.toJSON(e));
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<ExecuteResponse>): ExecuteResponse {
-    return ExecuteResponse.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<ExecuteResponse>): ExecuteResponse {
-    const message = createBaseExecuteResponse();
-    message.results = object.results?.map((e) => QueryResult.fromPartial(e)) || [];
-    message.advices = object.advices?.map((e) => Advice.fromPartial(e)) || [];
-    return message;
-  },
-};
-
 function createBaseAdminExecuteRequest(): AdminExecuteRequest {
   return { name: "", statement: "", limit: 0, timeout: undefined, schema: undefined };
 }
@@ -964,7 +803,16 @@ export const AdminExecuteResponse: MessageFns<AdminExecuteResponse> = {
 };
 
 function createBaseQueryRequest(): QueryRequest {
-  return { name: "", statement: "", limit: 0, timeout: undefined, dataSourceId: "", explain: false, schema: undefined };
+  return {
+    name: "",
+    statement: "",
+    limit: 0,
+    timeout: undefined,
+    dataSourceId: "",
+    explain: false,
+    schema: undefined,
+    queryOption: undefined,
+  };
 }
 
 export const QueryRequest: MessageFns<QueryRequest> = {
@@ -989,6 +837,9 @@ export const QueryRequest: MessageFns<QueryRequest> = {
     }
     if (message.schema !== undefined) {
       writer.uint32(66).string(message.schema);
+    }
+    if (message.queryOption !== undefined) {
+      QueryOption.encode(message.queryOption, writer.uint32(74).fork()).join();
     }
     return writer;
   },
@@ -1049,6 +900,13 @@ export const QueryRequest: MessageFns<QueryRequest> = {
 
           message.schema = reader.string();
           continue;
+        case 9:
+          if (tag !== 74) {
+            break;
+          }
+
+          message.queryOption = QueryOption.decode(reader, reader.uint32());
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1067,6 +925,7 @@ export const QueryRequest: MessageFns<QueryRequest> = {
       dataSourceId: isSet(object.dataSourceId) ? globalThis.String(object.dataSourceId) : "",
       explain: isSet(object.explain) ? globalThis.Boolean(object.explain) : false,
       schema: isSet(object.schema) ? globalThis.String(object.schema) : undefined,
+      queryOption: isSet(object.queryOption) ? QueryOption.fromJSON(object.queryOption) : undefined,
     };
   },
 
@@ -1093,6 +952,9 @@ export const QueryRequest: MessageFns<QueryRequest> = {
     if (message.schema !== undefined) {
       obj.schema = message.schema;
     }
+    if (message.queryOption !== undefined) {
+      obj.queryOption = QueryOption.toJSON(message.queryOption);
+    }
     return obj;
   },
 
@@ -1110,6 +972,9 @@ export const QueryRequest: MessageFns<QueryRequest> = {
     message.dataSourceId = object.dataSourceId ?? "";
     message.explain = object.explain ?? false;
     message.schema = object.schema ?? undefined;
+    message.queryOption = (object.queryOption !== undefined && object.queryOption !== null)
+      ? QueryOption.fromPartial(object.queryOption)
+      : undefined;
     return message;
   },
 };
@@ -1199,6 +1064,68 @@ export const QueryResponse: MessageFns<QueryResponse> = {
     message.results = object.results?.map((e) => QueryResult.fromPartial(e)) || [];
     message.advices = object.advices?.map((e) => Advice.fromPartial(e)) || [];
     message.allowExport = object.allowExport ?? false;
+    return message;
+  },
+};
+
+function createBaseQueryOption(): QueryOption {
+  return { redisRunCommandsOn: QueryOption_RedisRunCommandsOn.REDIS_RUN_COMMANDS_ON_UNSPECIFIED };
+}
+
+export const QueryOption: MessageFns<QueryOption> = {
+  encode(message: QueryOption, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.redisRunCommandsOn !== QueryOption_RedisRunCommandsOn.REDIS_RUN_COMMANDS_ON_UNSPECIFIED) {
+      writer.uint32(8).int32(queryOption_RedisRunCommandsOnToNumber(message.redisRunCommandsOn));
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryOption {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryOption();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.redisRunCommandsOn = queryOption_RedisRunCommandsOnFromJSON(reader.int32());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryOption {
+    return {
+      redisRunCommandsOn: isSet(object.redisRunCommandsOn)
+        ? queryOption_RedisRunCommandsOnFromJSON(object.redisRunCommandsOn)
+        : QueryOption_RedisRunCommandsOn.REDIS_RUN_COMMANDS_ON_UNSPECIFIED,
+    };
+  },
+
+  toJSON(message: QueryOption): unknown {
+    const obj: any = {};
+    if (message.redisRunCommandsOn !== QueryOption_RedisRunCommandsOn.REDIS_RUN_COMMANDS_ON_UNSPECIFIED) {
+      obj.redisRunCommandsOn = queryOption_RedisRunCommandsOnToJSON(message.redisRunCommandsOn);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryOption>): QueryOption {
+    return QueryOption.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryOption>): QueryOption {
+    const message = createBaseQueryOption();
+    message.redisRunCommandsOn = object.redisRunCommandsOn ??
+      QueryOption_RedisRunCommandsOn.REDIS_RUN_COMMANDS_ON_UNSPECIFIED;
     return message;
   },
 };
@@ -3776,36 +3703,7 @@ export const SQLServiceDefinition = {
       responseStream: true,
       options: {
         _unknownFields: {
-          800010: [
-            new Uint8Array([
-              25,
-              98,
-              98,
-              46,
-              105,
-              110,
-              115,
-              116,
-              97,
-              110,
-              99,
-              101,
-              115,
-              46,
-              97,
-              100,
-              109,
-              105,
-              110,
-              69,
-              120,
-              101,
-              99,
-              117,
-              116,
-              101,
-            ]),
-          ],
+          800010: [new Uint8Array([12, 98, 98, 46, 115, 113, 108, 46, 97, 100, 109, 105, 110])],
           800016: [new Uint8Array([1])],
           800024: [new Uint8Array([1])],
           578365826: [

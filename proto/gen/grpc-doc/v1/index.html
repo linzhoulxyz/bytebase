@@ -707,6 +707,10 @@
                 </li>
               
                 <li>
+                  <a href="#bytebase.v1.TriggerMetadata"><span class="badge">M</span>TriggerMetadata</a>
+                </li>
+              
+                <li>
                   <a href="#bytebase.v1.UpdateDatabaseMetadataRequest"><span class="badge">M</span>UpdateDatabaseMetadataRequest</a>
                 </li>
               
@@ -2632,6 +2636,10 @@
                 </li>
               
                 <li>
+                  <a href="#bytebase.v1.TaskRunLogEntry.PriorBackup"><span class="badge">M</span>TaskRunLogEntry.PriorBackup</a>
+                </li>
+              
+                <li>
                   <a href="#bytebase.v1.TaskRunLogEntry.SchemaDump"><span class="badge">M</span>TaskRunLogEntry.SchemaDump</a>
                 </li>
               
@@ -2770,14 +2778,6 @@
                 </li>
               
                 <li>
-                  <a href="#bytebase.v1.ExecuteRequest"><span class="badge">M</span>ExecuteRequest</a>
-                </li>
-              
-                <li>
-                  <a href="#bytebase.v1.ExecuteResponse"><span class="badge">M</span>ExecuteResponse</a>
-                </li>
-              
-                <li>
                   <a href="#bytebase.v1.ExportRequest"><span class="badge">M</span>ExportRequest</a>
                 </li>
               
@@ -2811,6 +2811,10 @@
               
                 <li>
                   <a href="#bytebase.v1.QueryHistory"><span class="badge">M</span>QueryHistory</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.QueryOption"><span class="badge">M</span>QueryOption</a>
                 </li>
               
                 <li>
@@ -2868,6 +2872,10 @@
               
                 <li>
                   <a href="#bytebase.v1.QueryHistory.Type"><span class="badge">E</span>QueryHistory.Type</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.QueryOption.RedisRunCommandsOn"><span class="badge">E</span>QueryOption.RedisRunCommandsOn</a>
                 </li>
               
               
@@ -6970,6 +6978,34 @@ Format: projcets/{project}/branches/{branch} </p></td>
                   <td><p>The signature is the name with the number and type of input arguments the function takes. </p></td>
                 </tr>
               
+                <tr>
+                  <td>character_set_client</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>MySQL specific metadata. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>collation_connection</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>database_collation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>sql_mode</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -8109,6 +8145,41 @@ Format: projcets/{project}/branches/{branch} </p></td>
                   <td><p>The definition is the definition of a procedure. </p></td>
                 </tr>
               
+                <tr>
+                  <td>signature</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The signature is the name with the number and type of input arguments the function takes. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>character_set_client</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>MySQL specific metadata. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>collation_connection</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>database_collation</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>sql_mode</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -8363,6 +8434,13 @@ It is an empty string for databases without such concept such as MySQL. </p></td
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>triggers</td>
+                  <td><a href="#bytebase.v1.TriggerMetadata">TriggerMetadata</a></td>
+                  <td>repeated</td>
+                  <td><p>The triggers is the list of triggers in a schema, triggers are sorted by table_name, name, event, timing, action_order. </p></td>
                 </tr>
               
             </tbody>
@@ -9079,6 +9157,79 @@ Example: 01ad32a0-1bb6-5e93-0000-000000000001 </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>The definition of the task. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.TriggerMetadata">TriggerMetadata</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The name is the name of the trigger. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>table_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The table_name is the name of the table/view that the trigger is created on. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>event</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The event is the event of the trigger, such as INSERT, UPDATE, DELETE, TRUNCATE. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>timing</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The timing is the timing of the trigger, such as BEFORE, AFTER. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>body</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The body is the body of the trigger. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>sql_mode</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>character_set_client</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>collation_connection</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -28239,6 +28390,13 @@ Format: instances/{instance}/databases/{database} </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>prior_backup</td>
+                  <td><a href="#bytebase.v1.TaskRunLogEntry.PriorBackup">TaskRunLogEntry.PriorBackup</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -28350,6 +28508,51 @@ Format: instances/{instance}/databases/{database} </p></td>
                 <tr>
                   <td>end_time</td>
                   <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>error</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.TaskRunLogEntry.PriorBackup">TaskRunLogEntry.PriorBackup</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>start_time</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>end_time</td>
+                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>prior_backup_detail</td>
+                  <td><a href="#bytebase.v1.TaskRun.PriorBackupDetail">TaskRun.PriorBackupDetail</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -28958,6 +29161,12 @@ Format: instances/{instance}/databases/{database} </p></td>
               <tr>
                 <td>TRANSACTION_CONTROL</td>
                 <td>5</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PRIOR_BACKUP</td>
+                <td>6</td>
                 <td><p></p></td>
               </tr>
             
@@ -29899,90 +30108,6 @@ If not provided, the database metadata will be fetched from the database. </p></
 
         
       
-        <h3 id="bytebase.v1.ExecuteRequest">ExecuteRequest</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>name</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>The name is the instance name to execute the query against.
-Format: instances/{instance}/databases/{databaseName} </p></td>
-                </tr>
-              
-                <tr>
-                  <td>statement</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>The SQL statement to execute. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>limit</td>
-                  <td><a href="#int32">int32</a></td>
-                  <td></td>
-                  <td><p>The maximum number of rows to return. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>timeout</td>
-                  <td><a href="#google.protobuf.Duration">google.protobuf.Duration</a></td>
-                  <td></td>
-                  <td><p>The timeout for the request. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>schema</td>
-                  <td><a href="#string">string</a></td>
-                  <td>optional</td>
-                  <td><p>The default schema to execute the statement. Equals to the current schema in Oracle and search path in Postgres. </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="bytebase.v1.ExecuteResponse">ExecuteResponse</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>results</td>
-                  <td><a href="#bytebase.v1.QueryResult">QueryResult</a></td>
-                  <td>repeated</td>
-                  <td><p>The execute results. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>advices</td>
-                  <td><a href="#bytebase.v1.Advice">Advice</a></td>
-                  <td>repeated</td>
-                  <td><p>The execute advices. </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
         <h3 id="bytebase.v1.ExportRequest">ExportRequest</h3>
         <p></p>
 
@@ -30344,6 +30469,30 @@ Format: instances/{instance}/databases/{databaseName} </p></td>
 
         
       
+        <h3 id="bytebase.v1.QueryOption">QueryOption</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>redis_run_commands_on</td>
+                  <td><a href="#bytebase.v1.QueryOption.RedisRunCommandsOn">QueryOption.RedisRunCommandsOn</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="bytebase.v1.QueryRequest">QueryRequest</h3>
         <p></p>
 
@@ -30404,6 +30553,13 @@ Or it can be used to query a specific read-only data source. </p></td>
                   <td><a href="#string">string</a></td>
                   <td>optional</td>
                   <td><p>The default schema to search objects. Equals to the current schema in Oracle and search path in Postgres. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>query_option</td>
+                  <td><a href="#bytebase.v1.QueryOption">QueryOption</a></td>
+                  <td></td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -31088,6 +31244,35 @@ to retrieve the next page of history. </p></td>
             
               <tr>
                 <td>EXPORT</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+        <h3 id="bytebase.v1.QueryOption.RedisRunCommandsOn">QueryOption.RedisRunCommandsOn</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>REDIS_RUN_COMMANDS_ON_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p>UNSPECIFIED defaults to SINGLE_NODE.</p></td>
+              </tr>
+            
+              <tr>
+                <td>SINGLE_NODE</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ALL_NODES</td>
                 <td>2</td>
                 <td><p></p></td>
               </tr>

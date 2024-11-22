@@ -30,6 +30,9 @@
       :min-row-height="ROW_HEIGHT"
       :height-for-row="() => ROW_HEIGHT"
       :scroll-x="tableResize.getTableScrollWidth()"
+      :scrollbar-props="{
+        trigger: 'none',
+      }"
       table-layout="fixed"
       size="small"
       class="relative z-[1] -mr-px"
@@ -245,6 +248,9 @@ watch(
 </script>
 
 <style lang="postcss" scoped>
+:deep(.n-data-table-base-table-body) {
+  height: auto;
+}
 :deep(.n-data-table-th .n-data-table-resize-button::after) {
   @apply bg-control-bg h-2/3;
 }

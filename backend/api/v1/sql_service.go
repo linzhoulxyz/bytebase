@@ -51,6 +51,15 @@ const (
 	oracleBackupDatabaseName = "BBDATAARCHIVE"
 )
 
+var (
+	queryNewACLSupportEngines = map[storepb.Engine]bool{
+		storepb.Engine_MYSQL:    true,
+		storepb.Engine_POSTGRES: true,
+		storepb.Engine_ORACLE:   true,
+		storepb.Engine_MSSQL:    true,
+	}
+)
+
 // SQLService is the service for SQL.
 type SQLService struct {
 	v1pb.UnimplementedSQLServiceServer
@@ -170,7 +179,7 @@ func (s *SQLService) Query(ctx context.Context, request *v1pb.QueryRequest) (*v1
 
 	// Validate the request.
 	// New query ACL experience.
-	if !request.Explain && instance.Engine != storepb.Engine_MYSQL {
+	if !request.Explain && !queryNewACLSupportEngines[instance.Engine] {
 		if err := validateQueryRequest(instance, statement); err != nil {
 			return nil, err
 		}
@@ -196,7 +205,12 @@ func (s *SQLService) Query(ctx context.Context, request *v1pb.QueryRequest) (*v1
 		defer conn.Close()
 	}
 
-	queryContext := db.QueryContext{Explain: request.Explain, Limit: int(request.Limit), OperatorEmail: user.Email}
+	queryContext := db.QueryContext{
+		Explain:       request.Explain,
+		Limit:         int(request.Limit),
+		OperatorEmail: user.Email,
+		Option:        request.QueryOption,
+	}
 	if request.Schema != nil {
 		queryContext.Schema = *request.Schema
 	}
@@ -631,7 +645,10 @@ func DoExport(
 		}
 		defer conn.Close()
 	}
-	queryContext := db.QueryContext{Limit: int(request.Limit), OperatorEmail: user.Email}
+	queryContext := db.QueryContext{
+		Limit:         int(request.Limit),
+		OperatorEmail: user.Email,
+	}
 	results, spans, duration, queryErr := queryRetry(ctx, storeInstance, user, instance, database, driver, conn, request.Statement, nil /* timeDuration */, queryContext, true, licenseService, optionalAccessCheck, schemaSyncer)
 	if queryErr != nil {
 		return nil, duration, err
@@ -989,25 +1006,24 @@ func (s *SQLService) accessCheck(
 
 	for _, span := range spans {
 		// New query ACL experience.
-		switch instance.Engine {
-		case storepb.Engine_MYSQL, storepb.Engine_POSTGRES, storepb.Engine_ORACLE, storepb.Engine_TIDB, storepb.Engine_MSSQL:
+		if queryNewACLSupportEngines[instance.Engine] {
 			var permission iam.Permission
 			switch span.Type {
 			case base.QueryTypeUnknown:
 				return status.Error(codes.PermissionDenied, "disallowed query type")
 			case base.DDL:
-				permission = iam.PermissionDatabasesQueryDDL
+				permission = iam.PermissionSQLDdl
 			case base.DML:
-				permission = iam.PermissionDatabasesQueryDML
+				permission = iam.PermissionSQLDml
 			case base.Explain:
-				permission = iam.PermissionDatabasesQueryExplain
+				permission = iam.PermissionSQLExplain
 			case base.SelectInfoSchema:
-				permission = iam.PermissionDatabasesQueryInfo
+				permission = iam.PermissionSQLInfo
 			case base.Select:
 				// Conditional permission check below.
 			}
 			if isExplain {
-				permission = iam.PermissionDatabasesQueryExplain
+				permission = iam.PermissionSQLExplain
 			}
 			if span.Type == base.DDL || span.Type == base.DML {
 				if err := checkDataSourceQueryPolicy(ctx, s.store, database, span.Type); err != nil {
@@ -1165,9 +1181,9 @@ func validateQueryRequest(instance *store.InstanceMessage, statement string) err
 }
 
 func (s *SQLService) hasDatabaseAccessRights(ctx context.Context, user *store.UserMessage, iamPolicies []*storepb.IamPolicy, attributes map[string]any, isExport bool) (bool, error) {
-	wantPermission := iam.PermissionDatabasesQuery
+	wantPermission := iam.PermissionSQLSelect
 	if isExport {
-		wantPermission = iam.PermissionDatabasesExport
+		wantPermission = iam.PermissionSQLExport
 	}
 
 	bindings := utils.GetUserIAMPolicyBindings(ctx, s.store, user, iamPolicies...)
@@ -1314,7 +1330,11 @@ func (s *SQLService) SQLReviewCheck(
 		return storepb.Advice_ERROR, nil, status.Errorf(codes.Internal, "failed to create a catalog: %v", err)
 	}
 
-	driver, err := s.dbFactory.GetAdminDatabaseDriver(ctx, instance, database, db.ConnectionContext{UseDatabaseOwner: true})
+	useDatabaseOwner, err := getUseDatabaseOwner(ctx, s.store, instance, database, changeType)
+	if err != nil {
+		return storepb.Advice_ERROR, nil, status.Errorf(codes.Internal, "failed to get use database owner: %v", err)
+	}
+	driver, err := s.dbFactory.GetAdminDatabaseDriver(ctx, instance, database, db.ConnectionContext{UseDatabaseOwner: useDatabaseOwner})
 	if err != nil {
 		return storepb.Advice_ERROR, nil, status.Errorf(codes.Internal, "failed to get database driver: %v", err)
 	}
@@ -1323,16 +1343,17 @@ func (s *SQLService) SQLReviewCheck(
 
 	classificationConfig := GetClassificationByProject(ctx, s.store, database.ProjectID)
 	context := advisor.SQLReviewCheckContext{
-		Charset:              dbMetadata.CharacterSet,
-		Collation:            dbMetadata.Collation,
-		ChangeType:           convertChangeType(changeType),
-		DBSchema:             dbMetadata,
-		DbType:               instance.Engine,
-		Catalog:              catalog,
-		Driver:               connection,
-		Context:              ctx,
-		CurrentDatabase:      database.DatabaseName,
-		ClassificationConfig: classificationConfig,
+		Charset:                  dbMetadata.CharacterSet,
+		Collation:                dbMetadata.Collation,
+		ChangeType:               convertChangeType(changeType),
+		DBSchema:                 dbMetadata,
+		DbType:                   instance.Engine,
+		Catalog:                  catalog,
+		Driver:                   connection,
+		Context:                  ctx,
+		CurrentDatabase:          database.DatabaseName,
+		ClassificationConfig:     classificationConfig,
+		UsePostgresDatabaseOwner: useDatabaseOwner,
 	}
 
 	reviewConfig, err := s.store.GetReviewConfigForDatabase(ctx, database)
@@ -1368,6 +1389,24 @@ func (s *SQLService) SQLReviewCheck(
 	}
 
 	return adviceLevel, advices, nil
+}
+
+func getUseDatabaseOwner(ctx context.Context, stores *store.Store, instance *store.InstanceMessage, database *store.DatabaseMessage, changeType v1pb.CheckRequest_ChangeType) (bool, error) {
+	if instance.Engine != storepb.Engine_POSTGRES || changeType == v1pb.CheckRequest_SQL_EDITOR {
+		return false, nil
+	}
+
+	// Check the project setting to see if we should use the database owner.
+	project, err := stores.GetProjectV2(ctx, &store.FindProjectMessage{ResourceID: &database.ProjectID})
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to get project")
+	}
+
+	if project.Setting == nil {
+		return false, nil
+	}
+
+	return project.Setting.PostgresDatabaseTenantMode, nil
 }
 
 func convertToV1Advice(advice *storepb.Advice) *v1pb.Advice {

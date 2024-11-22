@@ -138,6 +138,7 @@
     - [TableMetadata](#bytebase-v1-TableMetadata)
     - [TablePartitionMetadata](#bytebase-v1-TablePartitionMetadata)
     - [TaskMetadata](#bytebase-v1-TaskMetadata)
+    - [TriggerMetadata](#bytebase-v1-TriggerMetadata)
     - [UpdateDatabaseMetadataRequest](#bytebase-v1-UpdateDatabaseMetadataRequest)
     - [UpdateDatabaseRequest](#bytebase-v1-UpdateDatabaseRequest)
     - [UpdateSecretRequest](#bytebase-v1-UpdateSecretRequest)
@@ -642,6 +643,7 @@
     - [TaskRunLogEntry.CommandExecute](#bytebase-v1-TaskRunLogEntry-CommandExecute)
     - [TaskRunLogEntry.CommandExecute.CommandResponse](#bytebase-v1-TaskRunLogEntry-CommandExecute-CommandResponse)
     - [TaskRunLogEntry.DatabaseSync](#bytebase-v1-TaskRunLogEntry-DatabaseSync)
+    - [TaskRunLogEntry.PriorBackup](#bytebase-v1-TaskRunLogEntry-PriorBackup)
     - [TaskRunLogEntry.SchemaDump](#bytebase-v1-TaskRunLogEntry-SchemaDump)
     - [TaskRunLogEntry.TaskRunStatusUpdate](#bytebase-v1-TaskRunLogEntry-TaskRunStatusUpdate)
     - [TaskRunLogEntry.TransactionControl](#bytebase-v1-TaskRunLogEntry-TransactionControl)
@@ -679,8 +681,6 @@
     - [Advice](#bytebase-v1-Advice)
     - [CheckRequest](#bytebase-v1-CheckRequest)
     - [CheckResponse](#bytebase-v1-CheckResponse)
-    - [ExecuteRequest](#bytebase-v1-ExecuteRequest)
-    - [ExecuteResponse](#bytebase-v1-ExecuteResponse)
     - [ExportRequest](#bytebase-v1-ExportRequest)
     - [ExportResponse](#bytebase-v1-ExportResponse)
     - [GenerateRestoreSQLRequest](#bytebase-v1-GenerateRestoreSQLRequest)
@@ -690,6 +690,7 @@
     - [PrettyRequest](#bytebase-v1-PrettyRequest)
     - [PrettyResponse](#bytebase-v1-PrettyResponse)
     - [QueryHistory](#bytebase-v1-QueryHistory)
+    - [QueryOption](#bytebase-v1-QueryOption)
     - [QueryRequest](#bytebase-v1-QueryRequest)
     - [QueryResponse](#bytebase-v1-QueryResponse)
     - [QueryResult](#bytebase-v1-QueryResult)
@@ -705,6 +706,7 @@
     - [Advice.Status](#bytebase-v1-Advice-Status)
     - [CheckRequest.ChangeType](#bytebase-v1-CheckRequest-ChangeType)
     - [QueryHistory.Type](#bytebase-v1-QueryHistory-Type)
+    - [QueryOption.RedisRunCommandsOn](#bytebase-v1-QueryOption-RedisRunCommandsOn)
   
     - [SQLService](#bytebase-v1-SQLService)
   
@@ -2198,6 +2200,10 @@ FunctionMetadata is the metadata for functions.
 | name | [string](#string) |  | The name is the name of a function. |
 | definition | [string](#string) |  | The definition is the definition of a function. |
 | signature | [string](#string) |  | The signature is the name with the number and type of input arguments the function takes. |
+| character_set_client | [string](#string) |  | MySQL specific metadata. |
+| collation_connection | [string](#string) |  |  |
+| database_collation | [string](#string) |  |  |
+| sql_mode | [string](#string) |  |  |
 
 
 
@@ -2665,6 +2671,11 @@ ProcedureMetadata is the metadata for procedures.
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | The name is the name of a procedure. |
 | definition | [string](#string) |  | The definition is the definition of a procedure. |
+| signature | [string](#string) |  | The signature is the name with the number and type of input arguments the function takes. |
+| character_set_client | [string](#string) |  | MySQL specific metadata. |
+| collation_connection | [string](#string) |  |  |
+| database_collation | [string](#string) |  |  |
+| sql_mode | [string](#string) |  |  |
 
 
 
@@ -2736,6 +2747,7 @@ This is the concept of schema in Postgres, but it&#39;s a no-op for MySQL.
 | materialized_views | [MaterializedViewMetadata](#bytebase-v1-MaterializedViewMetadata) | repeated | The materialized_views is the list of materialized views in a schema. |
 | packages | [PackageMetadata](#bytebase-v1-PackageMetadata) | repeated | The packages is the list of packages in a schema. |
 | owner | [string](#string) |  |  |
+| triggers | [TriggerMetadata](#bytebase-v1-TriggerMetadata) | repeated | The triggers is the list of triggers in a schema, triggers are sorted by table_name, name, event, timing, action_order. |
 
 
 
@@ -2960,6 +2972,28 @@ TablePartitionMetadata is the metadata for table partitions.
 | state | [TaskMetadata.State](#bytebase-v1-TaskMetadata-State) |  | The state of the task. |
 | condition | [string](#string) |  | The condition of the task. |
 | definition | [string](#string) |  | The definition of the task. |
+
+
+
+
+
+
+<a name="bytebase-v1-TriggerMetadata"></a>
+
+### TriggerMetadata
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name is the name of the trigger. |
+| table_name | [string](#string) |  | The table_name is the name of the table/view that the trigger is created on. |
+| event | [string](#string) |  | The event is the event of the trigger, such as INSERT, UPDATE, DELETE, TRUNCATE. |
+| timing | [string](#string) |  | The timing is the timing of the trigger, such as BEFORE, AFTER. |
+| body | [string](#string) |  | The body is the body of the trigger. |
+| sql_mode | [string](#string) |  |  |
+| character_set_client | [string](#string) |  |  |
+| collation_connection | [string](#string) |  |  |
 
 
 
@@ -10314,6 +10348,7 @@ When paginating, all other parameters provided to `ListTaskRuns` must match the 
 | database_sync | [TaskRunLogEntry.DatabaseSync](#bytebase-v1-TaskRunLogEntry-DatabaseSync) |  |  |
 | task_run_status_update | [TaskRunLogEntry.TaskRunStatusUpdate](#bytebase-v1-TaskRunLogEntry-TaskRunStatusUpdate) |  |  |
 | transaction_control | [TaskRunLogEntry.TransactionControl](#bytebase-v1-TaskRunLogEntry-TransactionControl) |  |  |
+| prior_backup | [TaskRunLogEntry.PriorBackup](#bytebase-v1-TaskRunLogEntry-PriorBackup) |  |  |
 
 
 
@@ -10365,6 +10400,24 @@ When paginating, all other parameters provided to `ListTaskRuns` must match the 
 | ----- | ---- | ----- | ----------- |
 | start_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | end_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| error | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-TaskRunLogEntry-PriorBackup"></a>
+
+### TaskRunLogEntry.PriorBackup
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| start_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| end_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| prior_backup_detail | [TaskRun.PriorBackupDetail](#bytebase-v1-TaskRun-PriorBackupDetail) |  |  |
 | error | [string](#string) |  |  |
 
 
@@ -10590,6 +10643,7 @@ Read from `pg_stat_activity`
 | DATABASE_SYNC | 3 |  |
 | TASK_RUN_STATUS_UPDATE | 4 |  |
 | TRANSACTION_CONTROL | 5 |  |
+| PRIOR_BACKUP | 6 |  |
 
 
  
@@ -10897,41 +10951,6 @@ Type of the SheetPayload.
 
 
 
-<a name="bytebase-v1-ExecuteRequest"></a>
-
-### ExecuteRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | The name is the instance name to execute the query against. Format: instances/{instance}/databases/{databaseName} |
-| statement | [string](#string) |  | The SQL statement to execute. |
-| limit | [int32](#int32) |  | The maximum number of rows to return. |
-| timeout | [google.protobuf.Duration](#google-protobuf-Duration) |  | The timeout for the request. |
-| schema | [string](#string) | optional | The default schema to execute the statement. Equals to the current schema in Oracle and search path in Postgres. |
-
-
-
-
-
-
-<a name="bytebase-v1-ExecuteResponse"></a>
-
-### ExecuteResponse
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| results | [QueryResult](#bytebase-v1-QueryResult) | repeated | The execute results. |
-| advices | [Advice](#bytebase-v1-Advice) | repeated | The execute advices. |
-
-
-
-
-
-
 <a name="bytebase-v1-ExportRequest"></a>
 
 ### ExportRequest
@@ -11086,6 +11105,21 @@ Type of the SheetPayload.
 
 
 
+<a name="bytebase-v1-QueryOption"></a>
+
+### QueryOption
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| redis_run_commands_on | [QueryOption.RedisRunCommandsOn](#bytebase-v1-QueryOption-RedisRunCommandsOn) |  |  |
+
+
+
+
+
+
 <a name="bytebase-v1-QueryRequest"></a>
 
 ### QueryRequest
@@ -11101,6 +11135,7 @@ Type of the SheetPayload.
 | data_source_id | [string](#string) |  | The id of data source. It is used for querying admin data source even if the instance has read-only data sources. Or it can be used to query a specific read-only data source. |
 | explain | [bool](#bool) |  | Explain the statement. |
 | schema | [string](#string) | optional | The default schema to search objects. Equals to the current schema in Oracle and search path in Postgres. |
+| query_option | [QueryOption](#bytebase-v1-QueryOption) |  |  |
 
 
 
@@ -11344,6 +11379,19 @@ for field description.
 | TYPE_UNSPECIFIED | 0 |  |
 | QUERY | 1 |  |
 | EXPORT | 2 |  |
+
+
+
+<a name="bytebase-v1-QueryOption-RedisRunCommandsOn"></a>
+
+### QueryOption.RedisRunCommandsOn
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| REDIS_RUN_COMMANDS_ON_UNSPECIFIED | 0 | UNSPECIFIED defaults to SINGLE_NODE. |
+| SINGLE_NODE | 1 |  |
+| ALL_NODES | 2 |  |
 
 
  

@@ -396,6 +396,7 @@ func (s *SchedulerV2) scheduleRunningTaskRuns(ctx context.Context) error {
 		return errors.Wrapf(err, "failed to list pending tasks")
 	}
 
+	// TODO(p0ny): remove these because we will follow the version order
 	// Find the minimum task ID for each database.
 	// We only run the first (i.e. which has the minimum task ID) task for each database.
 	minTaskIDForDatabase := map[int]int{}
@@ -765,7 +766,7 @@ func (s *SchedulerV2) ListenTaskSkippedOrDone(ctx context.Context) {
 					p := &storepb.IssueCommentPayload{
 						Event: &storepb.IssueCommentPayload_StageEnd_{
 							StageEnd: &storepb.IssueCommentPayload_StageEnd{
-								Stage: fmt.Sprintf("%s%s/%s%d/%s%d", common.ProjectNamePrefix, issue.Project.ResourceID, common.RolloutPrefix, taskStage.PipelineID, common.StagePrefix, taskStage.ID),
+								Stage: common.FormatStage(issue.Project.ResourceID, taskStage.PipelineID, taskStage.ID),
 							},
 						},
 					}

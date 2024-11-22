@@ -31,7 +31,8 @@ export type AppFeatures = {
     | "EXPORT-DATA"
     | "SYNC-SCHEMA"
     | "EDIT-LABELS"
-    | "TRANSFER"
+    | "TRANSFER-OUT"
+    | "TRANSFER-IN"
   >;
   "bb.feature.databases.hide-unassigned": boolean;
   "bb.feature.databases.hide-inalterable": boolean;
@@ -86,7 +87,8 @@ export const defaultAppProfile = (): AppProfile => ({
       "EXPORT-DATA",
       "SYNC-SCHEMA",
       "EDIT-LABELS",
-      "TRANSFER",
+      "TRANSFER-OUT",
+      "TRANSFER-IN",
     ]),
     "bb.feature.databases.hide-unassigned": false,
     "bb.feature.databases.hide-inalterable": false,

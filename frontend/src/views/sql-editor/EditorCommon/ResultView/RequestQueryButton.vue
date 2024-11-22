@@ -9,7 +9,7 @@
       :project-name="database.project"
       :database-resource="databaseResource"
       :placement="'right'"
-      :role="PresetRoleType.PROJECT_QUERIER"
+      :role="PresetRoleType.SQL_EDITOR_USER"
       @close="showPanel = false"
     />
   </div>
@@ -41,11 +41,11 @@ const showPanel = ref(false);
 const dbStore = useDatabaseV1Store();
 
 const database = computed(() =>
-  dbStore.getDatabaseByName(props.databaseResource.databaseName)
+  dbStore.getDatabaseByName(props.databaseResource.databaseFullName)
 );
 
 const available = computed(() => {
-  if (!isValidDatabaseName(props.databaseResource.databaseName)) {
+  if (!isValidDatabaseName(props.databaseResource.databaseFullName)) {
     return false;
   }
 
