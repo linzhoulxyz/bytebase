@@ -454,11 +454,18 @@ func executeMigrationDefault(ctx context.Context, driverCtx context.Context, sto
 func executeMigrationWithFunc(ctx context.Context, driverCtx context.Context, s *store.Store, driver db.Driver, mi *db.MigrationInfo, mc *migrateContext, statement string, execFunc func(ctx context.Context, execStatement string) error, opts db.ExecuteOptions) (migrationHistoryID string, updatedSchema string, resErr error) {
 	var prevSchemaBuf bytes.Buffer
 	if mi.Type.NeedDump() {
-		opts.LogSchemaDumpStart()
+		opts.LogDatabaseSyncStart()
+		dbSchema, err := driver.SyncDBSchema(ctx)
+		if err != nil {
+			opts.LogDatabaseSyncEnd(err.Error())
+			return "", "", errors.Wrapf(err, "failed to sync database schema")
+		}
+		opts.LogDatabaseSyncEnd("")
 		// Don't record schema if the database hasn't existed yet or is schemaless, e.g. MongoDB.
 		// For baseline migration, we also record the live schema to detect the schema drift.
 		// See https://bytebase.com/blog/what-is-database-schema-drift
-		if err := driver.Dump(ctx, &prevSchemaBuf); err != nil {
+		opts.LogSchemaDumpStart()
+		if err := driver.Dump(ctx, &prevSchemaBuf, dbSchema); err != nil {
 			opts.LogSchemaDumpEnd(err.Error())
 			return "", "", err
 		}
@@ -520,8 +527,15 @@ func executeMigrationWithFunc(ctx context.Context, driverCtx context.Context, s 
 	// Phase 4 - Dump the schema after migration
 	var afterSchemaBuf bytes.Buffer
 	if mi.Type.NeedDump() {
+		opts.LogDatabaseSyncStart()
+		dbSchema, err := driver.SyncDBSchema(ctx)
+		if err != nil {
+			opts.LogDatabaseSyncEnd(err.Error())
+			return "", "", errors.Wrapf(err, "failed to sync database schema")
+		}
+		opts.LogDatabaseSyncEnd("")
 		opts.LogSchemaDumpStart()
-		if err := driver.Dump(ctx, &afterSchemaBuf); err != nil {
+		if err := driver.Dump(ctx, &afterSchemaBuf, dbSchema); err != nil {
 			// We will ignore the dump error if the database is dropped.
 			if strings.Contains(err.Error(), "not found") {
 				return insertedID, "", nil
@@ -567,20 +581,20 @@ func beginMigration(ctx context.Context, stores *store.Store, mi *db.MigrationIn
 		mc.syncHistoryPrev = syncHistoryPrev
 
 		// changelog
-		changelogUID, err := stores.CreateChangelog(ctx, &store.ChangelogMessage{DatabaseUID: mc.database.UID, Payload: &storepb.ChangelogPayload{
-			Task: &storepb.ChangelogTask{
-				TaskRun:           mc.taskRunName,
-				Issue:             mc.issueName,
-				Revision:          0,
-				ChangedResources:  mi.Payload.ChangedResources,
-				Status:            storepb.ChangelogTask_PENDING,
-				PrevSyncHistoryId: syncHistoryPrev,
-				SyncHistoryId:     0,
-				Sheet:             mc.sheetName,
-				Version:           mc.version,
-				Type:              convertTaskType(mc.task.Type),
-			},
-		}}, api.SystemBotID)
+		changelogUID, err := stores.CreateChangelog(ctx, &store.ChangelogMessage{
+			DatabaseUID:        mc.database.UID,
+			Status:             store.ChangelogStatusPending,
+			PrevSyncHistoryUID: &syncHistoryPrev,
+			SyncHistoryUID:     nil,
+			Payload: &storepb.ChangelogPayload{
+				TaskRun:          mc.taskRunName,
+				Issue:            mc.issueName,
+				Revision:         0,
+				ChangedResources: mi.Payload.ChangedResources,
+				Sheet:            mc.sheetName,
+				Version:          mc.version,
+				Type:             convertTaskType(mc.task.Type),
+			}}, api.SystemBotID)
 		if err != nil {
 			return "", errors.Wrapf(err, "failed to create changelog")
 		}
@@ -644,13 +658,13 @@ func endMigration(ctx context.Context, storeInstance *store.Store, startedNs int
 			if mc.version != "" {
 				r := &store.RevisionMessage{
 					DatabaseUID: mc.database.UID,
+					Version:     mc.version,
 					Payload: &storepb.RevisionPayload{
 						Release:     mc.release.release,
 						File:        mc.release.file,
 						Sheet:       "",
 						SheetSha256: "",
 						TaskRun:     mc.taskRunName,
-						Version:     mc.version,
 					},
 				}
 				if mc.sheet != nil {
@@ -664,10 +678,10 @@ func endMigration(ctx context.Context, storeInstance *store.Store, startedNs int
 				}
 				update.RevisionUID = &revision.UID
 			}
-			status := storepb.ChangelogTask_DONE
+			status := store.ChangelogStatusDone
 			update.Status = &status
 		} else {
-			status := storepb.ChangelogTask_FAILED
+			status := store.ChangelogStatusFailed
 			update.Status = &status
 		}
 
@@ -700,22 +714,22 @@ func endMigration(ctx context.Context, storeInstance *store.Store, startedNs int
 	return storeInstance.UpdateInstanceChangeHistory(ctx, update)
 }
 
-func convertTaskType(t api.TaskType) storepb.ChangelogTask_Type {
+func convertTaskType(t api.TaskType) storepb.ChangelogPayload_Type {
 	switch t {
 	case api.TaskDatabaseDataUpdate:
-		return storepb.ChangelogTask_DATA
+		return storepb.ChangelogPayload_DATA
 	case api.TaskDatabaseSchemaBaseline:
-		return storepb.ChangelogTask_BASELINE
+		return storepb.ChangelogPayload_BASELINE
 	case api.TaskDatabaseSchemaUpdate:
-		return storepb.ChangelogTask_MIGRATE
+		return storepb.ChangelogPayload_MIGRATE
 	case api.TaskDatabaseSchemaUpdateSDL:
-		return storepb.ChangelogTask_MIGRATE_SDL
+		return storepb.ChangelogPayload_MIGRATE_SDL
 	case api.TaskDatabaseSchemaUpdateGhostCutover, api.TaskDatabaseSchemaUpdateGhostSync:
-		return storepb.ChangelogTask_MIGRATE_GHOST
+		return storepb.ChangelogPayload_MIGRATE_GHOST
 
 	case api.TaskGeneral:
 	case api.TaskDatabaseCreate:
 	case api.TaskDatabaseDataExport:
 	}
-	return storepb.ChangelogTask_TYPE_UNSPECIFIED
+	return storepb.ChangelogPayload_TYPE_UNSPECIFIED
 }

@@ -70,7 +70,11 @@ func (d *Driver) Open(ctx context.Context, _ storepb.Engine, config db.Connectio
 	if config.Database != "" {
 		d.databaseName = d.config.Database
 		dsn := getDSN(d.config.Host, d.config.Database)
-		client, err := spanner.NewClient(ctx, dsn, o...)
+		client, err := spanner.NewClient(
+			ctx,
+			dsn,
+			o...,
+		)
 		if err != nil {
 			return nil, err
 		}

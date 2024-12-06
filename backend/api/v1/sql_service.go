@@ -189,7 +189,7 @@ func (s *SQLService) Query(ctx context.Context, request *v1pb.QueryRequest) (*v1
 	if err != nil {
 		return nil, err
 	}
-	driver, err := s.dbFactory.GetDataSourceDriver(ctx, instance, dataSource, database.DatabaseName, database.DataShare, true /* readOnly */, db.ConnectionContext{})
+	driver, err := s.dbFactory.GetDataSourceDriver(ctx, instance, dataSource, database.DatabaseName, database.DataShare, dataSource.Type == api.RO /* readOnly */, db.ConnectionContext{})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get database driver: %v", err)
 	}
@@ -228,12 +228,9 @@ func (s *SQLService) Query(ctx context.Context, request *v1pb.QueryRequest) (*v1
 		return nil, status.Error(code, queryErr.Error())
 	}
 
-	allowExport := true
 	// AllowExport is a validate only check.
-	if s.licenseService.IsFeatureEnabled(api.FeatureAccessControl) == nil {
-		err := s.accessCheck(ctx, instance, database, user, spans, queryContext.Limit, request.Explain, true /* isExport */)
-		allowExport = (err == nil)
-	}
+	checkErr := s.accessCheck(ctx, instance, database, user, spans, queryContext.Limit, request.Explain, true /* isExport */)
+	allowExport := (checkErr == nil)
 
 	response := &v1pb.QueryResponse{
 		Results:     results,
@@ -405,7 +402,7 @@ func queryRetry(
 		if err := replaceBackupTableWithSource(ctx, stores, instance, database, spans); err != nil {
 			slog.Debug("failed to replace backup table with source", log.BBError(err))
 		}
-		if licenseService.IsFeatureEnabled(api.FeatureAccessControl) == nil && optionalAccessCheck != nil {
+		if optionalAccessCheck != nil {
 			if err := optionalAccessCheck(ctx, instance, database, user, spans, queryContext.Limit, queryContext.Explain, isExport); err != nil {
 				return nil, nil, time.Duration(0), err
 			}
@@ -827,7 +824,7 @@ func (s *SQLService) SearchQueryHistories(ctx context.Context, request *v1pb.Sea
 	nextPageToken := ""
 	if len(historyList) == limitPlusOne {
 		historyList = historyList[:offset.limit]
-		if nextPageToken, err = offset.getPageToken(); err != nil {
+		if nextPageToken, err = offset.getNextPageToken(); err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to marshal next page token, error: %v", err)
 		}
 	}
@@ -1257,7 +1254,7 @@ func (s *SQLService) Check(ctx context.Context, request *v1pb.CheckRequest) (*v1
 			return nil, err
 		}
 	}
-	_, adviceList, err := s.SQLReviewCheck(ctx, request.Statement, request.ChangeType, instance, database, overideMetadata)
+	_, adviceList, err := s.SQLReviewCheck(ctx, request.Statement, convertChangeType(request.ChangeType), instance, database, overideMetadata)
 	if err != nil {
 		return nil, err
 	}
@@ -1295,7 +1292,7 @@ func GetClassificationByProject(ctx context.Context, stores *store.Store, projec
 func (s *SQLService) SQLReviewCheck(
 	ctx context.Context,
 	statement string,
-	changeType v1pb.CheckRequest_ChangeType,
+	changeType storepb.PlanCheckRunConfig_ChangeDatabaseType,
 	instance *store.InstanceMessage,
 	database *store.DatabaseMessage,
 	overrideMetadata *storepb.DatabaseSchemaMetadata,
@@ -1345,7 +1342,7 @@ func (s *SQLService) SQLReviewCheck(
 	context := advisor.SQLReviewCheckContext{
 		Charset:                  dbMetadata.CharacterSet,
 		Collation:                dbMetadata.Collation,
-		ChangeType:               convertChangeType(changeType),
+		ChangeType:               changeType,
 		DBSchema:                 dbMetadata,
 		DbType:                   instance.Engine,
 		Catalog:                  catalog,
@@ -1354,6 +1351,8 @@ func (s *SQLService) SQLReviewCheck(
 		CurrentDatabase:          database.DatabaseName,
 		ClassificationConfig:     classificationConfig,
 		UsePostgresDatabaseOwner: useDatabaseOwner,
+		ListDatabaseNamesFunc:    BuildListDatabaseNamesFunc(s.store),
+		InstanceID:               instance.ResourceID,
 	}
 
 	reviewConfig, err := s.store.GetReviewConfigForDatabase(ctx, database)
@@ -1391,8 +1390,8 @@ func (s *SQLService) SQLReviewCheck(
 	return adviceLevel, advices, nil
 }
 
-func getUseDatabaseOwner(ctx context.Context, stores *store.Store, instance *store.InstanceMessage, database *store.DatabaseMessage, changeType v1pb.CheckRequest_ChangeType) (bool, error) {
-	if instance.Engine != storepb.Engine_POSTGRES || changeType == v1pb.CheckRequest_SQL_EDITOR {
+func getUseDatabaseOwner(ctx context.Context, stores *store.Store, instance *store.InstanceMessage, database *store.DatabaseMessage, changeType storepb.PlanCheckRunConfig_ChangeDatabaseType) (bool, error) {
+	if instance.Engine != storepb.Engine_POSTGRES || changeType == storepb.PlanCheckRunConfig_SQL_EDITOR {
 		return false, nil
 	}
 

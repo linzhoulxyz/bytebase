@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -763,19 +764,48 @@ func getExtensions(txn *sql.Tx) ([]*storepb.ExtensionMetadata, error) {
 
 // getSequences gets all sequences of a database.
 func getSequences(txn *sql.Tx) (map[string][]*storepb.SequenceMetadata, error) {
-	query := `SELECT sequence_schema, sequence_name, data_type FROM information_schema.sequences;`
+	query := `
+	SELECT
+		schemaname,
+		sequencename,
+		data_type,
+		start_value,
+		min_value,
+		max_value,
+		increment_by,
+		cycle,
+		cache_size,
+		last_value
+	FROM pg_sequences
+	ORDER BY schemaname, sequencename;`
 	rows, err := txn.Query(query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
 	sequenceMap := make(map[string][]*storepb.SequenceMetadata)
 	for rows.Next() {
-		sequence := &storepb.SequenceMetadata{}
-		var schemaName string
-		if err := rows.Scan(&schemaName, &sequence.Name, &sequence.DataType); err != nil {
+		var schemaName, sequenceName, dataType string
+		var startValue, minValue, maxValue, incrementBy, cacheSize int64
+		var cycle bool
+		var lastValue sql.NullInt64
+		if err := rows.Scan(&schemaName, &sequenceName, &dataType, &startValue, &minValue, &maxValue, &incrementBy, &cycle, &cacheSize, &lastValue); err != nil {
 			return nil, err
+		}
+		lastValueStr := ""
+		if lastValue.Valid {
+			lastValueStr = strconv.FormatInt(lastValue.Int64, 10)
+		}
+		sequence := &storepb.SequenceMetadata{
+			Name:      sequenceName,
+			DataType:  dataType,
+			Start:     strconv.FormatInt(startValue, 10),
+			MinValue:  strconv.FormatInt(minValue, 10),
+			MaxValue:  strconv.FormatInt(maxValue, 10),
+			Increment: strconv.FormatInt(incrementBy, 10),
+			Cycle:     cycle,
+			CacheSize: strconv.FormatInt(cacheSize, 10),
+			LastValue: lastValueStr,
 		}
 		sequenceMap[schemaName] = append(sequenceMap[schemaName], sequence)
 	}
@@ -783,7 +813,49 @@ func getSequences(txn *sql.Tx) (map[string][]*storepb.SequenceMetadata, error) {
 		return nil, err
 	}
 
+	for schemaName, list := range sequenceMap {
+		for _, sequence := range list {
+			ownerTable, ownerColumn, err := getSequenceOwner(txn, schemaName, sequence.Name)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to get sequence %q owner", sequence.Name)
+			}
+			sequence.OwnerTable = ownerTable
+			sequence.OwnerColumn = ownerColumn
+		}
+	}
+
 	return sequenceMap, nil
+}
+
+func getSequenceOwner(txn *sql.Tx, schemaName, sequenceName string) (string, string, error) {
+	var ownerTable, ownerColumn string
+
+	query := fmt.Sprintf(`
+		SELECT tab.relname as table_name,
+			attr.attname as column_name
+		FROM pg_class as seq
+			JOIN pg_depend as dep ON (seq.relfilenode = dep.objid)
+			JOIN pg_class as tab ON (dep.refobjid = tab.relfilenode)
+			JOIN pg_attribute as attr ON (attr.attnum = dep.refobjsubid AND attr.attrelid = dep.refobjid)
+			JOIN pg_namespace as ns ON (tab.relnamespace = ns.oid)
+		WHERE ns.nspname = '%s' AND seq.relname = '%s';
+	`, schemaName, sequenceName)
+
+	rows, err := txn.Query(query)
+	if err != nil {
+		return "", "", err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		if err := rows.Scan(&ownerTable, &ownerColumn); err != nil {
+			return "", "", err
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return "", "", err
+	}
+	return ownerTable, ownerColumn, nil
 }
 
 var listIndexQuery = `

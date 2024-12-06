@@ -53,6 +53,7 @@
     - [DatabaseMetadata.LabelsEntry](#bytebase-store-DatabaseMetadata-LabelsEntry)
     - [DatabaseSchemaMetadata](#bytebase-store-DatabaseSchemaMetadata)
     - [DependentColumn](#bytebase-store-DependentColumn)
+    - [EventMetadata](#bytebase-store-EventMetadata)
     - [ExtensionMetadata](#bytebase-store-ExtensionMetadata)
     - [ExternalTableMetadata](#bytebase-store-ExternalTableMetadata)
     - [ForeignKeyMetadata](#bytebase-store-ForeignKeyMetadata)
@@ -106,12 +107,8 @@
   
 - [store/changelog.proto](#store_changelog-proto)
     - [ChangelogPayload](#bytebase-store-ChangelogPayload)
-    - [ChangelogRevision](#bytebase-store-ChangelogRevision)
-    - [ChangelogTask](#bytebase-store-ChangelogTask)
   
-    - [ChangelogRevision.Op](#bytebase-store-ChangelogRevision-Op)
-    - [ChangelogTask.Status](#bytebase-store-ChangelogTask-Status)
-    - [ChangelogTask.Type](#bytebase-store-ChangelogTask-Type)
+    - [ChangelogPayload.Type](#bytebase-store-ChangelogPayload-Type)
   
 - [store/data_source.proto](#store_data_source-proto)
     - [DataSourceExternalSecret](#bytebase-store-DataSourceExternalSecret)
@@ -1048,6 +1045,26 @@ DependentColumn is the metadata for dependent columns.
 
 
 
+<a name="bytebase-store-EventMetadata"></a>
+
+### EventMetadata
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the event. |
+| definition | [string](#string) |  | The schedule of the event. |
+| time_zone | [string](#string) |  | The time zone of the event. |
+| sql_mode | [string](#string) |  |  |
+| character_set_client | [string](#string) |  |  |
+| collation_connection | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="bytebase-store-ExtensionMetadata"></a>
 
 ### ExtensionMetadata
@@ -1331,7 +1348,8 @@ This is the concept of schema in Postgres, but it&#39;s a no-op for MySQL.
 | sequences | [SequenceMetadata](#bytebase-store-SequenceMetadata) | repeated | The sequences is the list of sequences in a schema. |
 | packages | [PackageMetadata](#bytebase-store-PackageMetadata) | repeated | The packages is the list of packages in a schema. |
 | owner | [string](#string) |  |  |
-| triggers | [TriggerMetadata](#bytebase-store-TriggerMetadata) | repeated | The triggers is the list of triggers in a schema, triggers are sorted by table_name, name, event, timing, action_order. |
+| triggers | [TriggerMetadata](#bytebase-store-TriggerMetadata) | repeated | The triggers is the list of triggers in a schema, triggers are sorted by table_name, event, timing, action_order. |
+| events | [EventMetadata](#bytebase-store-EventMetadata) | repeated |  |
 
 
 
@@ -1373,13 +1391,22 @@ This is the concept of schema in Postgres, but it&#39;s a no-op for MySQL.
 <a name="bytebase-store-SequenceMetadata"></a>
 
 ### SequenceMetadata
-SequenceMetadata is the metadata for sequences.
+
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | The name of a sequence. |
 | data_type | [string](#string) |  | The data type of a sequence. |
+| start | [string](#string) |  | The start value of a sequence. |
+| min_value | [string](#string) |  | The minimum value of a sequence. |
+| max_value | [string](#string) |  | The maximum value of a sequence. |
+| increment | [string](#string) |  | Increment value of a sequence. |
+| cycle | [bool](#bool) |  | Cycle is whether the sequence cycles. |
+| cache_size | [string](#string) |  | Cache size of a sequence. |
+| last_value | [string](#string) |  | Last value of a sequence. |
+| owner_table | [string](#string) |  | The owner table of the sequence. |
+| owner_column | [string](#string) |  | The owner column of the sequence. |
 
 
 
@@ -1606,11 +1633,13 @@ ViewMetadata is the metadata for views.
 <a name="bytebase-store-TablePartitionMetadata-Type"></a>
 
 ### TablePartitionMetadata.Type
-Type is the type of a table partition, some database engines may not support all types.
-Only avilable for the following database engines now:
-MySQL: RANGE, RANGE COLUMNS, LIST, LIST COLUMNS, HASH, LINEAR HASH, KEY, LINEAR_KEY (https://dev.mysql.com/doc/refman/8.0/en/partitioning-types.html)
-TiDB: RANGE, RANGE COLUMNS, LIST, LIST COLUMNS, HASH, KEY
-PostgreSQL: RANGE, LIST, HASH (https://www.postgresql.org/docs/current/ddl-partitioning.html)
+Type is the type of a table partition, some database engines may not
+support all types. Only avilable for the following database engines now:
+MySQL: RANGE, RANGE COLUMNS, LIST, LIST COLUMNS, HASH, LINEAR HASH, KEY,
+LINEAR_KEY
+(https://dev.mysql.com/doc/refman/8.0/en/partitioning-types.html) TiDB:
+RANGE, RANGE COLUMNS, LIST, LIST COLUMNS, HASH, KEY PostgreSQL: RANGE,
+LIST, HASH (https://www.postgresql.org/docs/current/ddl-partitioning.html)
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
@@ -1904,48 +1933,13 @@ PostgreSQL: RANGE, LIST, HASH (https://www.postgresql.org/docs/current/ddl-parti
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| task | [ChangelogTask](#bytebase-store-ChangelogTask) |  |  |
-| revision | [ChangelogRevision](#bytebase-store-ChangelogRevision) |  |  |
-
-
-
-
-
-
-<a name="bytebase-store-ChangelogRevision"></a>
-
-### ChangelogRevision
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| revision | [string](#string) |  | Marshalled revision for display |
-| operation | [ChangelogRevision.Op](#bytebase-store-ChangelogRevision-Op) |  |  |
-
-
-
-
-
-
-<a name="bytebase-store-ChangelogTask"></a>
-
-### ChangelogTask
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
 | task_run | [string](#string) |  | Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task}/taskruns/{taskrun} |
 | issue | [string](#string) |  | Format: projects/{project}/issues/{issue} |
 | revision | [int64](#int64) |  | The revision uid. optional |
 | changed_resources | [ChangedResources](#bytebase-store-ChangedResources) |  |  |
-| status | [ChangelogTask.Status](#bytebase-store-ChangelogTask-Status) |  |  |
-| prev_sync_history_id | [int64](#int64) |  |  |
-| sync_history_id | [int64](#int64) |  |  |
 | sheet | [string](#string) |  | The sheet that holds the content. Format: projects/{project}/sheets/{sheet} |
 | version | [string](#string) |  |  |
-| type | [ChangelogTask.Type](#bytebase-store-ChangelogTask-Type) |  |  |
+| type | [ChangelogPayload.Type](#bytebase-store-ChangelogPayload-Type) |  |  |
 
 
 
@@ -1954,36 +1948,9 @@ PostgreSQL: RANGE, LIST, HASH (https://www.postgresql.org/docs/current/ddl-parti
  
 
 
-<a name="bytebase-store-ChangelogRevision-Op"></a>
+<a name="bytebase-store-ChangelogPayload-Type"></a>
 
-### ChangelogRevision.Op
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| OP_UNSPECIFIED | 0 |  |
-| CREATE | 1 |  |
-| DELETE | 2 |  |
-
-
-
-<a name="bytebase-store-ChangelogTask-Status"></a>
-
-### ChangelogTask.Status
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| STATUS_UNSPECIFIED | 0 |  |
-| PENDING | 1 |  |
-| DONE | 2 |  |
-| FAILED | 3 |  |
-
-
-
-<a name="bytebase-store-ChangelogTask-Type"></a>
-
-### ChangelogTask.Type
+### ChangelogPayload.Type
 
 
 | Name | Number | Description |
@@ -3829,7 +3796,6 @@ SlowQueryPolicy is the policy configuration for slow query.
 | ----- | ---- | ----- | ----------- |
 | release | [string](#string) |  | Format: projects/{project}/releases/{release} Can be empty. |
 | file | [string](#string) |  | Format: projects/{project}/releases/{release}/files/{id} Can be empty. |
-| version | [string](#string) |  |  |
 | sheet | [string](#string) |  | The sheet that holds the content. Format: projects/{project}/sheets/{sheet} |
 | sheet_sha256 | [string](#string) |  | The SHA256 hash value of the sheet. |
 | task_run | [string](#string) |  | The task run associated with the revision. Can be empty. Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task}/taskRuns/{taskRun} |
