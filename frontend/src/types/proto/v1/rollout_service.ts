@@ -114,7 +114,21 @@ export interface CreateRolloutRequest {
    */
   parent: string;
   /** The rollout to create. */
-  rollout: Rollout | undefined;
+  rollout:
+    | Rollout
+    | undefined;
+  /**
+   * stage_id is the id in the plan deployment_config_snapshot.
+   * The rollout is created according to the plan and the
+   * stages are created up to the stage_id.
+   * If unspecified, all stages are created.
+   */
+  stageId: string;
+  /**
+   * If set, validate the request and preview the rollout, but
+   * do not actually create it.
+   */
+  validateOnly: boolean;
 }
 
 export interface PreviewRolloutRequest {
@@ -206,6 +220,12 @@ export interface Rollout {
 export interface Stage {
   /** Format: projects/{project}/rollouts/{rollout}/stages/{stage} */
   name: string;
+  /**
+   * The id comes from the deployment config.
+   * Format: UUID
+   * Empty for legacy stages.
+   */
+  id: string;
   title: string;
   tasks: Task[];
 }
@@ -529,7 +549,11 @@ export interface TaskRun {
   exportArchiveStatus: TaskRun_ExportArchiveStatus;
   /** The prior backup detail that will be used to rollback the task run. */
   priorBackupDetail: TaskRun_PriorBackupDetail | undefined;
-  schedulerInfo: TaskRun_SchedulerInfo | undefined;
+  schedulerInfo:
+    | TaskRun_SchedulerInfo
+    | undefined;
+  /** Format: projects/{project}/sheets/{sheet} */
+  sheet: string;
 }
 
 export enum TaskRun_Status {
@@ -1660,7 +1684,7 @@ export const ListRolloutsResponse: MessageFns<ListRolloutsResponse> = {
 };
 
 function createBaseCreateRolloutRequest(): CreateRolloutRequest {
-  return { parent: "", rollout: undefined };
+  return { parent: "", rollout: undefined, stageId: "", validateOnly: false };
 }
 
 export const CreateRolloutRequest: MessageFns<CreateRolloutRequest> = {
@@ -1670,6 +1694,12 @@ export const CreateRolloutRequest: MessageFns<CreateRolloutRequest> = {
     }
     if (message.rollout !== undefined) {
       Rollout.encode(message.rollout, writer.uint32(18).fork()).join();
+    }
+    if (message.stageId !== "") {
+      writer.uint32(26).string(message.stageId);
+    }
+    if (message.validateOnly !== false) {
+      writer.uint32(32).bool(message.validateOnly);
     }
     return writer;
   },
@@ -1697,6 +1727,22 @@ export const CreateRolloutRequest: MessageFns<CreateRolloutRequest> = {
           message.rollout = Rollout.decode(reader, reader.uint32());
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.stageId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.validateOnly = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1710,6 +1756,8 @@ export const CreateRolloutRequest: MessageFns<CreateRolloutRequest> = {
     return {
       parent: isSet(object.parent) ? globalThis.String(object.parent) : "",
       rollout: isSet(object.rollout) ? Rollout.fromJSON(object.rollout) : undefined,
+      stageId: isSet(object.stageId) ? globalThis.String(object.stageId) : "",
+      validateOnly: isSet(object.validateOnly) ? globalThis.Boolean(object.validateOnly) : false,
     };
   },
 
@@ -1720,6 +1768,12 @@ export const CreateRolloutRequest: MessageFns<CreateRolloutRequest> = {
     }
     if (message.rollout !== undefined) {
       obj.rollout = Rollout.toJSON(message.rollout);
+    }
+    if (message.stageId !== "") {
+      obj.stageId = message.stageId;
+    }
+    if (message.validateOnly !== false) {
+      obj.validateOnly = message.validateOnly;
     }
     return obj;
   },
@@ -1733,6 +1787,8 @@ export const CreateRolloutRequest: MessageFns<CreateRolloutRequest> = {
     message.rollout = (object.rollout !== undefined && object.rollout !== null)
       ? Rollout.fromPartial(object.rollout)
       : undefined;
+    message.stageId = object.stageId ?? "";
+    message.validateOnly = object.validateOnly ?? false;
     return message;
   },
 };
@@ -2283,13 +2339,16 @@ export const Rollout: MessageFns<Rollout> = {
 };
 
 function createBaseStage(): Stage {
-  return { name: "", title: "", tasks: [] };
+  return { name: "", id: "", title: "", tasks: [] };
 }
 
 export const Stage: MessageFns<Stage> = {
   encode(message: Stage, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.name !== "") {
       writer.uint32(10).string(message.name);
+    }
+    if (message.id !== "") {
+      writer.uint32(26).string(message.id);
     }
     if (message.title !== "") {
       writer.uint32(34).string(message.title);
@@ -2313,6 +2372,14 @@ export const Stage: MessageFns<Stage> = {
           }
 
           message.name = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.id = reader.string();
           continue;
         }
         case 4: {
@@ -2343,6 +2410,7 @@ export const Stage: MessageFns<Stage> = {
   fromJSON(object: any): Stage {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
+      id: isSet(object.id) ? globalThis.String(object.id) : "",
       title: isSet(object.title) ? globalThis.String(object.title) : "",
       tasks: globalThis.Array.isArray(object?.tasks) ? object.tasks.map((e: any) => Task.fromJSON(e)) : [],
     };
@@ -2352,6 +2420,9 @@ export const Stage: MessageFns<Stage> = {
     const obj: any = {};
     if (message.name !== "") {
       obj.name = message.name;
+    }
+    if (message.id !== "") {
+      obj.id = message.id;
     }
     if (message.title !== "") {
       obj.title = message.title;
@@ -2368,6 +2439,7 @@ export const Stage: MessageFns<Stage> = {
   fromPartial(object: DeepPartial<Stage>): Stage {
     const message = createBaseStage();
     message.name = object.name ?? "";
+    message.id = object.id ?? "";
     message.title = object.title ?? "";
     message.tasks = object.tasks?.map((e) => Task.fromPartial(e)) || [];
     return message;
@@ -3271,6 +3343,7 @@ function createBaseTaskRun(): TaskRun {
     exportArchiveStatus: TaskRun_ExportArchiveStatus.EXPORT_ARCHIVE_STATUS_UNSPECIFIED,
     priorBackupDetail: undefined,
     schedulerInfo: undefined,
+    sheet: "",
   };
 }
 
@@ -3317,6 +3390,9 @@ export const TaskRun: MessageFns<TaskRun> = {
     }
     if (message.schedulerInfo !== undefined) {
       TaskRun_SchedulerInfo.encode(message.schedulerInfo, writer.uint32(146).fork()).join();
+    }
+    if (message.sheet !== "") {
+      writer.uint32(154).string(message.sheet);
     }
     return writer;
   },
@@ -3440,6 +3516,14 @@ export const TaskRun: MessageFns<TaskRun> = {
           message.schedulerInfo = TaskRun_SchedulerInfo.decode(reader, reader.uint32());
           continue;
         }
+        case 19: {
+          if (tag !== 154) {
+            break;
+          }
+
+          message.sheet = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3469,6 +3553,7 @@ export const TaskRun: MessageFns<TaskRun> = {
         ? TaskRun_PriorBackupDetail.fromJSON(object.priorBackupDetail)
         : undefined,
       schedulerInfo: isSet(object.schedulerInfo) ? TaskRun_SchedulerInfo.fromJSON(object.schedulerInfo) : undefined,
+      sheet: isSet(object.sheet) ? globalThis.String(object.sheet) : "",
     };
   },
 
@@ -3516,6 +3601,9 @@ export const TaskRun: MessageFns<TaskRun> = {
     if (message.schedulerInfo !== undefined) {
       obj.schedulerInfo = TaskRun_SchedulerInfo.toJSON(message.schedulerInfo);
     }
+    if (message.sheet !== "") {
+      obj.sheet = message.sheet;
+    }
     return obj;
   },
 
@@ -3549,6 +3637,7 @@ export const TaskRun: MessageFns<TaskRun> = {
     message.schedulerInfo = (object.schedulerInfo !== undefined && object.schedulerInfo !== null)
       ? TaskRun_SchedulerInfo.fromPartial(object.schedulerInfo)
       : undefined;
+    message.sheet = object.sheet ?? "";
     return message;
   },
 };
@@ -5805,6 +5894,7 @@ export const RolloutServiceDefinition = {
         },
       },
     },
+    /** CreateRollout can be called multiple times with the same rollout.plan but different stage_id to promote rollout stages. */
     createRollout: {
       name: "CreateRollout",
       requestType: CreateRolloutRequest,

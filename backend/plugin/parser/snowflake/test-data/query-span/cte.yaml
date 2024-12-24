@@ -37,6 +37,7 @@
       ]
     }
   querySpan:
+    type: 1
     results:
         - name: C1
           sourcecolumns:
@@ -50,6 +51,7 @@
               schema: PUBLIC
               table: T1
               column: B
+          isplainfield: true
         - name: C2
           sourcecolumns:
             - server: ""
@@ -62,6 +64,7 @@
               schema: PUBLIC
               table: T1
               column: B
+          isplainfield: true
         - name: C3
           sourcecolumns:
             - server: ""
@@ -79,8 +82,10 @@
               schema: PUBLIC
               table: T1
               column: C
+          isplainfield: true
         - name: "N"
           sourcecolumns: []
+          isplainfield: false
     sourcecolumns:
         - server: ""
           database: SNOWFLAKE

@@ -17,6 +17,8 @@ roles:
       - bb.changelists.get
       - bb.changelists.list
       - bb.changelists.update
+      - bb.databaseCatalogs.get
+      - bb.databaseCatalogs.update
       - bb.databaseSecrets.delete
       - bb.databaseSecrets.list
       - bb.databaseSecrets.update
@@ -85,6 +87,7 @@ roles:
       - bb.roles.create
       - bb.roles.delete
       - bb.roles.list
+      - bb.roles.get
       - bb.roles.update
       - bb.rollouts.create
       - bb.rollouts.get
@@ -147,6 +150,8 @@ roles:
       - bb.changelists.get
       - bb.changelists.list
       - bb.changelists.update
+      - bb.databaseCatalogs.get
+      - bb.databaseCatalogs.update
       - bb.databaseSecrets.delete
       - bb.databaseSecrets.list
       - bb.databaseSecrets.update
@@ -215,6 +220,7 @@ roles:
       - bb.roles.create
       - bb.roles.delete
       - bb.roles.list
+      - bb.roles.get
       - bb.roles.update
       - bb.rollouts.create
       - bb.rollouts.get
@@ -265,6 +271,7 @@ roles:
       - bb.reviewConfigs.list
       - bb.risks.list
       - bb.roles.list
+      - bb.roles.get
       - bb.settings.get
       - bb.settings.list
       - bb.groups.create
@@ -291,6 +298,8 @@ roles:
       - bb.changelists.get
       - bb.changelists.list
       - bb.changelists.update
+      - bb.databaseCatalogs.get
+      - bb.databaseCatalogs.update
       - bb.databaseSecrets.delete
       - bb.databaseSecrets.list
       - bb.databaseSecrets.update
@@ -354,6 +363,7 @@ roles:
       - bb.changelists.get
       - bb.changelists.list
       - bb.changelists.update
+      - bb.databaseCatalogs.get
       - bb.databases.check
       - bb.databases.get
       - bb.databases.getSchema
@@ -387,6 +397,7 @@ roles:
   - name: roles/sqlEditorUser
     title: SQL Editor User
     permissions:
+      - bb.databaseCatalogs.get
       - bb.databases.check
       - bb.databases.get
       - bb.databases.getSchema
@@ -402,6 +413,7 @@ roles:
   - name: roles/projectExporter
     title: Project exporter
     permissions:
+      - bb.databaseCatalogs.get
       - bb.databases.check
       - bb.databases.get
       - bb.databases.getSchema
@@ -415,6 +427,7 @@ roles:
     permissions:
       - bb.branches.get
       - bb.changeHistories.get
+      - bb.databaseCatalogs.get
       - bb.databases.check
       - bb.databases.get
       - bb.databases.getSchema
@@ -437,6 +450,7 @@ roles:
   - name: roles/projectViewer
     title: Project viewer
     permissions:
+      - bb.databaseCatalogs.get
       - bb.databases.get
       - bb.databases.getSchema
       - bb.databases.list

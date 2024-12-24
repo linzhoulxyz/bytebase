@@ -59,6 +59,7 @@
       ]
     }
   querySpan:
+    type: 1
     results:
         - name: X
           sourcecolumns:
@@ -67,6 +68,7 @@
               schema: PUBLIC
               table: T1
               column: A
+          isplainfield: true
         - name: Z
           sourcecolumns:
             - server: ""
@@ -74,6 +76,7 @@
               schema: PUBLIC
               table: T1
               column: B
+          isplainfield: true
         - name: C
           sourcecolumns:
             - server: ""
@@ -81,6 +84,7 @@
               schema: PUBLIC
               table: T1
               column: C
+          isplainfield: true
         - name: D
           sourcecolumns:
             - server: ""
@@ -88,6 +92,7 @@
               schema: PUBLIC
               table: T1
               column: D
+          isplainfield: true
     sourcecolumns:
         - server: ""
           database: SNOWFLAKE
@@ -155,6 +160,7 @@
       ]
     }
   querySpan:
+    type: 1
     results:
         - name: A
           sourcecolumns:
@@ -163,6 +169,7 @@
               schema: PUBLIC
               table: T1
               column: A
+          isplainfield: true
         - name: B
           sourcecolumns:
             - server: ""
@@ -170,6 +177,7 @@
               schema: PUBLIC
               table: T1
               column: B
+          isplainfield: true
         - name: C
           sourcecolumns:
             - server: ""
@@ -177,6 +185,7 @@
               schema: PUBLIC
               table: T1
               column: C
+          isplainfield: true
         - name: D
           sourcecolumns:
             - server: ""
@@ -184,6 +193,7 @@
               schema: PUBLIC
               table: T1
               column: D
+          isplainfield: true
         - name: A
           sourcecolumns:
             - server: ""
@@ -191,6 +201,7 @@
               schema: PUBLIC
               table: T2
               column: A
+          isplainfield: true
         - name: E
           sourcecolumns:
             - server: ""
@@ -198,6 +209,7 @@
               schema: PUBLIC
               table: T2
               column: E
+          isplainfield: true
         - name: C
           sourcecolumns:
             - server: ""
@@ -205,6 +217,7 @@
               schema: PUBLIC
               table: T2
               column: C
+          isplainfield: true
         - name: D
           sourcecolumns:
             - server: ""
@@ -212,6 +225,7 @@
               schema: PUBLIC
               table: T2
               column: D
+          isplainfield: true
         - name: E
           sourcecolumns:
             - server: ""
@@ -219,6 +233,7 @@
               schema: PUBLIC
               table: T3
               column: E
+          isplainfield: true
         - name: F
           sourcecolumns:
             - server: ""
@@ -226,6 +241,7 @@
               schema: PUBLIC
               table: T3
               column: F
+          isplainfield: true
     sourcecolumns:
         - server: ""
           database: SNOWFLAKE
@@ -303,6 +319,7 @@
       ]
     }
   querySpan:
+    type: 1
     results:
         - name: A
           sourcecolumns:
@@ -311,6 +328,7 @@
               schema: PUBLIC
               table: T1
               column: A
+          isplainfield: true
         - name: E
           sourcecolumns:
             - server: ""
@@ -318,6 +336,7 @@
               schema: PUBLIC
               table: T2
               column: E
+          isplainfield: true
         - name: F
           sourcecolumns:
             - server: ""
@@ -325,6 +344,7 @@
               schema: PUBLIC
               table: T3
               column: F
+          isplainfield: true
     sourcecolumns:
         - server: ""
           database: SNOWFLAKE
@@ -374,6 +394,7 @@
       ]
     }
   querySpan:
+    type: 1
     results:
         - name: A
           sourcecolumns:
@@ -382,6 +403,7 @@
               schema: PUBLIC
               table: T1
               column: A
+          isplainfield: true
         - name: B
           sourcecolumns:
             - server: ""
@@ -389,6 +411,7 @@
               schema: PUBLIC
               table: T1
               column: B
+          isplainfield: true
     sourcecolumns:
         - server: ""
           database: SNOWFLAKE
@@ -428,6 +451,7 @@
       ]
     }
   querySpan:
+    type: 1
     results:
         - name: A
           sourcecolumns:
@@ -436,6 +460,7 @@
               schema: PUBLIC
               table: T1
               column: A
+          isplainfield: true
         - name: B
           sourcecolumns:
             - server: ""
@@ -443,6 +468,7 @@
               schema: PUBLIC
               table: T1
               column: B
+          isplainfield: true
         - name: C
           sourcecolumns:
             - server: ""
@@ -450,6 +476,7 @@
               schema: PUBLIC
               table: T1
               column: C
+          isplainfield: true
         - name: D
           sourcecolumns:
             - server: ""
@@ -457,6 +484,7 @@
               schema: PUBLIC
               table: T1
               column: D
+          isplainfield: true
     sourcecolumns:
         - server: ""
           database: SNOWFLAKE

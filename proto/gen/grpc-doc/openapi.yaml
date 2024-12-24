@@ -464,7 +464,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - MASKING
                         - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
@@ -532,7 +531,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - MASKING
                         - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
@@ -1396,6 +1394,79 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/instances/{instance}/databases/{database}/catalog:
+        get:
+            tags:
+                - DatabaseCatalogService
+            operationId: DatabaseCatalogService_GetDatabaseCatalog
+            parameters:
+                - name: instance
+                  in: path
+                  description: The instance id.
+                  required: true
+                  schema:
+                    type: string
+                - name: database
+                  in: path
+                  description: The database id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DatabaseCatalog'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        patch:
+            tags:
+                - DatabaseCatalogService
+            operationId: DatabaseCatalogService_UpdateDatabaseCatalog
+            parameters:
+                - name: instance
+                  in: path
+                  description: The instance id.
+                  required: true
+                  schema:
+                    type: string
+                - name: database
+                  in: path
+                  description: The database id.
+                  required: true
+                  schema:
+                    type: string
+                - name: updateMask
+                  in: query
+                  description: The list of fields to update.
+                  schema:
+                    type: string
+                    format: field-mask
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/DatabaseCatalog'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DatabaseCatalog'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/instances/{instance}/databases/{database}/changeHistories:
         get:
             tags:
@@ -1861,7 +1932,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - MASKING
                         - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
@@ -1935,7 +2005,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - MASKING
                         - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
@@ -2544,44 +2613,6 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
-    /v1/instances/{instance}/databases/{database}:generateRestoreSQL:
-        post:
-            tags:
-                - SQLService
-            description: Deprecated.
-            operationId: SQLService_GenerateRestoreSQL
-            parameters:
-                - name: instance
-                  in: path
-                  description: The instance id.
-                  required: true
-                  schema:
-                    type: string
-                - name: database
-                  in: path
-                  description: The database id.
-                  required: true
-                  schema:
-                    type: string
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/GenerateRestoreSQLRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/GenerateRestoreSQLResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
     /v1/instances/{instance}/databases/{database}:query:
         post:
             tags:
@@ -2705,7 +2736,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - MASKING
                         - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
@@ -2773,7 +2803,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - MASKING
                         - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
@@ -3281,7 +3310,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - MASKING
                         - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
@@ -3353,7 +3381,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - MASKING
                         - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
@@ -5382,7 +5409,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - MASKING
                         - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
@@ -5450,7 +5476,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - MASKING
                         - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
@@ -5877,6 +5902,7 @@ paths:
         post:
             tags:
                 - RolloutService
+            description: CreateRollout can be called multiple times with the same rollout.plan but different stage_id to promote rollout stages.
             operationId: RolloutService_CreateRollout
             parameters:
                 - name: project
@@ -5885,6 +5911,22 @@ paths:
                   required: true
                   schema:
                     type: string
+                - name: stageId
+                  in: query
+                  description: |-
+                    stage_id is the id in the plan deployment_config_snapshot.
+                     The rollout is created according to the plan and the
+                     stages are created up to the stage_id.
+                     If unspecified, all stages are created.
+                  schema:
+                    type: string
+                - name: validateOnly
+                  in: query
+                  description: |-
+                    If set, validate the request and preview the rollout, but
+                     do not actually create it.
+                  schema:
+                    type: boolean
             requestBody:
                 content:
                     application/json:
@@ -7446,6 +7488,30 @@ paths:
                             schema:
                                 $ref: '#/components/schemas/Status'
     /v1/roles/{role}:
+        get:
+            tags:
+                - RoleService
+            operationId: RoleService_GetRole
+            parameters:
+                - name: role
+                  in: path
+                  description: The role id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Role'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
         delete:
             tags:
                 - RoleService
@@ -8885,7 +8951,18 @@ components:
                     $ref: '#/components/schemas/AppIMSetting_Feishu'
                 wecom:
                     $ref: '#/components/schemas/AppIMSetting_Wecom'
+                lark:
+                    $ref: '#/components/schemas/AppIMSetting_Lark'
         AppIMSetting_Feishu:
+            type: object
+            properties:
+                enabled:
+                    type: boolean
+                appId:
+                    type: string
+                appSecret:
+                    type: string
+        AppIMSetting_Lark:
             type: object
             properties:
                 enabled:
@@ -9712,6 +9789,34 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/Advice'
+        ColumnCatalog:
+            type: object
+            properties:
+                name:
+                    type: string
+                semanticTypeId:
+                    type: string
+                labels:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: The user labels for a column.
+                classificationId:
+                    type: string
+                maskingLevel:
+                    enum:
+                        - MASKING_LEVEL_UNSPECIFIED
+                        - NONE
+                        - PARTIAL
+                        - FULL
+                    type: string
+                    format: enum
+                fullMaskingAlgorithmId:
+                    type: string
+                partialMaskingAlgorithmId:
+                    type: string
+                objectSchema:
+                    $ref: '#/components/schemas/ObjectSchema'
         ColumnConfig:
             type: object
             properties:
@@ -9726,6 +9831,18 @@ components:
                         type: string
                     description: The user labels for a column.
                 classificationId:
+                    type: string
+                maskingLevel:
+                    enum:
+                        - MASKING_LEVEL_UNSPECIFIED
+                        - NONE
+                        - PARTIAL
+                        - FULL
+                    type: string
+                    format: enum
+                fullMaskingAlgorithmId:
+                    type: string
+                partialMaskingAlgorithmId:
                     type: string
         ColumnMetadata:
             type: object
@@ -10118,6 +10235,18 @@ components:
                     readOnly: true
                     type: boolean
                     description: The database is available for DML prior backup.
+        DatabaseCatalog:
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: |-
+                        The name of the database catalog.
+                         Format: instances/{instance}/databases/{database}/catalog
+                schemas:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/SchemaCatalog'
         DatabaseConfig:
             type: object
             properties:
@@ -10190,20 +10319,12 @@ components:
         DeploymentConfig:
             type: object
             properties:
-                name:
-                    type: string
-                    description: |-
-                        The name of the resource.
-                         Format: projects/{project}/deploymentConfigs/default.
-                title:
-                    type: string
-                    description: The title of the deployment config.
                 schedule:
                     $ref: '#/components/schemas/Schedule'
         DeploymentSpec:
             type: object
             properties:
-                labelSelector:
+                selector:
                     $ref: '#/components/schemas/LabelSelector'
         DiffMetadataRequest:
             required:
@@ -10616,36 +10737,6 @@ components:
                     type: string
                     description: The timestamp when the function is updated in branch.
                     format: date-time
-        GenerateRestoreSQLRequest:
-            required:
-                - name
-            type: object
-            properties:
-                name:
-                    type: string
-                    description: |-
-                        The database name to execute the query against.
-                         Format: instances/{instance}/databases/{databaseName}
-                sheet:
-                    type: string
-                    description: |-
-                        The resource name of the sheet. It is used to get the original statement.
-                         Format: projects/{project}/sheets/{sheet}
-                backupDataSource:
-                    type: string
-                    description: |-
-                        The data source to restore from.
-                         Format: instances/{instance}/databases/{databaseName}, for general engines.
-                         Or instances/{instance}/databases/{databaseName}/schemas/{schemaName}, for PG only.
-                backupTable:
-                    type: string
-                    description: The backup table name.
-        GenerateRestoreSQLResponse:
-            type: object
-            properties:
-                statement:
-                    type: string
-                    description: The restore SQL statement.
         GenerationMetadata:
             type: object
             properties:
@@ -10831,6 +10922,15 @@ components:
                 definition:
                     type: string
                     description: The definition of an index.
+                parentIndexSchema:
+                    type: string
+                    description: The schema name of the parent index.
+                parentIndexName:
+                    type: string
+                    description: The index name of the parent index.
+                granularity:
+                    type: string
+                    description: The number of granules in the block. It's a ClickHouse specific field.
             description: IndexMetadata is the metadata for indexes.
         Instance:
             type: object
@@ -10915,6 +11015,13 @@ components:
                         The maximum number of connections.
                          The default is 10 if the value is unset or zero.
                     format: int32
+                syncDatabases:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        Enable sync for following databases.
+                         Default empty, means sync all schemas & databases.
             description: InstanceOptions is the option for instances.
         InstanceResource:
             type: object
@@ -11344,6 +11451,7 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/LabelSelectorRequirement'
+                    description: match_expressions is a list of label selector requirements. The requirements are ANDed.
         LabelSelectorRequirement:
             type: object
             properties:
@@ -11352,15 +11460,16 @@ components:
                 operator:
                     enum:
                         - OPERATOR_TYPE_UNSPECIFIED
-                        - OPERATOR_TYPE_IN
-                        - OPERATOR_TYPE_EXISTS
-                        - OPERATOR_TYPE_NOT_IN
+                        - IN
+                        - EXISTS
+                        - NOT_IN
                     type: string
                     format: enum
                 values:
                     type: array
                     items:
                         type: string
+                    description: Values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
         ListBranchesResponse:
             type: object
             properties:
@@ -11807,27 +11916,6 @@ components:
         LogoutRequest:
             type: object
             properties: {}
-        MaskData:
-            type: object
-            properties:
-                schema:
-                    type: string
-                table:
-                    type: string
-                column:
-                    type: string
-                maskingLevel:
-                    enum:
-                        - MASKING_LEVEL_UNSPECIFIED
-                        - NONE
-                        - PARTIAL
-                        - FULL
-                    type: string
-                    format: enum
-                fullMaskingAlgorithmId:
-                    type: string
-                partialMaskingAlgorithmId:
-                    type: string
         MaskingAlgorithmSetting:
             type: object
             properties:
@@ -11901,13 +11989,6 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/Expr'
                     description: The condition that is associated with this exception policy instance.
-        MaskingPolicy:
-            type: object
-            properties:
-                maskData:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/MaskData'
         MaskingRulePolicy:
             type: object
             properties:
@@ -11988,10 +12069,6 @@ components:
                     type: string
                 clientSecret:
                     type: string
-                scopes:
-                    type: array
-                    items:
-                        type: string
                 fieldMapping:
                     $ref: '#/components/schemas/FieldMapping'
                 skipTlsVerify:
@@ -12003,10 +12080,53 @@ components:
                         - IN_HEADER
                     type: string
                     format: enum
+                scopes:
+                    readOnly: true
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        The scopes that the OIDC provider supports.
+                         Should be fetched from the well-known configuration file of the OIDC provider.
+                authEndpoint:
+                    readOnly: true
+                    type: string
+                    description: |-
+                        The authorization endpoint of the OIDC provider.
+                         Should be fetched from the well-known configuration file of the OIDC provider.
             description: OIDCIdentityProviderConfig is the structure for OIDC identity provider config.
         OIDCIdentityProviderContext:
             type: object
             properties: {}
+        ObjectSchema:
+            type: object
+            properties:
+                type:
+                    enum:
+                        - TYPE_UNSPECIFIED
+                        - STRING
+                        - NUMBER
+                        - BOOLEAN
+                        - OBJECT
+                        - ARRAY
+                    type: string
+                    format: enum
+                structKind:
+                    $ref: '#/components/schemas/ObjectSchema_StructKind'
+                arrayKind:
+                    $ref: '#/components/schemas/ObjectSchema_ArrayKind'
+        ObjectSchema_ArrayKind:
+            type: object
+            properties:
+                kind:
+                    $ref: '#/components/schemas/ObjectSchema'
+        ObjectSchema_StructKind:
+            type: object
+            properties:
+                properties:
+                    type: object
+                    additionalProperties:
+                        $ref: '#/components/schemas/ObjectSchema'
         ParseMyBatisMapperRequest:
             type: object
             properties:
@@ -12101,6 +12221,13 @@ components:
                          - ERROR
                 releaseSource:
                     $ref: '#/components/schemas/Plan_ReleaseSource'
+                deploymentConfigSnapshot:
+                    readOnly: true
+                    allOf:
+                        - $ref: '#/components/schemas/DeploymentConfig'
+                    description: |-
+                        The deployment config snapshot taken at the time of plan creation.
+                         This is to ensure that we get consistent rollout for the plan.
         PlanCheckRun:
             type: object
             properties:
@@ -12359,7 +12486,6 @@ components:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - MASKING
                         - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
@@ -12372,8 +12498,6 @@ components:
                     format: enum
                 rolloutPolicy:
                     $ref: '#/components/schemas/RolloutPolicy'
-                maskingPolicy:
-                    $ref: '#/components/schemas/MaskingPolicy'
                 slowQueryPolicy:
                     $ref: '#/components/schemas/SlowQueryPolicy'
                 disableCopyDataPolicy:
@@ -12769,6 +12893,8 @@ components:
                     items:
                         $ref: '#/components/schemas/QueryRow'
                     description: Rows of the query result.
+                rowsCount:
+                    type: string
                 masked:
                     type: array
                     items:
@@ -13220,6 +13346,13 @@ components:
                     type: array
                     items:
                         type: string
+                type:
+                    enum:
+                        - TYPE_UNSPECIFIED
+                        - BUILT_IN
+                        - CUSTOM
+                    type: string
+                    format: enum
         Rollout:
             required:
                 - plan
@@ -13468,12 +13601,15 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/ScheduleDeployment'
+            description: Schedule is the message for deployment schedule.
         ScheduleDeployment:
             type: object
             properties:
                 title:
                     type: string
                     description: The title of the deployment (stage) in a schedule.
+                id:
+                    type: string
                 spec:
                     $ref: '#/components/schemas/DeploymentSpec'
         SchedulerInfo_WaitingCause:
@@ -13484,6 +13620,15 @@ components:
                 taskUid:
                     type: integer
                     format: int32
+        SchemaCatalog:
+            type: object
+            properties:
+                name:
+                    type: string
+                tables:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/TableCatalog'
         SchemaConfig:
             type: object
             properties:
@@ -14255,6 +14400,13 @@ components:
                 name:
                     type: string
                     description: 'Format: projects/{project}/rollouts/{rollout}/stages/{stage}'
+                id:
+                    readOnly: true
+                    type: string
+                    description: |-
+                        The id comes from the deployment config.
+                         Format: UUID
+                         Empty for legacy stages.
                 title:
                     type: string
                 tasks:
@@ -14391,7 +14543,12 @@ components:
                          the instance metadata (such as the database list) and any newly discovered instances will be synced.
         SyncInstanceResponse:
             type: object
-            properties: {}
+            properties:
+                databases:
+                    type: array
+                    items:
+                        type: string
+                    description: All database name list in the instance.
         SyncSlowQueriesRequest:
             required:
                 - parent
@@ -14403,6 +14560,24 @@ components:
                         The name of the instance to sync slow queries.
                          Format: instances/{instance} for one instance
                               or projects/{project} for one project.
+        TableCatalog:
+            type: object
+            properties:
+                name:
+                    type: string
+                columns:
+                    $ref: '#/components/schemas/TableCatalog_Columns'
+                objectSchema:
+                    $ref: '#/components/schemas/ObjectSchema'
+                classificationId:
+                    type: string
+        TableCatalog_Columns:
+            type: object
+            properties:
+                columns:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ColumnCatalog'
         TableConfig:
             type: object
             properties:
@@ -14498,6 +14673,13 @@ components:
                     description: The check_constraints is the list of check constraints in a table.
                 owner:
                     type: string
+                sortingKeys:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        The sorting_keys is a tuple of column names or arbitrary expressions. ClickHouse specific field.
+                         Reference: https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/mergetree#order_by
             description: TableMetadata is the metadata for tables.
         TablePartitionMetadata:
             type: object
@@ -14555,6 +14737,10 @@ components:
                     items:
                         $ref: '#/components/schemas/TablePartitionMetadata'
                     description: The subpartitions is the list of subpartitions in a table partition.
+                indexes:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/IndexMetadata'
             description: TablePartitionMetadata is the metadata for table partitions.
         TagPolicy:
             type: object
@@ -14696,6 +14882,10 @@ components:
                     readOnly: true
                     allOf:
                         - $ref: '#/components/schemas/TaskRun_SchedulerInfo'
+                sheet:
+                    readOnly: true
+                    type: string
+                    description: 'Format: projects/{project}/sheets/{sheet}'
         TaskRunLog:
             type: object
             properties:
@@ -15308,6 +15498,7 @@ components:
                         - TYPE_FEISHU
                         - TYPE_WECOM
                         - TYPE_CUSTOM
+                        - TYPE_LARK
                     type: string
                     description: type is the type of the webhook.
                     format: enum
@@ -15546,6 +15737,7 @@ tags:
     - name: BranchService
     - name: CelService
     - name: ChangelistService
+    - name: DatabaseCatalogService
     - name: DatabaseGroupService
     - name: DatabaseService
     - name: EnvironmentService

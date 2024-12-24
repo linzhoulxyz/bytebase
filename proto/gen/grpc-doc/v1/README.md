@@ -93,6 +93,7 @@
     - [DependentColumn](#bytebase-v1-DependentColumn)
     - [DiffSchemaRequest](#bytebase-v1-DiffSchemaRequest)
     - [DiffSchemaResponse](#bytebase-v1-DiffSchemaResponse)
+    - [EnumTypeMetadata](#bytebase-v1-EnumTypeMetadata)
     - [EventMetadata](#bytebase-v1-EventMetadata)
     - [ExtensionMetadata](#bytebase-v1-ExtensionMetadata)
     - [ExternalTableMetadata](#bytebase-v1-ExternalTableMetadata)
@@ -226,6 +227,7 @@
     - [Announcement](#bytebase-v1-Announcement)
     - [AppIMSetting](#bytebase-v1-AppIMSetting)
     - [AppIMSetting.Feishu](#bytebase-v1-AppIMSetting-Feishu)
+    - [AppIMSetting.Lark](#bytebase-v1-AppIMSetting-Lark)
     - [AppIMSetting.Slack](#bytebase-v1-AppIMSetting-Slack)
     - [AppIMSetting.Wecom](#bytebase-v1-AppIMSetting-Wecom)
     - [DataClassificationSetting](#bytebase-v1-DataClassificationSetting)
@@ -379,6 +381,24 @@
   
     - [ChangelistService](#bytebase-v1-ChangelistService)
   
+- [v1/database_catalog_service.proto](#v1_database_catalog_service-proto)
+    - [ColumnCatalog](#bytebase-v1-ColumnCatalog)
+    - [ColumnCatalog.LabelsEntry](#bytebase-v1-ColumnCatalog-LabelsEntry)
+    - [DatabaseCatalog](#bytebase-v1-DatabaseCatalog)
+    - [GetDatabaseCatalogRequest](#bytebase-v1-GetDatabaseCatalogRequest)
+    - [ObjectSchema](#bytebase-v1-ObjectSchema)
+    - [ObjectSchema.ArrayKind](#bytebase-v1-ObjectSchema-ArrayKind)
+    - [ObjectSchema.StructKind](#bytebase-v1-ObjectSchema-StructKind)
+    - [ObjectSchema.StructKind.PropertiesEntry](#bytebase-v1-ObjectSchema-StructKind-PropertiesEntry)
+    - [SchemaCatalog](#bytebase-v1-SchemaCatalog)
+    - [TableCatalog](#bytebase-v1-TableCatalog)
+    - [TableCatalog.Columns](#bytebase-v1-TableCatalog-Columns)
+    - [UpdateDatabaseCatalogRequest](#bytebase-v1-UpdateDatabaseCatalogRequest)
+  
+    - [ObjectSchema.Type](#bytebase-v1-ObjectSchema-Type)
+  
+    - [DatabaseCatalogService](#bytebase-v1-DatabaseCatalogService)
+  
 - [v1/database_group_service.proto](#v1_database_group_service-proto)
     - [CreateDatabaseGroupRequest](#bytebase-v1-CreateDatabaseGroupRequest)
     - [DatabaseGroup](#bytebase-v1-DatabaseGroup)
@@ -453,10 +473,8 @@
     - [GetPolicyRequest](#bytebase-v1-GetPolicyRequest)
     - [ListPoliciesRequest](#bytebase-v1-ListPoliciesRequest)
     - [ListPoliciesResponse](#bytebase-v1-ListPoliciesResponse)
-    - [MaskData](#bytebase-v1-MaskData)
     - [MaskingExceptionPolicy](#bytebase-v1-MaskingExceptionPolicy)
     - [MaskingExceptionPolicy.MaskingException](#bytebase-v1-MaskingExceptionPolicy-MaskingException)
-    - [MaskingPolicy](#bytebase-v1-MaskingPolicy)
     - [MaskingRulePolicy](#bytebase-v1-MaskingRulePolicy)
     - [MaskingRulePolicy.MaskingRule](#bytebase-v1-MaskingRulePolicy-MaskingRule)
     - [Policy](#bytebase-v1-Policy)
@@ -475,6 +493,44 @@
     - [SQLReviewRuleLevel](#bytebase-v1-SQLReviewRuleLevel)
   
     - [OrgPolicyService](#bytebase-v1-OrgPolicyService)
+  
+- [v1/project_service.proto](#v1_project_service-proto)
+    - [Activity](#bytebase-v1-Activity)
+    - [AddWebhookRequest](#bytebase-v1-AddWebhookRequest)
+    - [BatchGetIamPolicyRequest](#bytebase-v1-BatchGetIamPolicyRequest)
+    - [BatchGetIamPolicyResponse](#bytebase-v1-BatchGetIamPolicyResponse)
+    - [BatchGetIamPolicyResponse.PolicyResult](#bytebase-v1-BatchGetIamPolicyResponse-PolicyResult)
+    - [CreateProjectRequest](#bytebase-v1-CreateProjectRequest)
+    - [DeleteProjectRequest](#bytebase-v1-DeleteProjectRequest)
+    - [DeploymentConfig](#bytebase-v1-DeploymentConfig)
+    - [DeploymentSpec](#bytebase-v1-DeploymentSpec)
+    - [GetDeploymentConfigRequest](#bytebase-v1-GetDeploymentConfigRequest)
+    - [GetProjectRequest](#bytebase-v1-GetProjectRequest)
+    - [Label](#bytebase-v1-Label)
+    - [LabelSelector](#bytebase-v1-LabelSelector)
+    - [LabelSelectorRequirement](#bytebase-v1-LabelSelectorRequirement)
+    - [ListProjectsRequest](#bytebase-v1-ListProjectsRequest)
+    - [ListProjectsResponse](#bytebase-v1-ListProjectsResponse)
+    - [Project](#bytebase-v1-Project)
+    - [RemoveWebhookRequest](#bytebase-v1-RemoveWebhookRequest)
+    - [Schedule](#bytebase-v1-Schedule)
+    - [ScheduleDeployment](#bytebase-v1-ScheduleDeployment)
+    - [SearchProjectsRequest](#bytebase-v1-SearchProjectsRequest)
+    - [SearchProjectsResponse](#bytebase-v1-SearchProjectsResponse)
+    - [TestWebhookRequest](#bytebase-v1-TestWebhookRequest)
+    - [TestWebhookResponse](#bytebase-v1-TestWebhookResponse)
+    - [UndeleteProjectRequest](#bytebase-v1-UndeleteProjectRequest)
+    - [UpdateDeploymentConfigRequest](#bytebase-v1-UpdateDeploymentConfigRequest)
+    - [UpdateProjectRequest](#bytebase-v1-UpdateProjectRequest)
+    - [UpdateWebhookRequest](#bytebase-v1-UpdateWebhookRequest)
+    - [Webhook](#bytebase-v1-Webhook)
+  
+    - [Activity.Type](#bytebase-v1-Activity-Type)
+    - [OperatorType](#bytebase-v1-OperatorType)
+    - [Webhook.Type](#bytebase-v1-Webhook-Type)
+    - [Workflow](#bytebase-v1-Workflow)
+  
+    - [ProjectService](#bytebase-v1-ProjectService)
   
 - [v1/plan_service.proto](#v1_plan_service-proto)
     - [BatchCancelPlanCheckRunsRequest](#bytebase-v1-BatchCancelPlanCheckRunsRequest)
@@ -518,44 +574,6 @@
   
     - [PlanService](#bytebase-v1-PlanService)
   
-- [v1/project_service.proto](#v1_project_service-proto)
-    - [Activity](#bytebase-v1-Activity)
-    - [AddWebhookRequest](#bytebase-v1-AddWebhookRequest)
-    - [BatchGetIamPolicyRequest](#bytebase-v1-BatchGetIamPolicyRequest)
-    - [BatchGetIamPolicyResponse](#bytebase-v1-BatchGetIamPolicyResponse)
-    - [BatchGetIamPolicyResponse.PolicyResult](#bytebase-v1-BatchGetIamPolicyResponse-PolicyResult)
-    - [CreateProjectRequest](#bytebase-v1-CreateProjectRequest)
-    - [DeleteProjectRequest](#bytebase-v1-DeleteProjectRequest)
-    - [DeploymentConfig](#bytebase-v1-DeploymentConfig)
-    - [DeploymentSpec](#bytebase-v1-DeploymentSpec)
-    - [GetDeploymentConfigRequest](#bytebase-v1-GetDeploymentConfigRequest)
-    - [GetProjectRequest](#bytebase-v1-GetProjectRequest)
-    - [Label](#bytebase-v1-Label)
-    - [LabelSelector](#bytebase-v1-LabelSelector)
-    - [LabelSelectorRequirement](#bytebase-v1-LabelSelectorRequirement)
-    - [ListProjectsRequest](#bytebase-v1-ListProjectsRequest)
-    - [ListProjectsResponse](#bytebase-v1-ListProjectsResponse)
-    - [Project](#bytebase-v1-Project)
-    - [RemoveWebhookRequest](#bytebase-v1-RemoveWebhookRequest)
-    - [Schedule](#bytebase-v1-Schedule)
-    - [ScheduleDeployment](#bytebase-v1-ScheduleDeployment)
-    - [SearchProjectsRequest](#bytebase-v1-SearchProjectsRequest)
-    - [SearchProjectsResponse](#bytebase-v1-SearchProjectsResponse)
-    - [TestWebhookRequest](#bytebase-v1-TestWebhookRequest)
-    - [TestWebhookResponse](#bytebase-v1-TestWebhookResponse)
-    - [UndeleteProjectRequest](#bytebase-v1-UndeleteProjectRequest)
-    - [UpdateDeploymentConfigRequest](#bytebase-v1-UpdateDeploymentConfigRequest)
-    - [UpdateProjectRequest](#bytebase-v1-UpdateProjectRequest)
-    - [UpdateWebhookRequest](#bytebase-v1-UpdateWebhookRequest)
-    - [Webhook](#bytebase-v1-Webhook)
-  
-    - [Activity.Type](#bytebase-v1-Activity-Type)
-    - [OperatorType](#bytebase-v1-OperatorType)
-    - [Webhook.Type](#bytebase-v1-Webhook-Type)
-    - [Workflow](#bytebase-v1-Workflow)
-  
-    - [ProjectService](#bytebase-v1-ProjectService)
-  
 - [v1/sql_service.proto](#v1_sql_service-proto)
     - [AdminExecuteRequest](#bytebase-v1-AdminExecuteRequest)
     - [AdminExecuteResponse](#bytebase-v1-AdminExecuteResponse)
@@ -564,8 +582,6 @@
     - [CheckResponse](#bytebase-v1-CheckResponse)
     - [ExportRequest](#bytebase-v1-ExportRequest)
     - [ExportResponse](#bytebase-v1-ExportResponse)
-    - [GenerateRestoreSQLRequest](#bytebase-v1-GenerateRestoreSQLRequest)
-    - [GenerateRestoreSQLResponse](#bytebase-v1-GenerateRestoreSQLResponse)
     - [ParseMyBatisMapperRequest](#bytebase-v1-ParseMyBatisMapperRequest)
     - [ParseMyBatisMapperResponse](#bytebase-v1-ParseMyBatisMapperResponse)
     - [PrettyRequest](#bytebase-v1-PrettyRequest)
@@ -637,10 +653,13 @@
 - [v1/role_service.proto](#v1_role_service-proto)
     - [CreateRoleRequest](#bytebase-v1-CreateRoleRequest)
     - [DeleteRoleRequest](#bytebase-v1-DeleteRoleRequest)
+    - [GetRoleRequest](#bytebase-v1-GetRoleRequest)
     - [ListRolesRequest](#bytebase-v1-ListRolesRequest)
     - [ListRolesResponse](#bytebase-v1-ListRolesResponse)
     - [Role](#bytebase-v1-Role)
     - [UpdateRoleRequest](#bytebase-v1-UpdateRoleRequest)
+  
+    - [Role.Type](#bytebase-v1-Role-Type)
   
     - [RoleService](#bytebase-v1-RoleService)
   
@@ -1282,6 +1301,7 @@ InstanceOptions is the option for instances.
 | ----- | ---- | ----- | ----------- |
 | sync_interval | [google.protobuf.Duration](#google-protobuf-Duration) |  | How often the instance is synced. |
 | maximum_connections | [int32](#int32) |  | The maximum number of connections. The default is 10 if the value is unset or zero. |
+| sync_databases | [string](#string) | repeated | Enable sync for following databases. Default empty, means sync all schemas &amp; databases. |
 
 
 
@@ -1416,6 +1436,11 @@ When paginating, all other parameters provided to `ListInstances` must match the
 
 ### SyncInstanceResponse
 
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| databases | [string](#string) | repeated | All database name list in the instance. |
 
 
 
@@ -1877,6 +1902,9 @@ CheckConstraintMetadata is the metadata for check constraints.
 | semantic_type_id | [string](#string) |  |  |
 | labels | [ColumnConfig.LabelsEntry](#bytebase-v1-ColumnConfig-LabelsEntry) | repeated | The user labels for a column. |
 | classification_id | [string](#string) |  |  |
+| masking_level | [MaskingLevel](#bytebase-v1-MaskingLevel) |  |  |
+| full_masking_algorithm_id | [string](#string) |  |  |
+| partial_masking_algorithm_id | [string](#string) |  |  |
 
 
 
@@ -2112,6 +2140,22 @@ DependentColumn is the metadata for dependent columns.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | diff | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-EnumTypeMetadata"></a>
+
+### EnumTypeMetadata
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of a type. |
+| values | [string](#string) | repeated | The enum values of a type. |
 
 
 
@@ -2369,6 +2413,9 @@ IndexMetadata is the metadata for indexes.
 | visible | [bool](#bool) |  | The visible is whether the index is visible. |
 | comment | [string](#string) |  | The comment is the comment of an index. |
 | definition | [string](#string) |  | The definition of an index. |
+| parent_index_schema | [string](#string) |  | The schema name of the parent index. |
+| parent_index_name | [string](#string) |  | The index name of the parent index. |
+| granularity | [int64](#int64) |  | The number of granules in the block. It&#39;s a ClickHouse specific field. |
 
 
 
@@ -2778,6 +2825,7 @@ This is the concept of schema in Postgres, but it&#39;s a no-op for MySQL.
 | triggers | [TriggerMetadata](#bytebase-v1-TriggerMetadata) | repeated | The triggers is the list of triggers in a schema, triggers are sorted by table_name, name, event, timing, action_order. |
 | sequences | [SequenceMetadata](#bytebase-v1-SequenceMetadata) | repeated | The sequences is the list of sequences in a schema, sorted by name. |
 | events | [EventMetadata](#bytebase-v1-EventMetadata) | repeated |  |
+| enum_types | [EnumTypeMetadata](#bytebase-v1-EnumTypeMetadata) | repeated |  |
 
 
 
@@ -2983,6 +3031,7 @@ TableMetadata is the metadata for tables.
 | partitions | [TablePartitionMetadata](#bytebase-v1-TablePartitionMetadata) | repeated | The partitions is the list of partitions in a table. |
 | check_constraints | [CheckConstraintMetadata](#bytebase-v1-CheckConstraintMetadata) | repeated | The check_constraints is the list of check constraints in a table. |
 | owner | [string](#string) |  |  |
+| sorting_keys | [string](#string) | repeated | The sorting_keys is a tuple of column names or arbitrary expressions. ClickHouse specific field. Reference: https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/mergetree#order_by |
 
 
 
@@ -3003,6 +3052,7 @@ TablePartitionMetadata is the metadata for table partitions.
 | value | [string](#string) |  | The value is the value of a table partition. For MySQL, the value is for RANGE and LIST partition types, - For a RANGE partition, it contains the value set in the partition&#39;s VALUES LESS THAN clause, which can be either an integer or MAXVALUE. - For a LIST partition, this column contains the values defined in the partition&#39;s VALUES IN clause, which is a list of comma-separated integer values. - For others, it&#39;s an empty string. |
 | use_default | [string](#string) |  | The use_default is whether the users use the default partition, it stores the different value for different database engines. For MySQL, it&#39;s [INT] type, 0 means not use default partition, otherwise, it&#39;s equals to number in syntax [SUB]PARTITION {number}. |
 | subpartitions | [TablePartitionMetadata](#bytebase-v1-TablePartitionMetadata) | repeated | The subpartitions is the list of subpartitions in a table partition. |
+| indexes | [IndexMetadata](#bytebase-v1-IndexMetadata) | repeated |  |
 
 
 
@@ -3042,6 +3092,7 @@ TablePartitionMetadata is the metadata for table partitions.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | The name is the name of the trigger. |
+| schema_name | [string](#string) |  | The schema name of the table/view that the trigger is created. |
 | table_name | [string](#string) |  | The table_name is the name of the table/view that the trigger is created on. |
 | event | [string](#string) |  | The event is the event of the trigger, such as INSERT, UPDATE, DELETE, TRUNCATE. |
 | timing | [string](#string) |  | The timing is the timing of the trigger, such as BEFORE, AFTER. |
@@ -3049,6 +3100,8 @@ TablePartitionMetadata is the metadata for table partitions.
 | sql_mode | [string](#string) |  |  |
 | character_set_client | [string](#string) |  |  |
 | collation_connection | [string](#string) |  |  |
+| action_orientation | [string](#string) |  | For Postgres, identifies whether the trigger fires once for each processed row or once for each statement (ROW or STATEMENT). |
+| condition | [string](#string) |  | For Postgres, the WHEN condition of the trigger. |
 
 
 
@@ -4296,6 +4349,7 @@ ANY means approving any node will proceed.
 | slack | [AppIMSetting.Slack](#bytebase-v1-AppIMSetting-Slack) |  |  |
 | feishu | [AppIMSetting.Feishu](#bytebase-v1-AppIMSetting-Feishu) |  |  |
 | wecom | [AppIMSetting.Wecom](#bytebase-v1-AppIMSetting-Wecom) |  |  |
+| lark | [AppIMSetting.Lark](#bytebase-v1-AppIMSetting-Lark) |  |  |
 
 
 
@@ -4305,6 +4359,23 @@ ANY means approving any node will proceed.
 <a name="bytebase-v1-AppIMSetting-Feishu"></a>
 
 ### AppIMSetting.Feishu
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| enabled | [bool](#bool) |  |  |
+| app_id | [string](#string) |  |  |
+| app_secret | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-AppIMSetting-Lark"></a>
+
+### AppIMSetting.Lark
 
 
 
@@ -6515,6 +6586,248 @@ The changelist&#39;s `name` field is used to identify the changelist to update. 
 
 
 
+<a name="v1_database_catalog_service-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/database_catalog_service.proto
+
+
+
+<a name="bytebase-v1-ColumnCatalog"></a>
+
+### ColumnCatalog
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| semantic_type_id | [string](#string) |  |  |
+| labels | [ColumnCatalog.LabelsEntry](#bytebase-v1-ColumnCatalog-LabelsEntry) | repeated | The user labels for a column. |
+| classification_id | [string](#string) |  |  |
+| masking_level | [MaskingLevel](#bytebase-v1-MaskingLevel) |  |  |
+| full_masking_algorithm_id | [string](#string) |  |  |
+| partial_masking_algorithm_id | [string](#string) |  |  |
+| object_schema | [ObjectSchema](#bytebase-v1-ObjectSchema) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-ColumnCatalog-LabelsEntry"></a>
+
+### ColumnCatalog.LabelsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-DatabaseCatalog"></a>
+
+### DatabaseCatalog
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the database catalog. Format: instances/{instance}/databases/{database}/catalog |
+| schemas | [SchemaCatalog](#bytebase-v1-SchemaCatalog) | repeated |  |
+
+
+
+
+
+
+<a name="bytebase-v1-GetDatabaseCatalogRequest"></a>
+
+### GetDatabaseCatalogRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the database catalog to retrieve. Format: instances/{instance}/databases/{database}/catalog |
+
+
+
+
+
+
+<a name="bytebase-v1-ObjectSchema"></a>
+
+### ObjectSchema
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| type | [ObjectSchema.Type](#bytebase-v1-ObjectSchema-Type) |  |  |
+| struct_kind | [ObjectSchema.StructKind](#bytebase-v1-ObjectSchema-StructKind) |  |  |
+| array_kind | [ObjectSchema.ArrayKind](#bytebase-v1-ObjectSchema-ArrayKind) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-ObjectSchema-ArrayKind"></a>
+
+### ObjectSchema.ArrayKind
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| kind | [ObjectSchema](#bytebase-v1-ObjectSchema) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-ObjectSchema-StructKind"></a>
+
+### ObjectSchema.StructKind
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| properties | [ObjectSchema.StructKind.PropertiesEntry](#bytebase-v1-ObjectSchema-StructKind-PropertiesEntry) | repeated |  |
+
+
+
+
+
+
+<a name="bytebase-v1-ObjectSchema-StructKind-PropertiesEntry"></a>
+
+### ObjectSchema.StructKind.PropertiesEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [ObjectSchema](#bytebase-v1-ObjectSchema) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-SchemaCatalog"></a>
+
+### SchemaCatalog
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| tables | [TableCatalog](#bytebase-v1-TableCatalog) | repeated |  |
+
+
+
+
+
+
+<a name="bytebase-v1-TableCatalog"></a>
+
+### TableCatalog
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  |  |
+| columns | [TableCatalog.Columns](#bytebase-v1-TableCatalog-Columns) |  |  |
+| object_schema | [ObjectSchema](#bytebase-v1-ObjectSchema) |  |  |
+| classification_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-TableCatalog-Columns"></a>
+
+### TableCatalog.Columns
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| columns | [ColumnCatalog](#bytebase-v1-ColumnCatalog) | repeated |  |
+
+
+
+
+
+
+<a name="bytebase-v1-UpdateDatabaseCatalogRequest"></a>
+
+### UpdateDatabaseCatalogRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| catalog | [DatabaseCatalog](#bytebase-v1-DatabaseCatalog) |  | The database catalog to update.
+
+The catalog&#39;s `name` field is used to identify the database catalog to update. Format: instances/{instance}/databases/{database}/catalog |
+| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | The list of fields to update. |
+
+
+
+
+
+ 
+
+
+<a name="bytebase-v1-ObjectSchema-Type"></a>
+
+### ObjectSchema.Type
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| TYPE_UNSPECIFIED | 0 |  |
+| STRING | 1 |  |
+| NUMBER | 2 |  |
+| BOOLEAN | 3 |  |
+| OBJECT | 4 |  |
+| ARRAY | 5 |  |
+
+
+ 
+
+ 
+
+
+<a name="bytebase-v1-DatabaseCatalogService"></a>
+
+### DatabaseCatalogService
+
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetDatabaseCatalog | [GetDatabaseCatalogRequest](#bytebase-v1-GetDatabaseCatalogRequest) | [DatabaseCatalog](#bytebase-v1-DatabaseCatalog) |  |
+| UpdateDatabaseCatalog | [UpdateDatabaseCatalogRequest](#bytebase-v1-UpdateDatabaseCatalogRequest) | [DatabaseCatalog](#bytebase-v1-DatabaseCatalog) |  |
+
+ 
+
+
+
 <a name="v1_database_group_service-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -7282,10 +7595,11 @@ OIDCIdentityProviderConfig is the structure for OIDC identity provider config.
 | issuer | [string](#string) |  |  |
 | client_id | [string](#string) |  |  |
 | client_secret | [string](#string) |  |  |
-| scopes | [string](#string) | repeated |  |
 | field_mapping | [FieldMapping](#bytebase-v1-FieldMapping) |  |  |
 | skip_tls_verify | [bool](#bool) |  |  |
 | auth_style | [OAuth2AuthStyle](#bytebase-v1-OAuth2AuthStyle) |  |  |
+| scopes | [string](#string) | repeated | The scopes that the OIDC provider supports. Should be fetched from the well-known configuration file of the OIDC provider. |
+| auth_endpoint | [string](#string) |  | The authorization endpoint of the OIDC provider. Should be fetched from the well-known configuration file of the OIDC provider. |
 
 
 
@@ -7541,26 +7855,6 @@ When paginating, all other parameters provided to `ListPolicies` must match the 
 
 
 
-<a name="bytebase-v1-MaskData"></a>
-
-### MaskData
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| schema | [string](#string) |  |  |
-| table | [string](#string) |  |  |
-| column | [string](#string) |  |  |
-| masking_level | [MaskingLevel](#bytebase-v1-MaskingLevel) |  |  |
-| full_masking_algorithm_id | [string](#string) |  |  |
-| partial_masking_algorithm_id | [string](#string) |  |  |
-
-
-
-
-
-
 <a name="bytebase-v1-MaskingExceptionPolicy"></a>
 
 ### MaskingExceptionPolicy
@@ -7590,21 +7884,6 @@ MaskingExceptionPolicy is the allowlist of users who can access sensitive data.
 
 - `user:{email}`: An email address that represents a specific Bytebase account. For example, `alice@example.com`. - `group:{email}`: An email address for group. |
 | condition | [google.type.Expr](#google-type-Expr) |  | The condition that is associated with this exception policy instance. |
-
-
-
-
-
-
-<a name="bytebase-v1-MaskingPolicy"></a>
-
-### MaskingPolicy
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| mask_data | [MaskData](#bytebase-v1-MaskData) | repeated |  |
 
 
 
@@ -7655,7 +7934,6 @@ MaskingExceptionPolicy is the allowlist of users who can access sensitive data.
 | inherit_from_parent | [bool](#bool) |  |  |
 | type | [PolicyType](#bytebase-v1-PolicyType) |  |  |
 | rollout_policy | [RolloutPolicy](#bytebase-v1-RolloutPolicy) |  |  |
-| masking_policy | [MaskingPolicy](#bytebase-v1-MaskingPolicy) |  |  |
 | slow_query_policy | [SlowQueryPolicy](#bytebase-v1-SlowQueryPolicy) |  |  |
 | disable_copy_data_policy | [DisableCopyDataPolicy](#bytebase-v1-DisableCopyDataPolicy) |  |  |
 | masking_rule_policy | [MaskingRulePolicy](#bytebase-v1-MaskingRulePolicy) |  |  |
@@ -7842,7 +8120,6 @@ The policy&#39;s `name` field is used to identify the instance to update. Format
 | ---- | ------ | ----------- |
 | POLICY_TYPE_UNSPECIFIED | 0 |  |
 | ROLLOUT_POLICY | 11 |  |
-| MASKING | 5 |  |
 | SLOW_QUERY | 7 |  |
 | DISABLE_COPY_DATA | 8 |  |
 | MASKING_RULE | 9 |  |
@@ -7884,6 +8161,607 @@ The policy&#39;s `name` field is used to identify the instance to update. Format
 | CreatePolicy | [CreatePolicyRequest](#bytebase-v1-CreatePolicyRequest) | [Policy](#bytebase-v1-Policy) |  |
 | UpdatePolicy | [UpdatePolicyRequest](#bytebase-v1-UpdatePolicyRequest) | [Policy](#bytebase-v1-Policy) |  |
 | DeletePolicy | [DeletePolicyRequest](#bytebase-v1-DeletePolicyRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
+
+ 
+
+
+
+<a name="v1_project_service-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/project_service.proto
+
+
+
+<a name="bytebase-v1-Activity"></a>
+
+### Activity
+TODO(zp): move to activity later.
+
+
+
+
+
+
+<a name="bytebase-v1-AddWebhookRequest"></a>
+
+### AddWebhookRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| project | [string](#string) |  | The name of the project to add the webhook to. Format: projects/{project} |
+| webhook | [Webhook](#bytebase-v1-Webhook) |  | The webhook to add. |
+
+
+
+
+
+
+<a name="bytebase-v1-BatchGetIamPolicyRequest"></a>
+
+### BatchGetIamPolicyRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| scope | [string](#string) |  | The scope of the batch get. Typically it&#39;s &#34;projects/-&#34;. |
+| names | [string](#string) | repeated |  |
+
+
+
+
+
+
+<a name="bytebase-v1-BatchGetIamPolicyResponse"></a>
+
+### BatchGetIamPolicyResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| policy_results | [BatchGetIamPolicyResponse.PolicyResult](#bytebase-v1-BatchGetIamPolicyResponse-PolicyResult) | repeated |  |
+
+
+
+
+
+
+<a name="bytebase-v1-BatchGetIamPolicyResponse-PolicyResult"></a>
+
+### BatchGetIamPolicyResponse.PolicyResult
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| project | [string](#string) |  |  |
+| policy | [IamPolicy](#bytebase-v1-IamPolicy) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-CreateProjectRequest"></a>
+
+### CreateProjectRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| project | [Project](#bytebase-v1-Project) |  | The project to create. |
+| project_id | [string](#string) |  | The ID to use for the project, which will become the final component of the project&#39;s resource name.
+
+This value should be 4-63 characters, and valid characters are /[a-z][0-9]-/. |
+
+
+
+
+
+
+<a name="bytebase-v1-DeleteProjectRequest"></a>
+
+### DeleteProjectRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the project to delete. Format: projects/{project} |
+| force | [bool](#bool) |  | If set to true, any databases and sheets from this project will also be moved to default project, and all open issues will be closed. |
+
+
+
+
+
+
+<a name="bytebase-v1-DeploymentConfig"></a>
+
+### DeploymentConfig
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the resource. Format: projects/{project}/deploymentConfigs/default. |
+| title | [string](#string) |  | The title of the deployment config. |
+| schedule | [Schedule](#bytebase-v1-Schedule) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-DeploymentSpec"></a>
+
+### DeploymentSpec
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| label_selector | [LabelSelector](#bytebase-v1-LabelSelector) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-GetDeploymentConfigRequest"></a>
+
+### GetDeploymentConfigRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the resource. Format: projects/{project}/deploymentConfigs/default. |
+
+
+
+
+
+
+<a name="bytebase-v1-GetProjectRequest"></a>
+
+### GetProjectRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the project to retrieve. Format: projects/{project} |
+
+
+
+
+
+
+<a name="bytebase-v1-Label"></a>
+
+### Label
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| value | [string](#string) |  |  |
+| color | [string](#string) |  |  |
+| group | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-LabelSelector"></a>
+
+### LabelSelector
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| match_expressions | [LabelSelectorRequirement](#bytebase-v1-LabelSelectorRequirement) | repeated |  |
+
+
+
+
+
+
+<a name="bytebase-v1-LabelSelectorRequirement"></a>
+
+### LabelSelectorRequirement
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| operator | [OperatorType](#bytebase-v1-OperatorType) |  |  |
+| values | [string](#string) | repeated |  |
+
+
+
+
+
+
+<a name="bytebase-v1-ListProjectsRequest"></a>
+
+### ListProjectsRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| page_size | [int32](#int32) |  | Not used. The maximum number of projects to return. The service may return fewer than this value. If unspecified, at most 10 projects will be returned. The maximum value is 1000; values above 1000 will be coerced to 1000. |
+| page_token | [string](#string) |  | Not used. A page token, received from a previous `ListProjects` call. Provide this to retrieve the subsequent page.
+
+When paginating, all other parameters provided to `ListProjects` must match the call that provided the page token. |
+| show_deleted | [bool](#bool) |  | Show deleted projects if specified. |
+
+
+
+
+
+
+<a name="bytebase-v1-ListProjectsResponse"></a>
+
+### ListProjectsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| projects | [Project](#bytebase-v1-Project) | repeated | The projects from the specified request. |
+| next_page_token | [string](#string) |  | A token, which can be sent as `page_token` to retrieve the next page. If this field is omitted, there are no subsequent pages. |
+
+
+
+
+
+
+<a name="bytebase-v1-Project"></a>
+
+### Project
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the project. Format: projects/{project} |
+| state | [State](#bytebase-v1-State) |  |  |
+| title | [string](#string) |  | The title or name of a project. It&#39;s not unique within the workspace. |
+| key | [string](#string) |  | The key is a short and upper-case identifier for a project. It&#39;s unique within the workspace. |
+| workflow | [Workflow](#bytebase-v1-Workflow) |  |  |
+| webhooks | [Webhook](#bytebase-v1-Webhook) | repeated |  |
+| data_classification_config_id | [string](#string) |  |  |
+| issue_labels | [Label](#bytebase-v1-Label) | repeated |  |
+| force_issue_labels | [bool](#bool) |  | Force issue labels to be used when creating an issue. |
+| allow_modify_statement | [bool](#bool) |  | Allow modifying statement after issue is created. |
+| auto_resolve_issue | [bool](#bool) |  | Enable auto resolve issue. |
+| enforce_issue_title | [bool](#bool) |  | Enforce issue title created by user instead of generated by Bytebase. |
+| auto_enable_backup | [bool](#bool) |  | Whether to automatically enable backup. |
+| skip_backup_errors | [bool](#bool) |  | Whether to skip backup errors and continue the data migration. |
+| postgres_database_tenant_mode | [bool](#bool) |  | Whether to enable the database tenant mode for PostgreSQL. If enabled, the issue will be created with the pre-appended &#34;set role &lt;db_owner&gt;&#34; statement. |
+
+
+
+
+
+
+<a name="bytebase-v1-RemoveWebhookRequest"></a>
+
+### RemoveWebhookRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| webhook | [Webhook](#bytebase-v1-Webhook) |  | The webhook to remove. Identified by its url. |
+
+
+
+
+
+
+<a name="bytebase-v1-Schedule"></a>
+
+### Schedule
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| deployments | [ScheduleDeployment](#bytebase-v1-ScheduleDeployment) | repeated |  |
+
+
+
+
+
+
+<a name="bytebase-v1-ScheduleDeployment"></a>
+
+### ScheduleDeployment
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| title | [string](#string) |  | The title of the deployment (stage) in a schedule. |
+| id | [string](#string) |  |  |
+| spec | [DeploymentSpec](#bytebase-v1-DeploymentSpec) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-SearchProjectsRequest"></a>
+
+### SearchProjectsRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| show_deleted | [bool](#bool) |  | Show deleted projects if specified. |
+
+
+
+
+
+
+<a name="bytebase-v1-SearchProjectsResponse"></a>
+
+### SearchProjectsResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| projects | [Project](#bytebase-v1-Project) | repeated | The projects from the specified request. |
+
+
+
+
+
+
+<a name="bytebase-v1-TestWebhookRequest"></a>
+
+### TestWebhookRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| project | [string](#string) |  | The name of the project which owns the webhook to test. Format: projects/{project} |
+| webhook | [Webhook](#bytebase-v1-Webhook) |  | The webhook to test. Identified by its url. |
+
+
+
+
+
+
+<a name="bytebase-v1-TestWebhookResponse"></a>
+
+### TestWebhookResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| error | [string](#string) |  | The result of the test, empty if the test is successful. |
+
+
+
+
+
+
+<a name="bytebase-v1-UndeleteProjectRequest"></a>
+
+### UndeleteProjectRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the deleted project. Format: projects/{project} |
+
+
+
+
+
+
+<a name="bytebase-v1-UpdateDeploymentConfigRequest"></a>
+
+### UpdateDeploymentConfigRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| deployment_config | [DeploymentConfig](#bytebase-v1-DeploymentConfig) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-UpdateProjectRequest"></a>
+
+### UpdateProjectRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| project | [Project](#bytebase-v1-Project) |  | The project to update.
+
+The project&#39;s `name` field is used to identify the project to update. Format: projects/{project} |
+| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | The list of fields to update. |
+
+
+
+
+
+
+<a name="bytebase-v1-UpdateWebhookRequest"></a>
+
+### UpdateWebhookRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| webhook | [Webhook](#bytebase-v1-Webhook) |  | The webhook to modify. |
+| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | The list of fields to update. |
+
+
+
+
+
+
+<a name="bytebase-v1-Webhook"></a>
+
+### Webhook
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | name is the name of the webhook, generated by the server. format: projects/{project}/webhooks/{webhook} |
+| type | [Webhook.Type](#bytebase-v1-Webhook-Type) |  | type is the type of the webhook. |
+| title | [string](#string) |  | title is the title of the webhook. |
+| url | [string](#string) |  | url is the url of the webhook, should be unique within the project. |
+| direct_message | [bool](#bool) |  | if direct_message is set, the notification is sent directly to the persons and url will be ignored. IM integration setting should be set for this function to work. |
+| notification_types | [Activity.Type](#bytebase-v1-Activity-Type) | repeated | notification_types is the list of activities types that the webhook is interested in. Bytebase will only send notifications to the webhook if the activity type is in the list. It should not be empty, and should be a subset of the following: - TYPE_ISSUE_CREATED - TYPE_ISSUE_STATUS_UPDATE - TYPE_ISSUE_PIPELINE_STAGE_UPDATE - TYPE_ISSUE_PIPELINE_TASK_STATUS_UPDATE - TYPE_ISSUE_FIELD_UPDATE - TYPE_ISSUE_COMMENT_CREATE |
+
+
+
+
+
+ 
+
+
+<a name="bytebase-v1-Activity-Type"></a>
+
+### Activity.Type
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| TYPE_UNSPECIFIED | 0 |  |
+| TYPE_NOTIFY_ISSUE_APPROVED | 23 | Notifications via webhooks.
+
+TYPE_NOTIFY_ISSUE_APPROVED represents the issue approved notification. |
+| TYPE_NOTIFY_PIPELINE_ROLLOUT | 24 | TYPE_NOTIFY_PIPELINE_ROLLOUT represents the pipeline rollout notification. |
+| TYPE_ISSUE_CREATE | 1 | Issue related activity types.
+
+TYPE_ISSUE_CREATE represents creating an issue. |
+| TYPE_ISSUE_COMMENT_CREATE | 2 | TYPE_ISSUE_COMMENT_CREATE represents commenting on an issue. |
+| TYPE_ISSUE_FIELD_UPDATE | 3 | TYPE_ISSUE_FIELD_UPDATE represents updating the issue field, likes title, description, etc. |
+| TYPE_ISSUE_STATUS_UPDATE | 4 | TYPE_ISSUE_STATUS_UPDATE represents the issue status change, including OPEN, CLOSE, CANCEL fow now. |
+| TYPE_ISSUE_APPROVAL_NOTIFY | 21 | TYPE_ISSUE_APPROVAL_NOTIFY is the type for notifying issue approval. |
+| TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE | 5 | TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE represents the pipeline stage status change, including BEGIN, END for now. |
+| TYPE_ISSUE_PIPELINE_TASK_STATUS_UPDATE | 6 | TYPE_ISSUE_PIPELINE_TASK_STATUS_UPDATE represents the pipeline task status change, including PENDING, PENDING_APPROVAL, RUNNING, SUCCESS, FAILURE, CANCELED for now. |
+| TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE | 22 | TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE represents the pipeline task run status change, including PENDING, RUNNING, DONE, FAILED, CANCELED. |
+| TYPE_ISSUE_PIPELINE_TASK_STATEMENT_UPDATE | 8 | TYPE_ISSUE_PIPELINE_TASK_STATEMENT_UPDATE represents the manual update of the task statement. |
+| TYPE_ISSUE_PIPELINE_TASK_EARLIEST_ALLOWED_TIME_UPDATE | 9 | TYPE_ISSUE_PIPELINE_TASK_EARLIEST_ALLOWED_TIME_UPDATE represents the manual update of the task earliest allowed time. |
+| TYPE_MEMBER_CREATE | 10 | Member related activity types.
+
+TYPE_MEMBER_CREATE represents creating a members. |
+| TYPE_MEMBER_ROLE_UPDATE | 11 | TYPE_MEMBER_ROLE_UPDATE represents updating the member role, for example, from ADMIN to MEMBER. |
+| TYPE_MEMBER_ACTIVATE | 12 | TYPE_MEMBER_ACTIVATE represents activating a deactivated member. |
+| TYPE_MEMBER_DEACTIVATE | 13 | TYPE_MEMBER_DEACTIVATE represents deactivating an active member. |
+| TYPE_PROJECT_REPOSITORY_PUSH | 14 | Project related activity types.
+
+TYPE_PROJECT_REPOSITORY_PUSH represents Bytebase receiving a push event from the project repository. |
+| TYPE_PROJECT_DATABASE_TRANSFER | 15 | TYPE_PROJECT_DATABASE_TRANFER represents transfering the database from one project to another. |
+| TYPE_PROJECT_MEMBER_CREATE | 16 | TYPE_PROJECT_MEMBER_CREATE represents adding a member to the project. |
+| TYPE_PROJECT_MEMBER_DELETE | 17 | TYPE_PROJECT_MEMBER_DELETE represents removing a member from the project. |
+| TYPE_SQL_EDITOR_QUERY | 19 | SQL Editor related activity types. TYPE_SQL_EDITOR_QUERY represents executing query in SQL Editor. |
+
+
+
+<a name="bytebase-v1-OperatorType"></a>
+
+### OperatorType
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| OPERATOR_TYPE_UNSPECIFIED | 0 | The operator is not specified. |
+| OPERATOR_TYPE_IN | 1 | The operator is &#34;In&#34;. |
+| OPERATOR_TYPE_EXISTS | 2 | The operator is &#34;Exists&#34;. |
+| OPERATOR_TYPE_NOT_IN | 3 | The operator is &#34;Not In&#34;. |
+
+
+
+<a name="bytebase-v1-Webhook-Type"></a>
+
+### Webhook.Type
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| TYPE_UNSPECIFIED | 0 |  |
+| TYPE_SLACK | 1 |  |
+| TYPE_DISCORD | 2 |  |
+| TYPE_TEAMS | 3 |  |
+| TYPE_DINGTALK | 4 |  |
+| TYPE_FEISHU | 5 |  |
+| TYPE_WECOM | 6 |  |
+| TYPE_CUSTOM | 7 |  |
+| TYPE_LARK | 8 |  |
+
+
+
+<a name="bytebase-v1-Workflow"></a>
+
+### Workflow
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| WORKFLOW_UNSPECIFIED | 0 |  |
+| UI | 1 |  |
+| VCS | 2 |  |
+
+
+ 
+
+ 
+
+
+<a name="bytebase-v1-ProjectService"></a>
+
+### ProjectService
+
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetProject | [GetProjectRequest](#bytebase-v1-GetProjectRequest) | [Project](#bytebase-v1-Project) |  |
+| ListProjects | [ListProjectsRequest](#bytebase-v1-ListProjectsRequest) | [ListProjectsResponse](#bytebase-v1-ListProjectsResponse) |  |
+| SearchProjects | [SearchProjectsRequest](#bytebase-v1-SearchProjectsRequest) | [SearchProjectsResponse](#bytebase-v1-SearchProjectsResponse) |  |
+| CreateProject | [CreateProjectRequest](#bytebase-v1-CreateProjectRequest) | [Project](#bytebase-v1-Project) |  |
+| UpdateProject | [UpdateProjectRequest](#bytebase-v1-UpdateProjectRequest) | [Project](#bytebase-v1-Project) |  |
+| DeleteProject | [DeleteProjectRequest](#bytebase-v1-DeleteProjectRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
+| UndeleteProject | [UndeleteProjectRequest](#bytebase-v1-UndeleteProjectRequest) | [Project](#bytebase-v1-Project) |  |
+| GetIamPolicy | [GetIamPolicyRequest](#bytebase-v1-GetIamPolicyRequest) | [IamPolicy](#bytebase-v1-IamPolicy) |  |
+| BatchGetIamPolicy | [BatchGetIamPolicyRequest](#bytebase-v1-BatchGetIamPolicyRequest) | [BatchGetIamPolicyResponse](#bytebase-v1-BatchGetIamPolicyResponse) | Deprecated. |
+| SetIamPolicy | [SetIamPolicyRequest](#bytebase-v1-SetIamPolicyRequest) | [IamPolicy](#bytebase-v1-IamPolicy) |  |
+| GetDeploymentConfig | [GetDeploymentConfigRequest](#bytebase-v1-GetDeploymentConfigRequest) | [DeploymentConfig](#bytebase-v1-DeploymentConfig) |  |
+| UpdateDeploymentConfig | [UpdateDeploymentConfigRequest](#bytebase-v1-UpdateDeploymentConfigRequest) | [DeploymentConfig](#bytebase-v1-DeploymentConfig) |  |
+| AddWebhook | [AddWebhookRequest](#bytebase-v1-AddWebhookRequest) | [Project](#bytebase-v1-Project) |  |
+| UpdateWebhook | [UpdateWebhookRequest](#bytebase-v1-UpdateWebhookRequest) | [Project](#bytebase-v1-Project) |  |
+| RemoveWebhook | [RemoveWebhookRequest](#bytebase-v1-RemoveWebhookRequest) | [Project](#bytebase-v1-Project) |  |
+| TestWebhook | [TestWebhookRequest](#bytebase-v1-TestWebhookRequest) | [TestWebhookResponse](#bytebase-v1-TestWebhookResponse) |  |
 
  
 
@@ -8043,6 +8921,7 @@ When paginating, all other parameters provided to `ListPlans` must match the cal
 | update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | plan_check_run_status_count | [Plan.PlanCheckRunStatusCountEntry](#bytebase-v1-Plan-PlanCheckRunStatusCountEntry) | repeated | The status count of the latest plan check runs. Keys are: - SUCCESS - WARNING - ERROR |
 | release_source | [Plan.ReleaseSource](#bytebase-v1-Plan-ReleaseSource) |  |  |
+| deployment_config_snapshot | [DeploymentConfig](#bytebase-v1-DeploymentConfig) |  | The deployment config snapshot taken at the time of plan creation. This is to ensure that we get consistent rollout for the plan. |
 
 
 
@@ -8555,605 +9434,6 @@ Type is the database change type.
 
 
 
-<a name="v1_project_service-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## v1/project_service.proto
-
-
-
-<a name="bytebase-v1-Activity"></a>
-
-### Activity
-TODO(zp): move to activity later.
-
-
-
-
-
-
-<a name="bytebase-v1-AddWebhookRequest"></a>
-
-### AddWebhookRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| project | [string](#string) |  | The name of the project to add the webhook to. Format: projects/{project} |
-| webhook | [Webhook](#bytebase-v1-Webhook) |  | The webhook to add. |
-
-
-
-
-
-
-<a name="bytebase-v1-BatchGetIamPolicyRequest"></a>
-
-### BatchGetIamPolicyRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| scope | [string](#string) |  | The scope of the batch get. Typically it&#39;s &#34;projects/-&#34;. |
-| names | [string](#string) | repeated |  |
-
-
-
-
-
-
-<a name="bytebase-v1-BatchGetIamPolicyResponse"></a>
-
-### BatchGetIamPolicyResponse
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| policy_results | [BatchGetIamPolicyResponse.PolicyResult](#bytebase-v1-BatchGetIamPolicyResponse-PolicyResult) | repeated |  |
-
-
-
-
-
-
-<a name="bytebase-v1-BatchGetIamPolicyResponse-PolicyResult"></a>
-
-### BatchGetIamPolicyResponse.PolicyResult
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| project | [string](#string) |  |  |
-| policy | [IamPolicy](#bytebase-v1-IamPolicy) |  |  |
-
-
-
-
-
-
-<a name="bytebase-v1-CreateProjectRequest"></a>
-
-### CreateProjectRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| project | [Project](#bytebase-v1-Project) |  | The project to create. |
-| project_id | [string](#string) |  | The ID to use for the project, which will become the final component of the project&#39;s resource name.
-
-This value should be 4-63 characters, and valid characters are /[a-z][0-9]-/. |
-
-
-
-
-
-
-<a name="bytebase-v1-DeleteProjectRequest"></a>
-
-### DeleteProjectRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | The name of the project to delete. Format: projects/{project} |
-| force | [bool](#bool) |  | If set to true, any databases and sheets from this project will also be moved to default project, and all open issues will be closed. |
-
-
-
-
-
-
-<a name="bytebase-v1-DeploymentConfig"></a>
-
-### DeploymentConfig
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | The name of the resource. Format: projects/{project}/deploymentConfigs/default. |
-| title | [string](#string) |  | The title of the deployment config. |
-| schedule | [Schedule](#bytebase-v1-Schedule) |  |  |
-
-
-
-
-
-
-<a name="bytebase-v1-DeploymentSpec"></a>
-
-### DeploymentSpec
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| label_selector | [LabelSelector](#bytebase-v1-LabelSelector) |  |  |
-
-
-
-
-
-
-<a name="bytebase-v1-GetDeploymentConfigRequest"></a>
-
-### GetDeploymentConfigRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | The name of the resource. Format: projects/{project}/deploymentConfigs/default. |
-
-
-
-
-
-
-<a name="bytebase-v1-GetProjectRequest"></a>
-
-### GetProjectRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | The name of the project to retrieve. Format: projects/{project} |
-
-
-
-
-
-
-<a name="bytebase-v1-Label"></a>
-
-### Label
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| value | [string](#string) |  |  |
-| color | [string](#string) |  |  |
-| group | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="bytebase-v1-LabelSelector"></a>
-
-### LabelSelector
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| match_expressions | [LabelSelectorRequirement](#bytebase-v1-LabelSelectorRequirement) | repeated |  |
-
-
-
-
-
-
-<a name="bytebase-v1-LabelSelectorRequirement"></a>
-
-### LabelSelectorRequirement
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| key | [string](#string) |  |  |
-| operator | [OperatorType](#bytebase-v1-OperatorType) |  |  |
-| values | [string](#string) | repeated |  |
-
-
-
-
-
-
-<a name="bytebase-v1-ListProjectsRequest"></a>
-
-### ListProjectsRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| page_size | [int32](#int32) |  | Not used. The maximum number of projects to return. The service may return fewer than this value. If unspecified, at most 10 projects will be returned. The maximum value is 1000; values above 1000 will be coerced to 1000. |
-| page_token | [string](#string) |  | Not used. A page token, received from a previous `ListProjects` call. Provide this to retrieve the subsequent page.
-
-When paginating, all other parameters provided to `ListProjects` must match the call that provided the page token. |
-| show_deleted | [bool](#bool) |  | Show deleted projects if specified. |
-
-
-
-
-
-
-<a name="bytebase-v1-ListProjectsResponse"></a>
-
-### ListProjectsResponse
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| projects | [Project](#bytebase-v1-Project) | repeated | The projects from the specified request. |
-| next_page_token | [string](#string) |  | A token, which can be sent as `page_token` to retrieve the next page. If this field is omitted, there are no subsequent pages. |
-
-
-
-
-
-
-<a name="bytebase-v1-Project"></a>
-
-### Project
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | The name of the project. Format: projects/{project} |
-| state | [State](#bytebase-v1-State) |  |  |
-| title | [string](#string) |  | The title or name of a project. It&#39;s not unique within the workspace. |
-| key | [string](#string) |  | The key is a short and upper-case identifier for a project. It&#39;s unique within the workspace. |
-| workflow | [Workflow](#bytebase-v1-Workflow) |  |  |
-| webhooks | [Webhook](#bytebase-v1-Webhook) | repeated |  |
-| data_classification_config_id | [string](#string) |  |  |
-| issue_labels | [Label](#bytebase-v1-Label) | repeated |  |
-| force_issue_labels | [bool](#bool) |  | Force issue labels to be used when creating an issue. |
-| allow_modify_statement | [bool](#bool) |  | Allow modifying statement after issue is created. |
-| auto_resolve_issue | [bool](#bool) |  | Enable auto resolve issue. |
-| enforce_issue_title | [bool](#bool) |  | Enforce issue title created by user instead of generated by Bytebase. |
-| auto_enable_backup | [bool](#bool) |  | Whether to automatically enable backup. |
-| skip_backup_errors | [bool](#bool) |  | Whether to skip backup errors and continue the data migration. |
-| postgres_database_tenant_mode | [bool](#bool) |  | Whether to enable the database tenant mode for PostgreSQL. If enabled, the issue will be created with the pre-appended &#34;set role &lt;db_owner&gt;&#34; statement. |
-
-
-
-
-
-
-<a name="bytebase-v1-RemoveWebhookRequest"></a>
-
-### RemoveWebhookRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| webhook | [Webhook](#bytebase-v1-Webhook) |  | The webhook to remove. Identified by its url. |
-
-
-
-
-
-
-<a name="bytebase-v1-Schedule"></a>
-
-### Schedule
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| deployments | [ScheduleDeployment](#bytebase-v1-ScheduleDeployment) | repeated |  |
-
-
-
-
-
-
-<a name="bytebase-v1-ScheduleDeployment"></a>
-
-### ScheduleDeployment
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| title | [string](#string) |  | The title of the deployment (stage) in a schedule. |
-| spec | [DeploymentSpec](#bytebase-v1-DeploymentSpec) |  |  |
-
-
-
-
-
-
-<a name="bytebase-v1-SearchProjectsRequest"></a>
-
-### SearchProjectsRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| show_deleted | [bool](#bool) |  | Show deleted projects if specified. |
-
-
-
-
-
-
-<a name="bytebase-v1-SearchProjectsResponse"></a>
-
-### SearchProjectsResponse
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| projects | [Project](#bytebase-v1-Project) | repeated | The projects from the specified request. |
-
-
-
-
-
-
-<a name="bytebase-v1-TestWebhookRequest"></a>
-
-### TestWebhookRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| project | [string](#string) |  | The name of the project which owns the webhook to test. Format: projects/{project} |
-| webhook | [Webhook](#bytebase-v1-Webhook) |  | The webhook to test. Identified by its url. |
-
-
-
-
-
-
-<a name="bytebase-v1-TestWebhookResponse"></a>
-
-### TestWebhookResponse
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| error | [string](#string) |  | The result of the test, empty if the test is successful. |
-
-
-
-
-
-
-<a name="bytebase-v1-UndeleteProjectRequest"></a>
-
-### UndeleteProjectRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | The name of the deleted project. Format: projects/{project} |
-
-
-
-
-
-
-<a name="bytebase-v1-UpdateDeploymentConfigRequest"></a>
-
-### UpdateDeploymentConfigRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| deployment_config | [DeploymentConfig](#bytebase-v1-DeploymentConfig) |  |  |
-
-
-
-
-
-
-<a name="bytebase-v1-UpdateProjectRequest"></a>
-
-### UpdateProjectRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| project | [Project](#bytebase-v1-Project) |  | The project to update.
-
-The project&#39;s `name` field is used to identify the project to update. Format: projects/{project} |
-| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | The list of fields to update. |
-
-
-
-
-
-
-<a name="bytebase-v1-UpdateWebhookRequest"></a>
-
-### UpdateWebhookRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| webhook | [Webhook](#bytebase-v1-Webhook) |  | The webhook to modify. |
-| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | The list of fields to update. |
-
-
-
-
-
-
-<a name="bytebase-v1-Webhook"></a>
-
-### Webhook
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | name is the name of the webhook, generated by the server. format: projects/{project}/webhooks/{webhook} |
-| type | [Webhook.Type](#bytebase-v1-Webhook-Type) |  | type is the type of the webhook. |
-| title | [string](#string) |  | title is the title of the webhook. |
-| url | [string](#string) |  | url is the url of the webhook, should be unique within the project. |
-| direct_message | [bool](#bool) |  | if direct_message is set, the notification is sent directly to the persons and url will be ignored. IM integration setting should be set for this function to work. |
-| notification_types | [Activity.Type](#bytebase-v1-Activity-Type) | repeated | notification_types is the list of activities types that the webhook is interested in. Bytebase will only send notifications to the webhook if the activity type is in the list. It should not be empty, and should be a subset of the following: - TYPE_ISSUE_CREATED - TYPE_ISSUE_STATUS_UPDATE - TYPE_ISSUE_PIPELINE_STAGE_UPDATE - TYPE_ISSUE_PIPELINE_TASK_STATUS_UPDATE - TYPE_ISSUE_FIELD_UPDATE - TYPE_ISSUE_COMMENT_CREATE |
-
-
-
-
-
- 
-
-
-<a name="bytebase-v1-Activity-Type"></a>
-
-### Activity.Type
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| TYPE_UNSPECIFIED | 0 |  |
-| TYPE_NOTIFY_ISSUE_APPROVED | 23 | Notifications via webhooks.
-
-TYPE_NOTIFY_ISSUE_APPROVED represents the issue approved notification. |
-| TYPE_NOTIFY_PIPELINE_ROLLOUT | 24 | TYPE_NOTIFY_PIPELINE_ROLLOUT represents the pipeline rollout notification. |
-| TYPE_ISSUE_CREATE | 1 | Issue related activity types.
-
-TYPE_ISSUE_CREATE represents creating an issue. |
-| TYPE_ISSUE_COMMENT_CREATE | 2 | TYPE_ISSUE_COMMENT_CREATE represents commenting on an issue. |
-| TYPE_ISSUE_FIELD_UPDATE | 3 | TYPE_ISSUE_FIELD_UPDATE represents updating the issue field, likes title, description, etc. |
-| TYPE_ISSUE_STATUS_UPDATE | 4 | TYPE_ISSUE_STATUS_UPDATE represents the issue status change, including OPEN, CLOSE, CANCEL fow now. |
-| TYPE_ISSUE_APPROVAL_NOTIFY | 21 | TYPE_ISSUE_APPROVAL_NOTIFY is the type for notifying issue approval. |
-| TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE | 5 | TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE represents the pipeline stage status change, including BEGIN, END for now. |
-| TYPE_ISSUE_PIPELINE_TASK_STATUS_UPDATE | 6 | TYPE_ISSUE_PIPELINE_TASK_STATUS_UPDATE represents the pipeline task status change, including PENDING, PENDING_APPROVAL, RUNNING, SUCCESS, FAILURE, CANCELED for now. |
-| TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE | 22 | TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE represents the pipeline task run status change, including PENDING, RUNNING, DONE, FAILED, CANCELED. |
-| TYPE_ISSUE_PIPELINE_TASK_STATEMENT_UPDATE | 8 | TYPE_ISSUE_PIPELINE_TASK_STATEMENT_UPDATE represents the manual update of the task statement. |
-| TYPE_ISSUE_PIPELINE_TASK_EARLIEST_ALLOWED_TIME_UPDATE | 9 | TYPE_ISSUE_PIPELINE_TASK_EARLIEST_ALLOWED_TIME_UPDATE represents the manual update of the task earliest allowed time. |
-| TYPE_MEMBER_CREATE | 10 | Member related activity types.
-
-TYPE_MEMBER_CREATE represents creating a members. |
-| TYPE_MEMBER_ROLE_UPDATE | 11 | TYPE_MEMBER_ROLE_UPDATE represents updating the member role, for example, from ADMIN to MEMBER. |
-| TYPE_MEMBER_ACTIVATE | 12 | TYPE_MEMBER_ACTIVATE represents activating a deactivated member. |
-| TYPE_MEMBER_DEACTIVATE | 13 | TYPE_MEMBER_DEACTIVATE represents deactivating an active member. |
-| TYPE_PROJECT_REPOSITORY_PUSH | 14 | Project related activity types.
-
-TYPE_PROJECT_REPOSITORY_PUSH represents Bytebase receiving a push event from the project repository. |
-| TYPE_PROJECT_DATABASE_TRANSFER | 15 | TYPE_PROJECT_DATABASE_TRANFER represents transfering the database from one project to another. |
-| TYPE_PROJECT_MEMBER_CREATE | 16 | TYPE_PROJECT_MEMBER_CREATE represents adding a member to the project. |
-| TYPE_PROJECT_MEMBER_DELETE | 17 | TYPE_PROJECT_MEMBER_DELETE represents removing a member from the project. |
-| TYPE_SQL_EDITOR_QUERY | 19 | SQL Editor related activity types. TYPE_SQL_EDITOR_QUERY represents executing query in SQL Editor. |
-
-
-
-<a name="bytebase-v1-OperatorType"></a>
-
-### OperatorType
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| OPERATOR_TYPE_UNSPECIFIED | 0 | The operator is not specified. |
-| OPERATOR_TYPE_IN | 1 | The operator is &#34;In&#34;. |
-| OPERATOR_TYPE_EXISTS | 2 | The operator is &#34;Exists&#34;. |
-| OPERATOR_TYPE_NOT_IN | 3 | The operator is &#34;Not In&#34;. |
-
-
-
-<a name="bytebase-v1-Webhook-Type"></a>
-
-### Webhook.Type
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| TYPE_UNSPECIFIED | 0 |  |
-| TYPE_SLACK | 1 |  |
-| TYPE_DISCORD | 2 |  |
-| TYPE_TEAMS | 3 |  |
-| TYPE_DINGTALK | 4 |  |
-| TYPE_FEISHU | 5 |  |
-| TYPE_WECOM | 6 |  |
-| TYPE_CUSTOM | 7 |  |
-
-
-
-<a name="bytebase-v1-Workflow"></a>
-
-### Workflow
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| WORKFLOW_UNSPECIFIED | 0 |  |
-| UI | 1 |  |
-| VCS | 2 |  |
-
-
- 
-
- 
-
-
-<a name="bytebase-v1-ProjectService"></a>
-
-### ProjectService
-
-
-| Method Name | Request Type | Response Type | Description |
-| ----------- | ------------ | ------------- | ------------|
-| GetProject | [GetProjectRequest](#bytebase-v1-GetProjectRequest) | [Project](#bytebase-v1-Project) |  |
-| ListProjects | [ListProjectsRequest](#bytebase-v1-ListProjectsRequest) | [ListProjectsResponse](#bytebase-v1-ListProjectsResponse) |  |
-| SearchProjects | [SearchProjectsRequest](#bytebase-v1-SearchProjectsRequest) | [SearchProjectsResponse](#bytebase-v1-SearchProjectsResponse) |  |
-| CreateProject | [CreateProjectRequest](#bytebase-v1-CreateProjectRequest) | [Project](#bytebase-v1-Project) |  |
-| UpdateProject | [UpdateProjectRequest](#bytebase-v1-UpdateProjectRequest) | [Project](#bytebase-v1-Project) |  |
-| DeleteProject | [DeleteProjectRequest](#bytebase-v1-DeleteProjectRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
-| UndeleteProject | [UndeleteProjectRequest](#bytebase-v1-UndeleteProjectRequest) | [Project](#bytebase-v1-Project) |  |
-| GetIamPolicy | [GetIamPolicyRequest](#bytebase-v1-GetIamPolicyRequest) | [IamPolicy](#bytebase-v1-IamPolicy) |  |
-| BatchGetIamPolicy | [BatchGetIamPolicyRequest](#bytebase-v1-BatchGetIamPolicyRequest) | [BatchGetIamPolicyResponse](#bytebase-v1-BatchGetIamPolicyResponse) | Deprecated. |
-| SetIamPolicy | [SetIamPolicyRequest](#bytebase-v1-SetIamPolicyRequest) | [IamPolicy](#bytebase-v1-IamPolicy) |  |
-| GetDeploymentConfig | [GetDeploymentConfigRequest](#bytebase-v1-GetDeploymentConfigRequest) | [DeploymentConfig](#bytebase-v1-DeploymentConfig) |  |
-| UpdateDeploymentConfig | [UpdateDeploymentConfigRequest](#bytebase-v1-UpdateDeploymentConfigRequest) | [DeploymentConfig](#bytebase-v1-DeploymentConfig) |  |
-| AddWebhook | [AddWebhookRequest](#bytebase-v1-AddWebhookRequest) | [Project](#bytebase-v1-Project) |  |
-| UpdateWebhook | [UpdateWebhookRequest](#bytebase-v1-UpdateWebhookRequest) | [Project](#bytebase-v1-Project) |  |
-| RemoveWebhook | [RemoveWebhookRequest](#bytebase-v1-RemoveWebhookRequest) | [Project](#bytebase-v1-Project) |  |
-| TestWebhook | [TestWebhookRequest](#bytebase-v1-TestWebhookRequest) | [TestWebhookResponse](#bytebase-v1-TestWebhookResponse) |  |
-
- 
-
-
-
 <a name="v1_sql_service-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -9281,39 +9561,6 @@ TYPE_PROJECT_REPOSITORY_PUSH represents Bytebase receiving a push event from the
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | content | [bytes](#bytes) |  | The export file content. |
-
-
-
-
-
-
-<a name="bytebase-v1-GenerateRestoreSQLRequest"></a>
-
-### GenerateRestoreSQLRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | The database name to execute the query against. Format: instances/{instance}/databases/{databaseName} |
-| sheet | [string](#string) |  | The resource name of the sheet. It is used to get the original statement. Format: projects/{project}/sheets/{sheet} |
-| backup_data_source | [string](#string) |  | The data source to restore from. Format: instances/{instance}/databases/{databaseName}, for general engines. Or instances/{instance}/databases/{databaseName}/schemas/{schemaName}, for PG only. |
-| backup_table | [string](#string) |  | The backup table name. |
-
-
-
-
-
-
-<a name="bytebase-v1-GenerateRestoreSQLResponse"></a>
-
-### GenerateRestoreSQLResponse
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| statement | [string](#string) |  | The restore SQL statement. |
 
 
 
@@ -9469,6 +9716,7 @@ TYPE_PROJECT_REPOSITORY_PUSH represents Bytebase receiving a push event from the
 | column_names | [string](#string) | repeated | Column names of the query result. |
 | column_type_names | [string](#string) | repeated | Column types of the query result. The types come from the Golang SQL driver. |
 | rows | [QueryRow](#bytebase-v1-QueryRow) | repeated | Rows of the query result. |
+| rows_count | [int64](#int64) |  |  |
 | masked | [bool](#bool) | repeated | Columns are masked or not. |
 | sensitive | [bool](#bool) | repeated | Columns are sensitive or not. |
 | error | [string](#string) |  | The error message if the query failed. |
@@ -9713,7 +9961,6 @@ for field description.
 | ParseMyBatisMapper | [ParseMyBatisMapperRequest](#bytebase-v1-ParseMyBatisMapperRequest) | [ParseMyBatisMapperResponse](#bytebase-v1-ParseMyBatisMapperResponse) |  |
 | Pretty | [PrettyRequest](#bytebase-v1-PrettyRequest) | [PrettyResponse](#bytebase-v1-PrettyResponse) |  |
 | StringifyMetadata | [StringifyMetadataRequest](#bytebase-v1-StringifyMetadataRequest) | [StringifyMetadataResponse](#bytebase-v1-StringifyMetadataResponse) |  |
-| GenerateRestoreSQL | [GenerateRestoreSQLRequest](#bytebase-v1-GenerateRestoreSQLRequest) | [GenerateRestoreSQLResponse](#bytebase-v1-GenerateRestoreSQLResponse) | Deprecated. |
 
  
 
@@ -10336,6 +10583,21 @@ This value should be 4-63 characters, and valid characters are /[a-z][A-Z][0-9]/
 
 
 
+<a name="bytebase-v1-GetRoleRequest"></a>
+
+### GetRoleRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | [string](#string) |  | The name of the role to retrieve. Format: roles/{role} |
+
+
+
+
+
+
 <a name="bytebase-v1-ListRolesRequest"></a>
 
 ### ListRolesRequest
@@ -10382,6 +10644,7 @@ When paginating, all other parameters provided to `ListRoles` must match the cal
 | title | [string](#string) |  |  |
 | description | [string](#string) |  |  |
 | permissions | [string](#string) | repeated |  |
+| type | [Role.Type](#bytebase-v1-Role-Type) |  |  |
 
 
 
@@ -10406,6 +10669,19 @@ When paginating, all other parameters provided to `ListRoles` must match the cal
 
  
 
+
+<a name="bytebase-v1-Role-Type"></a>
+
+### Role.Type
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| TYPE_UNSPECIFIED | 0 |  |
+| BUILT_IN | 1 |  |
+| CUSTOM | 2 |  |
+
+
  
 
  
@@ -10419,6 +10695,7 @@ When paginating, all other parameters provided to `ListRoles` must match the cal
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | ListRoles | [ListRolesRequest](#bytebase-v1-ListRolesRequest) | [ListRolesResponse](#bytebase-v1-ListRolesResponse) |  |
+| GetRole | [GetRoleRequest](#bytebase-v1-GetRoleRequest) | [Role](#bytebase-v1-Role) |  |
 | CreateRole | [CreateRoleRequest](#bytebase-v1-CreateRoleRequest) | [Role](#bytebase-v1-Role) |  |
 | UpdateRole | [UpdateRoleRequest](#bytebase-v1-UpdateRoleRequest) | [Role](#bytebase-v1-Role) |  |
 | DeleteRole | [DeleteRoleRequest](#bytebase-v1-DeleteRoleRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
@@ -10525,6 +10802,8 @@ When paginating, all other parameters provided to `ListRoles` must match the cal
 | ----- | ---- | ----- | ----------- |
 | parent | [string](#string) |  | The parent project where this rollout will be created. Format: projects/{project} |
 | rollout | [Rollout](#bytebase-v1-Rollout) |  | The rollout to create. |
+| stage_id | [string](#string) |  | stage_id is the id in the plan deployment_config_snapshot. The rollout is created according to the plan and the stages are created up to the stage_id. If unspecified, all stages are created. |
+| validate_only | [bool](#bool) |  | If set, validate the request and preview the rollout, but do not actually create it. |
 
 
 
@@ -10738,6 +11017,7 @@ When paginating, all other parameters provided to `ListTaskRuns` must match the 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | Format: projects/{project}/rollouts/{rollout}/stages/{stage} |
+| id | [string](#string) |  | The id comes from the deployment config. Format: UUID Empty for legacy stages. |
 | title | [string](#string) |  |  |
 | tasks | [Task](#bytebase-v1-Task) | repeated |  |
 
@@ -10898,6 +11178,7 @@ When paginating, all other parameters provided to `ListTaskRuns` must match the 
 | export_archive_status | [TaskRun.ExportArchiveStatus](#bytebase-v1-TaskRun-ExportArchiveStatus) |  |  |
 | prior_backup_detail | [TaskRun.PriorBackupDetail](#bytebase-v1-TaskRun-PriorBackupDetail) |  | The prior backup detail that will be used to rollback the task run. |
 | scheduler_info | [TaskRun.SchedulerInfo](#bytebase-v1-TaskRun-SchedulerInfo) |  |  |
+| sheet | [string](#string) |  | Format: projects/{project}/sheets/{sheet} |
 
 
 
@@ -11346,7 +11627,7 @@ Read from `pg_stat_activity`
 | ----------- | ------------ | ------------- | ------------|
 | GetRollout | [GetRolloutRequest](#bytebase-v1-GetRolloutRequest) | [Rollout](#bytebase-v1-Rollout) |  |
 | ListRollouts | [ListRolloutsRequest](#bytebase-v1-ListRolloutsRequest) | [ListRolloutsResponse](#bytebase-v1-ListRolloutsResponse) |  |
-| CreateRollout | [CreateRolloutRequest](#bytebase-v1-CreateRolloutRequest) | [Rollout](#bytebase-v1-Rollout) |  |
+| CreateRollout | [CreateRolloutRequest](#bytebase-v1-CreateRolloutRequest) | [Rollout](#bytebase-v1-Rollout) | CreateRollout can be called multiple times with the same rollout.plan but different stage_id to promote rollout stages. |
 | PreviewRollout | [PreviewRolloutRequest](#bytebase-v1-PreviewRolloutRequest) | [Rollout](#bytebase-v1-Rollout) |  |
 | ListTaskRuns | [ListTaskRunsRequest](#bytebase-v1-ListTaskRunsRequest) | [ListTaskRunsResponse](#bytebase-v1-ListTaskRunsResponse) |  |
 | GetTaskRun | [GetTaskRunRequest](#bytebase-v1-GetTaskRunRequest) | [TaskRun](#bytebase-v1-TaskRun) |  |

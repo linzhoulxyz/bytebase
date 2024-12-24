@@ -9,6 +9,7 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import Long from "long";
 import { Timestamp } from "../google/protobuf/timestamp";
 import { StringValue } from "../google/protobuf/wrappers";
+import { MaskingLevel, maskingLevelFromJSON, maskingLevelToJSON, maskingLevelToNumber } from "./common";
 
 export const protobufPackage = "bytebase.store";
 
@@ -41,6 +42,12 @@ export interface DatabaseSchemaMetadata {
   serviceName: string;
   linkedDatabases: LinkedDatabaseMetadata[];
   owner: string;
+}
+
+export interface LinkedDatabaseMetadata {
+  name: string;
+  username: string;
+  host: string;
 }
 
 /**
@@ -86,6 +93,14 @@ export interface SchemaMetadata {
    */
   triggers: TriggerMetadata[];
   events: EventMetadata[];
+  enumTypes: EnumTypeMetadata[];
+}
+
+export interface EnumTypeMetadata {
+  /** The name of a type. */
+  name: string;
+  /** The enum values of a type. */
+  values: string[];
 }
 
 export interface EventMetadata {
@@ -128,6 +143,8 @@ export interface SequenceMetadata {
 export interface TriggerMetadata {
   /** The name is the name of the trigger. */
   name: string;
+  /** The schema name of the table/view that the trigger is created. */
+  schemaName: string;
   /**
    * The table_name is the name of the table/view that the trigger is created
    * on.
@@ -145,6 +162,10 @@ export interface TriggerMetadata {
   sqlMode: string;
   characterSetClient: string;
   collationConnection: string;
+  /** For Postgres, identifies whether the trigger fires once for each processed row or once for each statement (ROW or STATEMENT). */
+  actionOrientation: string;
+  /** For Postgres, the WHEN condition of the trigger. */
+  condition: string;
 }
 
 export interface TaskMetadata {
@@ -389,6 +410,11 @@ export interface TableMetadata {
   /** The check_constraints is the list of check constraints in a table. */
   checkConstraints: CheckConstraintMetadata[];
   owner: string;
+  /**
+   * The sorting_keys is a tuple of column names or arbitrary expressions. ClickHouse specific field.
+   * Reference: https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/mergetree#order_by
+   */
+  sortingKeys: string[];
 }
 
 export interface CheckConstraintMetadata {
@@ -448,6 +474,7 @@ export interface TablePartitionMetadata {
   useDefault: string;
   /** The subpartitions is the list of subpartitions in a table partition. */
   subpartitions: TablePartitionMetadata[];
+  indexes: IndexMetadata[];
 }
 
 /**
@@ -766,6 +793,12 @@ export interface IndexMetadata {
   comment: string;
   /** The definition of an index. */
   definition: string;
+  /** The schema name of the parent index. */
+  parentIndexSchema: string;
+  /** The index name of the parent index. */
+  parentIndexName: string;
+  /** The number of granules in the block. It's a ClickHouse specific field. */
+  granularity: Long;
 }
 
 /** ExtensionMetadata is the metadata for extensions. */
@@ -932,17 +965,14 @@ export interface ColumnConfig {
   /** The user labels for a column. */
   labels: { [key: string]: string };
   classificationId: string;
+  maskingLevel: MaskingLevel;
+  fullMaskingAlgorithmId: string;
+  partialMaskingAlgorithmId: string;
 }
 
 export interface ColumnConfig_LabelsEntry {
   key: string;
   value: string;
-}
-
-export interface LinkedDatabaseMetadata {
-  name: string;
-  username: string;
-  host: string;
 }
 
 function createBaseDatabaseMetadata(): DatabaseMetadata {
@@ -1338,6 +1368,98 @@ export const DatabaseSchemaMetadata: MessageFns<DatabaseSchemaMetadata> = {
   },
 };
 
+function createBaseLinkedDatabaseMetadata(): LinkedDatabaseMetadata {
+  return { name: "", username: "", host: "" };
+}
+
+export const LinkedDatabaseMetadata: MessageFns<LinkedDatabaseMetadata> = {
+  encode(message: LinkedDatabaseMetadata, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.name !== "") {
+      writer.uint32(10).string(message.name);
+    }
+    if (message.username !== "") {
+      writer.uint32(18).string(message.username);
+    }
+    if (message.host !== "") {
+      writer.uint32(26).string(message.host);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): LinkedDatabaseMetadata {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseLinkedDatabaseMetadata();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.username = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.host = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): LinkedDatabaseMetadata {
+    return {
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      username: isSet(object.username) ? globalThis.String(object.username) : "",
+      host: isSet(object.host) ? globalThis.String(object.host) : "",
+    };
+  },
+
+  toJSON(message: LinkedDatabaseMetadata): unknown {
+    const obj: any = {};
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.username !== "") {
+      obj.username = message.username;
+    }
+    if (message.host !== "") {
+      obj.host = message.host;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<LinkedDatabaseMetadata>): LinkedDatabaseMetadata {
+    return LinkedDatabaseMetadata.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<LinkedDatabaseMetadata>): LinkedDatabaseMetadata {
+    const message = createBaseLinkedDatabaseMetadata();
+    message.name = object.name ?? "";
+    message.username = object.username ?? "";
+    message.host = object.host ?? "";
+    return message;
+  },
+};
+
 function createBaseSchemaMetadata(): SchemaMetadata {
   return {
     name: "",
@@ -1354,6 +1476,7 @@ function createBaseSchemaMetadata(): SchemaMetadata {
     owner: "",
     triggers: [],
     events: [],
+    enumTypes: [],
   };
 }
 
@@ -1400,6 +1523,9 @@ export const SchemaMetadata: MessageFns<SchemaMetadata> = {
     }
     for (const v of message.events) {
       EventMetadata.encode(v!, writer.uint32(114).fork()).join();
+    }
+    for (const v of message.enumTypes) {
+      EnumTypeMetadata.encode(v!, writer.uint32(122).fork()).join();
     }
     return writer;
   },
@@ -1523,6 +1649,14 @@ export const SchemaMetadata: MessageFns<SchemaMetadata> = {
           message.events.push(EventMetadata.decode(reader, reader.uint32()));
           continue;
         }
+        case 15: {
+          if (tag !== 122) {
+            break;
+          }
+
+          message.enumTypes.push(EnumTypeMetadata.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1565,6 +1699,9 @@ export const SchemaMetadata: MessageFns<SchemaMetadata> = {
         : [],
       events: globalThis.Array.isArray(object?.events)
         ? object.events.map((e: any) => EventMetadata.fromJSON(e))
+        : [],
+      enumTypes: globalThis.Array.isArray(object?.enumTypes)
+        ? object.enumTypes.map((e: any) => EnumTypeMetadata.fromJSON(e))
         : [],
     };
   },
@@ -1613,6 +1750,9 @@ export const SchemaMetadata: MessageFns<SchemaMetadata> = {
     if (message.events?.length) {
       obj.events = message.events.map((e) => EventMetadata.toJSON(e));
     }
+    if (message.enumTypes?.length) {
+      obj.enumTypes = message.enumTypes.map((e) => EnumTypeMetadata.toJSON(e));
+    }
     return obj;
   },
 
@@ -1635,6 +1775,83 @@ export const SchemaMetadata: MessageFns<SchemaMetadata> = {
     message.owner = object.owner ?? "";
     message.triggers = object.triggers?.map((e) => TriggerMetadata.fromPartial(e)) || [];
     message.events = object.events?.map((e) => EventMetadata.fromPartial(e)) || [];
+    message.enumTypes = object.enumTypes?.map((e) => EnumTypeMetadata.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseEnumTypeMetadata(): EnumTypeMetadata {
+  return { name: "", values: [] };
+}
+
+export const EnumTypeMetadata: MessageFns<EnumTypeMetadata> = {
+  encode(message: EnumTypeMetadata, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.name !== "") {
+      writer.uint32(10).string(message.name);
+    }
+    for (const v of message.values) {
+      writer.uint32(18).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): EnumTypeMetadata {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseEnumTypeMetadata();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.values.push(reader.string());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): EnumTypeMetadata {
+    return {
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      values: globalThis.Array.isArray(object?.values) ? object.values.map((e: any) => globalThis.String(e)) : [],
+    };
+  },
+
+  toJSON(message: EnumTypeMetadata): unknown {
+    const obj: any = {};
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.values?.length) {
+      obj.values = message.values;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<EnumTypeMetadata>): EnumTypeMetadata {
+    return EnumTypeMetadata.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<EnumTypeMetadata>): EnumTypeMetadata {
+    const message = createBaseEnumTypeMetadata();
+    message.name = object.name ?? "";
+    message.values = object.values?.map((e) => e) || [];
     return message;
   },
 };
@@ -2014,6 +2231,7 @@ export const SequenceMetadata: MessageFns<SequenceMetadata> = {
 function createBaseTriggerMetadata(): TriggerMetadata {
   return {
     name: "",
+    schemaName: "",
     tableName: "",
     event: "",
     timing: "",
@@ -2021,6 +2239,8 @@ function createBaseTriggerMetadata(): TriggerMetadata {
     sqlMode: "",
     characterSetClient: "",
     collationConnection: "",
+    actionOrientation: "",
+    condition: "",
   };
 }
 
@@ -2028,6 +2248,9 @@ export const TriggerMetadata: MessageFns<TriggerMetadata> = {
   encode(message: TriggerMetadata, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.name !== "") {
       writer.uint32(10).string(message.name);
+    }
+    if (message.schemaName !== "") {
+      writer.uint32(74).string(message.schemaName);
     }
     if (message.tableName !== "") {
       writer.uint32(18).string(message.tableName);
@@ -2050,6 +2273,12 @@ export const TriggerMetadata: MessageFns<TriggerMetadata> = {
     if (message.collationConnection !== "") {
       writer.uint32(66).string(message.collationConnection);
     }
+    if (message.actionOrientation !== "") {
+      writer.uint32(82).string(message.actionOrientation);
+    }
+    if (message.condition !== "") {
+      writer.uint32(90).string(message.condition);
+    }
     return writer;
   },
 
@@ -2066,6 +2295,14 @@ export const TriggerMetadata: MessageFns<TriggerMetadata> = {
           }
 
           message.name = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.schemaName = reader.string();
           continue;
         }
         case 2: {
@@ -2124,6 +2361,22 @@ export const TriggerMetadata: MessageFns<TriggerMetadata> = {
           message.collationConnection = reader.string();
           continue;
         }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.actionOrientation = reader.string();
+          continue;
+        }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.condition = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2136,6 +2389,7 @@ export const TriggerMetadata: MessageFns<TriggerMetadata> = {
   fromJSON(object: any): TriggerMetadata {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
+      schemaName: isSet(object.schemaName) ? globalThis.String(object.schemaName) : "",
       tableName: isSet(object.tableName) ? globalThis.String(object.tableName) : "",
       event: isSet(object.event) ? globalThis.String(object.event) : "",
       timing: isSet(object.timing) ? globalThis.String(object.timing) : "",
@@ -2143,6 +2397,8 @@ export const TriggerMetadata: MessageFns<TriggerMetadata> = {
       sqlMode: isSet(object.sqlMode) ? globalThis.String(object.sqlMode) : "",
       characterSetClient: isSet(object.characterSetClient) ? globalThis.String(object.characterSetClient) : "",
       collationConnection: isSet(object.collationConnection) ? globalThis.String(object.collationConnection) : "",
+      actionOrientation: isSet(object.actionOrientation) ? globalThis.String(object.actionOrientation) : "",
+      condition: isSet(object.condition) ? globalThis.String(object.condition) : "",
     };
   },
 
@@ -2150,6 +2406,9 @@ export const TriggerMetadata: MessageFns<TriggerMetadata> = {
     const obj: any = {};
     if (message.name !== "") {
       obj.name = message.name;
+    }
+    if (message.schemaName !== "") {
+      obj.schemaName = message.schemaName;
     }
     if (message.tableName !== "") {
       obj.tableName = message.tableName;
@@ -2172,6 +2431,12 @@ export const TriggerMetadata: MessageFns<TriggerMetadata> = {
     if (message.collationConnection !== "") {
       obj.collationConnection = message.collationConnection;
     }
+    if (message.actionOrientation !== "") {
+      obj.actionOrientation = message.actionOrientation;
+    }
+    if (message.condition !== "") {
+      obj.condition = message.condition;
+    }
     return obj;
   },
 
@@ -2181,6 +2446,7 @@ export const TriggerMetadata: MessageFns<TriggerMetadata> = {
   fromPartial(object: DeepPartial<TriggerMetadata>): TriggerMetadata {
     const message = createBaseTriggerMetadata();
     message.name = object.name ?? "";
+    message.schemaName = object.schemaName ?? "";
     message.tableName = object.tableName ?? "";
     message.event = object.event ?? "";
     message.timing = object.timing ?? "";
@@ -2188,6 +2454,8 @@ export const TriggerMetadata: MessageFns<TriggerMetadata> = {
     message.sqlMode = object.sqlMode ?? "";
     message.characterSetClient = object.characterSetClient ?? "";
     message.collationConnection = object.collationConnection ?? "";
+    message.actionOrientation = object.actionOrientation ?? "";
+    message.condition = object.condition ?? "";
     return message;
   },
 };
@@ -2609,6 +2877,7 @@ function createBaseTableMetadata(): TableMetadata {
     partitions: [],
     checkConstraints: [],
     owner: "",
+    sortingKeys: [],
   };
 }
 
@@ -2664,6 +2933,9 @@ export const TableMetadata: MessageFns<TableMetadata> = {
     }
     if (message.owner !== "") {
       writer.uint32(146).string(message.owner);
+    }
+    for (const v of message.sortingKeys) {
+      writer.uint32(154).string(v!);
     }
     return writer;
   },
@@ -2811,6 +3083,14 @@ export const TableMetadata: MessageFns<TableMetadata> = {
           message.owner = reader.string();
           continue;
         }
+        case 19: {
+          if (tag !== 154) {
+            break;
+          }
+
+          message.sortingKeys.push(reader.string());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2849,6 +3129,9 @@ export const TableMetadata: MessageFns<TableMetadata> = {
         ? object.checkConstraints.map((e: any) => CheckConstraintMetadata.fromJSON(e))
         : [],
       owner: isSet(object.owner) ? globalThis.String(object.owner) : "",
+      sortingKeys: globalThis.Array.isArray(object?.sortingKeys)
+        ? object.sortingKeys.map((e: any) => globalThis.String(e))
+        : [],
     };
   },
 
@@ -2905,6 +3188,9 @@ export const TableMetadata: MessageFns<TableMetadata> = {
     if (message.owner !== "") {
       obj.owner = message.owner;
     }
+    if (message.sortingKeys?.length) {
+      obj.sortingKeys = message.sortingKeys;
+    }
     return obj;
   },
 
@@ -2938,6 +3224,7 @@ export const TableMetadata: MessageFns<TableMetadata> = {
     message.partitions = object.partitions?.map((e) => TablePartitionMetadata.fromPartial(e)) || [];
     message.checkConstraints = object.checkConstraints?.map((e) => CheckConstraintMetadata.fromPartial(e)) || [];
     message.owner = object.owner ?? "";
+    message.sortingKeys = object.sortingKeys?.map((e) => e) || [];
     return message;
   },
 };
@@ -3136,6 +3423,7 @@ function createBaseTablePartitionMetadata(): TablePartitionMetadata {
     value: "",
     useDefault: "",
     subpartitions: [],
+    indexes: [],
   };
 }
 
@@ -3158,6 +3446,9 @@ export const TablePartitionMetadata: MessageFns<TablePartitionMetadata> = {
     }
     for (const v of message.subpartitions) {
       TablePartitionMetadata.encode(v!, writer.uint32(50).fork()).join();
+    }
+    for (const v of message.indexes) {
+      IndexMetadata.encode(v!, writer.uint32(58).fork()).join();
     }
     return writer;
   },
@@ -3217,6 +3508,14 @@ export const TablePartitionMetadata: MessageFns<TablePartitionMetadata> = {
           message.subpartitions.push(TablePartitionMetadata.decode(reader, reader.uint32()));
           continue;
         }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.indexes.push(IndexMetadata.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3237,6 +3536,9 @@ export const TablePartitionMetadata: MessageFns<TablePartitionMetadata> = {
       useDefault: isSet(object.useDefault) ? globalThis.String(object.useDefault) : "",
       subpartitions: globalThis.Array.isArray(object?.subpartitions)
         ? object.subpartitions.map((e: any) => TablePartitionMetadata.fromJSON(e))
+        : [],
+      indexes: globalThis.Array.isArray(object?.indexes)
+        ? object.indexes.map((e: any) => IndexMetadata.fromJSON(e))
         : [],
     };
   },
@@ -3261,6 +3563,9 @@ export const TablePartitionMetadata: MessageFns<TablePartitionMetadata> = {
     if (message.subpartitions?.length) {
       obj.subpartitions = message.subpartitions.map((e) => TablePartitionMetadata.toJSON(e));
     }
+    if (message.indexes?.length) {
+      obj.indexes = message.indexes.map((e) => IndexMetadata.toJSON(e));
+    }
     return obj;
   },
 
@@ -3275,6 +3580,7 @@ export const TablePartitionMetadata: MessageFns<TablePartitionMetadata> = {
     message.value = object.value ?? "";
     message.useDefault = object.useDefault ?? "";
     message.subpartitions = object.subpartitions?.map((e) => TablePartitionMetadata.fromPartial(e)) || [];
+    message.indexes = object.indexes?.map((e) => IndexMetadata.fromPartial(e)) || [];
     return message;
   },
 };
@@ -4371,6 +4677,9 @@ function createBaseIndexMetadata(): IndexMetadata {
     visible: false,
     comment: "",
     definition: "",
+    parentIndexSchema: "",
+    parentIndexName: "",
+    granularity: Long.ZERO,
   };
 }
 
@@ -4409,6 +4718,15 @@ export const IndexMetadata: MessageFns<IndexMetadata> = {
     }
     if (message.definition !== "") {
       writer.uint32(66).string(message.definition);
+    }
+    if (message.parentIndexSchema !== "") {
+      writer.uint32(90).string(message.parentIndexSchema);
+    }
+    if (message.parentIndexName !== "") {
+      writer.uint32(98).string(message.parentIndexName);
+    }
+    if (!message.granularity.equals(Long.ZERO)) {
+      writer.uint32(104).int64(message.granularity.toString());
     }
     return writer;
   },
@@ -4520,6 +4838,30 @@ export const IndexMetadata: MessageFns<IndexMetadata> = {
           message.definition = reader.string();
           continue;
         }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.parentIndexSchema = reader.string();
+          continue;
+        }
+        case 12: {
+          if (tag !== 98) {
+            break;
+          }
+
+          message.parentIndexName = reader.string();
+          continue;
+        }
+        case 13: {
+          if (tag !== 104) {
+            break;
+          }
+
+          message.granularity = Long.fromString(reader.int64().toString());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -4545,6 +4887,9 @@ export const IndexMetadata: MessageFns<IndexMetadata> = {
       visible: isSet(object.visible) ? globalThis.Boolean(object.visible) : false,
       comment: isSet(object.comment) ? globalThis.String(object.comment) : "",
       definition: isSet(object.definition) ? globalThis.String(object.definition) : "",
+      parentIndexSchema: isSet(object.parentIndexSchema) ? globalThis.String(object.parentIndexSchema) : "",
+      parentIndexName: isSet(object.parentIndexName) ? globalThis.String(object.parentIndexName) : "",
+      granularity: isSet(object.granularity) ? Long.fromValue(object.granularity) : Long.ZERO,
     };
   },
 
@@ -4580,6 +4925,15 @@ export const IndexMetadata: MessageFns<IndexMetadata> = {
     if (message.definition !== "") {
       obj.definition = message.definition;
     }
+    if (message.parentIndexSchema !== "") {
+      obj.parentIndexSchema = message.parentIndexSchema;
+    }
+    if (message.parentIndexName !== "") {
+      obj.parentIndexName = message.parentIndexName;
+    }
+    if (!message.granularity.equals(Long.ZERO)) {
+      obj.granularity = (message.granularity || Long.ZERO).toString();
+    }
     return obj;
   },
 
@@ -4598,6 +4952,11 @@ export const IndexMetadata: MessageFns<IndexMetadata> = {
     message.visible = object.visible ?? false;
     message.comment = object.comment ?? "";
     message.definition = object.definition ?? "";
+    message.parentIndexSchema = object.parentIndexSchema ?? "";
+    message.parentIndexName = object.parentIndexName ?? "";
+    message.granularity = (object.granularity !== undefined && object.granularity !== null)
+      ? Long.fromValue(object.granularity)
+      : Long.ZERO;
     return message;
   },
 };
@@ -5806,7 +6165,15 @@ export const ViewConfig: MessageFns<ViewConfig> = {
 };
 
 function createBaseColumnConfig(): ColumnConfig {
-  return { name: "", semanticTypeId: "", labels: {}, classificationId: "" };
+  return {
+    name: "",
+    semanticTypeId: "",
+    labels: {},
+    classificationId: "",
+    maskingLevel: MaskingLevel.MASKING_LEVEL_UNSPECIFIED,
+    fullMaskingAlgorithmId: "",
+    partialMaskingAlgorithmId: "",
+  };
 }
 
 export const ColumnConfig: MessageFns<ColumnConfig> = {
@@ -5822,6 +6189,15 @@ export const ColumnConfig: MessageFns<ColumnConfig> = {
     });
     if (message.classificationId !== "") {
       writer.uint32(34).string(message.classificationId);
+    }
+    if (message.maskingLevel !== MaskingLevel.MASKING_LEVEL_UNSPECIFIED) {
+      writer.uint32(40).int32(maskingLevelToNumber(message.maskingLevel));
+    }
+    if (message.fullMaskingAlgorithmId !== "") {
+      writer.uint32(50).string(message.fullMaskingAlgorithmId);
+    }
+    if (message.partialMaskingAlgorithmId !== "") {
+      writer.uint32(58).string(message.partialMaskingAlgorithmId);
     }
     return writer;
   },
@@ -5868,6 +6244,30 @@ export const ColumnConfig: MessageFns<ColumnConfig> = {
           message.classificationId = reader.string();
           continue;
         }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.maskingLevel = maskingLevelFromJSON(reader.int32());
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.fullMaskingAlgorithmId = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.partialMaskingAlgorithmId = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5888,6 +6288,15 @@ export const ColumnConfig: MessageFns<ColumnConfig> = {
         }, {})
         : {},
       classificationId: isSet(object.classificationId) ? globalThis.String(object.classificationId) : "",
+      maskingLevel: isSet(object.maskingLevel)
+        ? maskingLevelFromJSON(object.maskingLevel)
+        : MaskingLevel.MASKING_LEVEL_UNSPECIFIED,
+      fullMaskingAlgorithmId: isSet(object.fullMaskingAlgorithmId)
+        ? globalThis.String(object.fullMaskingAlgorithmId)
+        : "",
+      partialMaskingAlgorithmId: isSet(object.partialMaskingAlgorithmId)
+        ? globalThis.String(object.partialMaskingAlgorithmId)
+        : "",
     };
   },
 
@@ -5911,6 +6320,15 @@ export const ColumnConfig: MessageFns<ColumnConfig> = {
     if (message.classificationId !== "") {
       obj.classificationId = message.classificationId;
     }
+    if (message.maskingLevel !== MaskingLevel.MASKING_LEVEL_UNSPECIFIED) {
+      obj.maskingLevel = maskingLevelToJSON(message.maskingLevel);
+    }
+    if (message.fullMaskingAlgorithmId !== "") {
+      obj.fullMaskingAlgorithmId = message.fullMaskingAlgorithmId;
+    }
+    if (message.partialMaskingAlgorithmId !== "") {
+      obj.partialMaskingAlgorithmId = message.partialMaskingAlgorithmId;
+    }
     return obj;
   },
 
@@ -5928,6 +6346,9 @@ export const ColumnConfig: MessageFns<ColumnConfig> = {
       return acc;
     }, {});
     message.classificationId = object.classificationId ?? "";
+    message.maskingLevel = object.maskingLevel ?? MaskingLevel.MASKING_LEVEL_UNSPECIFIED;
+    message.fullMaskingAlgorithmId = object.fullMaskingAlgorithmId ?? "";
+    message.partialMaskingAlgorithmId = object.partialMaskingAlgorithmId ?? "";
     return message;
   },
 };
@@ -6004,98 +6425,6 @@ export const ColumnConfig_LabelsEntry: MessageFns<ColumnConfig_LabelsEntry> = {
     const message = createBaseColumnConfig_LabelsEntry();
     message.key = object.key ?? "";
     message.value = object.value ?? "";
-    return message;
-  },
-};
-
-function createBaseLinkedDatabaseMetadata(): LinkedDatabaseMetadata {
-  return { name: "", username: "", host: "" };
-}
-
-export const LinkedDatabaseMetadata: MessageFns<LinkedDatabaseMetadata> = {
-  encode(message: LinkedDatabaseMetadata, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.name !== "") {
-      writer.uint32(10).string(message.name);
-    }
-    if (message.username !== "") {
-      writer.uint32(18).string(message.username);
-    }
-    if (message.host !== "") {
-      writer.uint32(26).string(message.host);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): LinkedDatabaseMetadata {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseLinkedDatabaseMetadata();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.name = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.username = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.host = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): LinkedDatabaseMetadata {
-    return {
-      name: isSet(object.name) ? globalThis.String(object.name) : "",
-      username: isSet(object.username) ? globalThis.String(object.username) : "",
-      host: isSet(object.host) ? globalThis.String(object.host) : "",
-    };
-  },
-
-  toJSON(message: LinkedDatabaseMetadata): unknown {
-    const obj: any = {};
-    if (message.name !== "") {
-      obj.name = message.name;
-    }
-    if (message.username !== "") {
-      obj.username = message.username;
-    }
-    if (message.host !== "") {
-      obj.host = message.host;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<LinkedDatabaseMetadata>): LinkedDatabaseMetadata {
-    return LinkedDatabaseMetadata.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<LinkedDatabaseMetadata>): LinkedDatabaseMetadata {
-    const message = createBaseLinkedDatabaseMetadata();
-    message.name = object.name ?? "";
-    message.username = object.username ?? "";
-    message.host = object.host ?? "";
     return message;
   },
 };

@@ -18,6 +18,8 @@ const (
 	PermissionChangelistsGet             Permission = "bb.changelists.get"
 	PermissionChangelistsList            Permission = "bb.changelists.list"
 	PermissionChangelistsUpdate          Permission = "bb.changelists.update"
+	PermissionDatabaseCatalogsGet        Permission = "bb.databaseCatalogs.get"
+	PermissionDatabaseCatalogsUpdate     Permission = "bb.databaseCatalogs.update"
 	PermissionDatabaseSecretsDelete      Permission = "bb.databaseSecrets.delete"
 	PermissionDatabaseSecretsList        Permission = "bb.databaseSecrets.list"
 	PermissionDatabaseSecretsUpdate      Permission = "bb.databaseSecrets.update"
@@ -86,6 +88,7 @@ const (
 	PermissionRolesCreate                Permission = "bb.roles.create"
 	PermissionRolesDelete                Permission = "bb.roles.delete"
 	PermissionRolesList                  Permission = "bb.roles.list"
+	PermissionRolesGet                   Permission = "bb.roles.get"
 	PermissionRolesUpdate                Permission = "bb.roles.update"
 	PermissionRolloutsCreate             Permission = "bb.rollouts.create"
 	PermissionRolloutsGet                Permission = "bb.rollouts.get"
@@ -148,6 +151,8 @@ var allPermissions = []Permission{
 	PermissionChangelistsGet,
 	PermissionChangelistsList,
 	PermissionChangelistsUpdate,
+	PermissionDatabaseCatalogsGet,
+	PermissionDatabaseCatalogsUpdate,
 	PermissionDatabaseSecretsDelete,
 	PermissionDatabaseSecretsList,
 	PermissionDatabaseSecretsUpdate,
@@ -216,6 +221,7 @@ var allPermissions = []Permission{
 	PermissionRolesCreate,
 	PermissionRolesDelete,
 	PermissionRolesList,
+	PermissionRolesGet,
 	PermissionRolesUpdate,
 	PermissionRolloutsCreate,
 	PermissionRolloutsGet,

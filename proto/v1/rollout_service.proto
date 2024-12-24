@@ -28,6 +28,7 @@ service RolloutService {
     option (bytebase.v1.auth_method) = IAM;
   }
 
+  // CreateRollout can be called multiple times with the same rollout.plan but different stage_id to promote rollout stages.
   rpc CreateRollout(CreateRolloutRequest) returns (Rollout) {
     option (google.api.http) = {
       post: "/v1/{parent=projects/*}/rollouts"
@@ -214,6 +215,16 @@ message CreateRolloutRequest {
 
   // The rollout to create.
   Rollout rollout = 2 [(google.api.field_behavior) = REQUIRED];
+
+  // stage_id is the id in the plan deployment_config_snapshot.
+  // The rollout is created according to the plan and the
+  // stages are created up to the stage_id.
+  // If unspecified, all stages are created.
+  string stage_id = 3;
+
+  // If set, validate the request and preview the rollout, but
+  // do not actually create it.
+  bool validate_only = 4;
 }
 
 message PreviewRolloutRequest {
@@ -322,6 +333,11 @@ message Stage {
 
   // Format: projects/{project}/rollouts/{rollout}/stages/{stage}
   string name = 1;
+
+  // The id comes from the deployment config.
+  // Format: UUID
+  // Empty for legacy stages.
+  string id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   string title = 4;
   repeated Task tasks = 5;
@@ -529,6 +545,9 @@ message TaskRun {
     WaitingCause waiting_cause = 2;
   }
   SchedulerInfo scheduler_info = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Format: projects/{project}/sheets/{sheet}
+  string sheet = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message TaskRunLog {
