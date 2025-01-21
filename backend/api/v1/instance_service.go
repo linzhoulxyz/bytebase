@@ -86,6 +86,39 @@ func (s *InstanceService) ListInstances(ctx context.Context, request *v1pb.ListI
 	return response, nil
 }
 
+// ListInstanceDatabase list all databases in the instance.
+func (s *InstanceService) ListInstanceDatabase(ctx context.Context, request *v1pb.ListInstanceDatabaseRequest) (*v1pb.ListInstanceDatabaseResponse, error) {
+	var instanceMessage *store.InstanceMessage
+
+	if request.Instance != nil {
+		instanceID, err := common.GetInstanceID(request.Name)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		if instanceMessage, err = s.convertToInstanceMessage(instanceID, request.Instance); err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+	} else {
+		instance, err := getInstanceMessage(ctx, s.store, request.Name)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		instanceMessage = instance
+	}
+
+	instanceMeta, err := s.schemaSyncer.GetInstanceMeta(ctx, instanceMessage)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	response := &v1pb.ListInstanceDatabaseResponse{}
+	for _, database := range instanceMeta.Databases {
+		response.Databases = append(response.Databases, database.Name)
+	}
+	return response, nil
+}
+
 // CreateInstance creates an instance.
 func (s *InstanceService) CreateInstance(ctx context.Context, request *v1pb.CreateInstanceRequest) (*v1pb.Instance, error) {
 	if request.Instance == nil {
@@ -122,6 +155,7 @@ func (s *InstanceService) CreateInstance(ctx context.Context, request *v1pb.Crea
 				return nil, err
 			}
 		}
+
 		return convertToInstance(instanceMessage)
 	}
 
@@ -432,7 +466,7 @@ func (s *InstanceService) syncSlowQueriesForProject(ctx context.Context, project
 	if project.Deleted {
 		return nil, status.Errorf(codes.NotFound, "project %q has been deleted", projectName)
 	}
-	databases, err := s.store.ListDatabases(ctx, &store.FindDatabaseMessage{InstanceID: &project.ResourceID})
+	databases, err := s.store.ListDatabases(ctx, &store.FindDatabaseMessage{ProjectID: &project.ResourceID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list databases: %s", err.Error())
 	}

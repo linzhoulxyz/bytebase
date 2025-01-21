@@ -53,15 +53,25 @@ func (q *querySpanExtractor) getQuerySpan(ctx context.Context, stmt string) (*ba
 	if mixed {
 		return nil, base.MixUserSystemTablesError
 	}
-	if allSystems {
+
+	queryTypeListener := &queryTypeListener{
+		allSystems: allSystems,
+		result:     base.QueryTypeUnknown,
+	}
+	antlr.ParseTreeWalkerDefault.Walk(queryTypeListener, tree)
+	if queryTypeListener.err != nil {
+		return nil, queryTypeListener.err
+	}
+	if queryTypeListener.result != base.Select {
 		return &base.QuerySpan{
+			Type:          queryTypeListener.result,
 			SourceColumns: base.SourceColumnSet{},
 			Results:       []base.QuerySpanResult{},
 		}, nil
 	}
 
 	// TODO(zp): statement type check.
-	querySpanResult, err := q.getQuerySpanResult(tree.(*parser.RootContext).Stmts().AllStmt()[0])
+	querySpanResult, err := q.getQuerySpanResult(tree.(*parser.RootContext).Stmts().AllUnterminated_sql_statement()[0].Sql_statement_body())
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +82,7 @@ func (q *querySpanExtractor) getQuerySpan(ctx context.Context, stmt string) (*ba
 	}, nil
 }
 
-func (q *querySpanExtractor) getQuerySpanResult(tree parser.IStmtContext) ([]base.QuerySpanResult, error) {
+func (q *querySpanExtractor) getQuerySpanResult(tree parser.ISql_statement_bodyContext) ([]base.QuerySpanResult, error) {
 	if tree.Query_statement() == nil {
 		return nil, errors.Errorf("unsupported non-query statement")
 	}

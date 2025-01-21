@@ -263,6 +263,7 @@ const columns = computed(() => {
       maxWidth: 320,
       hide: !showClassification.value,
       render: (table) => {
+        // TODO(ed): use catalog
         const config = configForTable(table);
         return h(ClassificationCell, {
           classification: config.classificationId,
@@ -382,8 +383,8 @@ const handleApplyTemplate = (template: SchemaTemplateSetting_TableTemplate) => {
   /* eslint-disable-next-line vue/no-mutating-props */
   props.schema.tables.push(table);
   const metadata = metadataForTable(table);
-  upsertTableConfig(props.db, metadata, (config) =>
-    Object.assign(config, template.config)
+  upsertTableConfig(props.db, metadata, (catalog) =>
+    Object.assign(catalog, template.catalog)
   );
 
   markEditStatus(props.db, metadata, "created");

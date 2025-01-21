@@ -1,12 +1,13 @@
 import { cloneDeep } from "lodash-es";
 import { t } from "@/plugins/i18n";
-import { pushNotification, useDBSchemaV1Store } from "@/store";
+import { pushNotification, useDatabaseCatalogV1Store } from "@/store";
 import { Engine } from "@/types/proto/v1/common";
 import {
-  ColumnConfig,
-  TableConfig,
-  DatabaseMetadataView,
-} from "@/types/proto/v1/database_service";
+  SchemaCatalog,
+  ColumnCatalog,
+  TableCatalog,
+  TableCatalog_Columns,
+} from "@/types/proto/v1/database_catalog_service";
 
 export const supportClassificationFromCommentFeature = (engine: Engine) => {
   return engine === Engine.MYSQL || engine === Engine.POSTGRES;
@@ -29,121 +30,104 @@ export const updateColumnConfig = async ({
   schema,
   table,
   column,
-  config,
+  columnCatalog,
+  notification = "common.updated",
 }: {
   database: string;
   schema: string;
   table: string;
   column: string;
-  config: Partial<ColumnConfig>;
+  columnCatalog: Partial<ColumnCatalog>;
+  notification?: string;
 }) => {
-  const dbSchemaV1Store = useDBSchemaV1Store();
-  const databaseMetadata = dbSchemaV1Store.getDatabaseMetadata(
-    database,
-    DatabaseMetadataView.DATABASE_METADATA_VIEW_FULL
-  );
+  const dbCatalogStore = useDatabaseCatalogV1Store();
+  const catalog = await dbCatalogStore.getOrFetchDatabaseCatalog({ database });
 
-  const tableConfig = dbSchemaV1Store.getTableConfig(database, schema, table);
-  const index = tableConfig.columnConfigs.findIndex(
-    (config) => config.name === column
+  const pendingUpdateCatalog = cloneDeep(catalog);
+  let targetSchema = pendingUpdateCatalog.schemas.find(
+    (s) => s.name === schema
   );
+  if (!targetSchema) {
+    targetSchema = SchemaCatalog.fromPartial({ name: schema, tables: [] });
+    pendingUpdateCatalog.schemas.push(targetSchema);
+  }
 
-  const pendingUpdateTableConfig = cloneDeep(tableConfig);
-  if (index < 0) {
-    pendingUpdateTableConfig.columnConfigs.push(
-      ColumnConfig.fromPartial({
-        name: column,
-        ...config,
-      })
-    );
+  let targetTable = targetSchema.tables.find((t) => t.name === table);
+  if (!targetTable) {
+    targetTable = TableCatalog.fromPartial({
+      name: table,
+      columns: TableCatalog_Columns.fromPartial({}),
+    });
+    targetSchema.tables.push(targetTable);
+  }
+  if (!targetTable.columns) {
+    targetTable.columns = TableCatalog_Columns.fromPartial({});
+  }
+
+  const columns = targetTable.columns?.columns || [];
+  const columnIndex = columns.findIndex((c) => c.name === column);
+  if (columnIndex < 0) {
+    columns.push(ColumnCatalog.fromPartial({ name: column, ...columnCatalog }));
   } else {
-    pendingUpdateTableConfig.columnConfigs[index] = {
-      ...pendingUpdateTableConfig.columnConfigs[index],
-      ...config,
+    columns[columnIndex] = {
+      ...columns[columnIndex],
+      ...columnCatalog,
     };
   }
+  await dbCatalogStore.updateDatabaseCatalog(pendingUpdateCatalog);
 
-  const schemaConfig = dbSchemaV1Store.getSchemaConfig(database, schema);
-  const pendingUpdateSchemaConfig = cloneDeep(schemaConfig);
-  const tableIndex = pendingUpdateSchemaConfig.tableConfigs.findIndex(
-    (config) => config.name === pendingUpdateTableConfig.name
-  );
-  if (tableIndex < 0) {
-    pendingUpdateSchemaConfig.tableConfigs.push(pendingUpdateTableConfig);
-  } else {
-    pendingUpdateSchemaConfig.tableConfigs[tableIndex] =
-      pendingUpdateTableConfig;
-  }
-
-  const pendingUpdateDatabaseConfig = cloneDeep(databaseMetadata);
-  const schemaIndex = pendingUpdateDatabaseConfig.schemaConfigs.findIndex(
-    (config) => config.name === pendingUpdateSchemaConfig.name
-  );
-  if (schemaIndex < 0) {
-    pendingUpdateDatabaseConfig.schemaConfigs.push(pendingUpdateSchemaConfig);
-  } else {
-    pendingUpdateDatabaseConfig.schemaConfigs[schemaIndex] =
-      pendingUpdateSchemaConfig;
-  }
-
-  await dbSchemaV1Store.updateDatabaseSchemaConfigs(
-    pendingUpdateDatabaseConfig
-  );
   pushNotification({
     module: "bytebase",
     style: "SUCCESS",
-    title: t("common.updated"),
+    title: t(notification),
   });
 };
 
-export const updateTableConfig = async (
-  database: string,
-  schema: string,
-  table: string,
-  config: Partial<TableConfig>
-) => {
-  const dbSchemaV1Store = useDBSchemaV1Store();
-  const databaseMetadata = dbSchemaV1Store.getDatabaseMetadata(
-    database,
-    DatabaseMetadataView.DATABASE_METADATA_VIEW_FULL
-  );
+export const updateTableConfig = async ({
+  database,
+  schema,
+  table,
+  tableCatalog,
+  notification = "common.updated",
+}: {
+  database: string;
+  schema: string;
+  table: string;
+  tableCatalog: Partial<TableCatalog>;
+  notification?: string;
+}) => {
+  const dbCatalogStore = useDatabaseCatalogV1Store();
+  const catalog = await dbCatalogStore.getOrFetchDatabaseCatalog({ database });
 
-  const schemaConfig = dbSchemaV1Store.getSchemaConfig(database, schema);
-  const pendingUpdateSchemaConfig = cloneDeep(schemaConfig);
-  const tableIndex = pendingUpdateSchemaConfig.tableConfigs.findIndex(
-    (config) => config.name === table
+  const pendingUpdateCatalog = cloneDeep(catalog);
+  let targetSchema = pendingUpdateCatalog.schemas.find(
+    (s) => s.name === schema
   );
+  if (!targetSchema) {
+    targetSchema = { name: schema, tables: [] };
+    pendingUpdateCatalog.schemas.push(targetSchema);
+  }
+
+  const tableIndex = targetSchema.tables.findIndex((t) => t.name === table);
   if (tableIndex < 0) {
-    pendingUpdateSchemaConfig.tableConfigs.push(
-      TableConfig.fromPartial({
+    targetSchema.tables.push(
+      TableCatalog.fromPartial({
         name: table,
-        ...config,
+        ...tableCatalog,
       })
     );
   } else {
-    pendingUpdateSchemaConfig.tableConfigs[tableIndex] = {
-      ...pendingUpdateSchemaConfig.tableConfigs[tableIndex],
-      ...config,
+    targetSchema.tables[tableIndex] = {
+      ...targetSchema.tables[tableIndex],
+      ...tableCatalog,
     };
   }
 
-  const pendingUpdateDatabaseConfig = cloneDeep(databaseMetadata);
-  const schemaIndex = pendingUpdateDatabaseConfig.schemaConfigs.findIndex(
-    (config) => config.name === pendingUpdateSchemaConfig.name
-  );
-  if (schemaIndex < 0) {
-    pendingUpdateDatabaseConfig.schemaConfigs.push(pendingUpdateSchemaConfig);
-  } else {
-    pendingUpdateDatabaseConfig.schemaConfigs[schemaIndex] =
-      pendingUpdateSchemaConfig;
-  }
+  await dbCatalogStore.updateDatabaseCatalog(pendingUpdateCatalog);
 
-  await dbSchemaV1Store.updateDatabaseSchemaConfigs(
-    pendingUpdateDatabaseConfig
-  );
   pushNotification({
     module: "bytebase",
     style: "SUCCESS",
-    title: t("common.updated"),
+    title: t(notification),
   });
 };

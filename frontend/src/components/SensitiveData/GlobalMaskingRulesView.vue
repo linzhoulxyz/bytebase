@@ -1,11 +1,5 @@
 <template>
   <div class="w-full space-y-4">
-    <div class="textinfolabel">
-      {{ $t("settings.sensitive-data.global-rules.description") }}
-      <LearnMoreLink
-        url="https://www.bytebase.com/docs/security/mask-data?source=console"
-      />
-    </div>
     <div class="flex flex-row items-center justify-end">
       <div v-if="state.reorderRules" class="flex items-center gap-x-2">
         <NButton
@@ -55,6 +49,12 @@
           {{ $t("common.add") }}
         </NButton>
       </div>
+    </div>
+    <div class="textinfolabel">
+      {{ $t("settings.sensitive-data.global-rules.description") }}
+      <LearnMoreLink
+        url="https://www.bytebase.com/docs/security/mask-data?source=console"
+      />
     </div>
     <NoDataPlaceholder v-if="state.maskingRuleItemList.length === 0" />
     <div
@@ -125,7 +125,6 @@ import { useI18n } from "vue-i18n";
 import { useBodyLayoutContext } from "@/layouts/common";
 import type { Factor } from "@/plugins/cel";
 import { featureToRef, pushNotification, usePolicyV1Store } from "@/store";
-import { MaskingLevel } from "@/types/proto/v1/common";
 import type { Policy } from "@/types/proto/v1/org_policy_service";
 import {
   PolicyType,
@@ -204,9 +203,8 @@ onMounted(async () => {
 const addNewRule = () => {
   state.maskingRuleItemList.push({
     mode: "CREATE",
-    rule: MaskingRulePolicy_MaskingRule.fromJSON({
+    rule: MaskingRulePolicy_MaskingRule.fromPartial({
       id: uuidv4(),
-      maskingLevel: MaskingLevel.FULL,
     }),
   });
   nextTick(() => {

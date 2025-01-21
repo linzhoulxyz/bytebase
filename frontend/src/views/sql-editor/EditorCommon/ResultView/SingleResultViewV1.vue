@@ -4,7 +4,7 @@
       <ErrorView :error="result.error" />
     </BBAttention>
     <div
-      class="w-full shrink-0 flex flex-row justify-between items-center mb-2 overflow-x-auto hide-scrollbar"
+      class="relative w-full shrink-0 flex flex-row justify-between items-center mb-2 overflow-x-auto hide-scrollbar"
     >
       <div class="flex flex-row justify-start items-center mr-2 shrink-0">
         <NInput
@@ -34,9 +34,7 @@
           <span class="ml-2">{{ $t("sql-editor.rows-upper-limit") }}</span>
         </span>
       </div>
-      <div
-        class="flex justify-between items-center shrink-0 gap-x-3 overflow-y-hidden hide-scrollbar"
-      >
+      <div class="flex justify-between items-center shrink-0 gap-x-3">
         <div class="flex items-center">
           <NSwitch v-model:value="state.vertical" size="small" />
           <span class="ml-1 whitespace-nowrap text-sm text-gray-500">
@@ -64,14 +62,6 @@
             />
           </template>
         </NPagination>
-        <NButton
-          v-if="showVisualizeButton"
-          text
-          type="primary"
-          @click="visualizeExplain"
-        >
-          {{ $t("sql-editor.visualize-explain") }}
-        </NButton>
         <NTooltip v-if="DISMISS_PLACEHOLDER">
           <template #trigger>
             <NButton
@@ -113,6 +103,7 @@
           </NButton>
         </template>
       </div>
+      <SelectionCopyTooltips />
     </div>
 
     <div class="flex-1 w-full flex flex-col overflow-y-auto">
@@ -124,26 +115,14 @@
         :is-sensitive-column="isSensitiveColumn"
         :is-column-missing-sensitive="isColumnMissingSensitive"
       />
-      <template v-else>
-        <DataTableLite
-          v-if="useDataTableLite"
-          :table="table"
-          :set-index="setIndex"
-          :offset="pageIndex * pageSize"
-          :is-sensitive-column="isSensitiveColumn"
-          :is-column-missing-sensitive="isColumnMissingSensitive"
-          :max-height="maxDataTableHeight"
-        />
-        <DataTable
-          v-else
-          :table="table"
-          :set-index="setIndex"
-          :offset="pageIndex * pageSize"
-          :is-sensitive-column="isSensitiveColumn"
-          :is-column-missing-sensitive="isColumnMissingSensitive"
-          :max-height="maxDataTableHeight"
-        />
-      </template>
+      <DataTable
+        v-else
+        :table="table"
+        :set-index="setIndex"
+        :offset="pageIndex * pageSize"
+        :is-sensitive-column="isSensitiveColumn"
+        :is-column-missing-sensitive="isColumnMissingSensitive"
+      />
     </div>
 
     <div
@@ -152,8 +131,17 @@
       <div class="flex-1 truncate">
         {{ result.statement }}
       </div>
-      <div class="shrink-0">
-        {{ $t("sql-editor.query-time") }}: {{ queryTime }}
+      <div class="shrink-0 space-x-2">
+        <NButton
+          v-if="showVisualizeButton"
+          text
+          type="primary"
+          @click="visualizeExplain"
+          size="tiny"
+        >
+          {{ $t("sql-editor.visualize-explain") }}
+        </NButton>
+        <span>{{ $t("sql-editor.query-time") }}: {{ queryTime }}</span>
       </div>
     </div>
   </template>
@@ -162,7 +150,7 @@
       class="text-md font-normal flex items-center gap-x-1"
       :class="[dark ? 'text-matrix-green-hover' : 'text-control-light']"
     >
-      <span>{{ extractSQLRowValue(result.rows[0].values[0]).plain }}</span>
+      <span>{{ extractSQLRowValuePlain(result.rows[0].values[0]) }}</span>
       <span>rows affected</span>
     </div>
   </template>
@@ -239,17 +227,18 @@ import {
   compareQueryRowValues,
   createExplainToken,
   extractProjectResourceName,
-  extractSQLRowValue,
+  extractSQLRowValuePlain,
   generateIssueTitle,
   hasPermissionToCreateRequestGrantIssue,
-  hasWorkspacePermissionV2,
   instanceV1HasStructuredQueryResult,
   isNullOrUndefined,
 } from "@/utils";
 import DataBlock from "./DataBlock.vue";
-import { DataTable, DataTableLite } from "./DataTable";
+import DataTable from "./DataTable";
+import { provideSelectionContext } from "./DataTable/common/selection-logic";
 import EmptyView from "./EmptyView.vue";
 import ErrorView from "./ErrorView";
+import SelectionCopyTooltips from "./SelectionCopyTooltips.vue";
 import { useSQLResultViewContext } from "./context";
 
 type LocalState = {
@@ -270,7 +259,6 @@ const props = defineProps<{
   sqlResultSet: SQLResultSetV1;
   result: QueryResult;
   setIndex: number;
-  maxDataTableHeight?: number;
 }>();
 
 const state = reactive<LocalState>({
@@ -283,7 +271,6 @@ const router = useRouter();
 const { dark, keyword } = useSQLResultViewContext();
 const tabStore = useSQLEditorTabStore();
 const editorStore = useSQLEditorStore();
-const { exportData } = useExportData();
 const appFeatureDisallowExport = useAppFeature(
   "bb.feature.sql-editor.disallow-export-query-data"
 );
@@ -328,10 +315,6 @@ const showSearchFeature = computed(() => {
 });
 
 const allowToExportData = computed(() => {
-  if (hasWorkspacePermissionV2("bb.policies.update")) {
-    return true;
-  }
-
   return props.sqlResultSet?.allowExport || false;
 });
 
@@ -396,7 +379,7 @@ const data = computed(() => {
   if (search) {
     temp = data.filter((item) => {
       return item.values.some((col) => {
-        const value = extractSQLRowValue(col).plain;
+        const value = extractSQLRowValuePlain(col);
         if (isNullOrUndefined(value)) {
           return false;
         }
@@ -405,18 +388,6 @@ const data = computed(() => {
     });
   }
   return temp;
-});
-
-const useDataTableLite = computed(() => {
-  // In admin mode, always use DataTableLite to keep consistent
-  if (currentTab.value?.mode === "ADMIN") return true;
-
-  // Otherwise, use DataTableLite if the result set has too many columns
-  // or too many rows in a page.
-  const colCount = table.getFlatHeaders().length;
-  const rowCount = Math.min(pageSize.value, props.result.rows.length);
-
-  return colCount >= 50 || rowCount >= 200;
 });
 
 const isSensitiveColumn = (columnIndex: number): boolean => {
@@ -444,6 +415,8 @@ const table = useVueTable<QueryRow>({
 
 table.setPageSize(storedPageSize.value);
 
+provideSelectionContext(computed(() => table));
+
 const pageIndex = computed(() => {
   return table.getState().pagination.pageIndex;
 });
@@ -457,7 +430,7 @@ const pageSize = computed({
   },
 });
 const pageSizeOptions = computed(() => {
-  return [20, 50, 100, 1000].map<SelectOption>((n) => ({
+  return [20, 50, 100, 200].map<SelectOption>((n) => ({
     label: t("sql-editor.n-per-page", { n }),
     value: n,
   }));
@@ -482,8 +455,8 @@ const handleExportBtnClick = async (
   const limit = options.limit ?? (admin ? 0 : editorStore.resultRowsLimit);
 
   try {
-    const content = await exportData({
-      database,
+    const content = await useExportData().exportData({
+      name: database,
       // TODO(lj): support data source id similar to queries.
       dataSourceId: "",
       format: options.format,
@@ -566,7 +539,7 @@ const handleChangePage = (page: number) => {
 const explainFromSQLResultSetV1 = (resultSet: SQLResultSetV1 | undefined) => {
   if (!resultSet) return "";
   const lines = resultSet.results[0].rows.map((row) =>
-    row.values.map((value) => String(extractSQLRowValue(value).plain))
+    row.values.map((value) => String(extractSQLRowValuePlain(value)))
   );
   const explain = lines.map((line) => line[0]).join("\n");
   return explain;

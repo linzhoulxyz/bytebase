@@ -38,7 +38,6 @@
       >
         <SchemaEditorLite
           ref="schemaEditorRef"
-          resource-type="database"
           :project="project"
           :targets="state.targets"
           :loading="state.isPreparingMetadata"
@@ -367,19 +366,16 @@ const generateOrGetEditingDDL = async () => {
     return {
       statement: state.editStatement,
       errors: [],
-      fatal: false,
     };
   }
 
   const statementMap = await generateDiffDDLMap(/* silent */ true);
   const results = Array.from(statementMap.values());
   const statement = results.map((result) => result.statement).join("\n\n");
-
   const errors = results.flatMap((result) => result.errors);
   return {
     statement,
     errors,
-    fatal: results.some((result) => result.fatal),
   };
 };
 
@@ -405,7 +401,7 @@ const generateDiffDDLMap = async (silent: boolean) => {
       /* !allowEmptyDiffDDLWithConfigChange */ false
     );
 
-    if (result.fatal && !silent) {
+    if (result.errors.length > 0 && !silent) {
       pushNotification({
         module: "bytebase",
         style: "CRITICAL",

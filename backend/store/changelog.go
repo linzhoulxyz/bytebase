@@ -34,6 +34,11 @@ type ChangelogMessage struct {
 	UID         int64
 	CreatorUID  int
 	CreatedTime time.Time
+
+	PrevSchema    string
+	Schema        string
+	Statement     string
+	StatementSize int64
 }
 
 type FindChangelogMessage struct {
@@ -41,10 +46,15 @@ type FindChangelogMessage struct {
 	DatabaseUID *int
 
 	TypeList        []string
+	Status          *ChangelogStatus
 	ResourcesFilter *string
 
 	Limit  *int
 	Offset *int
+
+	// If false, PrevSchema, Schema are truncated
+	ShowFull       bool
+	HasSyncHistory bool
 }
 
 type UpdateChangelogMessage struct {
@@ -150,7 +160,7 @@ func (s *Store) ListChangelogs(ctx context.Context, find *FindChangelogMessage) 
 		where, args = append(where, fmt.Sprintf("changelog.database_id = $%d", len(args)+1)), append(args, *v)
 	}
 	if v := find.ResourcesFilter; v != nil {
-		text, err := generateResourceFilter(*v, "(changelog.payload->'task')")
+		text, err := generateResourceFilter(*v, "changelog.payload")
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to generate resource filter from %q", *v)
 		}
@@ -158,9 +168,32 @@ func (s *Store) ListChangelogs(ctx context.Context, find *FindChangelogMessage) 
 			where = append(where, text)
 		}
 	}
+	if v := find.Status; v != nil {
+		where, args = append(where, fmt.Sprintf("changelog.status = $%d", len(args)+1)), append(args, string(*v))
+	}
+	if find.HasSyncHistory {
+		where = append(where, "changelog.sync_history_id IS NOT NULL")
+	}
 	if len(find.TypeList) > 0 {
-		where = append(where, fmt.Sprintf("changelog.payload->'task'->>'type' = ANY($%d)", len(args)+1))
+		where = append(where, fmt.Sprintf("changelog.payload->>'type' = ANY($%d)", len(args)+1))
 		args = append(args, find.TypeList)
+	}
+
+	truncateSize := 512
+	if common.IsDev() {
+		truncateSize = 4
+	}
+	shPreField := fmt.Sprintf("LEFT(sh_pre.raw_dump, %d)", truncateSize)
+	if find.ShowFull {
+		shPreField = "sh_pre.raw_dump"
+	}
+	shCurField := fmt.Sprintf("LEFT(sh_cur.raw_dump, %d)", truncateSize)
+	if find.ShowFull {
+		shCurField = "sh_cur.raw_dump"
+	}
+	sheetField := fmt.Sprintf("LEFT(sheet_blob.content, %d)", truncateSize)
+	if find.ShowFull {
+		sheetField = "sheet_blob.content"
 	}
 
 	query := fmt.Sprintf(`
@@ -172,11 +205,23 @@ func (s *Store) ListChangelogs(ctx context.Context, find *FindChangelogMessage) 
 			changelog.status,
 			changelog.prev_sync_history_id,
 			changelog.sync_history_id,
-			payload
+			COALESCE(%s, ''),
+			COALESCE(%s, ''),
+			COALESCE(%s, ''),
+			COALESCE(OCTET_LENGTH(sheet_blob.content), 0),
+			changelog.payload
 		FROM changelog
+		LEFT JOIN sync_history sh_pre ON sh_pre.id = changelog.prev_sync_history_id
+		LEFT JOIN sync_history sh_cur ON sh_cur.id = changelog.sync_history_id
+		LEFT JOIN sheet ON sheet.id::text = split_part(changelog.payload->>'sheet', '/', 4)
+		LEFT JOIN sheet_blob ON sheet.sha256 = sheet_blob.sha256
 		WHERE %s
 		ORDER BY changelog.id DESC
-	`, strings.Join(where, " AND "))
+	`,
+		shPreField,
+		shCurField,
+		sheetField,
+		strings.Join(where, " AND "))
 	if v := find.Limit; v != nil {
 		query += fmt.Sprintf(" LIMIT %d", *v)
 	}
@@ -205,6 +250,10 @@ func (s *Store) ListChangelogs(ctx context.Context, find *FindChangelogMessage) 
 			&c.Status,
 			&c.PrevSyncHistoryUID,
 			&c.SyncHistoryUID,
+			&c.PrevSchema,
+			&c.Schema,
+			&c.Statement,
+			&c.StatementSize,
 			&payload,
 		); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan")
@@ -224,10 +273,8 @@ func (s *Store) ListChangelogs(ctx context.Context, find *FindChangelogMessage) 
 	return changelogs, nil
 }
 
-func (s *Store) GetChangelog(ctx context.Context, uid int64) (*ChangelogMessage, error) {
-	changelogs, err := s.ListChangelogs(ctx, &FindChangelogMessage{
-		UID: &uid,
-	})
+func (s *Store) GetChangelog(ctx context.Context, find *FindChangelogMessage) (*ChangelogMessage, error) {
+	changelogs, err := s.ListChangelogs(ctx, find)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +282,7 @@ func (s *Store) GetChangelog(ctx context.Context, uid int64) (*ChangelogMessage,
 		return nil, nil
 	}
 	if len(changelogs) > 1 {
-		return nil, errors.Errorf("found %d changelogs with UID %d, expect 1", len(changelogs), uid)
+		return nil, errors.Errorf("found %d changelogs with find %v, expect 1", len(changelogs), *find)
 	}
 	return changelogs[0], nil
 }

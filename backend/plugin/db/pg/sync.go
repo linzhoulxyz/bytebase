@@ -87,6 +87,18 @@ func (driver *Driver) SyncDBSchema(ctx context.Context) (*storepb.DatabaseSchema
 	}
 	defer txn.Rollback()
 
+	// We set the search path to empty before the column sync.
+	// The reason is that we can get the expression with default schema name.
+	originSearchPath, err := setSearchPath(txn, "")
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to set search path")
+	}
+	defer func() {
+		if _, err := setSearchPath(txn, originSearchPath); err != nil {
+			slog.Error("failed to restore search path", log.BBError(err))
+		}
+	}()
+
 	schemas, schemaOwners, err := getSchemas(txn)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get schemas from database %q", driver.databaseName)
@@ -110,7 +122,11 @@ func (driver *Driver) SyncDBSchema(ctx context.Context) (*storepb.DatabaseSchema
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get indexes from database %q", driver.databaseName)
 	}
-	tableMap, externalTableMap, err := getTables(txn, isAtLeastPG10, columnMap, indexMap, extensionDepend)
+	triggerMap, err := getTriggers(txn, extensionDepend)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get triggers from database %q", driver.databaseName)
+	}
+	tableMap, externalTableMap, tableOidMap, err := getTables(txn, isAtLeastPG10, columnMap, indexMap, triggerMap, extensionDepend)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get tables from database %q", driver.databaseName)
 	}
@@ -121,15 +137,19 @@ func (driver *Driver) SyncDBSchema(ctx context.Context) (*storepb.DatabaseSchema
 			return nil, errors.Wrapf(err, "failed to get table partitions from database %q", driver.databaseName)
 		}
 	}
-	viewMap, err := getViews(txn, columnMap, extensionDepend)
+	viewMap, viewOidMap, err := getViews(txn, columnMap, triggerMap, extensionDepend)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get views from database %q", driver.databaseName)
 	}
-	materializedViewMap, err := getMaterializedViews(txn, extensionDepend)
+	materializedViewMap, materializedViewOidMap, err := getMaterializedViews(txn, indexMap, triggerMap, extensionDepend)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get materialized views from database %q", driver.databaseName)
 	}
-	functionMap, err := getFunctions(txn, extensionDepend)
+	functionDependencyTables, err := getFunctionDependencyTables(txn)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get function dependency tables from database %q", driver.databaseName)
+	}
+	functionMap, err := getFunctions(txn, functionDependencyTables, tableOidMap, viewOidMap, materializedViewOidMap, extensionDepend)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get functions from database %q", driver.databaseName)
 	}
@@ -235,6 +255,7 @@ FROM
 WHERE
 	n.nspname NOT IN(%s)
 	AND c.contype = 'f'
+	AND c.conparentid = 0
 ORDER BY fk_schema, fk_table, fk_name;`, pgparser.SystemSchemaWhereClause)
 
 func getForeignKeys(txn *sql.Tx) (map[db.TableKey][]*storepb.ForeignKeyMetadata, error) {
@@ -248,11 +269,12 @@ func getForeignKeys(txn *sql.Tx) (map[db.TableKey][]*storepb.ForeignKeyMetadata,
 	for rows.Next() {
 		var fkMetadata storepb.ForeignKeyMetadata
 		var fkSchema, fkTable, fkDefinition string
+		var fkRefSchema sql.NullString
 		if err := rows.Scan(
 			&fkSchema,
 			&fkTable,
 			&fkMetadata.Name,
-			&fkMetadata.ReferencedSchema,
+			&fkRefSchema,
 			&fkMetadata.ReferencedTable,
 			&fkMetadata.OnDelete,
 			&fkMetadata.OnUpdate,
@@ -261,6 +283,11 @@ func getForeignKeys(txn *sql.Tx) (map[db.TableKey][]*storepb.ForeignKeyMetadata,
 		); err != nil {
 			return nil, err
 		}
+
+		if !fkRefSchema.Valid {
+			continue
+		}
+		fkMetadata.ReferencedSchema = fkRefSchema.String
 
 		fkTable = formatTableNameFromRegclass(fkTable)
 		fkMetadata.ReferencedTable = formatTableNameFromRegclass(fkMetadata.ReferencedTable)
@@ -408,21 +435,29 @@ func getListTableQuery(isAtLeastPG10 bool) string {
 }
 
 // getTables gets all tables of a database.
-func getTables(txn *sql.Tx, isAtLeastPG10 bool, columnMap map[db.TableKey][]*storepb.ColumnMetadata, indexMap map[db.TableKey][]*storepb.IndexMetadata, extensionDepend map[int]bool) (map[string][]*storepb.TableMetadata, map[string][]*storepb.ExternalTableMetadata, error) {
+func getTables(
+	txn *sql.Tx,
+	isAtLeastPG10 bool,
+	columnMap map[db.TableKey][]*storepb.ColumnMetadata,
+	indexMap map[db.TableKey][]*storepb.IndexMetadata,
+	triggerMap map[db.TableKey][]*storepb.TriggerMetadata,
+	extensionDepend map[int]bool,
+) (map[string][]*storepb.TableMetadata, map[string][]*storepb.ExternalTableMetadata, map[int]*db.TableKey, error) {
 	foreignKeysMap, err := getForeignKeys(txn)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "failed to get foreign keys")
+		return nil, nil, nil, errors.Wrapf(err, "failed to get foreign keys")
 	}
 	foreignTablesMap, err := getForeignTables(txn, columnMap)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "failed to get foreign tables")
+		return nil, nil, nil, errors.Wrapf(err, "failed to get foreign tables")
 	}
 
 	tableMap := make(map[string][]*storepb.TableMetadata)
+	tableOidMap := make(map[int]*db.TableKey)
 	query := getListTableQuery(isAtLeastPG10)
 	rows, err := txn.Query(query)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	defer rows.Close()
 
@@ -432,7 +467,7 @@ func getTables(txn *sql.Tx, isAtLeastPG10 bool, columnMap map[db.TableKey][]*sto
 		var schemaName string
 		var comment sql.NullString
 		if err := rows.Scan(&oid, &schemaName, &table.Name, &table.DataSize, &table.IndexSize, &table.RowCount, &comment, &table.Owner); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		if pgparser.IsSystemTable(table.Name) {
 			continue
@@ -448,14 +483,16 @@ func getTables(txn *sql.Tx, isAtLeastPG10 bool, columnMap map[db.TableKey][]*sto
 		table.Columns = columnMap[key]
 		table.Indexes = indexMap[key]
 		table.ForeignKeys = foreignKeysMap[key]
+		table.Triggers = triggerMap[key]
 
 		tableMap[schemaName] = append(tableMap[schemaName], table)
+		tableOidMap[oid] = &db.TableKey{Schema: schemaName, Table: table.Name}
 	}
 	if err := rows.Err(); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return tableMap, foreignTablesMap, nil
+	return tableMap, foreignTablesMap, tableOidMap, nil
 }
 
 func getForeignTables(txn *sql.Tx, columnMap map[db.TableKey][]*storepb.ColumnMetadata) (map[string][]*storepb.ExternalTableMetadata, error) {
@@ -601,6 +638,21 @@ func getIndexInheritance(txn *sql.Tx) (map[db.IndexKey]*db.IndexKey, error) {
 	return result, nil
 }
 
+var showSearchPathQuery = `SELECT pg_catalog.current_setting('search_path');`
+
+var setSearchPathQuery = `SELECT pg_catalog.set_config('search_path', $1, false);`
+
+func setSearchPath(txn *sql.Tx, searchPath string) (string, error) {
+	var originSearchPath string
+	if err := txn.QueryRow(showSearchPathQuery).Scan(&originSearchPath); err != nil {
+		return "", err
+	}
+	if _, err := txn.Exec(setSearchPathQuery, searchPath); err != nil {
+		return "", err
+	}
+	return originSearchPath, nil
+}
+
 var listColumnQuery = `
 SELECT
 	cols.table_schema,
@@ -678,12 +730,13 @@ FROM pg_catalog.pg_matviews
 WHERE schemaname NOT IN (%s)
 ORDER BY schemaname, matviewname;`, pgparser.SystemSchemaWhereClause)
 
-func getMaterializedViews(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*storepb.MaterializedViewMetadata, error) {
+func getMaterializedViews(txn *sql.Tx, indexMap map[db.TableKey][]*storepb.IndexMetadata, triggerMap map[db.TableKey][]*storepb.TriggerMetadata, extensionDepend map[int]bool) (map[string][]*storepb.MaterializedViewMetadata, map[int]*db.TableKey, error) {
 	matviewMap := make(map[string][]*storepb.MaterializedViewMetadata)
+	materializedViewOidMap := make(map[int]*db.TableKey)
 
 	rows, err := txn.Query(listMaterializedViewQuery)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
@@ -692,7 +745,7 @@ func getMaterializedViews(txn *sql.Tx, extensionDepend map[int]bool) (map[string
 		var schemaName string
 		var def, comment sql.NullString
 		if err := rows.Scan(&oid, &schemaName, &matview.Name, &def, &comment); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		// Skip system views.
 		if pgparser.IsSystemView(matview.Name) {
@@ -705,30 +758,34 @@ func getMaterializedViews(txn *sql.Tx, extensionDepend map[int]bool) (map[string
 
 		// Return error on NULL view definition.
 		if !def.Valid {
-			return nil, errors.Errorf("schema %q materialized view %q has empty definition; please check whether proper privileges have been granted to Bytebase", schemaName, matview.Name)
+			return nil, nil, errors.Errorf("schema %q materialized view %q has empty definition; please check whether proper privileges have been granted to Bytebase", schemaName, matview.Name)
 		}
 		matview.Definition = def.String
 		if comment.Valid {
 			matview.Comment = comment.String
 		}
+		viewKey := db.TableKey{Schema: schemaName, Table: matview.Name}
+		matview.Indexes = indexMap[viewKey]
+		matview.Triggers = triggerMap[viewKey]
 
 		matviewMap[schemaName] = append(matviewMap[schemaName], matview)
+		materializedViewOidMap[oid] = &viewKey
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	for schemaName, list := range matviewMap {
 		for _, matview := range list {
 			dependencies, err := getViewDependencies(txn, schemaName, matview.Name)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to get materialized view %q dependencies", matview.Name)
+				return nil, nil, errors.Wrapf(err, "failed to get materialized view %q dependencies", matview.Name)
 			}
-			matview.DependentColumns = dependencies
+			matview.DependencyColumns = dependencies
 		}
 	}
 
-	return matviewMap, nil
+	return matviewMap, materializedViewOidMap, nil
 }
 
 var listViewQuery = `
@@ -739,12 +796,13 @@ WHERE schemaname NOT IN (%s)
 ORDER BY schemaname, viewname;`, pgparser.SystemSchemaWhereClause)
 
 // getViews gets all views of a database.
-func getViews(txn *sql.Tx, columnMap map[db.TableKey][]*storepb.ColumnMetadata, extensionDepend map[int]bool) (map[string][]*storepb.ViewMetadata, error) {
+func getViews(txn *sql.Tx, columnMap map[db.TableKey][]*storepb.ColumnMetadata, triggerMap map[db.TableKey][]*storepb.TriggerMetadata, extensionDepend map[int]bool) (map[string][]*storepb.ViewMetadata, map[int]*db.TableKey, error) {
 	viewMap := make(map[string][]*storepb.ViewMetadata)
+	viewOidMap := make(map[int]*db.TableKey)
 
 	rows, err := txn.Query(listViewQuery)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
@@ -753,7 +811,7 @@ func getViews(txn *sql.Tx, columnMap map[db.TableKey][]*storepb.ColumnMetadata, 
 		var schemaName string
 		var def, comment sql.NullString
 		if err := rows.Scan(&oid, &schemaName, &view.Name, &def, &comment); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		// Skip system views.
 		if pgparser.IsSystemView(view.Name) {
@@ -767,7 +825,7 @@ func getViews(txn *sql.Tx, columnMap map[db.TableKey][]*storepb.ColumnMetadata, 
 		// Return error on NULL view definition.
 		// https://github.com/bytebase/bytebase/issues/343
 		if !def.Valid {
-			return nil, errors.Errorf("schema %q view %q has empty definition; please check whether proper privileges have been granted to Bytebase", schemaName, view.Name)
+			return nil, nil, errors.Errorf("schema %q view %q has empty definition; please check whether proper privileges have been granted to Bytebase", schemaName, view.Name)
 		}
 		view.Definition = def.String
 		if comment.Valid {
@@ -776,29 +834,31 @@ func getViews(txn *sql.Tx, columnMap map[db.TableKey][]*storepb.ColumnMetadata, 
 
 		key := db.TableKey{Schema: schemaName, Table: view.Name}
 		view.Columns = columnMap[key]
+		view.Triggers = triggerMap[key]
 
 		viewMap[schemaName] = append(viewMap[schemaName], view)
+		viewOidMap[oid] = &key
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	for schemaName, list := range viewMap {
 		for _, view := range list {
 			dependencies, err := getViewDependencies(txn, schemaName, view.Name)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to get view %q dependencies", view.Name)
+				return nil, nil, errors.Wrapf(err, "failed to get view %q dependencies", view.Name)
 			}
-			view.DependentColumns = dependencies
+			view.DependencyColumns = dependencies
 		}
 	}
 
-	return viewMap, nil
+	return viewMap, viewOidMap, nil
 }
 
 // getViewDependencies gets the dependencies of a view.
-func getViewDependencies(txn *sql.Tx, schemaName, viewName string) ([]*storepb.DependentColumn, error) {
-	var result []*storepb.DependentColumn
+func getViewDependencies(txn *sql.Tx, schemaName, viewName string) ([]*storepb.DependencyColumn, error) {
+	var result []*storepb.DependencyColumn
 
 	query := fmt.Sprintf(`
 		SELECT source_ns.nspname as source_schema,
@@ -806,15 +866,15 @@ func getViewDependencies(txn *sql.Tx, schemaName, viewName string) ([]*storepb.D
 	  		pg_attribute.attname as column_name
 	  	FROM pg_depend 
 	  		JOIN pg_rewrite ON pg_depend.objid = pg_rewrite.oid 
-	  		JOIN pg_class as dependent_view ON pg_rewrite.ev_class = dependent_view.oid 
+	  		JOIN pg_class as dependency_view ON pg_rewrite.ev_class = dependency_view.oid 
 	  		JOIN pg_class as source_table ON pg_depend.refobjid = source_table.oid 
 	  		JOIN pg_attribute ON pg_depend.refobjid = pg_attribute.attrelid 
 	  		    AND pg_depend.refobjsubid = pg_attribute.attnum 
-	  		JOIN pg_namespace dependent_ns ON dependent_ns.oid = dependent_view.relnamespace
+	  		JOIN pg_namespace dependency_ns ON dependency_ns.oid = dependency_view.relnamespace
 	  		JOIN pg_namespace source_ns ON source_ns.oid = source_table.relnamespace
 	  	WHERE 
-	  		dependent_ns.nspname = '%s'
-	  		AND dependent_view.relname = '%s'
+	  		dependency_ns.nspname = '%s'
+	  		AND dependency_view.relname = '%s'
 	  		AND pg_attribute.attnum > 0 
 	  	ORDER BY 1,2,3;
 	`, schemaName, viewName)
@@ -825,11 +885,11 @@ func getViewDependencies(txn *sql.Tx, schemaName, viewName string) ([]*storepb.D
 	}
 	defer rows.Close()
 	for rows.Next() {
-		dependentColumn := &storepb.DependentColumn{}
-		if err := rows.Scan(&dependentColumn.Schema, &dependentColumn.Table, &dependentColumn.Column); err != nil {
+		dependencyColumn := &storepb.DependencyColumn{}
+		if err := rows.Scan(&dependencyColumn.Schema, &dependencyColumn.Table, &dependencyColumn.Column); err != nil {
 			return nil, err
 		}
-		result = append(result, dependentColumn)
+		result = append(result, dependencyColumn)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -877,7 +937,8 @@ func getEnumTypes(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*stor
 		pt.oid,
 		pn.nspname as schema_name,
 		pt.typname as enum_name,
-		pe.enumlabel as enum_value
+		pe.enumlabel as enum_value,
+		pg_catalog.obj_description(pt.oid) as enum_comment
 	FROM pg_enum as pe
 		LEFT JOIN pg_type as pt ON pe.enumtypid = pt.oid
 		LEFT JOIN pg_namespace as pn ON pt.typnamespace = pn.oid
@@ -892,11 +953,13 @@ func getEnumTypes(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*stor
 	enumTypes := make(map[string][]*storepb.EnumTypeMetadata)
 	currentEnumSchema := ""
 	currentEnumNmae := ""
+	currentEnumComment := ""
 	var currentEnumValues []string
 	for rows.Next() {
 		var oid int
 		var schemaName, enumName, enumValue string
-		if err := rows.Scan(&oid, &schemaName, &enumName, &enumValue); err != nil {
+		var comment sql.NullString
+		if err := rows.Scan(&oid, &schemaName, &enumName, &enumValue, &comment); err != nil {
 			return nil, err
 		}
 
@@ -905,16 +968,22 @@ func getEnumTypes(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*stor
 			continue
 		}
 
+		if comment.Valid {
+			currentEnumComment = comment.String
+		}
+
 		if currentEnumSchema != schemaName || currentEnumNmae != enumName {
 			if currentEnumSchema != "" {
 				enumTypes[currentEnumSchema] = append(enumTypes[currentEnumSchema], &storepb.EnumTypeMetadata{
-					Name:   currentEnumNmae,
-					Values: currentEnumValues,
+					Name:    currentEnumNmae,
+					Values:  currentEnumValues,
+					Comment: currentEnumComment,
 				})
 			}
 			currentEnumSchema = schemaName
 			currentEnumNmae = enumName
 			currentEnumValues = []string{}
+			currentEnumComment = ""
 		}
 		currentEnumValues = append(currentEnumValues, enumValue)
 	}
@@ -924,8 +993,9 @@ func getEnumTypes(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*stor
 
 	if currentEnumSchema != "" {
 		enumTypes[currentEnumSchema] = append(enumTypes[currentEnumSchema], &storepb.EnumTypeMetadata{
-			Name:   currentEnumNmae,
-			Values: currentEnumValues,
+			Name:    currentEnumNmae,
+			Values:  currentEnumValues,
+			Comment: currentEnumComment,
 		})
 	}
 
@@ -946,7 +1016,8 @@ func getSequences(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*stor
 		increment_by,
 		cycle,
 		cache_size,
-		last_value
+		last_value,
+		pg_catalog.obj_description(pc.oid) as sequence_comment
 	FROM pg_sequences
 		LEFT JOIN pg_class as pc ON pc.oid = format('%s.%s', quote_ident(schemaname), quote_ident(sequencename))::regclass
 	ORDER BY schemaname, sequencename;`
@@ -960,9 +1031,10 @@ func getSequences(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*stor
 		var oid int
 		var schemaName, sequenceName, dataType string
 		var startValue, minValue, maxValue, incrementBy, cacheSize int64
+		var comment sql.NullString
 		var cycle bool
 		var lastValue sql.NullInt64
-		if err := rows.Scan(&oid, &schemaName, &sequenceName, &dataType, &startValue, &minValue, &maxValue, &incrementBy, &cycle, &cacheSize, &lastValue); err != nil {
+		if err := rows.Scan(&oid, &schemaName, &sequenceName, &dataType, &startValue, &minValue, &maxValue, &incrementBy, &cycle, &cacheSize, &lastValue, &comment); err != nil {
 			return nil, err
 		}
 		if extensionDepend[oid] {
@@ -972,6 +1044,10 @@ func getSequences(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*stor
 		lastValueStr := ""
 		if lastValue.Valid {
 			lastValueStr = strconv.FormatInt(lastValue.Int64, 10)
+		}
+		sequenceComment := ""
+		if comment.Valid {
+			sequenceComment = comment.String
 		}
 		sequence := &storepb.SequenceMetadata{
 			Name:      sequenceName,
@@ -983,6 +1059,7 @@ func getSequences(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*stor
 			Cycle:     cycle,
 			CacheSize: strconv.FormatInt(cacheSize, 10),
 			LastValue: lastValueStr,
+			Comment:   sequenceComment,
 		}
 		sequenceMap[schemaName] = append(sequenceMap[schemaName], sequence)
 	}
@@ -990,49 +1067,130 @@ func getSequences(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*stor
 		return nil, err
 	}
 
+	sequenceOwnerMap, err := getSequenceOwners(txn)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get sequence owners")
+	}
+
 	for schemaName, list := range sequenceMap {
 		for _, sequence := range list {
-			ownerTable, ownerColumn, err := getSequenceOwner(txn, schemaName, sequence.Name)
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to get sequence %q owner", sequence.Name)
+			if ownerColumn, ok := sequenceOwnerMap[db.SequenceKey{Schema: schemaName, Sequence: sequence.Name}]; ok {
+				sequence.OwnerTable = ownerColumn.Table
+				sequence.OwnerColumn = ownerColumn.Column
 			}
-			sequence.OwnerTable = ownerTable
-			sequence.OwnerColumn = ownerColumn
 		}
 	}
 
 	return sequenceMap, nil
 }
 
-func getSequenceOwner(txn *sql.Tx, schemaName, sequenceName string) (string, string, error) {
-	var ownerTable, ownerColumn string
-
+func getSequenceOwners(txn *sql.Tx) (map[db.SequenceKey]db.ColumnKey, error) {
 	query := fmt.Sprintf(`
-		SELECT tab.relname as table_name,
-			attr.attname as column_name
-		FROM pg_class as seq
-			JOIN pg_depend as dep ON (seq.relfilenode = dep.objid)
-			JOIN pg_class as tab ON (dep.refobjid = tab.relfilenode)
-			JOIN pg_attribute as attr ON (attr.attnum = dep.refobjsubid AND attr.attrelid = dep.refobjid)
-			JOIN pg_namespace as ns ON (tab.relnamespace = ns.oid)
-		WHERE ns.nspname = '%s' AND seq.relname = '%s';
-	`, schemaName, sequenceName)
-
+	SELECT
+		ns.nspname as schema_name,
+		seq.relname as sequence_name,
+		tab.relname as table_name,
+		attr.attname as column_name
+	FROM pg_class as seq
+		JOIN pg_depend as dep ON (seq.relfilenode = dep.objid)
+		JOIN pg_class as tab ON (dep.refobjid = tab.relfilenode)
+		JOIN pg_attribute as attr ON (attr.attnum = dep.refobjsubid AND attr.attrelid = dep.refobjid)
+		JOIN pg_namespace as ns ON (tab.relnamespace = ns.oid)
+	WHERE ns.nspname NOT IN (%s) AND seq.relkind = 'S';
+	`, pgparser.SystemSchemaWhereClause)
 	rows, err := txn.Query(query)
 	if err != nil {
-		return "", "", err
+		return nil, err
+	}
+	defer rows.Close()
+	sequenceOwnerMap := make(map[db.SequenceKey]db.ColumnKey)
+	for rows.Next() {
+		var schemaName, sequenceName, tableName, columnName string
+		if err := rows.Scan(&schemaName, &sequenceName, &tableName, &columnName); err != nil {
+			return nil, err
+		}
+		sequenceOwnerMap[db.SequenceKey{Schema: schemaName, Sequence: sequenceName}] = db.ColumnKey{Schema: schemaName, Table: tableName, Column: columnName}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return sequenceOwnerMap, nil
+}
+
+func getTriggers(txn *sql.Tx, extensionDepend map[int]bool) (map[db.TableKey][]*storepb.TriggerMetadata, error) {
+	query := `
+	SELECT
+		pt.oid,
+		pn.nspname as schema_name,
+		pc.relname as table_name,
+		pt.tgname as trigger_name,
+		pg_get_triggerdef(pt.oid) as trigger_def,
+		obj_description(pt.oid) as trigger_comment
+	FROM pg_trigger as pt
+		LEFT JOIN pg_class as pc ON pc.oid = pt.tgrelid
+		LEFT JOIN pg_namespace as pn ON pn.oid = pc.relnamespace
+	WHERE pn.nspname NOT IN (%s) AND pt.tgisinternal = false;`
+	rows, err := txn.Query(fmt.Sprintf(query, pgparser.SystemSchemaWhereClause))
+	if err != nil {
+		return nil, err
 	}
 	defer rows.Close()
 
+	triggersMap := make(map[db.TableKey][]*storepb.TriggerMetadata)
 	for rows.Next() {
-		if err := rows.Scan(&ownerTable, &ownerColumn); err != nil {
-			return "", "", err
+		trigger := &storepb.TriggerMetadata{}
+		var oid int
+		var schemaName, tableName string
+		var comment sql.NullString
+		if err := rows.Scan(&oid, &schemaName, &tableName, &trigger.Name, &trigger.Body, &comment); err != nil {
+			return nil, err
 		}
+		if extensionDepend[oid] {
+			// Skip extension trigger.
+			continue
+		}
+		if comment.Valid {
+			trigger.Comment = comment.String
+		}
+		tableKey := db.TableKey{Schema: schemaName, Table: tableName}
+		triggersMap[tableKey] = append(triggersMap[tableKey], trigger)
 	}
 	if err := rows.Err(); err != nil {
-		return "", "", err
+		return nil, err
 	}
-	return ownerTable, ownerColumn, nil
+
+	return triggersMap, nil
+}
+
+func getUniqueConstraints(txn *sql.Tx) (map[db.IndexKey]bool, error) {
+	query := `
+	SELECT
+		pn.nspname as schema_name,
+		pg_constraint.conname as constraint_name
+	FROM pg_constraint
+		LEFT JOIN pg_class as pc ON pc.oid = pg_constraint.conrelid
+		LEFT JOIN pg_namespace as pn ON pn.oid = pc.relnamespace
+	WHERE pn.nspname NOT IN (%s) AND pg_constraint.contype = 'u';`
+	rows, err := txn.Query(fmt.Sprintf(query, pgparser.SystemSchemaWhereClause))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[db.IndexKey]bool)
+	for rows.Next() {
+		var schemaName, constraintName string
+		if err := rows.Scan(&schemaName, &constraintName); err != nil {
+			return nil, err
+		}
+		indexKey := db.IndexKey{Schema: schemaName, Index: constraintName}
+		result[indexKey] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 var listIndexQuery = `
@@ -1049,6 +1207,11 @@ ORDER BY idx.schemaname, idx.tablename, idx.indexname;`, pgparser.SystemSchemaWh
 
 // getIndexes gets all indices of a database.
 func getIndexes(txn *sql.Tx, indexInheritanceMap map[db.IndexKey]*db.IndexKey) (map[db.TableKey][]*storepb.IndexMetadata, error) {
+	uniqueConstraintMap, err := getUniqueConstraints(txn)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get unique constraints")
+	}
+
 	indexMap := make(map[db.TableKey][]*storepb.IndexMetadata)
 
 	rows, err := txn.Query(listIndexQuery)
@@ -1076,18 +1239,14 @@ func getIndexes(txn *sql.Tx, indexInheritanceMap map[db.IndexKey]*db.IndexKey) (
 		if !ok {
 			return nil, errors.Errorf("statement %q is not index statement", statement)
 		}
-		deparsed, err := pgrawparser.Deparse(pgrawparser.DeparseContext{}, node)
-		if err != nil {
-			return nil, err
-		}
-		// Instead of using indexdef, we use deparsed format so that the definition has quoted identifiers.
-		index.Definition = deparsed
+		index.Definition = statement + ";" // Add semicolon to the end of the statement.
 
 		index.Type = getIndexMethodType(statement)
 		index.Unique = node.Index.Unique
 		index.Expressions = node.Index.GetKeyNameList()
 		if primary.Valid && primary.Int32 == 1 {
 			index.Primary = true
+			index.IsConstraint = true
 		}
 		if comment.Valid {
 			index.Comment = comment.String
@@ -1095,6 +1254,11 @@ func getIndexes(txn *sql.Tx, indexInheritanceMap map[db.IndexKey]*db.IndexKey) (
 		if parentKey, ok := indexInheritanceMap[db.IndexKey{Schema: schemaName, Index: index.Name}]; ok && parentKey != nil {
 			index.ParentIndexSchema = parentKey.Schema
 			index.ParentIndexName = parentKey.Index
+		}
+
+		indexKey := db.IndexKey{Schema: schemaName, Index: index.Name}
+		if uniqueConstraintMap[indexKey] {
+			index.IsConstraint = true
 		}
 
 		key := db.TableKey{Schema: schemaName, Table: tableName}
@@ -1116,13 +1280,49 @@ func getIndexMethodType(stmt string) string {
 	return matches[1]
 }
 
+var listFunctionDependencyTablesQuery = `
+select
+	p.oid as function_oid,
+	pt.typrelid as table_oid
+from pg_proc p
+	left join pg_depend d on p.oid = d.objid
+	left join pg_type pt on d.refobjid = pt.oid
+	left join pg_namespace n on p.pronamespace = n.oid` + fmt.Sprintf(`
+where n.nspname not in (%s) AND pt.typrelid IS NOT NULL
+`, pgparser.SystemSchemaWhereClause)
+
+func getFunctionDependencyTables(txn *sql.Tx) (map[int][]int, error) {
+	dependencyTableMap := make(map[int][]int)
+
+	rows, err := txn.Query(listFunctionDependencyTablesQuery)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var functionOid, tableOid int
+		if err := rows.Scan(&functionOid, &tableOid); err != nil {
+			return nil, err
+		}
+		dependencyTableMap[functionOid] = append(dependencyTableMap[functionOid], tableOid)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return dependencyTableMap, nil
+}
+
 var listFunctionQuery = `
 select p.oid, n.nspname as function_schema,
 	p.proname as function_name,
 	pg_catalog.pg_get_function_identity_arguments(p.oid) as arguments,
 	case when l.lanname = 'internal' then p.prosrc
 			else pg_get_functiondef(p.oid)
-			end as definition
+			end as definition,
+	pg_catalog.obj_description(p.oid) as comment
 from pg_proc p
 left join pg_namespace n on p.pronamespace = n.oid
 left join pg_language l on p.prolang = l.oid
@@ -1131,7 +1331,12 @@ where n.nspname not in (%s)
 order by function_schema, function_name;`, pgparser.SystemSchemaWhereClause)
 
 // getFunctions gets all functions of a database.
-func getFunctions(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*storepb.FunctionMetadata, error) {
+func getFunctions(
+	txn *sql.Tx,
+	functionDependencyTables map[int][]int,
+	tableOidMap, viewOidMap, materializedViewOidMap map[int]*db.TableKey,
+	extensionDepend map[int]bool,
+) (map[string][]*storepb.FunctionMetadata, error) {
 	functionMap := make(map[string][]*storepb.FunctionMetadata)
 
 	rows, err := txn.Query(listFunctionQuery)
@@ -1143,7 +1348,8 @@ func getFunctions(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*stor
 		function := &storepb.FunctionMetadata{}
 		var oid int
 		var schemaName, arguments string
-		if err := rows.Scan(&oid, &schemaName, &function.Name, &arguments, &function.Definition); err != nil {
+		var comment sql.NullString
+		if err := rows.Scan(&oid, &schemaName, &function.Name, &arguments, &function.Definition, &comment); err != nil {
 			return nil, err
 		}
 		// Skip internal functions.
@@ -1154,8 +1360,30 @@ func getFunctions(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*stor
 			// Skip extension function.
 			continue
 		}
+		if comment.Valid {
+			function.Comment = comment.String
+		}
 
 		function.Signature = fmt.Sprintf("%s(%s)", function.Name, arguments)
+		for _, tableOid := range functionDependencyTables[oid] {
+			if table, ok := tableOidMap[tableOid]; ok {
+				function.DependencyTables = append(function.DependencyTables, &storepb.DependencyTable{
+					Schema: table.Schema,
+					Table:  table.Table,
+				})
+			} else if view, ok := viewOidMap[tableOid]; ok {
+				function.DependencyTables = append(function.DependencyTables, &storepb.DependencyTable{
+					Schema: view.Schema,
+					Table:  view.Table,
+				})
+			} else if matview, ok := materializedViewOidMap[tableOid]; ok {
+				function.DependencyTables = append(function.DependencyTables, &storepb.DependencyTable{
+					Schema: matview.Schema,
+					Table:  matview.Table,
+				})
+			}
+		}
+
 		functionMap[schemaName] = append(functionMap[schemaName], function)
 	}
 	if err := rows.Err(); err != nil {
@@ -1236,10 +1464,10 @@ func (driver *Driver) SyncSlowQuery(ctx context.Context, _ time.Time) (map[strin
 	for slowQueryStatisticsRows.Next() {
 		var database string
 		var fingerprint string
-		var calls int32
+		var calls int64
 		var totalExecTime float64
 		var maxExecTime float64
-		var rows int32
+		var rows int64
 		if err := slowQueryStatisticsRows.Scan(&database, &fingerprint, &calls, &totalExecTime, &maxExecTime, &rows); err != nil {
 			return nil, err
 		}

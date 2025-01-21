@@ -37,7 +37,6 @@ const (
 	DatabaseGroupNamePrefix    = "databaseGroups/"
 	SchemaNamePrefix           = "schemas/"
 	TableNamePrefix            = "tables/"
-	ChangeHistoryPrefix        = "changeHistories/"
 	ChangelogPrefix            = "changelogs/"
 	IssueNamePrefix            = "issues/"
 	IssueCommentNamePrefix     = "issueComments/"
@@ -56,6 +55,7 @@ const (
 
 	SchemaSuffix     = "/schema"
 	MetadataSuffix   = "/metadata"
+	CatalogSuffix    = "/catalog"
 	GitOpsInfoSuffix = "/gitOpsInfo"
 
 	UserBindingPrefix  = "user:"
@@ -185,16 +185,6 @@ func GetInstanceDatabaseID(name string) (string, string, error) {
 		return "", "", err
 	}
 	return tokens[0], tokens[1], nil
-}
-
-// GetInstanceDatabaseIDChangeHistory returns the instance ID, database ID, and change history ID from a resource name.
-func GetInstanceDatabaseIDChangeHistory(name string) (string, string, string, error) {
-	// the name should be instances/{instance-id}/databases/{database-id}/changeHistories/{changeHistory-id}
-	tokens, err := GetNameParentTokens(name, InstanceNamePrefix, DatabaseIDPrefix, ChangeHistoryPrefix)
-	if err != nil {
-		return "", "", "", err
-	}
-	return tokens[0], tokens[1], tokens[2], nil
 }
 
 // GetInstanceDatabaseIDSecretName returns the instance ID, database ID, and secret name from a resource name.

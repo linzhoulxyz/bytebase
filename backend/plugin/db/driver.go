@@ -13,7 +13,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/bytebase/bytebase/backend/common/log"
-	"github.com/bytebase/bytebase/backend/store/model"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
@@ -59,6 +58,11 @@ type IndexKey struct {
 	Schema string
 	Table  string
 	Index  string
+}
+
+type SequenceKey struct {
+	Schema   string
+	Sequence string
 }
 
 var (
@@ -153,7 +157,6 @@ type MigrationInfo struct {
 	CreatorID  int
 
 	ReleaseVersion string
-	Version        model.Version
 	Namespace      string
 	Database       string
 	Environment    string
@@ -246,6 +249,9 @@ type QueryContext struct {
 	// Schema is the specific schema for the query.
 	// Mainly used for the search path of PostgreSQL.
 	Schema string
+	// Container is the specific container for the query.
+	// Mainly used for CosmosDB.
+	Container string
 	// Limit is the maximum row count returned. No limit enforced if limit <= 0
 	Limit         int
 	Explain       bool

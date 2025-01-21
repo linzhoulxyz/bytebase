@@ -111,6 +111,7 @@
                 {{ $t("schema-editor.actions.add-from-template") }}
               </NButton>
             </div>
+
             <TableColumnEditor
               :readonly="!!readonly"
               :show-foreign-key="false"
@@ -201,15 +202,17 @@ import {
 } from "@/components/v2";
 import {
   useSettingV1Store,
+  useDatabaseCatalog,
   useNotificationStore,
   pushNotification,
 } from "@/store";
 import { unknownProject } from "@/types";
 import {
-  ColumnMetadata,
-  SchemaConfig,
-  TableConfig,
-} from "@/types/proto/v1/database_service";
+  SchemaCatalog,
+  TableCatalog,
+  TableCatalog_Columns,
+} from "@/types/proto/v1/database_catalog_service";
+import { ColumnMetadata } from "@/types/proto/v1/database_service";
 import {
   SchemaTemplateSetting_TableTemplate,
   type SchemaTemplateSetting_FieldTemplate,
@@ -256,10 +259,8 @@ const targets = computed(() => {
 const context = provideSchemaEditorContext({
   targets,
   project: ref(unknownProject()),
-  resourceType: ref("branch"),
   readonly: toRef(props, "readonly"),
   selectedRolloutObjects: ref(undefined),
-  showLastUpdater: ref(false),
   disableDiffColoring: ref(true),
   hidePreview: ref(false),
 });
@@ -270,45 +271,46 @@ const state = reactive<LocalState>({
 });
 const { t } = useI18n();
 const settingStore = useSettingV1Store();
-
-const tableConfig = computed(() => {
-  const { database, schema, table } = editing.value;
-  const schemaConfig = database.schemaConfigs.find(
+const databaseCatalog = useDatabaseCatalog(editing.value.database.name, false);
+const tableCatalog = computed(() => {
+  const { schema, table } = editing.value;
+  const schemaCatalog = databaseCatalog.value.schemas.find(
     (sc) => sc.name === schema.name
   );
-  if (!schemaConfig) return undefined;
-  return schemaConfig.tableConfigs.find((tc) => tc.name === table.name);
+  if (!schemaCatalog) return undefined;
+  return schemaCatalog.tables.find((tc) => tc.name === table.name);
 });
 
 const tableClassificationId = computed({
   get() {
-    return tableConfig.value?.classificationId;
+    return tableCatalog.value?.classification;
   },
   set(id) {
-    const { database, schema, table } = editing.value;
-    let schemaConfig = database.schemaConfigs.find(
+    const { schema, table } = editing.value;
+    let schemaCatalog = databaseCatalog.value.schemas.find(
       (sc) => sc.name === schema.name
     );
-    if (!schemaConfig) {
-      schemaConfig = SchemaConfig.fromPartial({
+    if (!schemaCatalog) {
+      schemaCatalog = SchemaCatalog.fromPartial({
         name: schema.name,
-        tableConfigs: [],
+        tables: [],
       });
     }
-    if (!schemaConfig.tableConfigs) {
-      schemaConfig.tableConfigs = [];
+    if (!schemaCatalog.tables) {
+      schemaCatalog.tables = [];
     }
-    let tableConfig = schemaConfig.tableConfigs.find(
+    let tableCatalog = schemaCatalog.tables.find(
       (tc) => tc.name === table.name
     );
-    if (!tableConfig) {
-      tableConfig = TableConfig.fromPartial({
+    if (!tableCatalog) {
+      tableCatalog = TableCatalog.fromPartial({
         name: table.name,
-        classificationId: id,
+        classification: id,
+        columns: TableCatalog_Columns.fromPartial({}),
       });
-      schemaConfig.tableConfigs.push(tableConfig);
+      schemaCatalog.tables.push(tableCatalog);
     }
-    tableConfig.classificationId = id ?? "";
+    tableCatalog.classification = id ?? "";
   },
 });
 
@@ -352,7 +354,7 @@ const submitDisabled = computed(() => {
   if (
     !props.create &&
     isEqual(props.template.table, table) &&
-    isEqual(props.template.config, tableConfig.value) &&
+    isEqual(props.template.catalog, tableCatalog.value) &&
     props.template.category === category
   ) {
     return true;
@@ -469,9 +471,9 @@ const handleApplyColumnTemplate = (
   }
   const column = cloneDeep(template.column);
   table.columns.push(column);
-  if (template.config) {
+  if (template.catalog) {
     context.upsertColumnConfig(db, metadataForColumn(column), (config) => {
-      Object.assign(config, template.config);
+      Object.assign(config, template.catalog);
     });
   }
   markColumnStatus(column, "created");
@@ -495,7 +497,7 @@ const handleReorderColumn = (
 
 const handleUpdateTableName = (name: string) => {
   editing.value.table.name = name;
-  const tc = tableConfig.value;
+  const tc = tableCatalog.value;
   if (tc) {
     tc.name = name;
   }

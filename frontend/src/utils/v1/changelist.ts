@@ -9,20 +9,15 @@ export const extractChangelistResourceName = (name: string) => {
   return matches?.[1] ?? "";
 };
 
-export const isChangeHistoryChangeSource = (change: Change) => {
-  return change.source.match(/(^|\/)changeHistories\//);
-};
-export const isBranchChangeSource = (change: Change) => {
-  return change.source.match(/(^|\/)branches\//);
+export const isChangelogChangeSource = (change: Change) => {
+  return change.source.match(/(^|\/)changelogs\//);
 };
 
 export const getChangelistChangeSourceType = (
   change: Change
 ): Changelist_Change_Source => {
-  if (isChangeHistoryChangeSource(change)) {
-    return "CHANGE_HISTORY";
-  } else if (isBranchChangeSource(change)) {
-    return "BRANCH";
+  if (isChangelogChangeSource(change)) {
+    return "CHANGELOG";
   } else {
     return "RAW_SQL";
   }

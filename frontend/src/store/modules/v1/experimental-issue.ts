@@ -1,3 +1,4 @@
+import { orderBy } from "lodash-es";
 import { ref, watch, type WatchCallback } from "vue";
 import {
   issueServiceClient,
@@ -22,6 +23,7 @@ import {
   extractUserResourceName,
   hasProjectPermissionV2,
 } from "@/utils";
+import { DEFAULT_PAGE_SIZE } from "../common";
 
 export interface ComposeIssueConfig {
   withPlan?: boolean;
@@ -62,12 +64,11 @@ export const composeIssue = async (
     }
     if (hasProjectPermissionV2(projectEntity, "bb.planCheckRuns.list")) {
       // Only show the latest plan check runs.
-      // TODO(steven): maybe we need to show all plan check runs on a separate page later.
       const { planCheckRuns } = await planServiceClient.listPlanCheckRuns({
         parent: issue.plan,
         latestOnly: true,
       });
-      issue.planCheckRunList = planCheckRuns;
+      issue.planCheckRunList = orderBy(planCheckRuns, "name", "desc");
     }
   }
   if (config.withRollout && issue.rollout) {
@@ -79,7 +80,7 @@ export const composeIssue = async (
     if (hasProjectPermissionV2(projectEntity, "bb.taskRuns.list")) {
       const { taskRuns } = await rolloutServiceClient.listTaskRuns({
         parent: `${issue.rollout}/stages/-/tasks/-`,
-        pageSize: 1000, // MAX
+        pageSize: DEFAULT_PAGE_SIZE,
       });
       const composedTaskRuns: ComposedTaskRun[] = [];
       for (const taskRun of taskRuns) {

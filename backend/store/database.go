@@ -12,7 +12,6 @@ import (
 
 	"github.com/bytebase/bytebase/backend/common"
 	api "github.com/bytebase/bytebase/backend/legacyapi"
-	"github.com/bytebase/bytebase/backend/store/model"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
@@ -27,12 +26,13 @@ type DatabaseMessage struct {
 	DatabaseName         string
 	SyncState            api.SyncStatus
 	SuccessfulSyncTimeTs int64
-	SchemaVersion        model.Version
 	Secrets              *storepb.Secrets
 	DataShare            bool
 	// ServiceName is the Oracle specific field.
 	ServiceName string
 	Metadata    *storepb.DatabaseMetadata
+	// Output only
+	SchemaVersion string
 }
 
 // UpdateDatabaseMessage is the mssage for updating a database.
@@ -43,7 +43,6 @@ type UpdateDatabaseMessage struct {
 	ProjectID            *string
 	SyncState            *api.SyncStatus
 	SuccessfulSyncTimeTs *int64
-	SchemaVersion        *model.Version
 	SourceBackupID       *int
 	Secrets              *storepb.Secrets
 	DataShare            *bool
@@ -245,10 +244,6 @@ func (s *Store) UpsertDatabase(ctx context.Context, create *DatabaseMessage) (*D
 	if instance == nil {
 		return nil, errors.Errorf("instance %q not found", create.InstanceID)
 	}
-	storedVersion, err := create.SchemaVersion.Marshal()
-	if err != nil {
-		return nil, err
-	}
 
 	secretsString, err := protojson.Marshal(create.Secrets)
 	if err != nil {
@@ -286,7 +281,7 @@ func (s *Store) UpsertDatabase(ctx context.Context, create *DatabaseMessage) (*D
 			service_name,
 			metadata
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, '', $9, $10, $11, $12)
 		ON CONFLICT (instance_id, name) DO UPDATE SET
 			project_id = EXCLUDED.project_id,
 			environment = EXCLUDED.environment,
@@ -305,7 +300,6 @@ func (s *Store) UpsertDatabase(ctx context.Context, create *DatabaseMessage) (*D
 		create.DatabaseName,
 		create.SyncState,
 		create.SuccessfulSyncTimeTs,
-		storedVersion,
 		secretsString,
 		create.DataShare,
 		create.ServiceName,
@@ -352,13 +346,6 @@ func (s *Store) UpdateDatabase(ctx context.Context, patch *UpdateDatabaseMessage
 	}
 	if v := patch.SuccessfulSyncTimeTs; v != nil {
 		set, args = append(set, fmt.Sprintf("last_successful_sync_ts = $%d", len(args)+1)), append(args, *v)
-	}
-	if v := patch.SchemaVersion; v != nil {
-		storedVersion, err := patch.SchemaVersion.Marshal()
-		if err != nil {
-			return nil, err
-		}
-		set, args = append(set, fmt.Sprintf("schema_version = $%d", len(args)+1)), append(args, storedVersion)
 	}
 	if v := patch.Secrets; v != nil {
 		secretsString, err := protojson.Marshal(v)
@@ -523,7 +510,16 @@ func (*Store) listDatabaseImplV2(ctx context.Context, tx *Tx, find *FindDatabase
 			db.name,
 			db.sync_status,
 			db.last_successful_sync_ts,
-			db.schema_version,
+			COALESCE(
+				(
+					SELECT revision.version
+					FROM revision
+					WHERE revision.database_id = db.id AND deleted_ts IS NOT NULL
+					ORDER BY revision.version DESC
+					LIMIT 1
+				),
+				''
+			),
 			db.secrets,
 			db.datashare,
 			db.service_name,
@@ -551,7 +547,7 @@ func (*Store) listDatabaseImplV2(ctx context.Context, tx *Tx, find *FindDatabase
 	defer rows.Close()
 	for rows.Next() {
 		databaseMessage := &DatabaseMessage{}
-		var storedVersion, secretsString, metadataString string
+		var secretsString, metadataString string
 		var effectiveEnvironment, environment sql.NullString
 		if err := rows.Scan(
 			&databaseMessage.UID,
@@ -562,7 +558,7 @@ func (*Store) listDatabaseImplV2(ctx context.Context, tx *Tx, find *FindDatabase
 			&databaseMessage.DatabaseName,
 			&databaseMessage.SyncState,
 			&databaseMessage.SuccessfulSyncTimeTs,
-			&storedVersion,
+			&databaseMessage.SchemaVersion,
 			&secretsString,
 			&databaseMessage.DataShare,
 			&databaseMessage.ServiceName,
@@ -576,11 +572,6 @@ func (*Store) listDatabaseImplV2(ctx context.Context, tx *Tx, find *FindDatabase
 		if environment.Valid {
 			databaseMessage.EnvironmentID = environment.String
 		}
-		version, err := model.NewVersion(storedVersion)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse schema version %q", storedVersion)
-		}
-		databaseMessage.SchemaVersion = version
 
 		var secret storepb.Secrets
 		if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(secretsString), &secret); err != nil {

@@ -1,20 +1,26 @@
 <template>
-  <div class="flex items-center">
-    {{ semanticType?.title }}
-    <button
+  <div class="flex items-center gap-x-1">
+    <span v-if="semanticType?.title">{{ semanticType?.title }}</span>
+    <span v-else class="text-control-placeholder italic"> N/A </span>
+    <NPopconfirm
       v-if="!readonly && semanticType"
-      class="w-5 h-5 p-0.5 hover:bg-gray-300 rounded cursor-pointer"
-      @click.prevent="onSemanticTypeApply('')"
+      @positive-click="() => onSemanticTypeApply('')"
     >
-      <heroicons-outline:x class="w-4 h-4" />
-    </button>
-    <button
-      v-if="!readonly"
-      class="w-5 h-5 p-0.5 hover:bg-gray-300 rounded cursor-pointer"
-      @click.prevent="openSemanticTypeDrawer()"
-    >
-      <heroicons-outline:pencil class="w-4 h-4" />
-    </button>
+      <template #trigger>
+        <MiniActionButton v-if="!readonly && semanticType">
+          <XIcon class="w-3 h-3" />
+        </MiniActionButton>
+      </template>
+
+      <template #default>
+        <div>
+          {{ $t("settings.sensitive-data.remove-semantic-type-tips") }}
+        </div>
+      </template>
+    </NPopconfirm>
+    <MiniActionButton v-if="!readonly" @click.prevent="openSemanticTypeDrawer">
+      <PencilIcon class="w-3 h-3" />
+    </MiniActionButton>
   </div>
 
   <FeatureModal
@@ -34,15 +40,13 @@
 </template>
 
 <script lang="ts" setup>
-import { computed } from "vue";
-import { reactive } from "vue";
+import { PencilIcon, XIcon } from "lucide-vue-next";
+import { NPopconfirm } from "naive-ui";
+import { computed, reactive } from "vue";
 import { useSemanticType } from "@/components/SensitiveData/useSemanticType";
+import { MiniActionButton } from "@/components/v2";
 import { useSubscriptionV1Store } from "@/store";
 import type { ComposedDatabase } from "@/types";
-import type {
-  ColumnMetadata,
-  TableMetadata,
-} from "@/types/proto/v1/database_service";
 import FeatureModal from "../FeatureGuard/FeatureModal.vue";
 import SemanticTypesDrawer from "../SensitiveData/components/SemanticTypesDrawer.vue";
 import { updateColumnConfig } from "./utils";
@@ -55,8 +59,8 @@ type LocalState = {
 const props = defineProps<{
   database: ComposedDatabase;
   schema: string;
-  table: TableMetadata;
-  column: ColumnMetadata;
+  table: string;
+  column: string;
   readonly?: boolean;
 }>();
 
@@ -68,8 +72,8 @@ const subscriptionV1Store = useSubscriptionV1Store();
 const { semanticType, semanticTypeList } = useSemanticType({
   database: props.database.name,
   schema: props.schema,
-  table: props.table.name,
-  column: props.column.name,
+  table: props.table,
+  column: props.column,
 });
 
 const hasSensitiveDataFeature = computed(() => {
@@ -92,13 +96,14 @@ const openSemanticTypeDrawer = () => {
   state.showSemanticTypesDrawer = true;
 };
 
-const onSemanticTypeApply = async (semanticTypeId: string) => {
+const onSemanticTypeApply = async (semanticType: string) => {
   await updateColumnConfig({
     database: props.database.name,
     schema: props.schema,
-    table: props.table.name,
-    column: props.column.name,
-    config: { semanticTypeId },
+    table: props.table,
+    column: props.column,
+    columnCatalog: { semanticType },
+    notification: !semanticType ? "common.removed" : undefined,
   });
 };
 </script>

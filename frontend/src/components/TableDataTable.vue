@@ -5,6 +5,9 @@
     :row-props="rowProps"
     :max-height="640"
     :virtual-scroll="true"
+    :row-key="
+      (table: TableMetadata) => `${database.name}.${schemaName}.${table.name}`
+    "
     :striped="true"
     :bordered="true"
   />
@@ -31,7 +34,11 @@ import {
   updateTableConfig,
   supportSetClassificationFromComment,
 } from "@/components/ColumnDataTable/utils";
-import { useSettingV1Store, useDBSchemaV1Store } from "@/store/modules";
+import {
+  useSettingV1Store,
+  useDatabaseCatalog,
+  getTableCatalog,
+} from "@/store/modules";
 import type { ComposedDatabase } from "@/types";
 import { Engine } from "@/types/proto/v1/common";
 import type { TableMetadata } from "@/types/proto/v1/database_service";
@@ -67,7 +74,6 @@ const route = useRoute();
 const router = useRouter();
 const state = reactive<LocalState>({});
 const settingStore = useSettingV1Store();
-const dbSchemaStore = useDBSchemaV1Store();
 
 onMounted(() => {
   const table = route.query.table as string;
@@ -125,6 +131,8 @@ const hasPartitionTables = computed(() => {
   );
 });
 
+const databaseCatalog = useDatabaseCatalog(props.database.name, false);
+
 const columns = computed(() => {
   const columns: (DataTableColumn<TableMetadata> & { hide?: boolean })[] = [
     {
@@ -163,13 +171,13 @@ const columns = computed(() => {
       resizable: true,
       minWidth: 140,
       render: (table) => {
-        const tableConfig = dbSchemaStore.getTableConfig(
-          props.database.name,
+        const tableCatalog = getTableCatalog(
+          databaseCatalog.value,
           props.schemaName,
           table.name
         );
         return h(ClassificationCell, {
-          classification: tableConfig.classificationId,
+          classification: tableCatalog.classification,
           classificationConfig:
             classificationConfig.value ??
             DataClassificationConfig.fromPartial({}),
@@ -250,10 +258,15 @@ const mixedTableList = computed(() => {
 
 const onClassificationIdApply = async (
   table: string,
-  classificationId: string
+  classification: string
 ) => {
-  await updateTableConfig(props.database.name, props.schemaName, table, {
-    classificationId,
+  await updateTableConfig({
+    database: props.database.name,
+    schema: props.schemaName,
+    table,
+    tableCatalog: {
+      classification,
+    },
   });
 };
 </script>

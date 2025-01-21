@@ -9,11 +9,11 @@ import { ActuatorServiceDefinition } from "@/types/proto/v1/actuator_service";
 import { AnomalyServiceDefinition } from "@/types/proto/v1/anomaly_service";
 import { AuditLogServiceDefinition } from "@/types/proto/v1/audit_log_service";
 import { AuthServiceDefinition } from "@/types/proto/v1/auth_service";
-import { BranchServiceDefinition } from "@/types/proto/v1/branch_service";
 import { CelServiceDefinition } from "@/types/proto/v1/cel_service";
 import { ChangelistServiceDefinition } from "@/types/proto/v1/changelist_service";
 import { DatabaseGroupServiceDefinition } from "@/types/proto/v1/database_group_service";
 import { DatabaseServiceDefinition } from "@/types/proto/v1/database_service";
+import { DatabaseCatalogServiceDefinition } from "@/types/proto/v1/database_catalog_service";
 import { EnvironmentServiceDefinition } from "@/types/proto/v1/environment_service";
 import { GroupServiceDefinition } from "@/types/proto/v1/group_service";
 import { IdentityProviderServiceDefinition } from "@/types/proto/v1/idp_service";
@@ -108,6 +108,11 @@ export const databaseServiceClient = clientFactory.create(
   channel
 );
 
+export const databaseCatalogServiceClient = clientFactory.create(
+  DatabaseCatalogServiceDefinition,
+  channel
+);
+
 export const databaseGroupServiceClient = clientFactory.create(
   DatabaseGroupServiceDefinition,
   channel
@@ -190,11 +195,6 @@ export const vcsConnectorServiceClient = clientFactory.create(
 
 export const anomalyServiceClient = clientFactory.create(
   AnomalyServiceDefinition,
-  channel
-);
-
-export const branchServiceClient = clientFactory.create(
-  BranchServiceDefinition,
   channel
 );
 

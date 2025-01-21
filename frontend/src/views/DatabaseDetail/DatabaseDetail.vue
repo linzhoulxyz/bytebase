@@ -13,9 +13,9 @@
           <!-- Summary -->
           <div class="flex items-center">
             <div>
-              <div class="flex items-center">
+              <div class="flex items-baseline gap-x-2">
                 <h1
-                  class="text-xl font-bold text-main truncate flex items-center gap-x-3"
+                  class="text-xl font-bold text-main truncate flex items-center gap-x-2"
                 >
                   {{ database.databaseName }}
 
@@ -25,6 +25,7 @@
                     class="w-5 h-5"
                   />
                 </h1>
+                <span class="textinfolabel">{{ database.name }}</span>
               </div>
             </div>
           </div>
@@ -118,15 +119,15 @@
       <NTabPane
         v-if="
           databaseChangeMode === DatabaseChangeMode.PIPELINE &&
-          allowListChangeHistories
+          allowListChangelogs
         "
-        name="change-history"
-        :tab="$t('change-history.self')"
+        name="changelog"
+        :tab="$t('common.changelog')"
       >
-        <DatabaseChangeHistoryPanel class="mt-2" :database="database" />
+        <DatabaseChangelogPanel class="mt-2" :database="database" />
       </NTabPane>
       <NTabPane
-        v-if="isDev() && databaseChangeMode === DatabaseChangeMode.PIPELINE"
+        v-if="databaseChangeMode === DatabaseChangeMode.PIPELINE"
         name="revision"
         :tab="$t('database.revision.self')"
       >
@@ -139,10 +140,7 @@
       >
         <DatabaseSlowQueryPanel class="mt-2" :database="database" />
       </NTabPane>
-      <NTabPane
-        name="sensitive-data"
-        :tab="$t('settings.sensitive-data.sensitive-column-list')"
-      >
+      <NTabPane name="catalog" :tab="$t('common.catalog')">
         <DatabaseSensitiveDataPanel class="mt-2" :database="database" />
       </NTabPane>
       <NTabPane
@@ -208,7 +206,7 @@ import { computed, reactive, watch, ref, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { BBModal } from "@/bbkit";
 import SchemaEditorModal from "@/components/AlterSchemaPrepForm/SchemaEditorModal.vue";
-import DatabaseChangeHistoryPanel from "@/components/Database/DatabaseChangeHistoryPanel.vue";
+import DatabaseChangelogPanel from "@/components/Database/DatabaseChangelogPanel.vue";
 import DatabaseOverviewPanel from "@/components/Database/DatabaseOverviewPanel.vue";
 import DatabaseRevisionPanel from "@/components/Database/DatabaseRevisionPanel.vue";
 import DatabaseSensitiveDataPanel from "@/components/Database/DatabaseSensitiveDataPanel.vue";
@@ -248,16 +246,15 @@ import {
   isDatabaseV1Queryable,
   allowUsingSchemaEditor,
   extractProjectResourceName,
-  isDev,
 } from "@/utils";
 
 const databaseHashList = [
   "overview",
-  "change-history",
+  "changelog",
   "revision",
   "slow-query",
   "setting",
-  "sensitive-data",
+  "catalog",
 ] as const;
 export type DatabaseHash = (typeof databaseHashList)[number];
 const isDatabaseHash = (x: any): x is DatabaseHash =>
@@ -297,7 +294,7 @@ const {
   allowTransferDatabase,
   allowChangeData,
   allowAlterSchema,
-  allowListChangeHistories,
+  allowListChangelogs,
   allowListSlowQueries,
 } = useDatabaseDetailContext();
 const disableSchemaEditor = useAppFeature(
@@ -306,9 +303,10 @@ const disableSchemaEditor = useAppFeature(
 const databaseChangeMode = useAppFeature("bb.feature.database-change-mode");
 
 onMounted(async () => {
-  anomalyList.value = await useAnomalyV1Store().fetchAnomalyList({
-    database: database.value.name,
-  });
+  anomalyList.value = await useAnomalyV1Store().fetchAnomalyList(
+    database.value.project,
+    { database: database.value.name }
+  );
 });
 
 watch(
@@ -399,9 +397,10 @@ const handleGotoSQLEditorFailed = () => {
 };
 
 const updateAnomalyList = async () => {
-  anomalyList.value = await useAnomalyV1Store().fetchAnomalyList({
-    database: database.value.name,
-  });
+  anomalyList.value = await useAnomalyV1Store().fetchAnomalyList(
+    database.value.project,
+    { database: database.value.name }
+  );
 };
 
 const environment = computed(() => {

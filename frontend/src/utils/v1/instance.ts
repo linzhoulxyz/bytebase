@@ -121,6 +121,7 @@ export const supportedEngineV1List = () => {
     Engine.DYNAMODB,
     Engine.DATABRICKS,
     Engine.COCKROACHDB,
+    Engine.COSMOSDB,
   ];
   if (locale.value === "zh-CN") {
     engines.push(Engine.DM);
@@ -344,6 +345,8 @@ export const engineNameV1 = (type: Engine): string => {
       return "DynamoDB";
     case Engine.DATABRICKS:
       return "Databricks";
+    case Engine.COSMOSDB:
+      return "CosmosDB";
   }
   return "";
 };
@@ -413,4 +416,16 @@ export const getFixedPrimaryKey = (engine: Engine) => {
     return "PRIMARY";
   }
   return undefined;
+};
+
+// supportStringifyMetadata returns true if the engine supports stringify metadata.
+export const supportStringifyMetadata = (engine: Engine) => {
+  return [
+    Engine.MYSQL,
+    Engine.OCEANBASE,
+    Engine.POSTGRES,
+    Engine.TIDB,
+    Engine.CLICKHOUSE,
+    Engine.REDSHIFT,
+  ].includes(engine);
 };

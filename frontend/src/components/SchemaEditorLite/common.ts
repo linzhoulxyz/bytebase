@@ -1,5 +1,5 @@
 import { isEqual } from "lodash-es";
-import { branchServiceClient } from "@/grpcweb";
+import { sqlServiceClient } from "@/grpcweb";
 import { t } from "@/plugins/i18n";
 import { useSettingV1Store } from "@/store";
 import type { ComposedDatabase } from "@/types";
@@ -15,7 +15,6 @@ export const _generateDiffDDLTimer = new TinyTimer<"generateDiffDDL">(
 export type GenerateDiffDDLResult = {
   statement: string;
   errors: string[];
-  fatal: boolean;
 };
 
 export const generateDiffDDL = async (
@@ -24,32 +23,30 @@ export const generateDiffDDL = async (
   target: DatabaseMetadata,
   allowEmptyDiffDDLWithConfigChange = true
 ): Promise<GenerateDiffDDLResult> => {
-  const finish = (statement: string, errors: string[], fatal: boolean) => {
+  const finish = (statement: string, errors: string[]) => {
     _generateDiffDDLTimer.end("generateDiffDDL");
     return {
       statement,
       errors,
-      fatal,
     };
   };
 
   if (isEqual(source, target)) {
-    return finish("", [], false);
+    return finish("", []);
   }
 
   const validationMessages = validateDatabaseMetadata(target);
   if (validationMessages.length > 0) {
-    return finish(
-      "",
-      [t("schema-editor.message.invalid-schema"), ...validationMessages],
-      true
-    );
+    return finish("", [
+      t("schema-editor.message.invalid-schema"),
+      ...validationMessages,
+    ]);
   }
   try {
     const classificationConfig = useSettingV1Store().getProjectClassification(
       database.projectEntity.dataClassificationConfigId
     );
-    const diffResponse = await branchServiceClient.diffMetadata(
+    const diffResponse = await sqlServiceClient.diffMetadata(
       {
         sourceMetadata: source,
         targetMetadata: target,
@@ -67,17 +64,13 @@ export const generateDiffDDL = async (
         !allowEmptyDiffDDLWithConfigChange &&
         !isEqual(source.schemaConfigs, target.schemaConfigs)
       ) {
-        return finish(
-          "",
-          [t("schema-editor.message.cannot-change-config")],
-          true
-        );
+        return finish("", [t("schema-editor.message.cannot-change-config")]);
       }
-      return finish("", [], false);
+      return finish("", []);
     }
-    return finish(diff, [], false);
+    return finish(diff, []);
   } catch (ex) {
     console.warn("[generateDiffDDL]", ex);
-    return finish("", [extractGrpcErrorMessage(ex)], true);
+    return finish("", [extractGrpcErrorMessage(ex)]);
   }
 };

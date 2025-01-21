@@ -79,16 +79,6 @@ service DatabaseService {
     option (bytebase.v1.auth_method) = IAM;
   }
 
-  rpc UpdateDatabaseMetadata(UpdateDatabaseMetadataRequest) returns (DatabaseMetadata) {
-    option (google.api.http) = {
-      patch: "/v1/{database_metadata.name=instances/*/databases/*/metadata}"
-      body: "database_metadata"
-    };
-    option (bytebase.v1.permission) = "bb.databases.update";
-    option (bytebase.v1.auth_method) = IAM;
-    option (bytebase.v1.audit) = true;
-  }
-
   rpc GetDatabaseSchema(GetDatabaseSchemaRequest) returns (DatabaseSchema) {
     option (google.api.http) = {get: "/v1/{name=instances/*/databases/*/schema}"};
     option (bytebase.v1.permission) = "bb.databases.getSchema";
@@ -101,7 +91,7 @@ service DatabaseService {
       body: "*"
 
       additional_bindings: {
-        post: "/v1/{name=instances/*/databases/*/changeHistories/*}:diffSchema"
+        post: "/v1/{name=instances/*/databases/*/changelogs/*}:diffSchema"
         body: "*"
       }
     };
@@ -148,46 +138,45 @@ service DatabaseService {
     option (bytebase.v1.auth_method) = IAM;
   }
 
-  rpc ListChangeHistories(ListChangeHistoriesRequest) returns (ListChangeHistoriesResponse) {
-    option (google.api.http) = {get: "/v1/{parent=instances/*/databases/*}/changeHistories"};
-    option (google.api.method_signature) = "parent";
-    option (bytebase.v1.permission) = "bb.changeHistories.list";
-    option (bytebase.v1.auth_method) = IAM;
-  }
-  rpc GetChangeHistory(GetChangeHistoryRequest) returns (ChangeHistory) {
-    option (google.api.http) = {get: "/v1/{name=instances/*/databases/*/changeHistories/*}"};
-    option (google.api.method_signature) = "name";
-    option (bytebase.v1.permission) = "bb.changeHistories.get";
-    option (bytebase.v1.auth_method) = IAM;
-  }
-
   rpc ListRevisions(ListRevisionsRequest) returns (ListRevisionsResponse) {
     option (google.api.http) = {get: "/v1/{parent=instances/*/databases/*}/revisions"};
     option (google.api.method_signature) = "parent";
+    option (bytebase.v1.permission) = "bb.revisions.list";
+    option (bytebase.v1.auth_method) = IAM;
   }
   rpc GetRevision(GetRevisionRequest) returns (Revision) {
     option (google.api.http) = {get: "/v1/{name=instances/*/databases/*/revisions/*}"};
     option (google.api.method_signature) = "name";
+    option (bytebase.v1.permission) = "bb.revisions.get";
+    option (bytebase.v1.auth_method) = IAM;
   }
   rpc CreateRevision(CreateRevisionRequest) returns (Revision) {
     option (google.api.http) = {
       post: "/v1/{parent=instances/*/databases/*}/revisions"
       body: "revision"
     };
+    option (bytebase.v1.permission) = "bb.revisions.create";
+    option (bytebase.v1.auth_method) = IAM;
   }
   rpc DeleteRevision(DeleteRevisionRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {delete: "/v1/{name=instances/*/databases/*/revisions/*}"};
     option (google.api.method_signature) = "name";
+    option (bytebase.v1.permission) = "bb.revisions.delete";
+    option (bytebase.v1.auth_method) = IAM;
   }
 
   rpc ListChangelogs(ListChangelogsRequest) returns (ListChangelogsResponse) {
     option (google.api.http) = {get: "/v1/{parent=instances/*/databases/*}/changelogs"};
     option (google.api.method_signature) = "parent";
+    option (bytebase.v1.permission) = "bb.changelogs.list";
+    option (bytebase.v1.auth_method) = IAM;
   }
 
   rpc GetChangelog(GetChangelogRequest) returns (Changelog) {
     option (google.api.http) = {get: "/v1/{name=instances/*/databases/*/changelogs/*}"};
     option (google.api.method_signature) = "name";
+    option (bytebase.v1.permission) = "bb.changelogs.get";
+    option (bytebase.v1.auth_method) = IAM;
   }
 }
 
@@ -335,18 +324,6 @@ message GetDatabaseMetadataRequest {
   string filter = 3;
 }
 
-message UpdateDatabaseMetadataRequest {
-  // The database metadata to update.
-  //
-  // The database_metadata's `name` field is used to identify the database
-  // metadata to update. Format:
-  // instances/{instance}/databases/{database}/metadata
-  DatabaseMetadata database_metadata = 1 [(google.api.field_behavior) = REQUIRED];
-
-  // The list of fields to update.
-  google.protobuf.FieldMask update_mask = 2;
-}
-
 message GetDatabaseSchemaRequest {
   // The name of the database to retrieve schema.
   // Format: instances/{instance}/databases/{database}/schema
@@ -365,11 +342,10 @@ message GetDatabaseSchemaRequest {
 }
 
 message DiffSchemaRequest {
-  // The name of the database or change history.
+  // The name of the database or changelog.
   // Format:
   // database: instances/{instance}/databases/{database}
-  // change history:
-  // instances/{instance}/databases/{database}/changeHistories/{changeHistory}
+  // changelog: instances/{instance}/databases/{database}/changelogs/{changelog}
   string name = 1 [
     (google.api.field_behavior) = REQUIRED,
     (google.api.resource_reference) = {type: "bytebase.com/Database"}
@@ -379,10 +355,10 @@ message DiffSchemaRequest {
     // The target schema.
     string schema = 2;
 
-    // The resource name of the change history
+    // The resource name of the changelog
     // Format:
-    // instances/{instance}/databases/{database}/changeHistories/{changeHistory}
-    string change_history = 3;
+    // instances/{instance}/databases/{database}/changelogs/{changelog}
+    string changelog = 3;
   }
 
   // Format the schema dump into SDL format.
@@ -506,10 +482,6 @@ message SchemaMetadata {
 
   string owner = 11;
 
-  // The triggers is the list of triggers in a schema, triggers are sorted by
-  // table_name, name, event, timing, action_order.
-  repeated TriggerMetadata triggers = 12;
-
   // The sequences is the list of sequences in a schema, sorted by name.
   repeated SequenceMetadata sequences = 13;
 
@@ -524,6 +496,8 @@ message EnumTypeMetadata {
 
   // The enum values of a type.
   repeated string values = 2;
+
+  string comment = 3;
 }
 
 message EventMetadata {
@@ -576,18 +550,13 @@ message SequenceMetadata {
 
   // The owner column of the sequence.
   string owner_column = 11;
+
+  string comment = 12;
 }
 
 message TriggerMetadata {
   // The name is the name of the trigger.
   string name = 1;
-
-  // The schema name of the table/view that the trigger is created.
-  string schema_name = 9;
-
-  // The table_name is the name of the table/view that the trigger is created
-  // on.
-  string table_name = 2;
 
   // The event is the event of the trigger, such as INSERT, UPDATE, DELETE,
   // TRUNCATE.
@@ -605,11 +574,7 @@ message TriggerMetadata {
 
   string collation_connection = 8;
 
-  // For Postgres, identifies whether the trigger fires once for each processed row or once for each statement (ROW or STATEMENT).
-  string action_orientation = 10;
-
-  // For Postgres, the WHEN condition of the trigger.
-  string condition = 11;
+  string comment = 9;
 }
 
 message ExternalTableMetadata {
@@ -682,6 +647,8 @@ message TableMetadata {
   // The sorting_keys is a tuple of column names or arbitrary expressions. ClickHouse specific field.
   // Reference: https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/mergetree#order_by
   repeated string sorting_keys = 19;
+
+  repeated TriggerMetadata triggers = 20;
 }
 
 // CheckConstraintMetadata is the metadata for check constraints.
@@ -795,10 +762,6 @@ message ColumnMetadata {
   // The user_comment is the user comment of a column parsed from the comment.
   string user_comment = 13;
 
-  // The effective_masking_level is the effective masking level of the column,
-  // evaluate from the column masking data and global masking rules.
-  MaskingLevel effective_masking_level = 14;
-
   // The generation is the generation of a column.
   GenerationMetadata generation = 16;
 }
@@ -825,15 +788,18 @@ message ViewMetadata {
   // The comment is the comment of a view.
   string comment = 3;
 
-  // The dependent_columns is the list of dependent columns of a view.
-  repeated DependentColumn dependent_columns = 4;
+  // The dependency_columns is the list of dependency columns of a view.
+  repeated DependencyColumn dependency_columns = 4;
 
   // The columns is the ordered list of columns in a table.
   repeated ColumnMetadata columns = 5;
+
+  // The triggers is the list of triggers in a view.
+  repeated TriggerMetadata triggers = 6;
 }
 
-// DependentColumn is the metadata for dependent columns.
-message DependentColumn {
+// DependencyColumn is the metadata for dependency columns.
+message DependencyColumn {
   // The schema is the schema of a reference column.
   string schema = 1;
 
@@ -855,9 +821,23 @@ message MaterializedViewMetadata {
   // The comment is the comment of a materialized view.
   string comment = 3;
 
-  // The dependent_columns is the list of dependent columns of a materialized
+  // The dependency_columns is the list of dependency columns of a materialized
   // view.
-  repeated DependentColumn dependent_columns = 4;
+  repeated DependencyColumn dependency_columns = 4;
+
+  // The columns is the ordered list of columns in a table.
+  repeated TriggerMetadata triggers = 5;
+
+  // The indexes is the list of indexes in a table.
+  repeated IndexMetadata indexes = 6;
+}
+
+message DependencyTable {
+  // The schema is the schema of a reference table.
+  string schema = 1;
+
+  // The table is the name of a reference table.
+  string table = 2;
 }
 
 // FunctionMetadata is the metadata for functions.
@@ -880,6 +860,12 @@ message FunctionMetadata {
   string database_collation = 6;
 
   string sql_mode = 7;
+
+  string comment = 8;
+
+  // The dependency_tables is the list of dependency tables of a function.
+  // For PostgreSQL, it's the list of tables that the function depends on the return type definition.
+  repeated DependencyTable dependency_tables = 9;
 }
 
 // ProcedureMetadata is the metadata for procedures.
@@ -1029,6 +1015,10 @@ message IndexMetadata {
 
   // The number of granules in the block. It's a ClickHouse specific field.
   int64 granularity = 13;
+
+  // It's a PostgreSQL specific field.
+  // The unique constraint and unique index are not the same thing in PostgreSQL.
+  bool is_constraint = 14;
 }
 
 // ExtensionMetadata is the metadata for extensions.
@@ -1093,12 +1083,6 @@ message SchemaConfig {
 
   // The table_configs is the list of configs for tables in a schema.
   repeated TableConfig table_configs = 2;
-
-  repeated FunctionConfig function_configs = 3;
-
-  repeated ProcedureConfig procedure_configs = 4;
-
-  repeated ViewConfig view_configs = 5;
 }
 
 message TableConfig {
@@ -1109,65 +1093,6 @@ message TableConfig {
   repeated ColumnConfig column_configs = 2;
 
   string classification_id = 3;
-
-  // The last updater of the table in branch.
-  // Format: users/{email}
-  string updater = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // The last change come from branch.
-  // Format: projcets/{project}/branches/{branch}
-  string source_branch = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // The timestamp when the table is updated in branch.
-  google.protobuf.Timestamp update_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
-message FunctionConfig {
-  // The name is the name of a function.
-  string name = 1;
-
-  // The last updater of the function in branch.
-  // Format: users/{email}
-  string updater = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // The last change come from branch.
-  // Format: projcets/{project}/branches/{branch}
-  string source_branch = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // The timestamp when the function is updated in branch.
-  google.protobuf.Timestamp update_time = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
-message ProcedureConfig {
-  // The name is the name of a procedure.
-  string name = 1;
-
-  // The last updater of the procedure in branch.
-  // Format: users/{email}
-  string updater = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // The last change come from branch.
-  // Format: projcets/{project}/branches/{branch}
-  string source_branch = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // The timestamp when the procedure is updated in branch.
-  google.protobuf.Timestamp update_time = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
-message ViewConfig {
-  // The name is the name of a view.
-  string name = 1;
-
-  // The last updater of the view in branch.
-  // Format: users/{email}
-  string updater = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // The last change come from branch.
-  // Format: projcets/{project}/branches/{branch}
-  string source_branch = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  // The timestamp when the view is updated in branch.
-  google.protobuf.Timestamp update_time = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message ColumnConfig {
@@ -1180,12 +1105,6 @@ message ColumnConfig {
   map<string, string> labels = 3;
 
   string classification_id = 4;
-
-  MaskingLevel masking_level = 5;
-
-  string full_masking_algorithm_id = 6;
-
-  string partial_masking_algorithm_id = 7;
 }
 
 // DatabaseSchema is the metadata for databases.
@@ -1251,7 +1170,7 @@ message SlowQueryStatistics {
   string sql_fingerprint = 1;
 
   // The count of the slow query log.
-  int32 count = 2;
+  int64 count = 2;
 
   // The latest log time of the slow query log.
   google.protobuf.Timestamp latest_log_time = 3;
@@ -1263,16 +1182,16 @@ message SlowQueryStatistics {
   google.protobuf.Duration maximum_query_time = 5;
 
   // The average rows sent of the slow query log.
-  int32 average_rows_sent = 6;
+  int64 average_rows_sent = 6;
 
   // The maximum rows sent of the slow query log.
-  int32 maximum_rows_sent = 7;
+  int64 maximum_rows_sent = 7;
 
   // The average rows examined of the slow query log.
-  int32 average_rows_examined = 8;
+  int64 average_rows_examined = 8;
 
   // The maximum rows examined of the slow query log.
-  int32 maximum_rows_examined = 9;
+  int64 maximum_rows_examined = 9;
 
   // The percentage of the query time.
   double query_time_percent = 10;
@@ -1297,10 +1216,10 @@ message SlowQueryDetails {
   google.protobuf.Duration lock_time = 3;
 
   // The rows sent of the slow query log.
-  int32 rows_sent = 4;
+  int64 rows_sent = 4;
 
   // The rows examined of the slow query log.
-  int32 rows_examined = 5;
+  int64 rows_examined = 5;
 
   // The sql text of the slow query log.
   string sql_text = 6;
@@ -1363,7 +1282,7 @@ message DeleteSecretRequest {
 // Secret is the secret of the database now.
 message Secret {
   option (google.api.resource) = {
-    type: "bytebase.com/DatabaseChangeHistory"
+    type: "bytebase.com/DatabaseSecret"
     pattern: "instances/{instance}/databases/{database}/secrets/{secret}"
   };
 
@@ -1407,76 +1326,6 @@ message AdviseIndexResponse {
 
   // The create index statement of the suggested index.
   string create_index_statement = 3;
-}
-
-message ChangeHistory {
-  option (google.api.resource) = {
-    type: "bytebase.com/DatabaseChangeHistory"
-    pattern:
-      "instances/{instance}/databases/{database}/changeHistories/"
-      "{changeHistory}"
-  };
-
-  reserved 2;
-
-  // Format:
-  // instances/{instance}/databases/{database}/changeHistories/{changeHistory}
-  string name = 1;
-
-  // Format: users/hello@world.com
-  string creator = 3;
-  // Format: users/hello@world.com
-  string updater = 4;
-  google.protobuf.Timestamp create_time = 5;
-  google.protobuf.Timestamp update_time = 6;
-
-  // release version of Bytebase
-  string release_version = 7;
-
-  enum Source {
-    SOURCE_UNSPECIFIED = 0;
-    UI = 1;
-    VCS = 2;
-    LIBRARY = 3;
-  }
-  Source source = 8;
-
-  enum Type {
-    TYPE_UNSPECIFIED = 0;
-    BASELINE = 1;
-    MIGRATE = 2;
-    MIGRATE_SDL = 3;
-    MIGRATE_GHOST = 4;
-    DATA = 6;
-  }
-  Type type = 9;
-
-  enum Status {
-    STATUS_UNSPECIFIED = 0;
-    PENDING = 1;
-    DONE = 2;
-    FAILED = 3;
-  }
-  Status status = 10;
-
-  string version = 11;
-
-  string description = 12;
-  // The statement is used for preview purpose.
-  string statement = 13;
-  int64 statement_size = 21;
-  // The name of the sheet resource.
-  // Format: projects/{project}/sheets/{sheet}
-  string statement_sheet = 20;
-  string schema = 14;
-  int64 schema_size = 22;
-  string prev_schema = 15;
-  int64 prev_schema_size = 23;
-  google.protobuf.Duration execution_duration = 16;
-  // Format: projects/{project}/issues/{issue}
-  string issue = 17;
-
-  ChangedResources changed_resources = 19;
 }
 
 message ChangedResources {
@@ -1527,99 +1376,6 @@ message ChangedResourceProcedure {
 
   // The ranges of sub-strings correspond to the statements on the sheet.
   repeated Range ranges = 2;
-}
-
-enum ChangeHistoryView {
-  // The default / unset value.
-  // The API will default to the BASIC view.
-  CHANGE_HISTORY_VIEW_UNSPECIFIED = 0;
-  CHANGE_HISTORY_VIEW_BASIC = 1;
-  CHANGE_HISTORY_VIEW_FULL = 2;
-}
-
-message ListChangeHistoriesRequest {
-  // The parent of the change histories.
-  // Format: instances/{instance}/databases/{database}
-  string parent = 1 [
-    (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {type: "bytebase.com/Database"}
-  ];
-
-  // The maximum number of change histories to return. The service may return
-  // fewer than this value. If unspecified, at most 10 change histories will be
-  // returned. The maximum value is 1000; values above 1000 will be coerced to
-  // 1000.
-  int32 page_size = 2;
-
-  // A page token, received from a previous `ListChangeHistories` call.
-  // Provide this to retrieve the subsequent page.
-  //
-  // When paginating, all other parameters provided to `ListChangeHistories`
-  // must match the call that provided the page token.
-  string page_token = 3;
-
-  ChangeHistoryView view = 4;
-
-  // The filter of the change histories.
-  // follow the
-  // [ebnf](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form)
-  // syntax. Support filter by type, source or table. For example: table =
-  // "tableExists('{database}', '{schema}', '{table}')" table =
-  // "tableExists('db', 'public', 'table1') || tableExists('db', 'public',
-  // 'table2')" type = "MIGRATE | DATA" source = "UI" source = "VCS"
-  //
-  // The table filter follow the CEL syntax.
-  // currently, we have one function for CEL:
-  // - tableExists(database, schema, table): return true if the table exists in
-  // changed resources.
-  //
-  // examples:
-  // Use
-  //   tableExists("db", "public", "table1")
-  // to filter the change histories which have the table "table1" in the schema
-  // "public" of the database "db". For MySQL, the schema is always "", such as
-  // tableExists("db", "", "table1").
-  //
-  // Combine multiple functions with "&&" and "||", we MUST use the Disjunctive
-  // Normal Form(DNF). In other words, the CEL expression consists of several
-  // parts connected by OR operators. For example, the following expression is
-  // valid:
-  // (
-  //  tableExists("db", "public", "table1") &&
-  //  tableExists("db", "public", "table2")
-  // ) || (
-  //  tableExists("db", "public", "table3")
-  // )
-  string filter = 5;
-}
-
-message ListChangeHistoriesResponse {
-  // The list of change histories.
-  repeated ChangeHistory change_histories = 1;
-
-  // A token, which can be sent as `page_token` to retrieve the next page.
-  // If this field is omitted, there are no subsequent pages.
-  string next_page_token = 2;
-}
-
-message GetChangeHistoryRequest {
-  // The name of the change history to retrieve.
-  // Format:
-  // instances/{instance}/databases/{database}/changeHistories/{changeHistory}
-  string name = 1 [
-    (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {type: "bytebase.com/DatabaseChangeHistory"}
-  ];
-
-  ChangeHistoryView view = 2;
-
-  // Format the schema dump into SDL format.
-  bool sdl_format = 3;
-
-  // When true, the schema dump will be concise.
-  // For Oracle, there will be tables and indexes only for Sync Schema.
-  // For Postgres, we'll filter the backup schema.
-  bool concise = 4;
 }
 
 message ListRevisionsRequest {
@@ -1859,9 +1615,7 @@ message Changelog {
 
   // Format: projects/{project}/issues/{issue}
   string issue = 12;
-  // Could be empty
-  // TODO(p0ny): We will migrate ChangeHistory to Changelog, and they won't have
-  // task_run.
+  // Format: projects/{projects}/rollouts/{rollout}/stages/{stage}/tasks/{task}/taskRuns/{taskRun}
   string task_run = 13;
 
   // Could be empty
@@ -1871,4 +1625,14 @@ message Changelog {
   string revision = 15;
 
   ChangedResources changed_resources = 16;
+
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    BASELINE = 1;
+    MIGRATE = 2;
+    MIGRATE_SDL = 3;
+    MIGRATE_GHOST = 4;
+    DATA = 6;
+  }
+  Type type = 17;
 }

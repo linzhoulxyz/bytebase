@@ -257,32 +257,103 @@ func (q *querySpanExtractor) extractTableSourceFromSystemFunction(node *pgquery.
 	// https://www.postgresql.org/docs/current/functions-srf.html.
 	switch strings.ToLower(funcName) {
 	case generateSeries:
+		alias := node.RangeFunction.Alias
+		if alias == nil {
+			return &base.PseudoTable{
+				Name: generateSeries,
+				Columns: []base.QuerySpanResult{
+					{
+						Name:          generateSeries,
+						SourceColumns: make(base.SourceColumnSet),
+					},
+				},
+			}, nil
+		}
+		if len(alias.Colnames) == 0 {
+			return &base.PseudoTable{
+				Name: alias.Aliasname,
+				Columns: []base.QuerySpanResult{
+					{
+						Name:          generateSeries,
+						SourceColumns: make(base.SourceColumnSet),
+					},
+				},
+			}, nil
+		}
 		return &base.PseudoTable{
+			Name: alias.Aliasname,
 			Columns: []base.QuerySpanResult{
 				{
-					Name:          generateSeries,
+					Name:          alias.Colnames[0].GetString_().Sval,
 					SourceColumns: make(base.SourceColumnSet),
 				},
 			},
 		}, nil
 	case generateSubscripts:
+		alias := node.RangeFunction.Alias
+		if alias == nil {
+			return &base.PseudoTable{
+				Name: generateSubscripts,
+				Columns: []base.QuerySpanResult{
+					{
+						Name:          generateSubscripts,
+						SourceColumns: make(base.SourceColumnSet),
+					},
+				},
+			}, nil
+		}
+		if len(alias.Colnames) == 0 {
+			return &base.PseudoTable{
+				Name: alias.Aliasname,
+				Columns: []base.QuerySpanResult{
+					{
+						Name:          generateSubscripts,
+						SourceColumns: make(base.SourceColumnSet),
+					},
+				},
+			}, nil
+		}
 		return &base.PseudoTable{
+			Name: alias.Aliasname,
 			Columns: []base.QuerySpanResult{
 				{
-					Name:          generateSubscripts,
+					Name:          alias.Colnames[0].GetString_().Sval,
 					SourceColumns: make(base.SourceColumnSet),
 				},
 			},
 		}, nil
 	case unnest:
-		table := &base.PseudoTable{Columns: []base.QuerySpanResult{}}
-		for range args {
+		table := &base.PseudoTable{Name: unnest, Columns: []base.QuerySpanResult{}}
+		alias := node.RangeFunction.Alias
+		if alias == nil {
+			for range args {
+				table.Columns = append(table.Columns, base.QuerySpanResult{
+					Name:          unnest,
+					SourceColumns: make(base.SourceColumnSet),
+				})
+			}
+			return table, nil
+		}
+		table.Name = alias.Aliasname
+		if len(alias.Colnames) == 0 {
+			for range args {
+				table.Columns = append(table.Columns, base.QuerySpanResult{
+					Name:          alias.Aliasname,
+					SourceColumns: make(base.SourceColumnSet),
+				})
+			}
+			return table, nil
+		}
+		if len(alias.Colnames) != len(args) {
+			return nil, errors.Errorf("expect equal length but found %d and %d", len(alias.Colnames), len(args))
+		}
+		for _, columnName := range alias.Colnames {
+			name := columnName.GetString_().Sval
 			table.Columns = append(table.Columns, base.QuerySpanResult{
-				Name:          unnest,
+				Name:          name,
 				SourceColumns: make(base.SourceColumnSet),
 			})
 		}
-		return table, nil
 	case jsonbEach, jsonEach, jsonbEachText, jsonEachText:
 		// Should be only called while jsonb_each act as table source.
 		// SELECT * FROM json_test, jsonb_each(jb) AS hh(key, value) WHERE id = 1;
@@ -1639,6 +1710,9 @@ func (q *querySpanExtractor) getAllTableColumnSources(schemaName, tableName stri
 
 func (q *querySpanExtractor) getFieldColumnSource(schemaName, tableName, fieldName string) (base.SourceColumnSet, bool) {
 	findInTableSource := func(tableSource base.TableSource) (base.SourceColumnSet, bool) {
+		if tableSource == nil {
+			return nil, false
+		}
 		if schemaName != "" && schemaName != tableSource.GetSchemaName() {
 			return nil, false
 		}
@@ -1713,6 +1787,9 @@ func (q *querySpanExtractor) findTableInFrom(schemaName string, tableName string
 
 	for i := len(q.tableSourcesFrom) - 1; i >= 0; i-- {
 		tableSource := q.tableSourcesFrom[i]
+		if tableSource == nil {
+			continue
+		}
 		emptySchemaNameMatch := schemaName == "" && (tableSource.GetSchemaName() == "" || tableSource.GetSchemaName() == q.defaultSchema) && tableName == tableSource.GetTableName()
 		nonEmptySchemaNameMatch := schemaName != "" && tableSource.GetSchemaName() == schemaName && tableName == tableSource.GetTableName()
 		if emptySchemaNameMatch || nonEmptySchemaNameMatch {

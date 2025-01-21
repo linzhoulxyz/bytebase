@@ -34,10 +34,6 @@ import (
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
-var getProfile = func() *config.Profile {
-	return nil
-}
-
 // RolloutService represents a service for managing rollout.
 type RolloutService struct {
 	v1pb.UnimplementedRolloutServiceServer
@@ -53,9 +49,6 @@ type RolloutService struct {
 
 // NewRolloutService returns a rollout service instance.
 func NewRolloutService(store *store.Store, sheetManager *sheet.Manager, licenseService enterprise.LicenseService, dbFactory *dbfactory.DBFactory, stateCfg *state.State, webhookManager *webhook.Manager, profile *config.Profile, iamManager *iam.Manager) *RolloutService {
-	getProfile = func() *config.Profile {
-		return profile
-	}
 	return &RolloutService{
 		store:          store,
 		sheetManager:   sheetManager,
@@ -96,7 +89,7 @@ func (s *RolloutService) PreviewRollout(ctx context.Context, request *v1pb.Previ
 		return nil, status.Errorf(codes.InvalidArgument, "failed to get pipeline create, error: %v", err)
 	}
 	if len(rollout.Stages) == 0 {
-		return nil, status.Errorf(codes.InvalidArgument, "plan has no stage created, hint: check deployment config setting")
+		return nil, status.Errorf(codes.InvalidArgument, "plan has no stage created, hint: check deployment config setting that the target database is in a stage")
 	}
 
 	rolloutV1, err := convertToRollout(ctx, s.store, project, rollout)
@@ -242,7 +235,7 @@ func (s *RolloutService) CreateRollout(ctx context.Context, request *v1pb.Create
 		return nil, status.Errorf(codes.InvalidArgument, "failed to get pipeline create, error: %v", err)
 	}
 	if len(pipelineCreate.Stages) == 0 {
-		return nil, status.Errorf(codes.InvalidArgument, "no database matched for deployment, hint: check deployment config setting")
+		return nil, status.Errorf(codes.InvalidArgument, "no database matched for deployment, hint: check deployment config setting that the target database is in a stage")
 	}
 	if isChangeDatabasePlan(plan.Config.GetSteps()) {
 		pipelineCreate, err = getPipelineCreateToTargetStage(ctx, s.store, plan.Config.GetDeploymentSnapshot().GetDeploymentConfigSnapshot().GetDeploymentConfig(), project, pipelineCreate, request.StageId)
@@ -255,6 +248,7 @@ func (s *RolloutService) CreateRollout(ctx context.Context, request *v1pb.Create
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to convert to rollout, error: %v", err)
 		}
+		rolloutV1.Plan = request.Rollout.GetPlan()
 		return rolloutV1, nil
 	}
 	pipelineUID, err := s.store.CreatePipelineAIO(ctx, planID, pipelineCreate, principalID)
@@ -1171,8 +1165,12 @@ func getTaskIndexDAGs(specs []*storepb.PlanConfig_Spec, getTaskIndexes func(spec
 }
 
 // filter pipelineCreate.Stages using targetStageID.
-func getPipelineCreateToTargetStage(ctx context.Context, s *store.Store, snapshot *storepb.DeploymentConfig, project *store.ProjectMessage, pipelineCreate *store.PipelineMessage, targetStageID string) (*store.PipelineMessage, error) {
-	if targetStageID == "" {
+func getPipelineCreateToTargetStage(ctx context.Context, s *store.Store, snapshot *storepb.DeploymentConfig, project *store.ProjectMessage, pipelineCreate *store.PipelineMessage, targetStageID *string) (*store.PipelineMessage, error) {
+	if targetStageID == nil {
+		return pipelineCreate, nil
+	}
+	if *targetStageID == "" {
+		pipelineCreate.Stages = nil
 		return pipelineCreate, nil
 	}
 	if snapshot == nil {
@@ -1199,13 +1197,13 @@ func getPipelineCreateToTargetStage(ctx context.Context, s *store.Store, snapsho
 			stageCreates = append(stageCreates, pipelineCreate.Stages[i])
 			i++
 		}
-		if id == targetStageID {
+		if id == *targetStageID {
 			foundID = true
 			break
 		}
 	}
 	if !foundID {
-		return nil, errors.Errorf("stageId %q not found in deployment schedules", targetStageID)
+		return nil, errors.Errorf("stageId %q not found in deployment schedules", *targetStageID)
 	}
 	pipelineCreate.Stages = stageCreates
 	return pipelineCreate, nil

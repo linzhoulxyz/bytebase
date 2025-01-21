@@ -3,7 +3,7 @@ package v1
 import (
 	"context"
 	"fmt"
-	"slices"
+	"log/slog"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/bytebase/bytebase/backend/common"
+	"github.com/bytebase/bytebase/backend/common/log"
 	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
 	api "github.com/bytebase/bytebase/backend/legacyapi"
 	"github.com/bytebase/bytebase/backend/plugin/idp/ldap"
@@ -94,15 +95,24 @@ func (s *IdentityProviderService) CreateIdentityProvider(ctx context.Context, re
 	if err := validIdentityProviderConfig(request.IdentityProvider.Type, request.IdentityProvider.Config); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	identityProviderMessage, err := s.store.CreateIdentityProvider(ctx, &store.IdentityProviderMessage{
+	identityProviderMessage := &store.IdentityProviderMessage{
 		ResourceID: request.IdentityProviderId,
 		Title:      request.IdentityProvider.Title,
 		Domain:     request.IdentityProvider.Domain,
 		Type:       storepb.IdentityProviderType(request.IdentityProvider.Type),
 		Config:     convertIdentityProviderConfigToStore(request.IdentityProvider.GetConfig()),
-	})
+	}
+	if request.ValidateOnly {
+		identityProvider, err := convertToIdentityProvider(identityProviderMessage)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to convert identity provider: %v", err)
+		}
+		return identityProvider, nil
+	}
+
+	identityProviderMessage, err = s.store.CreateIdentityProvider(ctx, identityProviderMessage)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, "failed to create identity provider: %v", err)
 	}
 	identityProvider, err := convertToIdentityProvider(identityProviderMessage)
 	if err != nil {
@@ -428,35 +438,36 @@ func convertIdentityProviderConfigFromStore(identityProviderConfig *storepb.Iden
 			},
 		}, nil
 	} else if v := identityProviderConfig.GetOidcConfig(); v != nil {
-		// Fetch openid configuration to get the auth endpoint and supported scopes.
-		openidConfigration, err := oidc.GetOpenIDConfiguration(v.Issuer)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to fetch openid configuration")
-		}
-		scopes := oidc.DefaultScopes
-		// Some IdPs like authning.cn doesn't expose "username" as part of standard claims.
-		// We need to check if it's supported by the IdP and add it to the scopes.
-		if slices.Contains(openidConfigration.ScopesSupported, "username") {
-			scopes = append(scopes, "username")
-		}
 		fieldMapping := v1pb.FieldMapping{
 			Identifier:  v.FieldMapping.Identifier,
 			DisplayName: v.FieldMapping.DisplayName,
 			Email:       v.FieldMapping.Email,
 			Phone:       v.FieldMapping.Phone,
 		}
+		oidcConfig := &v1pb.OIDCIdentityProviderConfig{
+			Issuer:        v.Issuer,
+			ClientId:      v.ClientId,
+			ClientSecret:  "", // SECURITY: We do not expose the client secret
+			FieldMapping:  &fieldMapping,
+			SkipTlsVerify: v.SkipTlsVerify,
+			AuthStyle:     v1pb.OAuth2AuthStyle(v.AuthStyle),
+			Scopes:        oidc.DefaultScopes,
+			AuthEndpoint:  "", // Leave it empty as it's not stored in the database.
+		}
+
+		// Fetch openid configuration to get the auth endpoint.
+		openidConfiguration, err := oidc.GetOpenIDConfiguration(v.Issuer)
+		if err != nil {
+			// Log the error but continue as it's not critical.
+			slog.Warn("failed to fetch openid configuration", slog.String("issuer", v.Issuer), log.BBError(err))
+		}
+		if openidConfiguration != nil {
+			// Update the auth endpoint if it's available.
+			oidcConfig.AuthEndpoint = openidConfiguration.AuthorizationEndpoint
+		}
 		return &v1pb.IdentityProviderConfig{
 			Config: &v1pb.IdentityProviderConfig_OidcConfig{
-				OidcConfig: &v1pb.OIDCIdentityProviderConfig{
-					Issuer:        v.Issuer,
-					ClientId:      v.ClientId,
-					ClientSecret:  "", // SECURITY: We do not expose the client secret
-					FieldMapping:  &fieldMapping,
-					SkipTlsVerify: v.SkipTlsVerify,
-					AuthStyle:     v1pb.OAuth2AuthStyle(v.AuthStyle),
-					Scopes:        scopes,
-					AuthEndpoint:  openidConfigration.AuthorizationEndpoint,
-				},
+				OidcConfig: oidcConfig,
 			},
 		}, nil
 	} else if v := identityProviderConfig.GetLdapConfig(); v != nil {

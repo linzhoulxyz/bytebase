@@ -20,29 +20,26 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	DatabaseService_GetDatabase_FullMethodName            = "/bytebase.v1.DatabaseService/GetDatabase"
-	DatabaseService_ListInstanceDatabases_FullMethodName  = "/bytebase.v1.DatabaseService/ListInstanceDatabases"
-	DatabaseService_ListDatabases_FullMethodName          = "/bytebase.v1.DatabaseService/ListDatabases"
-	DatabaseService_UpdateDatabase_FullMethodName         = "/bytebase.v1.DatabaseService/UpdateDatabase"
-	DatabaseService_BatchUpdateDatabases_FullMethodName   = "/bytebase.v1.DatabaseService/BatchUpdateDatabases"
-	DatabaseService_SyncDatabase_FullMethodName           = "/bytebase.v1.DatabaseService/SyncDatabase"
-	DatabaseService_GetDatabaseMetadata_FullMethodName    = "/bytebase.v1.DatabaseService/GetDatabaseMetadata"
-	DatabaseService_UpdateDatabaseMetadata_FullMethodName = "/bytebase.v1.DatabaseService/UpdateDatabaseMetadata"
-	DatabaseService_GetDatabaseSchema_FullMethodName      = "/bytebase.v1.DatabaseService/GetDatabaseSchema"
-	DatabaseService_DiffSchema_FullMethodName             = "/bytebase.v1.DatabaseService/DiffSchema"
-	DatabaseService_ListSlowQueries_FullMethodName        = "/bytebase.v1.DatabaseService/ListSlowQueries"
-	DatabaseService_ListSecrets_FullMethodName            = "/bytebase.v1.DatabaseService/ListSecrets"
-	DatabaseService_UpdateSecret_FullMethodName           = "/bytebase.v1.DatabaseService/UpdateSecret"
-	DatabaseService_DeleteSecret_FullMethodName           = "/bytebase.v1.DatabaseService/DeleteSecret"
-	DatabaseService_AdviseIndex_FullMethodName            = "/bytebase.v1.DatabaseService/AdviseIndex"
-	DatabaseService_ListChangeHistories_FullMethodName    = "/bytebase.v1.DatabaseService/ListChangeHistories"
-	DatabaseService_GetChangeHistory_FullMethodName       = "/bytebase.v1.DatabaseService/GetChangeHistory"
-	DatabaseService_ListRevisions_FullMethodName          = "/bytebase.v1.DatabaseService/ListRevisions"
-	DatabaseService_GetRevision_FullMethodName            = "/bytebase.v1.DatabaseService/GetRevision"
-	DatabaseService_CreateRevision_FullMethodName         = "/bytebase.v1.DatabaseService/CreateRevision"
-	DatabaseService_DeleteRevision_FullMethodName         = "/bytebase.v1.DatabaseService/DeleteRevision"
-	DatabaseService_ListChangelogs_FullMethodName         = "/bytebase.v1.DatabaseService/ListChangelogs"
-	DatabaseService_GetChangelog_FullMethodName           = "/bytebase.v1.DatabaseService/GetChangelog"
+	DatabaseService_GetDatabase_FullMethodName           = "/bytebase.v1.DatabaseService/GetDatabase"
+	DatabaseService_ListInstanceDatabases_FullMethodName = "/bytebase.v1.DatabaseService/ListInstanceDatabases"
+	DatabaseService_ListDatabases_FullMethodName         = "/bytebase.v1.DatabaseService/ListDatabases"
+	DatabaseService_UpdateDatabase_FullMethodName        = "/bytebase.v1.DatabaseService/UpdateDatabase"
+	DatabaseService_BatchUpdateDatabases_FullMethodName  = "/bytebase.v1.DatabaseService/BatchUpdateDatabases"
+	DatabaseService_SyncDatabase_FullMethodName          = "/bytebase.v1.DatabaseService/SyncDatabase"
+	DatabaseService_GetDatabaseMetadata_FullMethodName   = "/bytebase.v1.DatabaseService/GetDatabaseMetadata"
+	DatabaseService_GetDatabaseSchema_FullMethodName     = "/bytebase.v1.DatabaseService/GetDatabaseSchema"
+	DatabaseService_DiffSchema_FullMethodName            = "/bytebase.v1.DatabaseService/DiffSchema"
+	DatabaseService_ListSlowQueries_FullMethodName       = "/bytebase.v1.DatabaseService/ListSlowQueries"
+	DatabaseService_ListSecrets_FullMethodName           = "/bytebase.v1.DatabaseService/ListSecrets"
+	DatabaseService_UpdateSecret_FullMethodName          = "/bytebase.v1.DatabaseService/UpdateSecret"
+	DatabaseService_DeleteSecret_FullMethodName          = "/bytebase.v1.DatabaseService/DeleteSecret"
+	DatabaseService_AdviseIndex_FullMethodName           = "/bytebase.v1.DatabaseService/AdviseIndex"
+	DatabaseService_ListRevisions_FullMethodName         = "/bytebase.v1.DatabaseService/ListRevisions"
+	DatabaseService_GetRevision_FullMethodName           = "/bytebase.v1.DatabaseService/GetRevision"
+	DatabaseService_CreateRevision_FullMethodName        = "/bytebase.v1.DatabaseService/CreateRevision"
+	DatabaseService_DeleteRevision_FullMethodName        = "/bytebase.v1.DatabaseService/DeleteRevision"
+	DatabaseService_ListChangelogs_FullMethodName        = "/bytebase.v1.DatabaseService/ListChangelogs"
+	DatabaseService_GetChangelog_FullMethodName          = "/bytebase.v1.DatabaseService/GetChangelog"
 )
 
 // DatabaseServiceClient is the client API for DatabaseService service.
@@ -56,7 +53,6 @@ type DatabaseServiceClient interface {
 	BatchUpdateDatabases(ctx context.Context, in *BatchUpdateDatabasesRequest, opts ...grpc.CallOption) (*BatchUpdateDatabasesResponse, error)
 	SyncDatabase(ctx context.Context, in *SyncDatabaseRequest, opts ...grpc.CallOption) (*SyncDatabaseResponse, error)
 	GetDatabaseMetadata(ctx context.Context, in *GetDatabaseMetadataRequest, opts ...grpc.CallOption) (*DatabaseMetadata, error)
-	UpdateDatabaseMetadata(ctx context.Context, in *UpdateDatabaseMetadataRequest, opts ...grpc.CallOption) (*DatabaseMetadata, error)
 	GetDatabaseSchema(ctx context.Context, in *GetDatabaseSchemaRequest, opts ...grpc.CallOption) (*DatabaseSchema, error)
 	DiffSchema(ctx context.Context, in *DiffSchemaRequest, opts ...grpc.CallOption) (*DiffSchemaResponse, error)
 	ListSlowQueries(ctx context.Context, in *ListSlowQueriesRequest, opts ...grpc.CallOption) (*ListSlowQueriesResponse, error)
@@ -64,8 +60,6 @@ type DatabaseServiceClient interface {
 	UpdateSecret(ctx context.Context, in *UpdateSecretRequest, opts ...grpc.CallOption) (*Secret, error)
 	DeleteSecret(ctx context.Context, in *DeleteSecretRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	AdviseIndex(ctx context.Context, in *AdviseIndexRequest, opts ...grpc.CallOption) (*AdviseIndexResponse, error)
-	ListChangeHistories(ctx context.Context, in *ListChangeHistoriesRequest, opts ...grpc.CallOption) (*ListChangeHistoriesResponse, error)
-	GetChangeHistory(ctx context.Context, in *GetChangeHistoryRequest, opts ...grpc.CallOption) (*ChangeHistory, error)
 	ListRevisions(ctx context.Context, in *ListRevisionsRequest, opts ...grpc.CallOption) (*ListRevisionsResponse, error)
 	GetRevision(ctx context.Context, in *GetRevisionRequest, opts ...grpc.CallOption) (*Revision, error)
 	CreateRevision(ctx context.Context, in *CreateRevisionRequest, opts ...grpc.CallOption) (*Revision, error)
@@ -152,16 +146,6 @@ func (c *databaseServiceClient) GetDatabaseMetadata(ctx context.Context, in *Get
 	return out, nil
 }
 
-func (c *databaseServiceClient) UpdateDatabaseMetadata(ctx context.Context, in *UpdateDatabaseMetadataRequest, opts ...grpc.CallOption) (*DatabaseMetadata, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(DatabaseMetadata)
-	err := c.cc.Invoke(ctx, DatabaseService_UpdateDatabaseMetadata_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *databaseServiceClient) GetDatabaseSchema(ctx context.Context, in *GetDatabaseSchemaRequest, opts ...grpc.CallOption) (*DatabaseSchema, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DatabaseSchema)
@@ -226,26 +210,6 @@ func (c *databaseServiceClient) AdviseIndex(ctx context.Context, in *AdviseIndex
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AdviseIndexResponse)
 	err := c.cc.Invoke(ctx, DatabaseService_AdviseIndex_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *databaseServiceClient) ListChangeHistories(ctx context.Context, in *ListChangeHistoriesRequest, opts ...grpc.CallOption) (*ListChangeHistoriesResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListChangeHistoriesResponse)
-	err := c.cc.Invoke(ctx, DatabaseService_ListChangeHistories_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *databaseServiceClient) GetChangeHistory(ctx context.Context, in *GetChangeHistoryRequest, opts ...grpc.CallOption) (*ChangeHistory, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ChangeHistory)
-	err := c.cc.Invoke(ctx, DatabaseService_GetChangeHistory_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +287,6 @@ type DatabaseServiceServer interface {
 	BatchUpdateDatabases(context.Context, *BatchUpdateDatabasesRequest) (*BatchUpdateDatabasesResponse, error)
 	SyncDatabase(context.Context, *SyncDatabaseRequest) (*SyncDatabaseResponse, error)
 	GetDatabaseMetadata(context.Context, *GetDatabaseMetadataRequest) (*DatabaseMetadata, error)
-	UpdateDatabaseMetadata(context.Context, *UpdateDatabaseMetadataRequest) (*DatabaseMetadata, error)
 	GetDatabaseSchema(context.Context, *GetDatabaseSchemaRequest) (*DatabaseSchema, error)
 	DiffSchema(context.Context, *DiffSchemaRequest) (*DiffSchemaResponse, error)
 	ListSlowQueries(context.Context, *ListSlowQueriesRequest) (*ListSlowQueriesResponse, error)
@@ -331,8 +294,6 @@ type DatabaseServiceServer interface {
 	UpdateSecret(context.Context, *UpdateSecretRequest) (*Secret, error)
 	DeleteSecret(context.Context, *DeleteSecretRequest) (*emptypb.Empty, error)
 	AdviseIndex(context.Context, *AdviseIndexRequest) (*AdviseIndexResponse, error)
-	ListChangeHistories(context.Context, *ListChangeHistoriesRequest) (*ListChangeHistoriesResponse, error)
-	GetChangeHistory(context.Context, *GetChangeHistoryRequest) (*ChangeHistory, error)
 	ListRevisions(context.Context, *ListRevisionsRequest) (*ListRevisionsResponse, error)
 	GetRevision(context.Context, *GetRevisionRequest) (*Revision, error)
 	CreateRevision(context.Context, *CreateRevisionRequest) (*Revision, error)
@@ -370,9 +331,6 @@ func (UnimplementedDatabaseServiceServer) SyncDatabase(context.Context, *SyncDat
 func (UnimplementedDatabaseServiceServer) GetDatabaseMetadata(context.Context, *GetDatabaseMetadataRequest) (*DatabaseMetadata, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetDatabaseMetadata not implemented")
 }
-func (UnimplementedDatabaseServiceServer) UpdateDatabaseMetadata(context.Context, *UpdateDatabaseMetadataRequest) (*DatabaseMetadata, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateDatabaseMetadata not implemented")
-}
 func (UnimplementedDatabaseServiceServer) GetDatabaseSchema(context.Context, *GetDatabaseSchemaRequest) (*DatabaseSchema, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetDatabaseSchema not implemented")
 }
@@ -393,12 +351,6 @@ func (UnimplementedDatabaseServiceServer) DeleteSecret(context.Context, *DeleteS
 }
 func (UnimplementedDatabaseServiceServer) AdviseIndex(context.Context, *AdviseIndexRequest) (*AdviseIndexResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AdviseIndex not implemented")
-}
-func (UnimplementedDatabaseServiceServer) ListChangeHistories(context.Context, *ListChangeHistoriesRequest) (*ListChangeHistoriesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListChangeHistories not implemented")
-}
-func (UnimplementedDatabaseServiceServer) GetChangeHistory(context.Context, *GetChangeHistoryRequest) (*ChangeHistory, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetChangeHistory not implemented")
 }
 func (UnimplementedDatabaseServiceServer) ListRevisions(context.Context, *ListRevisionsRequest) (*ListRevisionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListRevisions not implemented")
@@ -565,24 +517,6 @@ func _DatabaseService_GetDatabaseMetadata_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DatabaseService_UpdateDatabaseMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UpdateDatabaseMetadataRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DatabaseServiceServer).UpdateDatabaseMetadata(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: DatabaseService_UpdateDatabaseMetadata_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DatabaseServiceServer).UpdateDatabaseMetadata(ctx, req.(*UpdateDatabaseMetadataRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _DatabaseService_GetDatabaseSchema_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetDatabaseSchemaRequest)
 	if err := dec(in); err != nil {
@@ -705,42 +639,6 @@ func _DatabaseService_AdviseIndex_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DatabaseServiceServer).AdviseIndex(ctx, req.(*AdviseIndexRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _DatabaseService_ListChangeHistories_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListChangeHistoriesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DatabaseServiceServer).ListChangeHistories(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: DatabaseService_ListChangeHistories_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DatabaseServiceServer).ListChangeHistories(ctx, req.(*ListChangeHistoriesRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _DatabaseService_GetChangeHistory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetChangeHistoryRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DatabaseServiceServer).GetChangeHistory(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: DatabaseService_GetChangeHistory_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DatabaseServiceServer).GetChangeHistory(ctx, req.(*GetChangeHistoryRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -889,10 +787,6 @@ var DatabaseService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _DatabaseService_GetDatabaseMetadata_Handler,
 		},
 		{
-			MethodName: "UpdateDatabaseMetadata",
-			Handler:    _DatabaseService_UpdateDatabaseMetadata_Handler,
-		},
-		{
 			MethodName: "GetDatabaseSchema",
 			Handler:    _DatabaseService_GetDatabaseSchema_Handler,
 		},
@@ -919,14 +813,6 @@ var DatabaseService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AdviseIndex",
 			Handler:    _DatabaseService_AdviseIndex_Handler,
-		},
-		{
-			MethodName: "ListChangeHistories",
-			Handler:    _DatabaseService_ListChangeHistories_Handler,
-		},
-		{
-			MethodName: "GetChangeHistory",
-			Handler:    _DatabaseService_GetChangeHistory_Handler,
 		},
 		{
 			MethodName: "ListRevisions",

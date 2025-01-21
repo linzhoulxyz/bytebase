@@ -741,15 +741,14 @@ CREATE TABLE anomaly (
     created_ts BIGINT NOT NULL DEFAULT extract(epoch from now()),
     updater_id INTEGER NOT NULL REFERENCES principal (id),
     updated_ts BIGINT NOT NULL DEFAULT extract(epoch from now()),
+    project TEXT NOT NULL,
     instance_id INTEGER NOT NULL REFERENCES instance (id),
-    -- NULL if it's an instance anomaly
     database_id INTEGER NULL REFERENCES db (id),
     type TEXT NOT NULL CHECK (type LIKE 'bb.anomaly.%'),
     payload JSONB NOT NULL DEFAULT '{}'
 );
 
-CREATE INDEX idx_anomaly_instance_id_row_status_type ON anomaly(instance_id, row_status, type);
-CREATE INDEX idx_anomaly_database_id_row_status_type ON anomaly(database_id, row_status, type);
+CREATE UNIQUE INDEX idx_anomaly_unique_project_database_id_type ON anomaly(project, database_id, type);
 
 ALTER SEQUENCE anomaly_id_seq RESTART WITH 101;
 
@@ -964,3 +963,61 @@ CREATE TABLE review_config
     name TEXT NOT NULL,
     payload JSONB NOT NULL DEFAULT '{}'
 );
+
+CREATE TABLE revision (
+    id BIGSERIAL PRIMARY KEY,
+    database_id INTEGER NOT NULL REFERENCES db (id),
+    creator_id INTEGER NOT NULL REFERENCES principal (id),
+    created_ts TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deleter_id INTEGER REFERENCES principal (id),
+    deleted_ts TIMESTAMPTZ,
+    version TEXT NOT NULL,
+    payload JSONB NOT NULL DEFAULT '{}'
+);
+
+ALTER SEQUENCE revision_id_seq RESTART WITH 101;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_revision_unique_database_id_version_deleted_ts_null ON revision (database_id, version) WHERE deleted_ts IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_revision_database_id_version ON revision (database_id, version);
+
+CREATE TABLE sync_history (
+    id BIGSERIAL PRIMARY KEY,
+    creator_id INTEGER NOT NULL REFERENCES principal (id),
+    created_ts TIMESTAMPTZ NOT NULL DEFAULT now(),
+    database_id INTEGER NOT NULL REFERENCES db (id),
+    metadata JSON NOT NULL DEFAULT '{}',
+    raw_dump TEXT NOT NULL DEFAULT ''
+);
+
+ALTER SEQUENCE sync_history_id_seq RESTART WITH 101;
+
+CREATE INDEX IF NOT EXISTS idx_sync_history_database_id_created_ts ON sync_history (database_id, created_ts);
+
+CREATE TABLE changelog (
+    id BIGSERIAL PRIMARY KEY,
+    creator_id INTEGER NOT NULL REFERENCES principal (id),
+    created_ts TIMESTAMPTZ NOT NULL DEFAULT now(),
+    database_id INTEGER NOT NULL REFERENCES db (id),
+    status TEXT NOT NULL CONSTRAINT changelog_status_check CHECK (status IN ('PENDING', 'DONE', 'FAILED')),
+    prev_sync_history_id BIGINT REFERENCES sync_history (id),
+    sync_history_id BIGINT REFERENCES sync_history (id),
+    payload JSONB NOT NULL DEFAULT '{}'
+);
+
+ALTER SEQUENCE changelog_id_seq RESTART WITH 101;
+
+CREATE INDEX IF NOT EXISTS idx_changelog_database_id ON changelog (database_id);
+
+CREATE TABLE IF NOT EXISTS release (
+    id BIGSERIAL PRIMARY KEY,
+    row_status row_status NOT NULL DEFAULT 'NORMAL',
+    project_id INTEGER NOT NULL REFERENCES project (id),
+    creator_id INTEGER NOT NULL REFERENCES principal (id),
+    created_ts TIMESTAMPTZ NOT NULL DEFAULT now(),
+    payload JSONB NOT NULL DEFAULT '{}'
+);
+
+ALTER SEQUENCE release_id_seq RESTART WITH 101;
+
+CREATE INDEX idx_release_project_id ON release (project_id);

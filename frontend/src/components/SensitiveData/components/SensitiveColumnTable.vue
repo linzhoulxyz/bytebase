@@ -3,7 +3,6 @@
     key="sensitive-column-table"
     :columns="dataTableColumns"
     :data="columnList"
-    :row-props="rowProps"
     :row-key="itemKey"
     :checked-row-keys="checkedItemKeys"
     size="small"
@@ -11,19 +10,28 @@
   />
 </template>
 
-<script lang="ts" setup>
-import { PencilIcon } from "lucide-vue-next";
+<script lang="tsx" setup>
 import { TrashIcon } from "lucide-vue-next";
 import { NDataTable, NPopconfirm, type DataTableColumn } from "naive-ui";
-import { computed, h, ref, watch } from "vue";
-import { withModifiers } from "vue";
+import { computed, h, ref, watch, withModifiers } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter, RouterLink } from "vue-router";
+import ClassificationCell from "@/components/ColumnDataTable/ClassificationCell.vue";
+import SemanticTypeCell from "@/components/ColumnDataTable/SemanticTypeCell.vue";
+import { updateColumnConfig } from "@/components/ColumnDataTable/utils";
 import type { MaskData } from "@/components/SensitiveData/types";
 import { MiniActionButton } from "@/components/v2";
-import type { MaskingLevel } from "@/types/proto/v1/common";
-import { maskingLevelToJSON } from "@/types/proto/v1/common";
+import {
+  useSettingV1Store,
+  useDatabaseCatalog,
+  getColumnCatalog,
+} from "@/store";
+import type { ComposedDatabase } from "@/types";
+import { DataClassificationSetting_DataClassificationConfig as DataClassificationConfig } from "@/types/proto/v1/setting_service";
+import { autoDatabaseRoute } from "@/utils";
 
 const props = defineProps<{
+  database: ComposedDatabase;
   showOperation: boolean;
   rowClickable: boolean;
   rowSelectable: boolean;
@@ -32,19 +40,16 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (
-    event: "click",
-    item: MaskData,
-    row: number,
-    action: "VIEW" | "DELETE" | "EDIT"
-  ): void;
+  (event: "delete", item: MaskData): void;
   (event: "checked:update", list: number[]): void;
 }>();
 
 const { t } = useI18n();
+const router = useRouter();
 const checkedColumnIndex = ref<Set<number>>(
   new Set(props.checkedColumnIndexList)
 );
+const settingStore = useSettingV1Store();
 
 watch(
   () => props.columnList,
@@ -67,10 +72,15 @@ const itemKey = (item: MaskData) => {
   return parts.join("::");
 };
 
-const getMaskingLevelText = (maskingLevel: MaskingLevel) => {
-  const level = maskingLevelToJSON(maskingLevel);
-  return t(`settings.sensitive-data.masking-level.${level.toLowerCase()}`);
-};
+const databaseCatalog = useDatabaseCatalog(props.database.name, false);
+
+const classificationConfig = computed(() => {
+  return (
+    settingStore.getProjectClassification(
+      props.database.projectEntity.dataClassificationConfigId
+    ) ?? DataClassificationConfig.fromPartial({})
+  );
+});
 
 const checkedItemKeys = computed(() => {
   const keys: string[] = [];
@@ -86,28 +96,78 @@ const checkedItemKeys = computed(() => {
 const dataTableColumns = computed(() => {
   const columns: DataTableColumn<MaskData>[] = [
     {
-      key: "masking-level",
-      title: t("settings.sensitive-data.masking-level.self"),
-      width: "12rem",
-      resizable: true,
-      render(item) {
-        return getMaskingLevelText(item.maskingLevel);
-      },
-    },
-    {
       key: "table",
       title: t("common.table"),
       resizable: true,
+      width: "minmax(min-content, auto)",
       render(item) {
-        return item.schema ? `${item.schema}.${item.table}` : item.table;
+        return (
+          <div>
+            <RouterLink
+              to={{
+                ...autoDatabaseRoute(router, props.database),
+                query: {
+                  schema: item.schema,
+                  table: item.table,
+                },
+                hash: "overview",
+              }}
+              class="normal-link"
+              exactActiveClass=""
+            >
+              {item.schema ? `${item.schema}.${item.table}` : item.table}
+            </RouterLink>
+          </div>
+        );
       },
     },
     {
       key: "column",
       title: t("database.column"),
       resizable: true,
+      width: "minmax(min-content, auto)",
       render(item) {
         return item.column;
+      },
+    },
+    {
+      key: "semantic-type",
+      title: t("settings.sensitive-data.semantic-types.table.semantic-type"),
+      width: "minmax(min-content, auto)",
+      resizable: true,
+      render(item) {
+        return (
+          <SemanticTypeCell
+            database={props.database}
+            schema={item.schema}
+            table={item.table}
+            column={item.column}
+            readonly={!props.showOperation}
+          />
+        );
+      },
+    },
+    {
+      key: "classification",
+      title: t("database.classification.self"),
+      width: "minmax(min-content, auto)",
+      resizable: true,
+      render(item) {
+        const columnCatalog = getColumnCatalog(
+          databaseCatalog.value,
+          item.schema,
+          item.table,
+          item.column
+        );
+
+        return (
+          <ClassificationCell
+            classification={columnCatalog.classification}
+            classificationConfig={classificationConfig.value}
+            readonly={!props.showOperation}
+            onApply={(id: string) => onClassificationIdApply(item, id)}
+          />
+        );
       },
     },
   ];
@@ -116,23 +176,12 @@ const dataTableColumns = computed(() => {
       key: "operation",
       title: t("common.operation"),
       width: "6rem",
-      render(item, index) {
-        const editButton = h(
-          MiniActionButton,
-          {
-            onClick: withModifiers(() => {
-              emit("click", item, index, "EDIT");
-            }, ["prevent", "stop"]),
-          },
-          {
-            default: () => h(PencilIcon, { class: "w-4 h-4" }),
-          }
-        );
-        const deleteButton = h(
+      render(item) {
+        return h(
           NPopconfirm,
           {
             onPositiveClick: () => {
-              emit("click", item, index, "DELETE");
+              emit("delete", item);
             },
           },
           {
@@ -158,7 +207,6 @@ const dataTableColumns = computed(() => {
               ),
           }
         );
-        return [editButton, deleteButton];
       },
     });
   }
@@ -178,6 +226,20 @@ const dataTableColumns = computed(() => {
   return columns;
 });
 
+const onClassificationIdApply = async (
+  item: MaskData,
+  classification: string
+) => {
+  await updateColumnConfig({
+    database: props.database.name,
+    schema: item.schema,
+    table: item.table,
+    column: item.column,
+    columnCatalog: { classification },
+    notification: !classification ? "common.removed" : undefined,
+  });
+};
+
 const handleUpdateCheckedRowKeys = (keys: string[]) => {
   const keysSet = new Set(keys);
   const checkedIndexList: number[] = [];
@@ -188,14 +250,5 @@ const handleUpdateCheckedRowKeys = (keys: string[]) => {
     }
   });
   emit("checked:update", checkedIndexList);
-};
-
-const rowProps = (item: MaskData, index: number) => {
-  return {
-    style: props.rowClickable ? "cursor: pointer;" : "",
-    onClick: () => {
-      emit("click", item, index, "VIEW");
-    },
-  };
 };
 </script>

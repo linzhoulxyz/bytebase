@@ -11,13 +11,13 @@ const (
 	PermissionBranchesGet                Permission = "bb.branches.get"
 	PermissionBranchesList               Permission = "bb.branches.list"
 	PermissionBranchesUpdate             Permission = "bb.branches.update"
-	PermissionChangeHistoriesGet         Permission = "bb.changeHistories.get"
-	PermissionChangeHistoriesList        Permission = "bb.changeHistories.list"
 	PermissionChangelistsCreate          Permission = "bb.changelists.create"
 	PermissionChangelistsDelete          Permission = "bb.changelists.delete"
 	PermissionChangelistsGet             Permission = "bb.changelists.get"
 	PermissionChangelistsList            Permission = "bb.changelists.list"
 	PermissionChangelistsUpdate          Permission = "bb.changelists.update"
+	PermissionChangelogsGet              Permission = "bb.changelogs.get"
+	PermissionChangelogsList             Permission = "bb.changelogs.list"
 	PermissionDatabaseCatalogsGet        Permission = "bb.databaseCatalogs.get"
 	PermissionDatabaseCatalogsUpdate     Permission = "bb.databaseCatalogs.update"
 	PermissionDatabaseSecretsDelete      Permission = "bb.databaseSecrets.delete"
@@ -62,6 +62,7 @@ const (
 	PermissionPlansCreate                Permission = "bb.plans.create"
 	PermissionPlansGet                   Permission = "bb.plans.get"
 	PermissionPlansList                  Permission = "bb.plans.list"
+	PermissionPlansPreview               Permission = "bb.plans.preview"
 	PermissionPlansUpdate                Permission = "bb.plans.update"
 	PermissionPoliciesCreate             Permission = "bb.policies.create"
 	PermissionPoliciesDelete             Permission = "bb.policies.delete"
@@ -76,11 +77,22 @@ const (
 	PermissionProjectsSetIAMPolicy       Permission = "bb.projects.setIamPolicy"
 	PermissionProjectsUndelete           Permission = "bb.projects.undelete"
 	PermissionProjectsUpdate             Permission = "bb.projects.update"
+	PermissionReleasesCheck              Permission = "bb.releases.check"
+	PermissionReleasesCreate             Permission = "bb.releases.create"
+	PermissionReleasesDelete             Permission = "bb.releases.delete"
+	PermissionReleasesGet                Permission = "bb.releases.get"
+	PermissionReleasesList               Permission = "bb.releases.list"
+	PermissionReleasesUndelete           Permission = "bb.releases.undelete"
+	PermissionReleasesUpdate             Permission = "bb.releases.update"
 	PermissionReviewConfigsCreate        Permission = "bb.reviewConfigs.create"
 	PermissionReviewConfigsDelete        Permission = "bb.reviewConfigs.delete"
 	PermissionReviewConfigsGet           Permission = "bb.reviewConfigs.get"
 	PermissionReviewConfigsList          Permission = "bb.reviewConfigs.list"
 	PermissionReviewConfigsUpdate        Permission = "bb.reviewConfigs.update"
+	PermissionRevisionsCreate            Permission = "bb.revisions.create"
+	PermissionRevisionsDelete            Permission = "bb.revisions.delete"
+	PermissionRevisionsGet               Permission = "bb.revisions.get"
+	PermissionRevisionsList              Permission = "bb.revisions.list"
 	PermissionRisksCreate                Permission = "bb.risks.create"
 	PermissionRisksDelete                Permission = "bb.risks.delete"
 	PermissionRisksList                  Permission = "bb.risks.list"
@@ -144,13 +156,13 @@ var allPermissions = []Permission{
 	PermissionBranchesGet,
 	PermissionBranchesList,
 	PermissionBranchesUpdate,
-	PermissionChangeHistoriesGet,
-	PermissionChangeHistoriesList,
 	PermissionChangelistsCreate,
 	PermissionChangelistsDelete,
 	PermissionChangelistsGet,
 	PermissionChangelistsList,
 	PermissionChangelistsUpdate,
+	PermissionChangelogsGet,
+	PermissionChangelogsList,
 	PermissionDatabaseCatalogsGet,
 	PermissionDatabaseCatalogsUpdate,
 	PermissionDatabaseSecretsDelete,
@@ -196,6 +208,7 @@ var allPermissions = []Permission{
 	PermissionPlansGet,
 	PermissionPlansList,
 	PermissionPlansUpdate,
+	PermissionPlansPreview,
 	PermissionPoliciesCreate,
 	PermissionPoliciesDelete,
 	PermissionPoliciesGet,
@@ -209,11 +222,22 @@ var allPermissions = []Permission{
 	PermissionProjectsSetIAMPolicy,
 	PermissionProjectsUndelete,
 	PermissionProjectsUpdate,
+	PermissionReleasesCheck,
+	PermissionReleasesCreate,
+	PermissionReleasesDelete,
+	PermissionReleasesGet,
+	PermissionReleasesList,
+	PermissionReleasesUndelete,
+	PermissionReleasesUpdate,
 	PermissionReviewConfigsCreate,
 	PermissionReviewConfigsDelete,
 	PermissionReviewConfigsGet,
 	PermissionReviewConfigsList,
 	PermissionReviewConfigsUpdate,
+	PermissionRevisionsCreate,
+	PermissionRevisionsDelete,
+	PermissionRevisionsGet,
+	PermissionRevisionsList,
 	PermissionRisksCreate,
 	PermissionRisksDelete,
 	PermissionRisksList,

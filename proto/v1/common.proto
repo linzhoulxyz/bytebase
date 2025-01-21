@@ -37,6 +37,7 @@ enum Engine {
   DYNAMODB = 23;
   DATABRICKS = 24;
   COCKROACHDB = 25;
+  COSMOSDB = 26;
 }
 
 enum VCSType {
@@ -50,13 +51,6 @@ enum VCSType {
   BITBUCKET = 3;
   // Azure DevOps. Using for Azure DevOps GitOps workflow.
   AZURE_DEVOPS = 4;
-}
-
-enum MaskingLevel {
-  MASKING_LEVEL_UNSPECIFIED = 0;
-  NONE = 1;
-  PARTIAL = 2;
-  FULL = 3;
 }
 
 enum ExportFormat {

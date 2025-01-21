@@ -122,8 +122,11 @@ export interface CreateRolloutRequest {
    * The rollout is created according to the plan and the
    * stages are created up to the stage_id.
    * If unspecified, all stages are created.
+   * If set to "", no stages are created.
    */
-  stageId: string;
+  stageId?:
+    | string
+    | undefined;
   /**
    * If set, validate the request and preview the rollout, but
    * do not actually create it.
@@ -540,10 +543,10 @@ export interface TaskRun {
   /** Below are the results of a task run. */
   detail: string;
   /**
-   * The resource name of the change history
-   * Format: instances/{instance}/databases/{database}/changeHistories/{changeHistory}
+   * The resource name of the changelog.
+   * Format: instances/{instance}/databases/{database}/changelogs/{changelog}
    */
-  changeHistory: string;
+  changelog: string;
   schemaVersion: string;
   startTime: Timestamp | undefined;
   exportArchiveStatus: TaskRun_ExportArchiveStatus;
@@ -1684,7 +1687,7 @@ export const ListRolloutsResponse: MessageFns<ListRolloutsResponse> = {
 };
 
 function createBaseCreateRolloutRequest(): CreateRolloutRequest {
-  return { parent: "", rollout: undefined, stageId: "", validateOnly: false };
+  return { parent: "", rollout: undefined, stageId: undefined, validateOnly: false };
 }
 
 export const CreateRolloutRequest: MessageFns<CreateRolloutRequest> = {
@@ -1695,7 +1698,7 @@ export const CreateRolloutRequest: MessageFns<CreateRolloutRequest> = {
     if (message.rollout !== undefined) {
       Rollout.encode(message.rollout, writer.uint32(18).fork()).join();
     }
-    if (message.stageId !== "") {
+    if (message.stageId !== undefined) {
       writer.uint32(26).string(message.stageId);
     }
     if (message.validateOnly !== false) {
@@ -1756,7 +1759,7 @@ export const CreateRolloutRequest: MessageFns<CreateRolloutRequest> = {
     return {
       parent: isSet(object.parent) ? globalThis.String(object.parent) : "",
       rollout: isSet(object.rollout) ? Rollout.fromJSON(object.rollout) : undefined,
-      stageId: isSet(object.stageId) ? globalThis.String(object.stageId) : "",
+      stageId: isSet(object.stageId) ? globalThis.String(object.stageId) : undefined,
       validateOnly: isSet(object.validateOnly) ? globalThis.Boolean(object.validateOnly) : false,
     };
   },
@@ -1769,7 +1772,7 @@ export const CreateRolloutRequest: MessageFns<CreateRolloutRequest> = {
     if (message.rollout !== undefined) {
       obj.rollout = Rollout.toJSON(message.rollout);
     }
-    if (message.stageId !== "") {
+    if (message.stageId !== undefined) {
       obj.stageId = message.stageId;
     }
     if (message.validateOnly !== false) {
@@ -1787,7 +1790,7 @@ export const CreateRolloutRequest: MessageFns<CreateRolloutRequest> = {
     message.rollout = (object.rollout !== undefined && object.rollout !== null)
       ? Rollout.fromPartial(object.rollout)
       : undefined;
-    message.stageId = object.stageId ?? "";
+    message.stageId = object.stageId ?? undefined;
     message.validateOnly = object.validateOnly ?? false;
     return message;
   },
@@ -3337,7 +3340,7 @@ function createBaseTaskRun(): TaskRun {
     title: "",
     status: TaskRun_Status.STATUS_UNSPECIFIED,
     detail: "",
-    changeHistory: "",
+    changelog: "",
     schemaVersion: "",
     startTime: undefined,
     exportArchiveStatus: TaskRun_ExportArchiveStatus.EXPORT_ARCHIVE_STATUS_UNSPECIFIED,
@@ -3373,8 +3376,8 @@ export const TaskRun: MessageFns<TaskRun> = {
     if (message.detail !== "") {
       writer.uint32(74).string(message.detail);
     }
-    if (message.changeHistory !== "") {
-      writer.uint32(82).string(message.changeHistory);
+    if (message.changelog !== "") {
+      writer.uint32(162).string(message.changelog);
     }
     if (message.schemaVersion !== "") {
       writer.uint32(90).string(message.schemaVersion);
@@ -3468,12 +3471,12 @@ export const TaskRun: MessageFns<TaskRun> = {
           message.detail = reader.string();
           continue;
         }
-        case 10: {
-          if (tag !== 82) {
+        case 20: {
+          if (tag !== 162) {
             break;
           }
 
-          message.changeHistory = reader.string();
+          message.changelog = reader.string();
           continue;
         }
         case 11: {
@@ -3543,7 +3546,7 @@ export const TaskRun: MessageFns<TaskRun> = {
       title: isSet(object.title) ? globalThis.String(object.title) : "",
       status: isSet(object.status) ? taskRun_StatusFromJSON(object.status) : TaskRun_Status.STATUS_UNSPECIFIED,
       detail: isSet(object.detail) ? globalThis.String(object.detail) : "",
-      changeHistory: isSet(object.changeHistory) ? globalThis.String(object.changeHistory) : "",
+      changelog: isSet(object.changelog) ? globalThis.String(object.changelog) : "",
       schemaVersion: isSet(object.schemaVersion) ? globalThis.String(object.schemaVersion) : "",
       startTime: isSet(object.startTime) ? fromJsonTimestamp(object.startTime) : undefined,
       exportArchiveStatus: isSet(object.exportArchiveStatus)
@@ -3583,8 +3586,8 @@ export const TaskRun: MessageFns<TaskRun> = {
     if (message.detail !== "") {
       obj.detail = message.detail;
     }
-    if (message.changeHistory !== "") {
-      obj.changeHistory = message.changeHistory;
+    if (message.changelog !== "") {
+      obj.changelog = message.changelog;
     }
     if (message.schemaVersion !== "") {
       obj.schemaVersion = message.schemaVersion;
@@ -3624,7 +3627,7 @@ export const TaskRun: MessageFns<TaskRun> = {
     message.title = object.title ?? "";
     message.status = object.status ?? TaskRun_Status.STATUS_UNSPECIFIED;
     message.detail = object.detail ?? "";
-    message.changeHistory = object.changeHistory ?? "";
+    message.changelog = object.changelog ?? "";
     message.schemaVersion = object.schemaVersion ?? "";
     message.startTime = (object.startTime !== undefined && object.startTime !== null)
       ? Timestamp.fromPartial(object.startTime)

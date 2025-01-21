@@ -2,7 +2,6 @@ package v1
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -476,7 +475,7 @@ func getTaskCreatesFromChangeDatabaseConfigDatabaseTarget(ctx context.Context, s
 				File: spec.SpecReleaseSource.GetFile(),
 			},
 		}
-		bytesSync, err := json.Marshal(payloadSync)
+		bytesSync, err := protojson.Marshal(payloadSync)
 		if err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to marshal database schema update gh-ost sync payload")
 		}
@@ -702,8 +701,5 @@ func getOrDefaultSchemaVersion(v string) string {
 	if v != "" {
 		return v
 	}
-	if common.IsDev() && getProfile().DevelopmentVersioned {
-		return ""
-	}
-	return common.DefaultMigrationVersion().Version
+	return ""
 }

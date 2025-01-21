@@ -6,7 +6,6 @@ export type EditorPanelView =
   | "FUNCTIONS"
   | "PROCEDURES"
   | "SEQUENCES"
-  | "TRIGGERS"
   | "EXTERNAL_TABLES"
   | "PACKAGES"
   | "DIAGRAM";
@@ -26,7 +25,7 @@ export type EditorPanelViewState = {
     partition?: string;
     index?: string;
     foreignKey?: string;
-    dependentColumn?: string;
+    dependencyColumn?: string;
     package?: string;
   };
 };
@@ -45,11 +44,12 @@ export const typeToView = (type: string): EditorPanelView => {
     type === "column" ||
     type === "index" ||
     type === "foreign-key" ||
+    type === "trigger" ||
     type === "partition-table"
   ) {
     return "TABLES";
   }
-  if (type === "view" || type === "dependent-column") {
+  if (type === "view" || type === "dependency-column") {
     return "VIEWS";
   }
   if (type === "function") return "FUNCTIONS";
@@ -57,6 +57,5 @@ export const typeToView = (type: string): EditorPanelView => {
   if (type === "external-table") return "EXTERNAL_TABLES";
   if (type === "package") return "PACKAGES";
   if (type === "sequence") return "SEQUENCES";
-  if (type === "trigger") return "TRIGGERS";
   throw new Error(`unsupported type: "${type}"`);
 };

@@ -22,6 +22,7 @@ import type {
   SQLEditorTab,
 } from "@/types";
 import { isValidDatabaseName } from "@/types";
+import { Engine } from "@/types/proto/v1/common";
 import {
   Advice,
   Advice_Status,
@@ -34,6 +35,7 @@ import {
   hasPermissionToCreateChangeDatabaseIssue,
 } from "@/utils";
 import { extractGrpcErrorMessage } from "@/utils/grpcweb";
+import { flattenNoSQLResult } from "./utils";
 
 // SKIP_CHECK_THRESHOLD is the MaxSheetCheckSize in the backend.
 const SKIP_CHECK_THRESHOLD = 2 * 1024 * 1024;
@@ -337,6 +339,7 @@ const useExecuteSQL = () => {
             limit: sqlEditorStore.resultRowsLimit,
             explain: params.explain,
             schema: params.connection.schema,
+            container: params.connection.table,
             timeout: undefined, // TODO: make this param configurable
             queryOption: {
               redisRunCommandsOn: sqlEditorStore.redisCommandOption,
@@ -344,6 +347,13 @@ const useExecuteSQL = () => {
           },
           abortController.signal
         );
+
+        if (
+          database.instanceResource.engine === Engine.MONGODB ||
+          database.instanceResource.engine === Engine.COSMOSDB
+        ) {
+          flattenNoSQLResult(resultSet);
+        }
 
         if (checkBehavior === "NOTIFICATION") {
           notifyAdvices(checkResult.advices ?? []);

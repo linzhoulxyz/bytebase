@@ -5,20 +5,15 @@ import { PROJECT_V1_ROUTE_DASHBOARD } from "./workspaceRoutes";
 
 export const PROJECT_V1_ROUTE_DETAIL = `${PROJECT_V1_ROUTE_DASHBOARD}.detail`;
 export const PROJECT_V1_ROUTE_DATABASES = `${PROJECT_V1_ROUTE_DASHBOARD}.database`;
-export const PROJECT_V1_ROUTE_MASKING_ACCESS = `${PROJECT_V1_ROUTE_DASHBOARD}.masking-access`;
-export const PROJECT_V1_ROUTE_MASKING_ACCESS_CREATE = `${PROJECT_V1_ROUTE_DASHBOARD}.masking-access.create`;
+export const PROJECT_V1_ROUTE_MASKING_EXEMPTION = `${PROJECT_V1_ROUTE_DASHBOARD}.masking-exemption`;
+export const PROJECT_V1_ROUTE_MASKING_EXEMPTION_CREATE = `${PROJECT_V1_ROUTE_DASHBOARD}.masking-exemption.create`;
 export const PROJECT_V1_ROUTE_DATABASE_DETAIL = `${PROJECT_V1_ROUTE_DASHBOARD}.database.detail`;
-export const PROJECT_V1_ROUTE_DATABASE_CHANGE_HISTORY_DETAIL = `${PROJECT_V1_ROUTE_DASHBOARD}.database.change-history.detail`;
+export const PROJECT_V1_ROUTE_DATABASE_CHANGELOG_DETAIL = `${PROJECT_V1_ROUTE_DASHBOARD}.database.changelog.detail`;
 export const PROJECT_V1_ROUTE_DATABASE_REVISION_DETAIL = `${PROJECT_V1_ROUTE_DASHBOARD}.database.revision.detail`;
 export const PROJECT_V1_ROUTE_DATABASE_GROUPS = `${PROJECT_V1_ROUTE_DASHBOARD}.database-group`;
 export const PROJECT_V1_ROUTE_DATABASE_GROUPS_CREATE = `${PROJECT_V1_ROUTE_DASHBOARD}.database-group.create`;
 export const PROJECT_V1_ROUTE_DATABASE_GROUP_DETAIL = `${PROJECT_V1_ROUTE_DASHBOARD}.database-group.detail`;
 export const PROJECT_V1_ROUTE_DEPLOYMENT_CONFIG = `${PROJECT_V1_ROUTE_DASHBOARD}.deployment-config`;
-export const PROJECT_V1_ROUTE_BRANCHES = `${PROJECT_V1_ROUTE_DASHBOARD}.branch`;
-export const PROJECT_V1_ROUTE_BRANCH_DETAIL = `${PROJECT_V1_ROUTE_DASHBOARD}.branch.detail`;
-export const PROJECT_V1_ROUTE_BRANCH_ROLLOUT = `${PROJECT_V1_ROUTE_DASHBOARD}.branch.rollout`;
-export const PROJECT_V1_ROUTE_BRANCH_MERGE = `${PROJECT_V1_ROUTE_DASHBOARD}.branch.merge`;
-export const PROJECT_V1_ROUTE_BRANCH_REBASE = `${PROJECT_V1_ROUTE_DASHBOARD}.branch.rebase`;
 export const PROJECT_V1_ROUTE_ISSUES = `${PROJECT_V1_ROUTE_DASHBOARD}.issue`;
 export const PROJECT_V1_ROUTE_ISSUE_DETAIL = `${PROJECT_V1_ROUTE_DASHBOARD}.issue.detail`;
 export const PROJECT_V1_ROUTE_PLAN_DETAIL = `${PROJECT_V1_ROUTE_DASHBOARD}.plan.detail`;
@@ -75,7 +70,7 @@ const projectV1Routes: RouteRecordRaw[] = [
         props: true,
       },
       {
-        path: "masking-access",
+        path: "masking-exemption",
         meta: {
           overrideTitle: true,
           requiredProjectPermissionList: () => [
@@ -88,16 +83,16 @@ const projectV1Routes: RouteRecordRaw[] = [
         children: [
           {
             path: "",
-            name: PROJECT_V1_ROUTE_MASKING_ACCESS,
+            name: PROJECT_V1_ROUTE_MASKING_EXEMPTION,
             component: () =>
-              import("@/views/project/ProjectDatabaseMaskingAccess.vue"),
+              import("@/views/project/ProjectMaskingExemption.vue"),
             props: true,
           },
           {
             path: "create",
-            name: PROJECT_V1_ROUTE_MASKING_ACCESS_CREATE,
+            name: PROJECT_V1_ROUTE_MASKING_EXEMPTION_CREATE,
             component: () =>
-              import("@/views/project/ProjectDatabaseMaskingAccessCreate.vue"),
+              import("@/views/project/ProjectMaskingExemptionCreate.vue"),
             props: true,
             meta: {
               requiredProjectPermissionList: () => ["bb.policies.create"],
@@ -153,82 +148,6 @@ const projectV1Routes: RouteRecordRaw[] = [
         component: () =>
           import("@/views/project/ProjectDeploymentConfigPanel.vue"),
         props: true,
-      },
-      {
-        path: "branches",
-        meta: {
-          overrideTitle: true,
-        },
-        props: true,
-        children: [
-          {
-            path: "",
-            name: PROJECT_V1_ROUTE_BRANCHES,
-            meta: {
-              overrideTitle: true,
-              requiredProjectPermissionList: () => [
-                "bb.projects.get",
-                "bb.branches.list",
-              ],
-            },
-            component: () =>
-              import("@/views/project/ProjectBranchDashboard.vue"),
-            props: true,
-          },
-          {
-            path: ":branchName",
-            name: PROJECT_V1_ROUTE_BRANCH_DETAIL,
-            meta: {
-              overrideTitle: true,
-              requiredProjectPermissionList: () => [
-                "bb.projects.get",
-                "bb.branches.get",
-              ],
-            },
-            component: () => import("@/views/branch/BranchDetail.vue"),
-            props: true,
-          },
-          {
-            path: ":branchName/rollout",
-            name: PROJECT_V1_ROUTE_BRANCH_ROLLOUT,
-            meta: {
-              overrideTitle: true,
-              requiredProjectPermissionList: () => [
-                "bb.projects.get",
-                "bb.branches.get",
-                "bb.issues.create",
-              ],
-            },
-            component: () => import("@/views/branch/BranchRollout.vue"),
-            props: true,
-          },
-          {
-            path: ":branchName/merge",
-            name: PROJECT_V1_ROUTE_BRANCH_MERGE,
-            meta: {
-              title: () => t("branch.merge-rebase.merge-branch"),
-              requiredProjectPermissionList: () => [
-                "bb.projects.get",
-                "bb.branches.get",
-              ],
-            },
-            component: () => import("@/views/branch/BranchMerge.vue"),
-            props: true,
-          },
-          {
-            path: ":branchName/rebase",
-            name: PROJECT_V1_ROUTE_BRANCH_REBASE,
-            meta: {
-              title: () => t("branch.merge-rebase.rebase-branch"),
-              requiredProjectPermissionList: () => [
-                "bb.projects.get",
-                "bb.branches.get",
-              ],
-            },
-            component: () => import("@/views/branch/BranchRebase.vue"),
-            props: true,
-          },
-        ],
       },
       {
         path: "issues",
@@ -310,7 +229,8 @@ const projectV1Routes: RouteRecordRaw[] = [
             "bb.databases.sync",
           ],
         },
-        component: () => import("@/views/project/ProjectSyncDatabasePanel.vue"),
+        component: () =>
+          import("@/views/project/ProjectSyncDatabasePanelV1.vue"),
         props: true,
       },
       {
@@ -483,24 +403,23 @@ const projectV1Routes: RouteRecordRaw[] = [
             props: true,
           },
           {
-            path: "change-histories/:changeHistoryId",
-            name: PROJECT_V1_ROUTE_DATABASE_CHANGE_HISTORY_DETAIL,
+            path: "changelogs/:changelogId",
+            name: PROJECT_V1_ROUTE_DATABASE_CHANGELOG_DETAIL,
             meta: {
-              overrideTitle: true,
               requiredProjectPermissionList: () => [
                 "bb.projects.get",
                 "bb.databases.get",
-                "bb.changeHistories.get",
+                // TODO: add changelogs related permission.
               ],
             },
             component: () =>
-              import("@/views/DatabaseDetail/ChangeHistoryDetail.vue"),
+              import("@/views/DatabaseDetail/ChangelogDetail.vue"),
             props: (route) => ({
               ...route.params,
               project: `projects/${route.params.projectId}`,
               instance: `instances/${route.params.instanceId}`,
               database: `instances/${route.params.instanceId}/databases/${route.params.databaseName}`,
-              changeHistoryId: route.params.changeHistoryId,
+              changelogId: route.params.changelogId,
             }),
           },
           {

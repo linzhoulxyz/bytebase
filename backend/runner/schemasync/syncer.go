@@ -253,25 +253,19 @@ func (s *Syncer) SyncDatabasesAsync(databases []*store.DatabaseMessage) {
 	}
 }
 
-// SyncInstance syncs the schema for all databases in an instance.
-func (s *Syncer) SyncInstance(ctx context.Context, instance *store.InstanceMessage) (*store.InstanceMessage, []*storepb.DatabaseSchemaMetadata, []*store.DatabaseMessage, error) {
-	if s.profile.Readonly {
-		return nil, nil, nil, nil
-	}
-
+// GetInstanceMeta gets the instance metadata.
+func (s *Syncer) GetInstanceMeta(ctx context.Context, instance *store.InstanceMessage) (*db.InstanceMetadata, error) {
 	driver, err := s.dbFactory.GetAdminDatabaseDriver(ctx, instance, nil /* database */, db.ConnectionContext{})
 	if err != nil {
-		s.upsertInstanceConnectionAnomaly(ctx, instance, err)
-		return nil, nil, nil, err
+		return nil, err
 	}
 	defer driver.Close(ctx)
-	s.upsertInstanceConnectionAnomaly(ctx, instance, nil)
 
 	deadlineCtx, cancelFunc := context.WithDeadline(ctx, time.Now().Add(syncTimeout))
 	defer cancelFunc()
 	instanceMeta, err := driver.SyncInstance(deadlineCtx)
 	if err != nil {
-		return nil, nil, nil, errors.Wrapf(err, "failed to sync instance: %s", instance.ResourceID)
+		return nil, errors.Wrapf(err, "failed to sync instance: %s", instance.ResourceID)
 	}
 
 	if instanceMeta.Metadata == nil {
@@ -279,6 +273,21 @@ func (s *Syncer) SyncInstance(ctx context.Context, instance *store.InstanceMessa
 	}
 
 	instanceMeta.Metadata.LastSyncTime = timestamppb.Now()
+
+	return instanceMeta, nil
+}
+
+// SyncInstance syncs the schema for all databases in an instance.
+func (s *Syncer) SyncInstance(ctx context.Context, instance *store.InstanceMessage) (*store.InstanceMessage, []*storepb.DatabaseSchemaMetadata, []*store.DatabaseMessage, error) {
+	if s.profile.Readonly {
+		return nil, nil, nil, nil
+	}
+
+	instanceMeta, err := s.GetInstanceMeta(ctx, instance)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	updateInstance := &store.UpdateInstanceMessage{
 		ResourceID: instance.ResourceID,
 		Metadata:   instanceMeta.Metadata,
@@ -566,68 +575,56 @@ func (s *Syncer) SyncDatabaseSchema(ctx context.Context, database *store.Databas
 
 	// Check schema drift
 	if s.licenseService.IsFeatureEnabledForInstance(api.FeatureSchemaDrift, instance) == nil {
-		// Redis and MongoDB are schemaless.
-		if disableSchemaDriftAnomalyCheck(instance.Engine) {
+		if err := func() error {
+			// Redis and MongoDB are schemaless.
+			if disableSchemaDriftAnomalyCheck(instance.Engine) {
+				return nil
+			}
+			limit := 1
+			list, err := s.store.ListChangelogs(ctx, &store.FindChangelogMessage{
+				DatabaseUID:    &database.UID,
+				TypeList:       []string{string(db.Migrate), string(db.Baseline)},
+				HasSyncHistory: true,
+				Limit:          &limit,
+				ShowFull:       true,
+			})
+			if err != nil {
+				return errors.Wrapf(err, "failed to list changelogs")
+			}
+			if len(list) == 0 {
+				return nil
+			}
+
+			changelog := list[0]
+			if changelog.SyncHistoryUID == nil {
+				return errors.Errorf("expect sync history but get nil")
+			}
+			latestSchema := string(rawDump)
+			if changelog.Schema != latestSchema {
+				if _, err = s.store.UpsertActiveAnomalyV2(ctx, api.SystemBotID, &store.AnomalyMessage{
+					ProjectID:   database.ProjectID,
+					InstanceUID: instance.UID,
+					DatabaseUID: database.UID,
+					Type:        api.AnomalyDatabaseSchemaDrift,
+				}); err != nil {
+					return errors.Wrapf(err, "failed to create anomaly")
+				}
+			} else {
+				err := s.store.DeleteAnomalyV2(ctx, &store.DeleteAnomalyMessage{
+					DatabaseUID: database.UID,
+					Type:        api.AnomalyDatabaseSchemaDrift,
+				})
+				if err != nil && common.ErrorCode(err) != common.NotFound {
+					return errors.Wrapf(err, "failed to close anomaly")
+				}
+			}
 			return nil
-		}
-		limit := 1
-		list, err := s.store.ListInstanceChangeHistory(ctx, &store.FindInstanceChangeHistoryMessage{
-			InstanceID: &instance.UID,
-			DatabaseID: &database.UID,
-			TypeList:   []db.MigrationType{db.Migrate, db.Baseline},
-			ShowFull:   true,
-			Limit:      &limit,
-		})
-		if err != nil {
-			slog.Error("Failed to check anomaly",
+		}(); err != nil {
+			slog.Error("failed to check anomaly",
 				slog.String("instance", instance.ResourceID),
 				slog.String("database", database.DatabaseName),
 				slog.String("type", string(api.AnomalyDatabaseSchemaDrift)),
 				log.BBError(err))
-			return nil
-		}
-		latestSchema := string(rawDump)
-		if len(list) > 0 {
-			if list[0].Schema != latestSchema {
-				anomalyPayload := &storepb.AnomalyDatabaseSchemaDriftPayload{
-					Version: list[0].Version.Version,
-					Expect:  list[0].Schema,
-					Actual:  latestSchema,
-				}
-				payload, err := protojson.Marshal(anomalyPayload)
-				if err != nil {
-					slog.Error("Failed to marshal anomaly payload",
-						slog.String("instance", instance.ResourceID),
-						slog.String("database", database.DatabaseName),
-						slog.String("type", string(api.AnomalyDatabaseSchemaDrift)),
-						log.BBError(err))
-				} else {
-					if _, err = s.store.UpsertActiveAnomalyV2(ctx, api.SystemBotID, &store.AnomalyMessage{
-						InstanceID:  instance.ResourceID,
-						DatabaseUID: &database.UID,
-						Type:        api.AnomalyDatabaseSchemaDrift,
-						Payload:     string(payload),
-					}); err != nil {
-						slog.Error("Failed to create anomaly",
-							slog.String("instance", instance.ResourceID),
-							slog.String("database", database.DatabaseName),
-							slog.String("type", string(api.AnomalyDatabaseSchemaDrift)),
-							log.BBError(err))
-					}
-				}
-			} else {
-				err := s.store.ArchiveAnomalyV2(ctx, &store.ArchiveAnomalyMessage{
-					DatabaseUID: &database.UID,
-					Type:        api.AnomalyDatabaseSchemaDrift,
-				})
-				if err != nil && common.ErrorCode(err) != common.NotFound {
-					slog.Error("Failed to close anomaly",
-						slog.String("instance", instance.ResourceID),
-						slog.String("database", database.DatabaseName),
-						slog.String("type", string(api.AnomalyDatabaseSchemaDrift)),
-						log.BBError(err))
-				}
-			}
 		}
 	}
 	return nil
@@ -670,75 +667,25 @@ func (s *Syncer) hasBackupSchema(ctx context.Context, instance *store.InstanceMe
 	return false
 }
 
-func (s *Syncer) upsertInstanceConnectionAnomaly(ctx context.Context, instance *store.InstanceMessage, connErr error) {
-	if connErr != nil {
-		anomalyPayload := &storepb.AnomalyConnectionPayload{
-			Detail: connErr.Error(),
-		}
-		payload, err := protojson.Marshal(anomalyPayload)
-		if err != nil {
-			slog.Error("Failed to marshal anomaly payload",
-				slog.String("instance", instance.ResourceID),
-				slog.String("type", string(api.AnomalyInstanceConnection)),
-				log.BBError(err))
-			return
-		}
-		if _, err = s.store.UpsertActiveAnomalyV2(ctx, api.SystemBotID, &store.AnomalyMessage{
-			InstanceID: instance.ResourceID,
-			Type:       api.AnomalyInstanceConnection,
-			Payload:    string(payload),
-		}); err != nil {
-			slog.Error("Failed to create anomaly",
-				slog.String("instance", instance.ResourceID),
-				slog.String("type", string(api.AnomalyInstanceConnection)),
-				log.BBError(err))
-		}
-		return
-	}
-
-	err := s.store.ArchiveAnomalyV2(ctx, &store.ArchiveAnomalyMessage{
-		InstanceID: &instance.ResourceID,
-		Type:       api.AnomalyInstanceConnection,
-	})
-	if err != nil && common.ErrorCode(err) != common.NotFound {
-		slog.Error("Failed to close anomaly",
-			slog.String("instance", instance.ResourceID),
-			slog.String("type", string(api.AnomalyInstanceConnection)),
-			log.BBError(err))
-	}
-}
-
 func (s *Syncer) upsertDatabaseConnectionAnomaly(ctx context.Context, instance *store.InstanceMessage, database *store.DatabaseMessage, connErr error) {
 	if connErr != nil {
-		anomalyPayload := &storepb.AnomalyConnectionPayload{
-			Detail: connErr.Error(),
-		}
-		payload, err := protojson.Marshal(anomalyPayload)
-		if err != nil {
-			slog.Error("Failed to marshal anomaly payload",
+		if _, err := s.store.UpsertActiveAnomalyV2(ctx, api.SystemBotID, &store.AnomalyMessage{
+			ProjectID:   database.ProjectID,
+			InstanceUID: instance.UID,
+			DatabaseUID: database.UID,
+			Type:        api.AnomalyDatabaseConnection,
+		}); err != nil {
+			slog.Error("Failed to create anomaly",
 				slog.String("instance", instance.ResourceID),
 				slog.String("database", database.DatabaseName),
 				slog.String("type", string(api.AnomalyDatabaseConnection)),
 				log.BBError(err))
-		} else {
-			if _, err = s.store.UpsertActiveAnomalyV2(ctx, api.SystemBotID, &store.AnomalyMessage{
-				InstanceID:  instance.ResourceID,
-				DatabaseUID: &database.UID,
-				Type:        api.AnomalyDatabaseConnection,
-				Payload:     string(payload),
-			}); err != nil {
-				slog.Error("Failed to create anomaly",
-					slog.String("instance", instance.ResourceID),
-					slog.String("database", database.DatabaseName),
-					slog.String("type", string(api.AnomalyDatabaseConnection)),
-					log.BBError(err))
-			}
 		}
 		return
 	}
 
-	err := s.store.ArchiveAnomalyV2(ctx, &store.ArchiveAnomalyMessage{
-		DatabaseUID: &database.UID,
+	err := s.store.DeleteAnomalyV2(ctx, &store.DeleteAnomalyMessage{
+		DatabaseUID: database.UID,
 		Type:        api.AnomalyDatabaseConnection,
 	})
 	if err != nil && common.ErrorCode(err) != common.NotFound {
@@ -759,14 +706,14 @@ func setClassificationAndUserCommentFromComment(dbSchema *storepb.DatabaseSchema
 			classification, userComment := common.GetClassificationAndUserComment(table.Comment, classificationConfig)
 
 			table.UserComment = userComment
-			tableConfig.ClassificationID = classification
+			tableConfig.Classification = classification
 
 			for _, col := range table.Columns {
 				columnConfig := tableConfig.CreateOrGetColumnConfig(col.Name)
 				colClassification, colUserComment := common.GetClassificationAndUserComment(col.Comment, classificationConfig)
 
 				col.UserComment = colUserComment
-				columnConfig.ClassificationId = colClassification
+				columnConfig.Classification = colClassification
 
 				if isEmptyColumnConfig(columnConfig) {
 					tableConfig.RemoveColumnConfig(col.Name)
@@ -783,13 +730,10 @@ func setClassificationAndUserCommentFromComment(dbSchema *storepb.DatabaseSchema
 	}
 }
 
-func isEmptyColumnConfig(config *storepb.ColumnConfig) bool {
+func isEmptyColumnConfig(config *storepb.ColumnCatalog) bool {
 	return config == nil || (len(config.Labels) == 0 &&
-		config.ClassificationId == "" &&
-		config.SemanticTypeId == "" &&
-		config.MaskingLevel == storepb.MaskingLevel_MASKING_LEVEL_UNSPECIFIED &&
-		config.FullMaskingAlgorithmId == "" &&
-		config.PartialMaskingAlgorithmId == "")
+		config.Classification == "" &&
+		config.SemanticType == "")
 }
 
 func setUserCommentFromComment(dbSchema *storepb.DatabaseSchemaMetadata) {

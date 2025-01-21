@@ -13,9 +13,15 @@
 
 <script lang="tsx" setup>
 import { orderBy } from "lodash-es";
-import { TrashIcon } from "lucide-vue-next";
+import { TrashIcon, InfoIcon } from "lucide-vue-next";
 import type { DataTableColumn } from "naive-ui";
-import { NCheckbox, NDatePicker, NDataTable, useDialog } from "naive-ui";
+import {
+  NCheckbox,
+  NDatePicker,
+  NDataTable,
+  useDialog,
+  NTooltip,
+} from "naive-ui";
 import { computed, reactive, h, watchEffect } from "vue";
 import type { VNodeChild } from "vue";
 import { useI18n } from "vue-i18n";
@@ -38,9 +44,9 @@ import {
   getUserEmailInBinding,
   getGroupEmailInBinding,
   groupBindingPrefix,
+  UNKNOWN_DATABASE_NAME,
 } from "@/types";
 import { Expr } from "@/types/proto/google/type/expr";
-import { MaskingLevel, maskingLevelToJSON } from "@/types/proto/v1/common";
 import { MaskingExceptionPolicy_MaskingException_Action } from "@/types/proto/v1/org_policy_service";
 import type {
   Policy,
@@ -50,7 +56,6 @@ import { PolicyType } from "@/types/proto/v1/org_policy_service";
 import { autoDatabaseRoute, hasWorkspacePermissionV2 } from "@/utils";
 import { convertFromCELString } from "@/utils/issue/cel";
 import UserAvatar from "../User/UserAvatar.vue";
-import MaskingLevelDropdown from "./components/MaskingLevelDropdown.vue";
 import { type AccessUser } from "./types";
 
 interface LocalState {
@@ -92,6 +97,16 @@ const policy = usePolicyByParentAndType(
   }))
 );
 
+const isValidDatabaseResource = (access: AccessUser): boolean => {
+  if (!access.databaseResource) {
+    return true;
+  }
+  const database = databaseStore.getDatabaseByName(
+    access.databaseResource.databaseFullName
+  );
+  return database.name !== UNKNOWN_DATABASE_NAME;
+};
+
 const getDatabaseAccessResource = (access: AccessUser): VNodeChild => {
   if (!access.databaseResource) {
     return <div class="textinfo">{t("database.all")}</div>;
@@ -99,33 +114,52 @@ const getDatabaseAccessResource = (access: AccessUser): VNodeChild => {
   const database = databaseStore.getDatabaseByName(
     access.databaseResource.databaseFullName
   );
+  const validDatabase = isValidDatabaseResource(access);
 
   return (
     <div class="space-y-1">
-      <div class="flex items-center gap-x-1 text-sm textinfo">
-        <span>{`${t("common.instance")}:`}</span>
-        <InstanceV1Name instance={database.instanceResource} />
-      </div>
+      {validDatabase && (
+        <div class="flex items-center gap-x-1 text-sm textinfo">
+          <span>{`${t("common.instance")}:`}</span>
+          <InstanceV1Name instance={database.instanceResource} />
+        </div>
+      )}
       <div class="flex items-center gap-x-1 text-sm textinfo">
         <span>{`${t("common.database")}:`}</span>
-        <div
-          class="normal-link hover:underline"
-          onClick={() => {
-            const query: Record<string, string> = {};
-            if (access.databaseResource?.schema) {
-              query.schema = access.databaseResource.schema;
-            }
-            if (access.databaseResource?.table) {
-              query.table = access.databaseResource.table;
-            }
-            router.push({
-              ...autoDatabaseRoute(router, database),
-              query,
-            });
-          }}
-        >
-          <DatabaseV1Name database={database} link={false} />
-        </div>
+        {validDatabase ? (
+          <div
+            class="normal-link hover:underline cursor-pointer"
+            onClick={() => {
+              const query: Record<string, string> = {};
+              if (access.databaseResource?.schema) {
+                query.schema = access.databaseResource.schema;
+              }
+              if (access.databaseResource?.table) {
+                query.table = access.databaseResource.table;
+              }
+              router.push({
+                ...autoDatabaseRoute(router, database),
+                query,
+              });
+            }}
+          >
+            <DatabaseV1Name database={database} link={false} />
+          </div>
+        ) : (
+          <div class="flex items-center gap-x-1">
+            <span class="line-through">
+              {access.databaseResource.databaseFullName}
+            </span>
+            {!isValidDatabaseResource(access) && (
+              <NTooltip>
+                {{
+                  trigger: () => <InfoIcon class="w-4 text-red-600" />,
+                  default: t("database.not-found"),
+                }}
+              </NTooltip>
+            )}
+          </div>
+        )}
       </div>
       {access.databaseResource.schema && (
         <div class="text-sm textinfo">{`${t("common.schema")}: ${access.databaseResource.schema}`}</div>
@@ -156,7 +190,6 @@ const getAccessUsers = async (
   const access: AccessUser = {
     type: "user",
     key: exception.member,
-    maskingLevel: exception.maskingLevel,
     expirationTimestamp,
     supportActions: new Set([exception.action]),
     rawExpression: expression,
@@ -184,10 +217,7 @@ const getExceptionIdentifier = (
   exception: MaskingExceptionPolicy_MaskingException
 ): string => {
   const expression = exception.condition?.expression ?? "";
-  const res: string[] = [
-    `level:"${maskingLevelToJSON(exception.maskingLevel)}"`,
-    expression,
-  ];
+  const res: string[] = [expression];
   return res.join(" && ");
 };
 
@@ -368,24 +398,6 @@ const accessTableColumns = computed(
         },
       },
       {
-        key: "level",
-        title: t("settings.sensitive-data.masking-level.self"),
-        render: (item: AccessUser, row: number) => {
-          return (
-            <MaskingLevelDropdown
-              disabled={!hasPermission.value || props.disabled}
-              level={item.maskingLevel}
-              levelList={[MaskingLevel.PARTIAL, MaskingLevel.NONE]}
-              onUpdate:level={(e) => {
-                if (e) {
-                  onAccessControlUpdate(row, (item) => (item.maskingLevel = e));
-                }
-              }}
-            />
-          );
-        },
-      },
-      {
         key: "expire",
         title: t("common.expiration"),
         render: (item: AccessUser, row: number) => {
@@ -453,7 +465,7 @@ const revokeAccessAlert = (
       return (
         <div class="space-y-3">
           <div class="textlabel !text-base">
-            {t("project.masking-access.revoke-access-title", {
+            {t("project.masking-exemption.revoke-exemption-title", {
               member: getMemberBinding(item),
             })}
           </div>
@@ -525,7 +537,9 @@ const updateExceptionPolicy = async () => {
   ).filter((exception) => !props.filterException(exception));
 
   for (const accessUser of state.accessList) {
-    const expressions = accessUser.rawExpression.split(" && ");
+    const expressions = accessUser.rawExpression
+      .split(" && ")
+      .filter((expression) => expression);
     const index = expressions.findIndex((exp) =>
       exp.startsWith("request.time")
     );
@@ -546,7 +560,6 @@ const updateExceptionPolicy = async () => {
     }
     for (const action of accessUser.supportActions) {
       unChangedExceptions.push({
-        maskingLevel: accessUser.maskingLevel,
         action,
         member: getMemberBinding(accessUser),
         condition: Expr.fromPartial({

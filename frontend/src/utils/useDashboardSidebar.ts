@@ -25,8 +25,9 @@ import {
   WORKSPACE_ROUTE_SQL_REVIEW,
   WORKSPACE_ROUTE_SCHEMA_TEMPLATE,
   WORKSPACE_ROUTE_CUSTOM_APPROVAL,
-  WORKSPACE_ROUTE_RISK_CENTER,
-  WORKSPACE_ROUTE_DATA_MASKING,
+  WORKSPACE_ROUTE_RISKS,
+  WORKSPACE_ROUTE_GLOBAL_MASKING,
+  WORKSPACE_ROUTE_SEMANTIC_TYPES,
   WORKSPACE_ROUTE_DATA_CLASSIFICATION,
   WORKSPACE_ROUTE_AUDIT_LOG,
   WORKSPACE_ROUTE_GITOPS,
@@ -236,8 +237,8 @@ export const useDashboardSidebar = () => {
             type: "route",
           },
           {
-            title: t("custom-approval.risk.risk-center"),
-            name: WORKSPACE_ROUTE_RISK_CENTER,
+            title: t("custom-approval.risk.risks"),
+            name: WORKSPACE_ROUTE_RISKS,
             type: "route",
           },
           {
@@ -264,13 +265,18 @@ export const useDashboardSidebar = () => {
         type: "div",
         children: [
           {
+            title: t("settings.sensitive-data.semantic-types.self"),
+            name: WORKSPACE_ROUTE_SEMANTIC_TYPES,
+            type: "route",
+          },
+          {
             title: t("settings.sidebar.data-classification"),
             name: WORKSPACE_ROUTE_DATA_CLASSIFICATION,
             type: "route",
           },
           {
-            title: t("settings.sidebar.data-masking"),
-            name: WORKSPACE_ROUTE_DATA_MASKING,
+            title: t("settings.sidebar.global-masking"),
+            name: WORKSPACE_ROUTE_GLOBAL_MASKING,
             type: "route",
           },
         ],

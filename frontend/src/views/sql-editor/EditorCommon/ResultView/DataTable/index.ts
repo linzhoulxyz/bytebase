@@ -1,4 +1,3 @@
-import DataTable from "./DataTable";
-import DataTableLite from "./DataTableLite";
+import DataTable from "./DataTable.vue";
 
-export { DataTable, DataTableLite };
+export default DataTable;

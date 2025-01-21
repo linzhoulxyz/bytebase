@@ -11,7 +11,7 @@
           :override-scope-id-list="overrideSearchScopeIdList"
         >
           <template #searchbox-suffix>
-            <NTooltip v-if="!disableDataExport" :disabled="allowExportData">
+            <NTooltip :disabled="allowExportData">
               <template #trigger>
                 <NButton
                   type="primary"
@@ -26,28 +26,27 @@
               </template>
               {{ $t("export-center.permission-denied") }}
             </NTooltip>
-            <div v-else />
           </template>
         </IssueSearch>
       </div>
     </div>
 
     <div class="relative w-full mt-4 min-h-[20rem]">
-      <PagedIssueTableV1
+      <PagedTable
+        ref="issuePagedTable"
         :session-key="'export-center'"
-        :issue-filter="mergedIssueFilter"
         :page-size="50"
-        :compose-issue-config="{ withRollout: true }"
+        :fetch-list="fetchIssueList"
       >
-        <template #table="{ issueList, loading }">
+        <template #table="{ list, loading }">
           <DataExportIssueDataTable
             :loading="loading"
-            :issue-list="issueList"
+            :issue-list="list"
             :highlight-text="state.params.query"
             :show-project="!specificProject"
           />
         </template>
-      </PagedIssueTableV1>
+      </PagedTable>
     </div>
   </div>
 
@@ -66,19 +65,21 @@
 <script lang="ts" setup>
 import { DownloadIcon } from "lucide-vue-next";
 import { NButton, NTooltip } from "naive-ui";
-import { computed, reactive } from "vue";
+import { computed, reactive, ref, watch } from "vue";
+import type { ComponentExposed } from "vue-component-type-helpers";
 import DataExportPrepForm from "@/components/DataExportPrepForm";
 import IssueSearch from "@/components/IssueV1/components/IssueSearch/IssueSearch.vue";
-import PagedIssueTableV1 from "@/components/IssueV1/components/PagedIssueTableV1.vue";
 import { Drawer } from "@/components/v2";
+import PagedTable from "@/components/v2/Model/PagedTable.vue";
 import {
   useCurrentUserV1,
   useProjectV1Store,
-  usePolicyByParentAndType,
+  useIssueV1Store,
+  useRefreshIssueList,
 } from "@/store";
 import { projectNamePrefix } from "@/store/modules/v1/common";
+import type { ComposedIssue } from "@/types";
 import { Issue_Type } from "@/types/proto/v1/issue_service";
-import { PolicyType } from "@/types/proto/v1/org_policy_service";
 import {
   buildIssueFilterBySearchParams,
   extractProjectResourceName,
@@ -104,13 +105,6 @@ const specificProject = computed(() => {
   );
 });
 
-const exportDataPolicy = usePolicyByParentAndType(
-  computed(() => ({
-    parentPath: "",
-    policyType: PolicyType.DATA_EXPORT,
-  }))
-);
-
 const readonlyScopes = computed((): SearchScope[] => {
   return [
     {
@@ -134,6 +128,9 @@ const state = reactive<LocalState>({
   showRequestExportPanel: false,
   params: defaultSearchParams(),
 });
+const issueStore = useIssueV1Store();
+const issuePagedTable =
+  ref<ComponentExposed<typeof PagedTable<ComposedIssue>>>();
 
 const dataExportIssueSearchParams = computed(() => {
   // Default scopes with type and creator.
@@ -172,9 +169,32 @@ const mergedIssueFilter = computed(() => {
   });
 });
 
-const disableDataExport = computed(
-  () => exportDataPolicy.value?.exportDataPolicy?.disable ?? false
+const fetchIssueList = async ({
+  pageToken,
+  pageSize,
+}: {
+  pageToken: string;
+  pageSize: number;
+}) => {
+  const { nextPageToken, issues } = await issueStore.listIssues(
+    {
+      find: mergedIssueFilter.value,
+      pageSize,
+      pageToken,
+    },
+    { withRollout: true }
+  );
+  return {
+    nextPageToken,
+    list: issues,
+  };
+};
+
+watch(
+  () => JSON.stringify(mergedIssueFilter.value),
+  () => issuePagedTable.value?.refresh()
 );
+useRefreshIssueList(() => issuePagedTable.value?.refresh());
 
 const allowExportData = computed(() => {
   if (specificProject.value) {

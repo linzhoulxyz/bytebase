@@ -34,13 +34,13 @@ import projectV1Routes, {
   PROJECT_V1_ROUTE_AUDIT_LOGS,
   PROJECT_V1_ROUTE_REVIEW_CENTER,
   PROJECT_V1_ROUTE_RELEASES,
-  PROJECT_V1_ROUTE_MASKING_ACCESS,
+  PROJECT_V1_ROUTE_MASKING_EXEMPTION,
 } from "@/router/dashboard/projectV1";
 import { useAppFeature } from "@/store";
 import type { ComposedProject, MaybeRef, Permission } from "@/types";
 import { DEFAULT_PROJECT_NAME } from "@/types";
 import { DatabaseChangeMode } from "@/types/proto/v1/setting_service";
-import { hasProjectPermissionV2, isDev } from "@/utils";
+import { hasProjectPermissionV2 } from "@/utils";
 
 interface ProjectSidebarItem extends SidebarItem {
   title: string;
@@ -141,11 +141,6 @@ export const useProjectSidebar = (
             type: "div",
           },
           {
-            title: t("project.masking-access.self"),
-            path: PROJECT_V1_ROUTE_MASKING_ACCESS,
-            type: "div",
-          },
-          {
             title: t("common.groups"),
             path: PROJECT_V1_ROUTE_DATABASE_GROUPS,
             type: "div",
@@ -196,7 +191,6 @@ export const useProjectSidebar = (
         icon: () => h(PackageIcon),
         type: "div",
         hide:
-          !isDev() ||
           isDefaultProject.value ||
           databaseChangeMode.value === DatabaseChangeMode.EDITOR,
       },
@@ -240,6 +234,11 @@ export const useProjectSidebar = (
           {
             title: t("common.members"),
             path: PROJECT_V1_ROUTE_MEMBERS,
+            type: "div",
+          },
+          {
+            title: t("project.masking-exemption.self"),
+            path: PROJECT_V1_ROUTE_MASKING_EXEMPTION,
             type: "div",
           },
           {

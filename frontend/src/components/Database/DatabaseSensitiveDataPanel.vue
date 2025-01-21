@@ -4,36 +4,17 @@
       v-if="hasSensitiveDataFeature && isMissingLicenseForInstance"
       feature="bb.feature.sensitive-data"
     />
-    <div class="textinfolabel">
-      {{ $t("settings.sensitive-data.description") }}
-      <a
-        href="https://www.bytebase.com/docs/security/mask-data?source=console"
-        class="normal-link inline-flex flex-row items-center"
-        target="_blank"
-      >
-        {{ $t("common.learn-more") }}
-        <heroicons-outline:external-link class="w-4 h-4" />
-      </a>
-    </div>
     <div
       class="flex flex-col space-x-2 lg:flex-row gap-y-4 justify-between items-end lg:items-center"
     >
       <SearchBox v-model:value="state.searchText" style="max-width: 100%" />
       <div class="flex items-center space-x-2">
-        <MaskingLevelDropdown
-          v-model:level="state.selectedMaskLevel"
-          style="width: 12rem"
-          :clearable="true"
-          :level-list="[
-            MaskingLevel.FULL,
-            MaskingLevel.PARTIAL,
-            MaskingLevel.NONE,
-          ]"
-        />
         <NButton
           type="primary"
           :disabled="
-            state.pendingGrantAccessColumn.length === 0 || !hasPermission
+            state.pendingGrantAccessColumn.length === 0 ||
+            !hasPolicyPermission ||
+            !hasGetCatalogPermission
           "
           @click="onGrantAccessButtonClick"
         >
@@ -51,16 +32,16 @@
     </div>
 
     <SensitiveColumnTable
-      v-if="hasSensitiveDataFeature"
-      :row-clickable="true"
+      v-if="hasSensitiveDataFeature && hasGetCatalogPermission"
+      :database="database"
+      :row-clickable="false"
       :row-selectable="true"
-      :show-operation="hasPermission && hasSensitiveDataFeature"
+      :show-operation="hasUpdateCatalogPermission && hasSensitiveDataFeature"
       :column-list="filteredColumnList"
       :checked-column-index-list="checkedColumnIndexList"
-      @click="onRowClick"
+      @delete="onColumnRemove"
       @checked:update="updateCheckedColumnList($event)"
     />
-
     <NoDataPlaceholder v-else />
   </div>
 
@@ -115,8 +96,6 @@
 import { ShieldCheckIcon } from "lucide-vue-next";
 import { NButton } from "naive-ui";
 import { computed, reactive, watch } from "vue";
-import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
 import { updateColumnConfig } from "@/components/ColumnDataTable/utils";
 import {
   FeatureModal,
@@ -125,23 +104,19 @@ import {
 } from "@/components/FeatureGuard";
 import GrantAccessDrawer from "@/components/SensitiveData/GrantAccessDrawer.vue";
 import SensitiveColumnDrawer from "@/components/SensitiveData/SensitiveColumnDrawer.vue";
-import MaskingLevelDropdown from "@/components/SensitiveData/components/MaskingLevelDropdown.vue";
 import SensitiveColumnTable from "@/components/SensitiveData/components/SensitiveColumnTable.vue";
 import type { MaskData } from "@/components/SensitiveData/types";
 import { isCurrentColumnException } from "@/components/SensitiveData/utils";
 import { SearchBox } from "@/components/v2";
 import {
-  useMetadata,
   featureToRef,
-  pushNotification,
   usePolicyV1Store,
   useSubscriptionV1Store,
+  useDatabaseCatalog,
 } from "@/store";
 import { type ComposedDatabase } from "@/types";
-import { MaskingLevel } from "@/types/proto/v1/common";
-import { DatabaseMetadataView } from "@/types/proto/v1/database_service";
 import { PolicyType } from "@/types/proto/v1/org_policy_service";
-import { autoDatabaseRoute, hasProjectPermissionV2 } from "@/utils";
+import { hasProjectPermissionV2 } from "@/utils";
 import NoDataPlaceholder from "../misc/NoDataPlaceholder.vue";
 
 const props = defineProps<{
@@ -156,7 +131,6 @@ interface LocalState {
   pendingGrantAccessColumn: MaskData[];
   showGrantAccessDrawer: boolean;
   showSensitiveColumnDrawer: boolean;
-  selectedMaskLevel?: MaskingLevel;
 }
 
 const state = reactive<LocalState>({
@@ -169,16 +143,27 @@ const state = reactive<LocalState>({
   showSensitiveColumnDrawer: false,
 });
 
-const hasPermission = computed(() => {
-  // TODO(ed): the permission and subscription check for db config update
+const hasUpdateCatalogPermission = computed(() => {
   return hasProjectPermissionV2(
     props.database.projectEntity,
-    "bb.databases.update"
+    "bb.databaseCatalogs.update"
   );
 });
 
-const { t } = useI18n();
-const router = useRouter();
+const hasGetCatalogPermission = computed(() => {
+  return hasProjectPermissionV2(
+    props.database.projectEntity,
+    "bb.databaseCatalogs.get"
+  );
+});
+
+const hasPolicyPermission = computed(() => {
+  return hasProjectPermissionV2(
+    props.database.projectEntity,
+    "bb.policies.update"
+  );
+});
+
 const policyStore = usePolicyV1Store();
 const subscriptionStore = useSubscriptionV1Store();
 
@@ -191,31 +176,24 @@ const isMissingLicenseForInstance = computed(() =>
   )
 );
 
-const databaseMetadata = useMetadata(
-  computed(() => props.database.name),
-  false /* !skipCache */,
-  DatabaseMetadataView.DATABASE_METADATA_VIEW_FULL
-);
+const databaseCatalog = useDatabaseCatalog(props.database.name, false);
 
 const updateList = async () => {
   state.isLoading = true;
   const sensitiveColumnList: MaskData[] = [];
 
-  for (const schemaConfig of databaseMetadata.value.schemaConfigs) {
-    for (const tableConfig of schemaConfig.tableConfigs) {
-      for (const columnConfig of tableConfig.columnConfigs) {
-        if (
-          columnConfig.maskingLevel === MaskingLevel.MASKING_LEVEL_UNSPECIFIED
-        ) {
+  for (const schema of databaseCatalog.value.schemas) {
+    for (const table of schema.tables) {
+      for (const column of table.columns?.columns ?? []) {
+        if (!column.semanticType && !column.classification) {
           continue;
         }
         sensitiveColumnList.push({
-          schema: schemaConfig.name,
-          table: tableConfig.name,
-          column: columnConfig.name,
-          maskingLevel: columnConfig.maskingLevel,
-          fullMaskingAlgorithmId: columnConfig.fullMaskingAlgorithmId,
-          partialMaskingAlgorithmId: columnConfig.partialMaskingAlgorithmId,
+          schema: schema.name,
+          table: table.name,
+          column: column.name,
+          semanticTypeId: column.semanticType,
+          classificationId: column.classification,
         });
       }
     }
@@ -225,13 +203,10 @@ const updateList = async () => {
   state.isLoading = false;
 };
 
-watch(databaseMetadata, updateList, { immediate: true, deep: true });
+watch(databaseCatalog, updateList, { immediate: true, deep: true });
 
 const filteredColumnList = computed(() => {
   let list = state.sensitiveColumnList;
-  if (state.selectedMaskLevel) {
-    list = list.filter((item) => item.maskingLevel === state.selectedMaskLevel);
-  }
   const searchText = state.searchText.trim().toLowerCase();
   if (searchText) {
     list = list.filter(
@@ -250,9 +225,11 @@ const removeSensitiveColumn = async (sensitiveColumn: MaskData) => {
     schema: sensitiveColumn.schema,
     table: sensitiveColumn.table,
     column: sensitiveColumn.column,
-    config: {
-      maskingLevel: MaskingLevel.MASKING_LEVEL_UNSPECIFIED,
+    columnCatalog: {
+      classification: "",
+      semanticType: "",
     },
+    notification: "common.removed",
   });
   await removeMaskingExceptions(sensitiveColumn);
 };
@@ -288,44 +265,6 @@ const removeMaskingExceptions = async (sensitiveColumn: MaskData) => {
 
 const onColumnRemove = async (column: MaskData) => {
   await removeSensitiveColumn(column);
-  pushNotification({
-    module: "bytebase",
-    style: "SUCCESS",
-    title: t("common.updated"),
-  });
-};
-
-const onRowClick = async (
-  item: MaskData,
-  row: number,
-  action: "VIEW" | "DELETE" | "EDIT"
-) => {
-  switch (action) {
-    case "VIEW": {
-      const query: Record<string, string> = {
-        table: item.table,
-      };
-      if (item.schema != "") {
-        query.schema = item.schema;
-      }
-      router.push({
-        ...autoDatabaseRoute(router, props.database),
-        query,
-      });
-      break;
-    }
-    case "DELETE":
-      await onColumnRemove(item);
-      break;
-    case "EDIT":
-      state.pendingGrantAccessColumn = [item];
-      if (isMissingLicenseForInstance.value) {
-        state.showFeatureModal = true;
-        return;
-      }
-      state.showSensitiveColumnDrawer = true;
-      break;
-  }
 };
 
 const onGrantAccessButtonClick = () => {

@@ -6,6 +6,7 @@
     :virtual-scroll="true"
     :striped="true"
     :bordered="true"
+    :row-key="getColumnKey"
   />
 </template>
 
@@ -19,7 +20,8 @@ import { getColumnDefaultValuePlaceholder } from "@/components/SchemaEditorLite"
 import {
   useSettingV1Store,
   useSubscriptionV1Store,
-  useDBSchemaV1Store,
+  useDatabaseCatalog,
+  getColumnCatalog,
 } from "@/store";
 import type { ComposedDatabase } from "@/types";
 import { Engine } from "@/types/proto/v1/common";
@@ -32,7 +34,6 @@ import { DataClassificationSetting_DataClassificationConfig as DataClassificatio
 import { hasProjectPermissionV2 } from "@/utils";
 import ClassificationCell from "./ClassificationCell.vue";
 import LabelsCell from "./LabelsCell.vue";
-import MaskingLevelCell from "./MaskingLevelCell.vue";
 import SemanticTypeCell from "./SemanticTypeCell.vue";
 import {
   updateColumnConfig,
@@ -65,14 +66,10 @@ const engine = computed(() => {
   return props.database.instanceResource.engine;
 });
 const subscriptionV1Store = useSubscriptionV1Store();
-const dbSchemaStore = useDBSchemaV1Store();
 const settingStore = useSettingV1Store();
 
 const hasSensitiveDataFeature = computed(() => {
-  return (
-    !props.isExternalTable &&
-    subscriptionV1Store.hasFeature("bb.feature.sensitive-data")
-  );
+  return subscriptionV1Store.hasFeature("bb.feature.sensitive-data");
 });
 
 const showSensitiveColumn = computed(() => {
@@ -93,7 +90,11 @@ const showSensitiveColumn = computed(() => {
 });
 
 const showClassificationColumn = computed(() => {
-  return !props.isExternalTable && props.classificationConfig;
+  return (
+    !props.isExternalTable &&
+    props.classificationConfig &&
+    hasSensitiveDataFeature.value
+  );
 });
 
 const setClassificationFromComment = computed(() => {
@@ -116,13 +117,18 @@ const showCollationColumn = computed(() => {
   );
 });
 
-const hasSensitiveDataPermission = computed(() => {
-  // TODO(ed): the permission and subscription check for db config update
+const hasDatabaseCatalogPermission = computed(() => {
   return hasProjectPermissionV2(
     props.database.projectEntity,
-    "bb.databases.update"
+    "bb.databaseCatalogs.update"
   );
 });
+
+const databaseCatalog = useDatabaseCatalog(props.database.name, false);
+
+const getColumnKey = (column: ColumnMetadata) => {
+  return `${props.database}.${props.schema}.${props.table.name}.${column.name}`;
+};
 
 const columns = computed(() => {
   const columns: (DataTableColumn<ColumnMetadata> & { hide?: boolean })[] = [
@@ -137,24 +143,8 @@ const columns = computed(() => {
       },
     },
     {
-      key: "maskingLevel",
-      title: t("settings.sensitive-data.masking-level.self"),
-      hide: !showSensitiveColumn.value,
-      resizable: true,
-      width: 220,
-      render: (column) => {
-        return h(MaskingLevelCell, {
-          database: props.database,
-          schema: props.schema,
-          table: props.table,
-          column: column,
-          readonly: !hasSensitiveDataPermission.value,
-        });
-      },
-    },
-    {
       key: "semanticType",
-      title: t("settings.sensitive-data.semantic-types.self"),
+      title: t("settings.sensitive-data.semantic-types.table.semantic-type"),
       hide: !showSensitiveColumn.value,
       resizable: true,
       width: 140,
@@ -162,9 +152,9 @@ const columns = computed(() => {
         return h(SemanticTypeCell, {
           database: props.database,
           schema: props.schema,
-          table: props.table,
-          column: column,
-          readonly: !hasSensitiveDataPermission.value,
+          table: props.table.name,
+          column: column.name,
+          readonly: !hasDatabaseCatalogPermission.value,
         });
       },
     },
@@ -175,18 +165,20 @@ const columns = computed(() => {
       width: 140,
       resizable: true,
       render: (column) => {
-        const columnConfig = dbSchemaStore.getColumnConfig({
-          database: props.database.name,
-          schema: props.schema,
-          table: props.table.name,
-          column: column.name,
-        });
+        const columnCatalog = getColumnCatalog(
+          databaseCatalog.value,
+          props.schema,
+          props.table.name,
+          column.name
+        );
         return h(ClassificationCell, {
-          classification: columnConfig.classificationId,
+          classification: columnCatalog.classification,
           classificationConfig:
             props.classificationConfig ??
             DataClassificationConfig.fromPartial({}),
-          readonly: setClassificationFromComment.value,
+          readonly:
+            setClassificationFromComment.value ||
+            !hasDatabaseCatalogPermission.value,
           onApply: (id: string) => onClassificationIdApply(column.name, id),
         });
       },
@@ -267,7 +259,7 @@ const columns = computed(() => {
           schema: props.schema,
           table: props.table,
           column: column,
-          readonly: !hasSensitiveDataPermission.value,
+          readonly: !hasDatabaseCatalogPermission.value,
         });
       },
     },
@@ -287,14 +279,15 @@ const filteredColumnList = computed(() => {
 
 const onClassificationIdApply = async (
   column: string,
-  classificationId: string
+  classification: string
 ) => {
   await updateColumnConfig({
     database: props.database.name,
     schema: props.schema,
     table: props.table.name,
     column,
-    config: { classificationId },
+    columnCatalog: { classification },
+    notification: !classification ? "common.removed" : undefined,
   });
 };
 </script>

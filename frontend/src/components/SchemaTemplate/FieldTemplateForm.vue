@@ -51,7 +51,7 @@
 
           <div class="sm:col-span-1 sm:col-start-1">
             <label for="semantic-types" class="textlabel">
-              {{ $t("settings.sensitive-data.semantic-types.self") }}
+              {{ $t("settings.sensitive-data.semantic-types.table.semantic-type") }}
             </label>
             <div class="flex items-center gap-x-2 mt-3 text-sm">
               {{ columnSemanticType?.title }}
@@ -77,13 +77,13 @@
             </label>
             <div class="flex items-center gap-x-2 mt-3">
               <ClassificationLevelBadge
-                :classification="state.config?.classificationId"
+                :classification="state.catalog?.classification"
                 :classification-config="classificationConfig"
               />
               <div v-if="!readonly" class="flex items-center">
                 <MiniActionButton
-                  v-if="state.config?.classificationId"
-                  @click.prevent="state.config!.classificationId = ''"
+                  v-if="state.catalog?.classification"
+                  @click.prevent="state.catalog!.classification = ''"
                 >
                   <XIcon class="w-4 h-4" />
                 </MiniActionButton>
@@ -260,9 +260,11 @@ import {
 } from "@/components/v2";
 import { useSettingV1Store, useNotificationStore } from "@/store";
 import {
-  ColumnConfig,
   ColumnMetadata,
 } from "@/types/proto/v1/database_service";
+import {
+  ColumnCatalog,
+} from "@/types/proto/v1/database_catalog_service";
 import {
   SchemaTemplateSetting,
   SchemaTemplateSetting_FieldTemplate,
@@ -301,8 +303,8 @@ const state = reactive<LocalState>({
   showClassificationDrawer: false,
   showSemanticTypesDrawer: false,
   showColumnDefaultValueExpressionModal: false,
-  config: ColumnConfig.fromPartial({
-    ...(props.template.config ?? {}),
+  catalog: ColumnCatalog.fromPartial({
+    ...(props.template.catalog ?? {}),
   }),
   kvList: [],
 });
@@ -317,23 +319,23 @@ const semanticTypeList = computed(() => {
 });
 
 const columnSemanticType = computed(() => {
-  if (!state.config?.semanticTypeId) {
+  if (!state.catalog?.semanticType) {
     return;
   }
   return semanticTypeList.value.find(
-    (data) => data.id === state.config?.semanticTypeId
+    (data) => data.id === state.catalog?.semanticType
   );
 });
 
 const convert = () => {
   return convertLabelsToKVList(
-    props.template.config?.labels ?? {},
+    props.template.catalog?.labels ?? {},
     true /* sort */
   );
 };
 
 watch(
-  () => props.template.config?.labels,
+  () => props.template.catalog?.labels,
   () => {
     state.kvList = convert();
   },
@@ -412,8 +414,8 @@ const submitDisabled = computed(() => {
 const submit = async () => {
   const template = SchemaTemplateSetting_FieldTemplate.fromPartial({
     ...state,
-    config: ColumnConfig.fromPartial({
-      ...state.config,
+    catalog: ColumnCatalog.fromPartial({
+      ...state.catalog,
       name: state.column?.name,
       labels: convertKVListToLabels(state.kvList, false /* !omitEmpty */),
     }),
@@ -454,10 +456,10 @@ const submit = async () => {
 };
 
 const onClassificationSelect = (id: string) => {
-  if (!state.config) {
+  if (!state.catalog) {
     return;
   }
-  state.config.classificationId = id;
+  state.catalog.classification = id;
 };
 
 const handleColumnDefaultChange = (key: string) => {
@@ -523,10 +525,10 @@ const handleSelectedColumnDefaultValueExpressionChange = (
   state.showColumnDefaultValueExpressionModal = false;
 };
 
-const onSemanticTypeApply = async (semanticTypeId: string) => {
-  state.config = ColumnConfig.fromPartial({
-    ...state.config,
-    semanticTypeId,
+const onSemanticTypeApply = async (semanticType: string) => {
+  state.catalog = ColumnCatalog.fromPartial({
+    ...state.catalog,
+    semanticType,
   });
 };
 </script>

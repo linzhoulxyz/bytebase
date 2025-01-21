@@ -46,6 +46,26 @@ func TestEvalMaskingLevelOfColumn(t *testing.T) {
 			},
 		},
 	}
+	fullAlgorithm := &storepb.Algorithm{
+		Mask: &storepb.Algorithm_FullMask_{FullMask: &storepb.Algorithm_FullMask{Substitution: "******"}},
+	}
+	hashAlgorithm := &storepb.Algorithm{
+		Mask: &storepb.Algorithm_Md5Mask{
+			Md5Mask: &storepb.Algorithm_MD5Mask{Salt: "123"},
+		},
+	}
+	defaultSemanticType := &storepb.SemanticTypeSetting{
+		Types: []*storepb.SemanticTypeSetting_SemanticType{
+			{
+				Id:        "default",
+				Algorithm: fullAlgorithm,
+			},
+			{
+				Id:        "salary-amount",
+				Algorithm: hashAlgorithm,
+			},
+		},
+	}
 
 	testCases := []struct {
 		description                             string
@@ -54,28 +74,28 @@ func TestEvalMaskingLevelOfColumn(t *testing.T) {
 		schemaName                              string
 		tableName                               string
 		columnName                              string
-		columnClassification                    string
-		maskingPolicyMap                        map[maskingPolicyKey]*storepb.MaskData
+		columnCatalog                           *storepb.ColumnCatalog
 		maskingRulePolicy                       *storepb.MaskingRulePolicy
 		filteredMaskingExceptions               []*storepb.MaskingExceptionPolicy_MaskingException
 		dataClassification                      *storepb.DataClassificationSetting
 
-		want storepb.MaskingLevel
+		want string
 	}{
 		{
-			description:          "Follow The Global Masking Rule If Column Masking Policy Is Default",
-			databaseMessage:      defaultDatabaseMessage,
-			schemaName:           "hiring",
-			tableName:            "employees",
-			columnName:           "salary",
-			columnClassification: "1-1-1",
-			maskingPolicyMap:     map[maskingPolicyKey]*storepb.MaskData{},
+			description:     "Follow The Global Masking Rule",
+			databaseMessage: defaultDatabaseMessage,
+			schemaName:      "hiring",
+			tableName:       "employees",
+			columnName:      "salary",
+			columnCatalog: &storepb.ColumnCatalog{
+				Classification: "1-1-1",
+			},
 			maskingRulePolicy: &storepb.MaskingRulePolicy{
 				Rules: []*storepb.MaskingRulePolicy_MaskingRule{
 					{
 						// Classification hit.
 						Condition:    &expr.Expr{Expression: `(table_name == "no_table") || (classification_level == "S2")`},
-						MaskingLevel: storepb.MaskingLevel_FULL,
+						SemanticType: "default",
 					},
 				},
 			},
@@ -83,22 +103,23 @@ func TestEvalMaskingLevelOfColumn(t *testing.T) {
 			dataClassification:                      defaultClassification,
 			databaseProjectDatabaseClassificationID: defaultProjectDatabaseDataClassificationID,
 
-			want: storepb.MaskingLevel_FULL,
+			want: "default",
 		},
 		{
-			description:          "Follow The Global Masking Rule If Column Masking Policy Is Default And Respect The Exception",
-			databaseMessage:      defaultDatabaseMessage,
-			schemaName:           "hiring",
-			tableName:            "employees",
-			columnName:           "salary",
-			columnClassification: "1-1-1",
-			maskingPolicyMap:     map[maskingPolicyKey]*storepb.MaskData{},
+			description:     "Respect The Exception",
+			databaseMessage: defaultDatabaseMessage,
+			schemaName:      "hiring",
+			tableName:       "employees",
+			columnName:      "salary",
+			columnCatalog: &storepb.ColumnCatalog{
+				Classification: "1-1-1",
+			},
 			maskingRulePolicy: &storepb.MaskingRulePolicy{
 				Rules: []*storepb.MaskingRulePolicy_MaskingRule{
 					{
 						// Classification hit.
 						Condition:    &expr.Expr{Expression: `(table_name == "no_table") || (classification_level == "S2")`},
-						MaskingLevel: storepb.MaskingLevel_FULL,
+						SemanticType: "default",
 					},
 				},
 			},
@@ -108,91 +129,36 @@ func TestEvalMaskingLevelOfColumn(t *testing.T) {
 					Condition: &expr.Expr{
 						Expression: `(resource.instance_id == "neon-host") && (resource.database_name == "bb") && (resource.schema_name == "hiring") && (resource.table_name == "employees") && (resource.column_name == "salary")`,
 					},
-					Member:       "users/1234",
-					MaskingLevel: storepb.MaskingLevel_PARTIAL,
+					Member: "users/1234",
 				},
 			},
 			dataClassification:                      defaultClassification,
 			databaseProjectDatabaseClassificationID: defaultProjectDatabaseDataClassificationID,
 
-			want: storepb.MaskingLevel_PARTIAL,
+			want: "",
 		},
 		{
-			description:          "Only Find The Lower Level in Exception",
-			databaseMessage:      defaultDatabaseMessage,
-			schemaName:           "hiring",
-			tableName:            "employees",
-			columnName:           "salary",
-			columnClassification: "1-1-1",
-			maskingPolicyMap:     map[maskingPolicyKey]*storepb.MaskData{},
-			maskingRulePolicy: &storepb.MaskingRulePolicy{
-				Rules: []*storepb.MaskingRulePolicy_MaskingRule{
-					{
-						// Classification hit.
-						Condition:    &expr.Expr{Expression: `(table_name == "no_table") || (classification_level == "S2")`},
-						MaskingLevel: storepb.MaskingLevel_PARTIAL,
-					},
-				},
+			description:     "Column Catalog",
+			databaseMessage: defaultDatabaseMessage,
+			schemaName:      "hiring",
+			tableName:       "employees",
+			columnName:      "salary",
+			columnCatalog: &storepb.ColumnCatalog{
+				SemanticType: "salary-amount",
 			},
-			filteredMaskingExceptions: []*storepb.MaskingExceptionPolicy_MaskingException{
-				{
-					// Hit, but MaskingLevel_FULL > MaskingLevel_PARTIAL, do not replace the rule.
-					Action: storepb.MaskingExceptionPolicy_MaskingException_QUERY,
-					Condition: &expr.Expr{
-						Expression: `(resource.instance_id == "neon-host") && (resource.database_name == "bb") && (resource.schema_name == "hiring") && (resource.table_name == "employees") && (resource.column_name == "salary")`,
-					},
-					Member:       "users/1234",
-					MaskingLevel: storepb.MaskingLevel_FULL,
-				},
-			},
+			maskingRulePolicy:                       &storepb.MaskingRulePolicy{},
 			dataClassification:                      defaultClassification,
 			databaseProjectDatabaseClassificationID: defaultProjectDatabaseDataClassificationID,
 
-			want: storepb.MaskingLevel_PARTIAL,
-		},
-		{
-			description:          "Respect The Column Masking Policy",
-			databaseMessage:      defaultDatabaseMessage,
-			schemaName:           "hiring",
-			tableName:            "employees",
-			columnName:           "salary",
-			columnClassification: "1-1-1",
-			maskingPolicyMap: map[maskingPolicyKey]*storepb.MaskData{
-				{
-					schema: "hiring",
-					table:  "employees",
-					column: "salary",
-				}: {
-					Schema:       "hiring",
-					Table:        "employees",
-					Column:       "salary",
-					MaskingLevel: storepb.MaskingLevel_FULL,
-				},
-			},
-			maskingRulePolicy: &storepb.MaskingRulePolicy{},
-			filteredMaskingExceptions: []*storepb.MaskingExceptionPolicy_MaskingException{
-				{
-					// Hit, and MaskingLevel_PARTIAL < MaskingLevel_FULL.
-					Action: storepb.MaskingExceptionPolicy_MaskingException_QUERY,
-					Condition: &expr.Expr{
-						Expression: `(resource.instance_id == "neon-host") && (resource.database_name == "bb") && (resource.schema_name == "hiring") && (resource.table_name == "employees") && (resource.column_name == "salary")`,
-					},
-					Member:       "users/1234",
-					MaskingLevel: storepb.MaskingLevel_PARTIAL,
-				},
-			},
-			dataClassification:                      defaultClassification,
-			databaseProjectDatabaseClassificationID: defaultProjectDatabaseDataClassificationID,
-
-			want: storepb.MaskingLevel_PARTIAL,
+			want: "salary-amount",
 		},
 	}
 
 	a := require.New(t)
 
 	for _, tc := range testCases {
-		m := newEmptyMaskingLevelEvaluator().withMaskingRulePolicy(tc.maskingRulePolicy).withDataClassificationSetting(tc.dataClassification)
-		result, err := m.evaluateMaskingLevelOfColumn(tc.databaseMessage, tc.schemaName, tc.tableName, tc.columnName, tc.columnClassification, tc.databaseProjectDatabaseClassificationID, tc.maskingPolicyMap, tc.filteredMaskingExceptions)
+		m := newEmptyMaskingLevelEvaluator().withMaskingRulePolicy(tc.maskingRulePolicy).withDataClassificationSetting(tc.dataClassification).withSemanticTypeSetting(defaultSemanticType)
+		result, err := m.evaluateSemanticTypeOfColumn(tc.databaseMessage, tc.schemaName, tc.tableName, tc.columnName, tc.databaseProjectDatabaseClassificationID, tc.columnCatalog, tc.filteredMaskingExceptions)
 		a.NoError(err, tc.description)
 		a.Equal(tc.want, result, tc.description)
 	}

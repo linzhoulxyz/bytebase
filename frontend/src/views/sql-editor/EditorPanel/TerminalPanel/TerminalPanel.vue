@@ -39,7 +39,7 @@
           </Suspense>
           <ResultViewV1
             v-if="query.params && query.resultSet"
-            class="flex-1 flex flex-col overflow-hidden"
+            class="flex-1 flex flex-col overflow-hidden max-h-80"
             :execute-params="query.params"
             :result-set="query.resultSet"
             :database="
@@ -47,7 +47,6 @@
             "
             :loading="query.status === 'RUNNING'"
             :dark="true"
-            :max-data-table-height="320"
           />
 
           <div
@@ -64,7 +63,7 @@
             <BBSpin />
             <div
               v-if="query === currentQuery && expired"
-              class="text-gray-400 cursor-pointer hover:underline select-none"
+              class="text-gray-400 cursor-pointer hover:underline text-sm select-none"
               @click="handleCancelQuery"
             >
               {{ $t("common.cancel") }}

@@ -12,6 +12,7 @@ import "google/protobuf/timestamp.proto";
 import "google/type/expr.proto";
 import "v1/annotation.proto";
 import "v1/common.proto";
+import "v1/database_catalog_service.proto";
 import "v1/database_service.proto";
 import "v1/issue_service.proto";
 import "v1/subscription_service.proto";
@@ -131,7 +132,6 @@ message Value {
     SchemaTemplateSetting schema_template_setting_value = 9;
     DataClassificationSetting data_classification_setting_value = 10;
     SemanticTypeSetting semantic_type_setting_value = 11;
-    MaskingAlgorithmSetting masking_algorithm_setting_value = 12;
     MaximumSQLResultSizeSetting maximum_sql_result_size_setting = 13;
     SCIMSetting scim_setting = 14;
     PasswordRestrictionSetting password_restriction_setting = 15;
@@ -310,7 +310,7 @@ message SchemaTemplateSetting {
 
     ColumnMetadata column = 4;
 
-    ColumnConfig config = 5;
+    ColumnCatalog catalog = 5;
   }
 
   repeated FieldTemplate field_templates = 1;
@@ -334,7 +334,7 @@ message SchemaTemplateSetting {
 
     TableMetadata table = 4;
 
-    TableConfig config = 5;
+    TableCatalog catalog = 5;
   }
 
   repeated TableTemplate table_templates = 3;
@@ -399,80 +399,60 @@ message SemanticTypeSetting {
     string title = 2;
     // the description of the semantic type, it can be empty.
     string description = 3;
-    // the partial mask algorithm id for the semantic type, if it is empty, should use the default partial mask algorithm.
-    string partial_mask_algorithm_id = 4;
-    // the full mask algorithm id for the semantic type, if it is empty, should use the default full mask algorithm.
-    string full_mask_algorithm_id = 5;
+
+    Algorithm algorithm = 6;
   }
 
   repeated SemanticType types = 1;
 }
 
-message MaskingAlgorithmSetting {
-  message Algorithm {
-    // id is the uuid for masking algorithm.
-    string id = 1;
-    // title is the title for masking algorithm.
-    string title = 2;
-    // description is the description for masking algorithm.
-    string description = 3;
-
-    // Category is the category for masking algorithm. Currently, it accepts 2 categories only: MASK and HASH.
-    // The range of accepted Payload is decided by the category.
-    // MASK: FullMask, RangeMask
-    // HASH: MD5Mask
-    string category = 4;
-
-    message FullMask {
-      // substitution is the string used to replace the original value, the
-      // max length of the string is 16 bytes.
-      string substitution = 1;
-    }
-
-    message RangeMask {
-      message Slice {
-        // start is the start index of the original value, start from 0 and should be less than stop.
-        int32 start = 1;
-        // stop is the stop index of the original value, should be less than the length of the original value.
-        int32 end = 2;
-        // substitution is the string used to replace the OriginalValue[start:end).
-        string substitution = 3;
-      }
-      // We store it as a repeated field to face the fact that the original value may have multiple parts should be masked.
-      // But frontend can be started with a single rule easily.
-      repeated Slice slices = 1;
-    }
-
-    message MD5Mask {
-      // salt is the salt value to generate a different hash that with the word alone.
-      string salt = 1;
-    }
-
-    message InnerOuterMask {
-      int32 prefix_len = 1;
-      int32 suffix_len = 2;
-
-      enum MaskType {
-        MASK_TYPE_UNSPECIFIED = 0;
-        INNER = 1;
-        OUTER = 2;
-      }
-
-      MaskType type = 3;
-
-      string substitution = 4;
-    }
-
-    oneof mask {
-      FullMask full_mask = 5;
-      RangeMask range_mask = 6;
-      MD5Mask md5_mask = 7;
-      InnerOuterMask inner_outer_mask = 8;
-    }
+message Algorithm {
+  message FullMask {
+    // substitution is the string used to replace the original value, the
+    // max length of the string is 16 bytes.
+    string substitution = 1;
   }
 
-  // algorithms is the list of masking algorithms.
-  repeated Algorithm algorithms = 1;
+  message RangeMask {
+    message Slice {
+      // start is the start index of the original value, start from 0 and should be less than stop.
+      int32 start = 1;
+      // stop is the stop index of the original value, should be less than the length of the original value.
+      int32 end = 2;
+      // substitution is the string used to replace the OriginalValue[start:end).
+      string substitution = 3;
+    }
+    // We store it as a repeated field to face the fact that the original value may have multiple parts should be masked.
+    // But frontend can be started with a single rule easily.
+    repeated Slice slices = 1;
+  }
+
+  message MD5Mask {
+    // salt is the salt value to generate a different hash that with the word alone.
+    string salt = 1;
+  }
+
+  message InnerOuterMask {
+    int32 prefix_len = 1;
+    int32 suffix_len = 2;
+
+    enum MaskType {
+      MASK_TYPE_UNSPECIFIED = 0;
+      INNER = 1;
+      OUTER = 2;
+    }
+
+    MaskType type = 3;
+
+    string substitution = 4;
+  }
+
+  oneof mask {
+    FullMask full_mask = 5;
+    RangeMask range_mask = 6;
+    MD5Mask md5_mask = 7;
+    InnerOuterMask inner_outer_mask = 8;
+  }
 }
 
 enum DatabaseChangeMode {

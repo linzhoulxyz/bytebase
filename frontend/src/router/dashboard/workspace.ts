@@ -14,8 +14,9 @@ import {
   WORKSPACE_ROUTE_SQL_REVIEW_DETAIL,
   WORKSPACE_ROUTE_SCHEMA_TEMPLATE,
   WORKSPACE_ROUTE_CUSTOM_APPROVAL,
-  WORKSPACE_ROUTE_RISK_CENTER,
-  WORKSPACE_ROUTE_DATA_MASKING,
+  WORKSPACE_ROUTE_RISKS,
+  WORKSPACE_ROUTE_GLOBAL_MASKING,
+  WORKSPACE_ROUTE_SEMANTIC_TYPES,
   WORKSPACE_ROUTE_DATA_CLASSIFICATION,
   WORKSPACE_ROUTE_AUDIT_LOG,
   WORKSPACE_ROUTE_GITOPS,
@@ -297,10 +298,10 @@ const workspaceRoutes: RouteRecordRaw[] = [
         props: true,
       },
       {
-        path: "risk-center",
-        name: WORKSPACE_ROUTE_RISK_CENTER,
+        path: "risks",
+        name: WORKSPACE_ROUTE_RISKS,
         meta: {
-          title: () => t("custom-approval.risk.risk-center"),
+          title: () => t("custom-approval.risk.risks"),
           requiredWorkspacePermissionList: () => [
             "bb.settings.get",
             "bb.risks.list",
@@ -310,13 +311,23 @@ const workspaceRoutes: RouteRecordRaw[] = [
         props: true,
       },
       {
-        path: "data-masking",
-        name: WORKSPACE_ROUTE_DATA_MASKING,
+        path: "global-masking",
+        name: WORKSPACE_ROUTE_GLOBAL_MASKING,
         meta: {
-          title: () => t("settings.sidebar.data-masking"),
+          title: () => t("settings.sidebar.global-masking"),
           requiredWorkspacePermissionList: () => ["bb.policies.get"],
         },
         component: () => import("@/views/SettingWorkspaceDataMasking.vue"),
+        props: true,
+      },
+      {
+        path: "semantic-types",
+        name: WORKSPACE_ROUTE_SEMANTIC_TYPES,
+        meta: {
+          title: () => t("settings.sensitive-data.semantic-types.self"),
+          requiredWorkspacePermissionList: () => ["bb.policies.get"],
+        },
+        component: () => import("@/views/SettingWorkspaceSemanticTypes.vue"),
         props: true,
       },
       {

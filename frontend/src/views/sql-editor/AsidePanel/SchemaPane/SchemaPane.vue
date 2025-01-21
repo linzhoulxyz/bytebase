@@ -329,7 +329,7 @@ const selectedKeys = computed(() => {
       partition,
       index,
       foreignKey,
-      dependentColumn,
+      dependencyColumn,
     },
   } = panelViewState.value;
 
@@ -342,6 +342,8 @@ const selectedKeys = computed(() => {
       parts.push(`indexes/${index}`);
     } else if (partition) {
       parts.push(`partitionTables/${partition}`);
+    } else if (trigger) {
+      parts.push(`triggers/${trigger}`);
     } else if (foreignKey) {
       parts.push(`foreignKeys/${foreignKey}`);
     }
@@ -349,8 +351,8 @@ const selectedKeys = computed(() => {
     parts.push(`views/${view}`);
     if (column) {
       parts.push(`columns/${column}`);
-    } else if (dependentColumn) {
-      parts.push(`dependentColumns/${dependentColumn}`);
+    } else if (dependencyColumn) {
+      parts.push(`dependencyColumns/${dependencyColumn}`);
     }
   } else if (procedure) {
     parts.push(`procedures/${procedure}`);
@@ -358,8 +360,6 @@ const selectedKeys = computed(() => {
     parts.push(`functions/${func}`);
   } else if (sequence) {
     parts.push(`sequences/${sequence}`);
-  } else if (trigger) {
-    parts.push(`triggers/${trigger}`);
   } else if (externalTable) {
     parts.push(`externalTables/${externalTable}`);
   } else if (pack) {
