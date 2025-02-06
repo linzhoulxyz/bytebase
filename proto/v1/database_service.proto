@@ -334,11 +334,6 @@ message GetDatabaseSchemaRequest {
 
   // Format the schema dump into SDL format.
   bool sdl_format = 2;
-
-  // When true, the schema dump will be concise.
-  // For Oracle, there will be tables and indexes only for Sync Schema.
-  // For Postgres, we'll filter the backup schema.
-  bool concise = 3;
 }
 
 message DiffSchemaRequest {
@@ -437,9 +432,6 @@ message DatabaseMetadata {
 
   // The extensions is the list of extensions in a database.
   repeated ExtensionMetadata extensions = 5;
-
-  // The schema_configs is the list of configs for schemas in a database.
-  repeated SchemaConfig schema_configs = 6;
 
   string owner = 7;
 }
@@ -1067,46 +1059,6 @@ message ForeignKeyMetadata {
   string match_type = 8;
 }
 
-message DatabaseConfig {
-  reserved 3;
-
-  string name = 1;
-
-  // The schema_configs is the list of configs for schemas in a database.
-  repeated SchemaConfig schema_configs = 2;
-}
-
-message SchemaConfig {
-  // The name is the schema name.
-  // It is an empty string for databases without such concept such as MySQL.
-  string name = 1;
-
-  // The table_configs is the list of configs for tables in a schema.
-  repeated TableConfig table_configs = 2;
-}
-
-message TableConfig {
-  // The name is the name of a table.
-  string name = 1;
-
-  // The column_configs is the ordered list of configs for columns in a table.
-  repeated ColumnConfig column_configs = 2;
-
-  string classification_id = 3;
-}
-
-message ColumnConfig {
-  // The name is the name of a column.
-  string name = 1;
-
-  string semantic_type_id = 2;
-
-  // The user labels for a column.
-  map<string, string> labels = 3;
-
-  string classification_id = 4;
-}
-
 // DatabaseSchema is the metadata for databases.
 message DatabaseSchema {
   // The schema dump from database.
@@ -1574,11 +1526,6 @@ message GetChangelogRequest {
 
   // Format the schema dump into SDL format.
   bool sdl_format = 3;
-
-  // When true, the schema dump will be concise.
-  // For Oracle, there will be tables and indexes only for Sync Schema.
-  // For Postgres, we'll filter the backup schema.
-  bool concise = 4;
 }
 
 message Changelog {

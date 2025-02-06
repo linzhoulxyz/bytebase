@@ -230,7 +230,9 @@
     "finish": "仕上げる",
     "title": "タイトル",
     "text-wrap": "テキストの折り返し",
-    "catalog": "カタログ"
+    "catalog": "カタログ",
+    "summary": "まとめ",
+    "errors": "エラー"
   },
   "error-page": {
     "go-back-home": "ホームページに戻る"
@@ -258,7 +260,10 @@
       "connection": "接続する",
       "sql-review": "SQL監査",
       "ghost-sync": "gh-ost同期",
-      "affected-rows": "影響を受ける行数 (統計に基づいて推定)",
+      "affected-rows": {
+        "self": "影響を受ける行",
+        "description": "統計情報から推定。"
+      },
       "summary-report": "概略報告"
     },
     "rollout-time": "公開時間を指定する",
@@ -316,6 +321,7 @@
     }
   },
   "banner": {
+    "license-expired": "{plan} のライセンスは {expireAt} に期限切れになりました。",
     "license-expires": "{plan} ライセンスは {expireAt} に期限切れになりました",
     "trial-expires": "{plan} トライアルは {days} 日後に期限切れになります",
     "trial-expired": "{plan} のトライアル期間が終了しました",
@@ -659,11 +665,6 @@
         },
         "select": "セマンティックタイプの選択"
       },
-      "column-detail": {
-        "masking-setting-for-column": "「{column}」の感度解除設定",
-        "access-user-list": "ユーザーアクセスリスト",
-        "access-user-list-desc": "許可されたユーザーは、感度を下げられていない生データにアクセスできます。"
-      },
       "algorithms": {
         "add": "アルゴリズムを追加",
         "edit": "アルゴリズムを編集",
@@ -764,8 +765,6 @@
       "skipped": "飛び越える",
       "rolled-out": "リリース",
       "xxx-automatically": "自動{verb}",
-      "verb-type-target-by-people": "{verb} {type} {target}",
-      "verb-type-target-by-system-bot": "{type} {target} {verb}",
       "failed-to-backup": "データのバックアップに失敗しました: {error}",
       "prior-back-table": "データベース {database} のテーブル {tables} にバックアップされました",
       "prior-back-table-for-line": "DML のデータベース {database} とテーブル {tables} の行 {line} へのデータのバックアップ"
@@ -979,7 +978,7 @@
           "database-sync": "データベースの同期",
           "prior-backup": "事前のバックアップ"
         },
-        "affected-rows-n": "影響を受ける行: {n}",
+        "estimated-affected-rows-n": "推定影響行数: {n}",
         "prior-backup-tables": "以前のバックアップテーブル",
         "status-update": {
           "waiting": "実行の準備完了",
@@ -1189,11 +1188,13 @@
     "external-secret-vault": {
       "vault-url": "ボールトの URL",
       "vault-auth-type": {
+        "self": "認証タイプ",
         "token": {
           "self": "トークン",
           "tips": "有効期限のないルートトークン"
         },
         "approle": {
+          "self": "AppRole",
           "role-id": "認証ロールID",
           "secret-id": "認証シークレットID",
           "secret-id-plain-text": "シークレットIDのプレーンテキスト",
@@ -1955,6 +1956,7 @@
     "search-database-and-table": "データベースとテーブルを検索する",
     "search-table": "検索テーブル",
     "search-column": "検索欄",
+    "nothing-changed-for-database": "データベース {database} には何も変更されていません",
     "actions": {
       "create-schema": "新しいスキーマ",
       "drop-schema": "スキーマの削除",
@@ -2117,21 +2119,6 @@
     "overuse-warning": "{neededPlan} は {currentPlan} で制限されます。通常どおり使用できるように、できるだけ早くアップグレードしてください。",
     "overuse-modal": {
       "description": "現在「{plan}」に含まれていない機能を使用しています。使用に影響を与えないように、すぐにアップグレードしてください。"
-    },
-    "features": {
-      "bb-feature-instance-count": {
-        "remaining": "現在の合計インスタンス割り当ては {total} で、使用可能な共有は {count} 個のみです。",
-        "runoutof": "すべての {total} インスタンス クレジットが使用されました。",
-        "upgrade": "@:{'subscription.upgrade'} を使用して、より多くのインスタンス割り当てを取得します。"
-      },
-      "bb-feature-user-count": {
-        "remaining": "現在の合計ユーザー割り当ては {total} で、使用できる共有は {count} 個のみです。",
-        "runoutof": "{total} 個のユーザー クレジットがすべて使用されました。",
-        "upgrade": "@:{'subscription.upgrade'} を使用すると、無制限のユーザー割り当てを取得できます。"
-      },
-      "bb-feature-index-advisor": {
-        "title": "インデックスの提案"
-      }
     }
   },
   "sheet": {
@@ -2721,9 +2708,10 @@
     "messages": {
       "succeed-to-create-release": "リリースの作成に成功",
       "files-will-always-be-sorted-and-executed-in-version-order": "ファイルは常にバージョン順に並べ替えられ、実行されます。",
-      "cannot-modify-files-after-created": "リリースの作成後はファイルを変更できません。"
+      "cannot-modify-files-after-created": "リリースの作成後はファイルを変更できません。",
+      "bytebase-will-skip-those-files-has-been-applied-on-target-database": "Bytebase は、ターゲット データベースですでに実行されているファイルを自動的にスキップします。"
     },
-    "usage-description": "このリリースは主に、API 統合によるカスタム GitOps で使用されます。"
+    "usage-description": "このリリースは、API統合を使用したカスタムGitOpsでのみ使用されます。"
   },
   "export-data": {
     "export-rows": "エクスポート行数",

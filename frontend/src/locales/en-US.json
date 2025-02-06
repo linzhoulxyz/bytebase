@@ -230,7 +230,9 @@
     "finish": "Finish",
     "title": "Title",
     "text-wrap": "Text wrap",
-    "catalog": "Catalog"
+    "catalog": "Catalog",
+    "summary": "Summary",
+    "errors": "Errors"
   },
   "error-page": {
     "go-back-home": "Go back home"
@@ -258,7 +260,10 @@
       "connection": "Connection",
       "sql-review": "SQL review",
       "ghost-sync": "gh-ost sync",
-      "affected-rows": "Affected rows (estimation based on statistical information)",
+      "affected-rows": {
+        "self": "Affected rows",
+        "description": "Estimated by statistical information."
+      },
       "summary-report": "Summary report"
     },
     "rollout-time": "Rollout time",
@@ -316,7 +321,8 @@
     }
   },
   "banner": {
-    "license-expires": "Your license for {plan} has expired on {expireAt}.",
+    "license-expired": "Your license for {plan} has expired on {expireAt}.",
+    "license-expires": "Your license for {plan} will expires in {days} days on {expireAt}.",
     "trial-expires": "Your free trial for {plan} will expire in {days} days on {expireAt}.",
     "trial-expired": "Your free trial for {plan} has expired.",
     "deploy": "Self Host",
@@ -659,11 +665,6 @@
         },
         "select": "Select semantic type"
       },
-      "column-detail": {
-        "masking-setting-for-column": "Masking Setting for \"{column}\"",
-        "access-user-list": "Access User List",
-        "access-user-list-desc": "Users granted to access de-masked data."
-      },
       "algorithms": {
         "add": "Add algorithm",
         "edit": "Edit algorithm",
@@ -764,8 +765,6 @@
       "skipped": "skipped",
       "rolled-out": "rolled out",
       "xxx-automatically": "{verb} automatically",
-      "verb-type-target-by-people": "{verb} {type} {target}",
-      "verb-type-target-by-system-bot": "{type} {target} {verb}",
       "failed-to-backup": "Failed to backup data: {error}",
       "prior-back-table": "Data backup to database {database} and tables {tables}",
       "prior-back-table-for-line": "Data backup to database {database} and table {tables} for DML in line {line}"
@@ -979,7 +978,7 @@
           "database-sync": "Database sync",
           "prior-backup": "Prior backup"
         },
-        "affected-rows-n": "Affected rows: {n}",
+        "estimated-affected-rows-n": "Estimated affected rows: {n}",
         "prior-backup-tables": "Prior backup tables",
         "status-update": {
           "waiting": "Ready to be executed",
@@ -1189,11 +1188,13 @@
     "external-secret-vault": {
       "vault-url": "Vault URL",
       "vault-auth-type": {
+        "self": "Auth type",
         "token": {
           "self": "Token",
           "tips": "A root token without TTL."
         },
         "approle": {
+          "self": "AppRole",
           "role-id": "Auth role id",
           "secret-id": "Auth secret id",
           "secret-id-plain-text": "Plain text for role secret id",
@@ -1955,6 +1956,7 @@
     "search-database-and-table": "Search database and table",
     "search-table": "Search table",
     "search-column": "Search column",
+    "nothing-changed-for-database": "Nothing changed for database {database}",
     "actions": {
       "create-schema": "Create schema",
       "drop-schema": "Drop schema",
@@ -2117,21 +2119,6 @@
     "overuse-warning": "{neededPlan} on {currentPlan} will be restricted. Upgrade now to ensure continued access.",
     "overuse-modal": {
       "description": "You are using features unavailable in the {plan}. Upgrade now to ensure continued access:"
-    },
-    "features": {
-      "bb-feature-instance-count": {
-        "remaining": "Your total instance quota is {total}, only have {count} instance remained.",
-        "runoutof": "Your have run out of your {total} instance quota.",
-        "upgrade": "@:{'subscription.upgrade'} to get more instance quota."
-      },
-      "bb-feature-user-count": {
-        "remaining": "Your total user quota is {total}, only have {count} user remained.",
-        "runoutof": "Your have run out of your {total} user quota.",
-        "upgrade": "@:{'subscription.upgrade'} to get unlimited user quota."
-      },
-      "bb-feature-index-advisor": {
-        "title": "Index advisor"
-      }
     }
   },
   "sheet": {
@@ -2721,9 +2708,10 @@
     "messages": {
       "succeed-to-create-release": "Succeed to create release",
       "files-will-always-be-sorted-and-executed-in-version-order": "The files will always be sorted and executed in version order.",
-      "cannot-modify-files-after-created": "You cannot modify files after the release is created."
+      "cannot-modify-files-after-created": "You cannot modify files after the release is created.",
+      "bytebase-will-skip-those-files-has-been-applied-on-target-database": "Bytebase will automatically skip those files that have already been executed on the target database."
     },
-    "usage-description": "The release is mainly used in custom GitOps with API integration."
+    "usage-description": "The release is only used in custom GitOps with API integration."
   },
   "export-data": {
     "export-rows": "Export rows",

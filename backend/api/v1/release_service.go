@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"fmt"
 	"slices"
 
 	"github.com/google/uuid"
@@ -257,16 +258,8 @@ func (s *ReleaseService) CheckRelease(ctx context.Context, request *v1pb.CheckRe
 		return nil, status.Errorf(codes.InvalidArgument, "targets cannot be empty")
 	}
 
-	// Validate and sanitize release files.
-	var err error
-	request.Release.Files, err = validateAndSanitizeReleaseFiles(request.Release.Files)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid release files, err: %v", err)
-	}
-
-	response := &v1pb.CheckReleaseResponse{}
+	var targetDatabases []*store.DatabaseMessage
 	for _, target := range request.Targets {
-		var databases []*store.DatabaseMessage
 		// Handle database target.
 		if instanceID, databaseName, err := common.GetInstanceDatabaseID(target); err == nil {
 			instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{
@@ -288,7 +281,7 @@ func (s *ReleaseService) CheckRelease(ctx context.Context, request *v1pb.CheckRe
 			if database == nil {
 				return nil, status.Errorf(codes.NotFound, "database %q not found", target)
 			}
-			databases = append(databases, database)
+			targetDatabases = append(targetDatabases, database)
 		}
 
 		// Handle database group target. Extract all matched databases in the database group.
@@ -326,50 +319,84 @@ func (s *ReleaseService) CheckRelease(ctx context.Context, request *v1pb.CheckRe
 			if err != nil {
 				return nil, err
 			}
-			databases = append(databases, matches...)
+			targetDatabases = append(targetDatabases, matches...)
+		}
+	}
+
+	// Validate and sanitize release files.
+	var err error
+	request.Release.Files, err = validateAndSanitizeReleaseFiles(request.Release.Files)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid release files, err: %v", err)
+	}
+
+	response := &v1pb.CheckReleaseResponse{}
+	var errorAdviceCount, warningAdviceCount int
+	var stopChecking bool
+	for _, database := range targetDatabases {
+		if stopChecking {
+			break
+		}
+		instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{
+			ResourceID: &database.InstanceID,
+		})
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get instance, error: %v", err)
+		}
+		if instance == nil {
+			return nil, status.Errorf(codes.NotFound, "instance %q not found", database.InstanceID)
 		}
 
-		for _, database := range databases {
-			instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{
-				ResourceID: &database.InstanceID,
+		catalog, err := catalog.NewCatalog(ctx, s.store, database.UID, instance.Engine, store.IgnoreDatabaseAndTableCaseSensitive(instance), nil)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to create catalog: %v", err)
+		}
+		for _, file := range request.Release.Files {
+			if stopChecking {
+				break
+			}
+			// Check if file has been applied to database.
+			revisions, err := s.store.ListRevisions(ctx, &store.FindRevisionMessage{
+				DatabaseUID: &database.UID,
+				Version:     &file.Version,
+				ShowDeleted: false,
 			})
 			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to get instance, error: %v", err)
+				return nil, status.Errorf(codes.Internal, "failed to list revisions: %v", err)
 			}
-			if instance == nil {
-				return nil, status.Errorf(codes.NotFound, "instance %q not found", database.InstanceID)
+			if len(revisions) > 0 {
+				// Skip the file if it has been applied to the database.
+				continue
 			}
 
-			catalog, err := catalog.NewCatalog(ctx, s.store, database.UID, instance.Engine, store.IgnoreDatabaseAndTableCaseSensitive(instance), nil)
+			adviceStatus, advices, err := s.runSQLReviewCheckForFile(ctx, catalog, instance, database, file)
 			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to create catalog: %v", err)
+				return nil, status.Errorf(codes.Internal, "failed to check SQL review: %v", err)
 			}
-			for _, file := range request.Release.Files {
-				// Check if file has been applied to database.
-				revisions, err := s.store.ListRevisions(ctx, &store.FindRevisionMessage{
-					DatabaseUID: &database.UID,
-					Version:     &file.Version,
-					ShowDeleted: false,
+			// If the advice status is not SUCCESS, we will add the file and advices to the response.
+			if adviceStatus != storepb.Advice_SUCCESS {
+				response.Results = append(response.Results, &v1pb.CheckReleaseResponse_CheckResult{
+					File:    file.Path,
+					Target:  fmt.Sprintf("instances/%s/databases/%s", instance.ResourceID, database.DatabaseName),
+					Advices: advices,
 				})
-				if err != nil {
-					return nil, status.Errorf(codes.Internal, "failed to list revisions: %v", err)
+			}
+			for _, advice := range advices {
+				switch advice.Status {
+				case v1pb.Advice_ERROR:
+					if errorAdviceCount < common.MaximumAdvicePerStatus {
+						errorAdviceCount++
+					}
+				case v1pb.Advice_WARNING:
+					if warningAdviceCount < common.MaximumAdvicePerStatus {
+						warningAdviceCount++
+					}
+				default:
 				}
-				if len(revisions) > 0 {
-					// Skip the file if it has been applied to the database.
-					continue
-				}
-
-				adviceStatus, advices, err := s.runSQLReviewCheckForFile(ctx, catalog, instance, database, file)
-				if err != nil {
-					return nil, status.Errorf(codes.Internal, "failed to check SQL review: %v", err)
-				}
-				// If the advice status is not SUCCESS, we will add the file and advices to the response.
-				if adviceStatus != storepb.Advice_SUCCESS {
-					response.Results = append(response.Results, &v1pb.CheckReleaseResponse_CheckResult{
-						File:    file.Path,
-						Advices: advices,
-					})
-				}
+			}
+			// If we have reached the maximum number of advices for both error and warning, we will stop checking.
+			if errorAdviceCount >= common.MaximumAdvicePerStatus && warningAdviceCount >= common.MaximumAdvicePerStatus {
+				stopChecking = true
 			}
 		}
 	}
@@ -544,6 +571,7 @@ func convertToReleaseFiles(ctx context.Context, s *store.Store, files []*storepb
 			Version:       f.Version,
 			Statement:     sheet.Statement,
 			StatementSize: sheet.Size,
+			ChangeType:    v1pb.Release_File_ChangeType(f.ChangeType),
 		})
 	}
 	return v1Files, nil
@@ -587,6 +615,7 @@ func convertReleaseFiles(ctx context.Context, s *store.Store, files []*v1pb.Rele
 			SheetSha256: sheet.GetSha256Hex(),
 			Type:        storepb.ReleaseFileType(f.Type),
 			Version:     f.Version,
+			ChangeType:  storepb.ReleasePayload_File_ChangeType(f.ChangeType),
 		})
 	}
 	return rFiles, nil

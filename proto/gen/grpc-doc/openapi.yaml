@@ -1580,14 +1580,6 @@ paths:
                   description: Format the schema dump into SDL format.
                   schema:
                     type: boolean
-                - name: concise
-                  in: query
-                  description: |-
-                    When true, the schema dump will be concise.
-                     For Oracle, there will be tables and indexes only for Sync Schema.
-                     For Postgres, we'll filter the backup schema.
-                  schema:
-                    type: boolean
             responses:
                 "200":
                     description: OK
@@ -2125,14 +2117,6 @@ paths:
                 - name: sdlFormat
                   in: query
                   description: Format the schema dump into SDL format.
-                  schema:
-                    type: boolean
-                - name: concise
-                  in: query
-                  description: |-
-                    When true, the schema dump will be concise.
-                     For Oracle, there will be tables and indexes only for Sync Schema.
-                     For Postgres, we'll filter the backup schema.
                   schema:
                     type: boolean
             responses:
@@ -5760,7 +5744,7 @@ paths:
             tags:
                 - RolloutService
             description: |-
-                BatchSkipTasks cancels the specified task runs in batch.
+                BatchCancelTaskRuns cancels the specified task runs in batch.
                  The access is the same as BatchRunTasks().
             operationId: RolloutService_BatchCancelTaskRuns
             parameters:
@@ -9071,10 +9055,16 @@ components:
                 file:
                     type: string
                     description: The file path that is being checked.
+                target:
+                    type: string
+                    description: |-
+                        The target that the check is performed on.
+                         Should be a database. Format: instances/{instance}/databases/{database}
                 advices:
                     type: array
                     items:
                         $ref: '#/components/schemas/Advice'
+                    description: The list of advice for the file and the target.
         CheckRequest:
             required:
                 - name
@@ -12617,23 +12607,33 @@ components:
                         - $ref: '#/components/schemas/GoogleProtobufValue'
                     description: value_value is used for Spanner and TUPLE ARRAY MAP in Clickhouse only.
                 timestampValue:
-                    type: string
+                    allOf:
+                        - $ref: '#/components/schemas/RowValue_Timestamp'
                     description: |-
                         timestamp_value is used for the timestamp without time zone data type,
                          meaning it only includes the timestamp without any time zone or location
                          info. Although it may be expressed as a UTC value, it should be seen as a
                          timestamp missing location context.
-                    format: date-time
                 timestampTzValue:
                     allOf:
                         - $ref: '#/components/schemas/RowValue_TimestampTZ'
                     description: |-
                         timestamp_tz_value is used for the timestamptz data type, which
                          accurately represents the timestamp with location information.
+        RowValue_Timestamp:
+            type: object
+            properties:
+                googleTimestamp:
+                    type: string
+                    format: date-time
+                accuracy:
+                    type: integer
+                    description: The accuracy is the number of digits after the decimal point.
+                    format: int32
         RowValue_TimestampTZ:
             type: object
             properties:
-                timestamp:
+                googleTimestamp:
                     type: string
                     format: date-time
                 zone:
@@ -12648,6 +12648,9 @@ components:
                 offset:
                     type: integer
                     description: The offset is in seconds east of UTC
+                    format: int32
+                accuracy:
+                    type: integer
                     format: int32
         RunPlanChecksRequest:
             required:
@@ -13608,9 +13611,11 @@ components:
                     format: enum
                 classificationFromConfig:
                     type: boolean
-                    description: |-
-                        If false, we will build the raw common by classification in database
-                         config.
+                    description: If false, we will build the raw common by classification in database catalog.
+                catalog:
+                    allOf:
+                        - $ref: '#/components/schemas/DatabaseCatalog'
+                    description: Database catlog is required if classification_from_config is false.
         StringifyMetadataResponse:
             type: object
             properties:

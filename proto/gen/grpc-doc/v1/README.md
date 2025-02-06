@@ -97,13 +97,10 @@
     - [ChangedResources](#bytebase-v1-ChangedResources)
     - [Changelog](#bytebase-v1-Changelog)
     - [CheckConstraintMetadata](#bytebase-v1-CheckConstraintMetadata)
-    - [ColumnConfig](#bytebase-v1-ColumnConfig)
-    - [ColumnConfig.LabelsEntry](#bytebase-v1-ColumnConfig-LabelsEntry)
     - [ColumnMetadata](#bytebase-v1-ColumnMetadata)
     - [CreateRevisionRequest](#bytebase-v1-CreateRevisionRequest)
     - [Database](#bytebase-v1-Database)
     - [Database.LabelsEntry](#bytebase-v1-Database-LabelsEntry)
-    - [DatabaseConfig](#bytebase-v1-DatabaseConfig)
     - [DatabaseMetadata](#bytebase-v1-DatabaseMetadata)
     - [DatabaseSchema](#bytebase-v1-DatabaseSchema)
     - [DeleteRevisionRequest](#bytebase-v1-DeleteRevisionRequest)
@@ -141,7 +138,6 @@
     - [PackageMetadata](#bytebase-v1-PackageMetadata)
     - [ProcedureMetadata](#bytebase-v1-ProcedureMetadata)
     - [Revision](#bytebase-v1-Revision)
-    - [SchemaConfig](#bytebase-v1-SchemaConfig)
     - [SchemaMetadata](#bytebase-v1-SchemaMetadata)
     - [Secret](#bytebase-v1-Secret)
     - [SequenceMetadata](#bytebase-v1-SequenceMetadata)
@@ -151,7 +147,6 @@
     - [StreamMetadata](#bytebase-v1-StreamMetadata)
     - [SyncDatabaseRequest](#bytebase-v1-SyncDatabaseRequest)
     - [SyncDatabaseResponse](#bytebase-v1-SyncDatabaseResponse)
-    - [TableConfig](#bytebase-v1-TableConfig)
     - [TableMetadata](#bytebase-v1-TableMetadata)
     - [TablePartitionMetadata](#bytebase-v1-TablePartitionMetadata)
     - [TaskMetadata](#bytebase-v1-TaskMetadata)
@@ -563,6 +558,7 @@
     - [QueryResult.PostgresError](#bytebase-v1-QueryResult-PostgresError)
     - [QueryRow](#bytebase-v1-QueryRow)
     - [RowValue](#bytebase-v1-RowValue)
+    - [RowValue.Timestamp](#bytebase-v1-RowValue-Timestamp)
     - [RowValue.TimestampTZ](#bytebase-v1-RowValue-TimestampTZ)
     - [SearchQueryHistoriesRequest](#bytebase-v1-SearchQueryHistoriesRequest)
     - [SearchQueryHistoriesResponse](#bytebase-v1-SearchQueryHistoriesResponse)
@@ -2084,40 +2080,6 @@ CheckConstraintMetadata is the metadata for check constraints.
 
 
 
-<a name="bytebase-v1-ColumnConfig"></a>
-
-### ColumnConfig
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | The name is the name of a column. |
-| semantic_type_id | [string](#string) |  |  |
-| labels | [ColumnConfig.LabelsEntry](#bytebase-v1-ColumnConfig-LabelsEntry) | repeated | The user labels for a column. |
-| classification_id | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="bytebase-v1-ColumnConfig-LabelsEntry"></a>
-
-### ColumnConfig.LabelsEntry
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| key | [string](#string) |  |  |
-| value | [string](#string) |  |  |
-
-
-
-
-
-
 <a name="bytebase-v1-ColumnMetadata"></a>
 
 ### ColumnMetadata
@@ -2202,22 +2164,6 @@ ColumnMetadata is the metadata for columns.
 
 
 
-<a name="bytebase-v1-DatabaseConfig"></a>
-
-### DatabaseConfig
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  |  |
-| schema_configs | [SchemaConfig](#bytebase-v1-SchemaConfig) | repeated | The schema_configs is the list of configs for schemas in a database. |
-
-
-
-
-
-
 <a name="bytebase-v1-DatabaseMetadata"></a>
 
 ### DatabaseMetadata
@@ -2233,7 +2179,6 @@ Format: instances/{instance}/databases/{database}/metadata |
 | character_set | [string](#string) |  | The character_set is the character set of a database. |
 | collation | [string](#string) |  | The collation is the collation of a database. |
 | extensions | [ExtensionMetadata](#bytebase-v1-ExtensionMetadata) | repeated | The extensions is the list of extensions in a database. |
-| schema_configs | [SchemaConfig](#bytebase-v1-SchemaConfig) | repeated | The schema_configs is the list of configs for schemas in a database. |
 | owner | [string](#string) |  |  |
 
 
@@ -2497,7 +2442,6 @@ FunctionMetadata is the metadata for functions.
 | name | [string](#string) |  | The name of the changelog to retrieve. Format: instances/{instance}/databases/{database}/changelogs/{changelog} |
 | view | [ChangelogView](#bytebase-v1-ChangelogView) |  |  |
 | sdl_format | [bool](#bool) |  | Format the schema dump into SDL format. |
-| concise | [bool](#bool) |  | When true, the schema dump will be concise. For Oracle, there will be tables and indexes only for Sync Schema. For Postgres, we&#39;ll filter the backup schema. |
 
 
 
@@ -2546,7 +2490,6 @@ FunctionMetadata is the metadata for functions.
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | The name of the database to retrieve schema. Format: instances/{instance}/databases/{database}/schema |
 | sdl_format | [bool](#bool) |  | Format the schema dump into SDL format. |
-| concise | [bool](#bool) |  | When true, the schema dump will be concise. For Oracle, there will be tables and indexes only for Sync Schema. For Postgres, we&#39;ll filter the backup schema. |
 
 
 
@@ -2898,22 +2841,6 @@ ProcedureMetadata is the metadata for procedures.
 
 
 
-<a name="bytebase-v1-SchemaConfig"></a>
-
-### SchemaConfig
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | The name is the schema name. It is an empty string for databases without such concept such as MySQL. |
-| table_configs | [TableConfig](#bytebase-v1-TableConfig) | repeated | The table_configs is the list of configs for tables in a schema. |
-
-
-
-
-
-
 <a name="bytebase-v1-SchemaMetadata"></a>
 
 ### SchemaMetadata
@@ -3092,23 +3019,6 @@ SlowQueryStatistics is the statistics of the slow query log.
 
 ### SyncDatabaseResponse
 
-
-
-
-
-
-
-<a name="bytebase-v1-TableConfig"></a>
-
-### TableConfig
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | The name is the name of a table. |
-| column_configs | [ColumnConfig](#bytebase-v1-ColumnConfig) | repeated | The column_configs is the ordered list of configs for columns in a table. |
-| classification_id | [string](#string) |  |  |
 
 
 
@@ -9239,8 +9149,24 @@ for field description.
 | uint32_value | [uint32](#uint32) |  |  |
 | uint64_value | [uint64](#uint64) |  |  |
 | value_value | [google.protobuf.Value](#google-protobuf-Value) |  | value_value is used for Spanner and TUPLE ARRAY MAP in Clickhouse only. |
-| timestamp_value | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | timestamp_value is used for the timestamp without time zone data type, meaning it only includes the timestamp without any time zone or location info. Although it may be expressed as a UTC value, it should be seen as a timestamp missing location context. |
+| timestamp_value | [RowValue.Timestamp](#bytebase-v1-RowValue-Timestamp) |  | timestamp_value is used for the timestamp without time zone data type, meaning it only includes the timestamp without any time zone or location info. Although it may be expressed as a UTC value, it should be seen as a timestamp missing location context. |
 | timestamp_tz_value | [RowValue.TimestampTZ](#bytebase-v1-RowValue-TimestampTZ) |  | timestamp_tz_value is used for the timestamptz data type, which accurately represents the timestamp with location information. |
+
+
+
+
+
+
+<a name="bytebase-v1-RowValue-Timestamp"></a>
+
+### RowValue.Timestamp
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| google_timestamp | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| accuracy | [int32](#int32) |  | The accuracy is the number of digits after the decimal point. |
 
 
 
@@ -9255,9 +9181,10 @@ for field description.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| timestamp | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| google_timestamp | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | zone | [string](#string) |  | Zone is the time zone abbreviations in timezone database such as &#34;PDT&#34;, &#34;PST&#34;. https://en.wikipedia.org/wiki/List_of_tz_database_time_zones We retrieve the time zone information from the timestamptz field in the database. A timestamp is in UTC or epoch time, and with zone info, we can convert it to a local time string. Zone and offset are returned by time.Time.Zone() |
 | offset | [int32](#int32) |  | The offset is in seconds east of UTC |
+| accuracy | [int32](#int32) |  |  |
 
 
 
@@ -9307,7 +9234,8 @@ for field description.
 | ----- | ---- | ----- | ----------- |
 | metadata | [DatabaseMetadata](#bytebase-v1-DatabaseMetadata) |  |  |
 | engine | [Engine](#bytebase-v1-Engine) |  | The database engine of the schema string. |
-| classification_from_config | [bool](#bool) |  | If false, we will build the raw common by classification in database config. |
+| classification_from_config | [bool](#bool) |  | If false, we will build the raw common by classification in database catalog. |
+| catalog | [DatabaseCatalog](#bytebase-v1-DatabaseCatalog) | optional | Database catlog is required if classification_from_config is false. |
 
 
 
@@ -9459,7 +9387,8 @@ for field description.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | file | [string](#string) |  | The file path that is being checked. |
-| advices | [Advice](#bytebase-v1-Advice) | repeated |  |
+| target | [string](#string) |  | The target that the check is performed on. Should be a database. Format: instances/{instance}/databases/{database} |
+| advices | [Advice](#bytebase-v1-Advice) | repeated | The list of advice for the file and the target. |
 
 
 
@@ -11080,7 +11009,7 @@ Read from `pg_stat_activity`
 | GetTaskRunSession | [GetTaskRunSessionRequest](#bytebase-v1-GetTaskRunSessionRequest) | [TaskRunSession](#bytebase-v1-TaskRunSession) |  |
 | BatchRunTasks | [BatchRunTasksRequest](#bytebase-v1-BatchRunTasksRequest) | [BatchRunTasksResponse](#bytebase-v1-BatchRunTasksResponse) | BatchRunTasks creates task runs for the specified tasks. DataExport issue only allows the creator to run the task. Users with &#34;bb.taskRuns.create&#34; permission can run the task, e.g. Workspace Admin and DBA. Follow role-based rollout policy for the environment. |
 | BatchSkipTasks | [BatchSkipTasksRequest](#bytebase-v1-BatchSkipTasksRequest) | [BatchSkipTasksResponse](#bytebase-v1-BatchSkipTasksResponse) | BatchSkipTasks skips the specified tasks. The access is the same as BatchRunTasks(). |
-| BatchCancelTaskRuns | [BatchCancelTaskRunsRequest](#bytebase-v1-BatchCancelTaskRunsRequest) | [BatchCancelTaskRunsResponse](#bytebase-v1-BatchCancelTaskRunsResponse) | BatchSkipTasks cancels the specified task runs in batch. The access is the same as BatchRunTasks(). |
+| BatchCancelTaskRuns | [BatchCancelTaskRunsRequest](#bytebase-v1-BatchCancelTaskRunsRequest) | [BatchCancelTaskRunsResponse](#bytebase-v1-BatchCancelTaskRunsResponse) | BatchCancelTaskRuns cancels the specified task runs in batch. The access is the same as BatchRunTasks(). |
 | PreviewTaskRunRollback | [PreviewTaskRunRollbackRequest](#bytebase-v1-PreviewTaskRunRollbackRequest) | [PreviewTaskRunRollbackResponse](#bytebase-v1-PreviewTaskRunRollbackResponse) |  |
 
  

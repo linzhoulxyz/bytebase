@@ -2,7 +2,6 @@ import { orderBy } from "lodash-es";
 import { stringify } from "uuid";
 import type { SQLResultSetV1 } from "@/types";
 import { NullValue } from "@/types/proto/google/protobuf/struct";
-import { Timestamp } from "@/types/proto/google/protobuf/timestamp";
 import { QueryRow, RowValue } from "@/types/proto/v1/sql_service";
 
 type NoSQLRowData = {
@@ -38,6 +37,7 @@ const flattenNoSQLColumn = (value: any): any => {
   const dict = value as { [key: string]: any };
   if (Object.keys(dict).length === 1 && Object.keys(dict)[0].startsWith("$")) {
     // Used by the MongoDB response.
+    // https://www.mongodb.com/zh-cn/docs/manual/reference/mongodb-extended-json/#bson-data-types-and-associated-representations
     const key = Object.keys(dict)[0];
     switch (key) {
       case "$oid":
@@ -61,6 +61,7 @@ const flattenNoSQLColumn = (value: any): any => {
       case "$timestamp":
         return (dict[key] as { t: number; i: number }).t;
       case "$binary": {
+        // https://www.mongodb.com/zh-cn/docs/manual/reference/bson-types/#binary-data
         const { base64, subType } = dict[key] as {
           base64: string;
           subType: string;
@@ -160,10 +161,12 @@ const convertAnyToRowValue = (
       if (value instanceof Date) {
         return {
           value: RowValue.fromPartial({
-            timestampValue: Timestamp.fromPartial({
-              seconds: Math.floor(value.getTime() / 1000),
-              nanos: (value.getTime() % 1000) * 1e6,
-            }),
+            timestampValue: {
+              googleTimestamp: {
+                seconds: Math.floor(value.getTime() / 1000),
+                nanos: (value.getTime() % 1000) * 1e6,
+              },
+            },
           }),
           type: "DATETIME",
         };

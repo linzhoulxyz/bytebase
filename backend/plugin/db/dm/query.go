@@ -34,7 +34,7 @@ func makeValueByTypeName(typeName string, _ *sql.ColumnType) any {
 	}
 }
 
-func convertValue(typeName string, value any) *v1pb.RowValue {
+func convertValue(typeName string, columnType *sql.ColumnType, value any) *v1pb.RowValue {
 	switch raw := value.(type) {
 	case *sql.NullString:
 		if raw.Valid {
@@ -78,10 +78,14 @@ func convertValue(typeName string, value any) *v1pb.RowValue {
 		}
 	case *sql.NullTime:
 		if raw.Valid {
+			_, scale, _ := columnType.DecimalSize()
 			if typeName == "DATE" || typeName == "TIMESTAMPDTY" {
 				return &v1pb.RowValue{
 					Kind: &v1pb.RowValue_TimestampValue{
-						TimestampValue: timestamppb.New(raw.Time),
+						TimestampValue: &v1pb.RowValue_Timestamp{
+							GoogleTimestamp: timestamppb.New(raw.Time),
+							Accuracy:        int32(scale),
+						},
 					},
 				}
 			}
@@ -95,7 +99,10 @@ func convertValue(typeName string, value any) *v1pb.RowValue {
 				// TODO(d): fix the go-ora library.
 				return &v1pb.RowValue{
 					Kind: &v1pb.RowValue_TimestampValue{
-						TimestampValue: timestamppb.New(t),
+						TimestampValue: &v1pb.RowValue_Timestamp{
+							GoogleTimestamp: timestamppb.New(t),
+							Accuracy:        int32(scale),
+						},
 					},
 				}
 			}
@@ -103,9 +110,10 @@ func convertValue(typeName string, value any) *v1pb.RowValue {
 			return &v1pb.RowValue{
 				Kind: &v1pb.RowValue_TimestampTzValue{
 					TimestampTzValue: &v1pb.RowValue_TimestampTZ{
-						Timestamp: timestamppb.New(raw.Time),
-						Zone:      zone,
-						Offset:    int32(offset),
+						GoogleTimestamp: timestamppb.New(raw.Time),
+						Zone:            zone,
+						Offset:          int32(offset),
+						Accuracy:        int32(scale),
 					},
 				},
 			}

@@ -230,7 +230,9 @@
     "finish": "完成",
     "title": "标题",
     "text-wrap": "文本折行",
-    "catalog": "Catalog"
+    "catalog": "Catalog",
+    "summary": "总结",
+    "errors": "错误"
   },
   "error-page": {
     "go-back-home": "回到主页"
@@ -258,7 +260,10 @@
       "connection": "连接",
       "sql-review": "SQL 审核",
       "ghost-sync": "gh-ost 同步",
-      "affected-rows": "影响行数（基于统计信息估算）",
+      "affected-rows": {
+        "self": "影响行数",
+        "description": "根据统计信息估算。"
+      },
       "summary-report": "概要报告"
     },
     "rollout-time": "指定发布时间",
@@ -316,7 +321,8 @@
     }
   },
   "banner": {
-    "license-expires": "您的{plan}证书已在 {expireAt} 过期",
+    "license-expired": "您的{plan}证书已在 {expireAt} 过期",
+    "license-expires": "您的{plan}证书将在 {days} 天后过期",
     "trial-expires": "您的{plan}试用将在 {days} 天后过期",
     "trial-expired": "您的{plan}试用已过期",
     "deploy": "本地部署",
@@ -659,11 +665,6 @@
         },
         "select": "选择语义类型"
       },
-      "column-detail": {
-        "masking-setting-for-column": "\"{column}\" 脱敏设置",
-        "access-user-list": "用户访问列表",
-        "access-user-list-desc": "被授权的用户可以访问非脱敏的原始数据。"
-      },
       "algorithms": {
         "add": "添加算法",
         "edit": "编辑算法",
@@ -764,8 +765,6 @@
       "skipped": "跳过",
       "rolled-out": "发布",
       "xxx-automatically": "自动{verb}",
-      "verb-type-target-by-people": "{verb} {type} {target}",
-      "verb-type-target-by-system-bot": "{type} {target} {verb}",
       "failed-to-backup": "数据备份失败：{error}",
       "prior-back-table": "已备份到数据库 {database} 中表 {tables}",
       "prior-back-table-for-line": "数据备份到数据库 {database} 和表 {tables}，用于第 {line} 行的DML"
@@ -979,7 +978,7 @@
           "database-sync": "数据库同步",
           "prior-backup": "数据预备份"
         },
-        "affected-rows-n": "影响行数：{n}",
+        "estimated-affected-rows-n": "预估影响行数：{n}",
         "prior-backup-tables": "数据预备份相关的表",
         "status-update": {
           "waiting": "准备就绪，等待执行",
@@ -1189,11 +1188,13 @@
     "external-secret-vault": {
       "vault-url": "Vault URL",
       "vault-auth-type": {
+        "self": "认证方式",
         "token": {
           "self": "Token",
           "tips": "没有过期时限的根 token"
         },
         "approle": {
+          "self": "AppRole",
           "role-id": "Auth role id",
           "secret-id": "Auth secret id",
           "secret-id-plain-text": "Secret id 明文",
@@ -1708,7 +1709,7 @@
     "masking-exemption": {
       "self": "脱敏豁免",
       "grant-exemption": "授予豁免",
-      "revoke-exemption-title": "是否豁免 {member} 的导出和查询脱敏？"
+      "revoke-exemption-title": "是否撤销 {member} 的导出和查询脱敏？"
     }
   },
   "gitops": {
@@ -1955,6 +1956,7 @@
     "search-database-and-table": "搜索数据库和表",
     "search-table": "搜索表",
     "search-column": "搜索列",
+    "nothing-changed-for-database": "数据库 {database} 未发生任何变化",
     "actions": {
       "create-schema": "新建 Schema",
       "drop-schema": "删除 Schema",
@@ -2117,21 +2119,6 @@
     "overuse-warning": "{neededPlan}在{currentPlan}将会受限，请尽快升级以确保正常使用。",
     "overuse-modal": {
       "description": "您正在使用当前「{plan}」不包含的功能。立即升级避免影响使用。"
-    },
-    "features": {
-      "bb-feature-instance-count": {
-        "remaining": "当前总实例额度为 {total}，目前仅剩 {count} 个份额可用。",
-        "runoutof": "已用尽全部 {total} 个实例额度。",
-        "upgrade": "@:{'subscription.upgrade'}来获取更多实例额度。"
-      },
-      "bb-feature-user-count": {
-        "remaining": "当前总用户额度为 {total}，目前仅剩 {count} 个份额可用。",
-        "runoutof": "已用尽全部 {total} 个用户额度。",
-        "upgrade": "@:{'subscription.upgrade'}来获取无限的用户额度。"
-      },
-      "bb-feature-index-advisor": {
-        "title": "索引建议"
-      }
     }
   },
   "sheet": {
@@ -2721,9 +2708,10 @@
     "messages": {
       "succeed-to-create-release": "成功创建发布",
       "files-will-always-be-sorted-and-executed-in-version-order": "文件将始终按照版本顺序排序和执行。",
-      "cannot-modify-files-after-created": "发布创建后您无法修改文件。"
+      "cannot-modify-files-after-created": "发布创建后您无法修改文件。",
+      "bytebase-will-skip-those-files-has-been-applied-on-target-database": "Bytebase 将自动跳过那些已经在目标数据库上执行过的文件。"
     },
-    "usage-description": "发布包主要用于自定义的 GitOps 与 Bytebase API 集成。"
+    "usage-description": "发布包仅用于自定义的 GitOps 与 Bytebase API 集成。"
   },
   "export-data": {
     "export-rows": "导出行数",

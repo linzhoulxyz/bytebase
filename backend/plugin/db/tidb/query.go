@@ -37,10 +37,11 @@ func makeValueByTypeName(typeName string, _ *sql.ColumnType) any {
 	}
 }
 
-func convertValue(typeName string, value any) *v1pb.RowValue {
+func convertValue(typeName string, columnType *sql.ColumnType, value any) *v1pb.RowValue {
 	switch raw := value.(type) {
 	case *sql.NullString:
 		if raw.Valid {
+			_, scale, _ := columnType.DecimalSize()
 			if typeName == "TIMESTAMP" || typeName == "DATETIME" {
 				t, err := time.Parse(time.DateTime, raw.String)
 				if err != nil {
@@ -49,7 +50,10 @@ func convertValue(typeName string, value any) *v1pb.RowValue {
 				}
 				return &v1pb.RowValue{
 					Kind: &v1pb.RowValue_TimestampValue{
-						TimestampValue: timestamppb.New(t),
+						TimestampValue: &v1pb.RowValue_Timestamp{
+							GoogleTimestamp: timestamppb.New(t),
+							Accuracy:        int32(scale),
+						},
 					},
 				}
 			}
@@ -112,6 +116,7 @@ func getStatementWithResultLimitInline(statement string, limit int) (string, err
 	if len(stmtList) != 1 {
 		return "", errors.Errorf("expect one single statement in the query, %s", statement)
 	}
+	restoreFlags := format.DefaultRestoreFlags | format.RestoreStringWithoutDefaultCharset
 	stmt := stmtList[0]
 	switch stmt := stmt.(type) {
 	case *tidbast.SelectStmt:
@@ -129,7 +134,7 @@ func getStatementWithResultLimitInline(statement string, limit int) (string, err
 			}
 		}
 		var buffer strings.Builder
-		ctx := format.NewRestoreCtx(format.DefaultRestoreFlags, &buffer)
+		ctx := format.NewRestoreCtx(restoreFlags, &buffer)
 		if err := stmt.Restore(ctx); err != nil {
 			return "", err
 		}
@@ -149,7 +154,7 @@ func getStatementWithResultLimitInline(statement string, limit int) (string, err
 			}
 		}
 		var buffer strings.Builder
-		ctx := format.NewRestoreCtx(format.DefaultRestoreFlags, &buffer)
+		ctx := format.NewRestoreCtx(restoreFlags, &buffer)
 		if err := stmt.Restore(ctx); err != nil {
 			return "", err
 		}

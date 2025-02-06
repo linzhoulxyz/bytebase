@@ -26,8 +26,6 @@ import (
 	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
 	api "github.com/bytebase/bytebase/backend/legacyapi"
 	"github.com/bytebase/bytebase/backend/plugin/parser/base"
-	"github.com/bytebase/bytebase/backend/plugin/parser/pg"
-	"github.com/bytebase/bytebase/backend/plugin/parser/plsql"
 	"github.com/bytebase/bytebase/backend/plugin/parser/sql/ast"
 	pgrawparser "github.com/bytebase/bytebase/backend/plugin/parser/sql/engine/pg"
 	"github.com/bytebase/bytebase/backend/plugin/parser/sql/transform"
@@ -508,10 +506,6 @@ func (s *DatabaseService) GetDatabaseMetadata(ctx context.Context, request *v1pb
 	if err != nil {
 		return nil, err
 	}
-	dbConfig := convertStoreDatabaseConfig(dbSchema.GetConfig(), filter)
-	if dbConfig != nil {
-		v1pbMetadata.SchemaConfigs = dbConfig.SchemaConfigs
-	}
 	v1pbMetadata.Name = fmt.Sprintf("%s%s/%s%s%s", common.InstanceNamePrefix, database.InstanceID, common.DatabaseIDPrefix, database.DatabaseName, common.MetadataSuffix)
 
 	return v1pbMetadata, nil
@@ -570,24 +564,6 @@ func (s *DatabaseService) GetDatabaseSchema(ctx context.Context, request *v1pb.G
 			schema = sdlSchema
 		}
 	}
-	if request.Concise {
-		switch instance.Engine {
-		case storepb.Engine_ORACLE:
-			conciseSchema, err := plsql.GetConciseSchema(schema)
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to get concise schema, error %v", err.Error())
-			}
-			schema = conciseSchema
-		case storepb.Engine_POSTGRES:
-			conciseSchema, err := pg.FilterBackupSchema(schema)
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to filter backup schema, error %v", err.Error())
-			}
-			schema = conciseSchema
-		default:
-			return nil, status.Errorf(codes.Unimplemented, "concise schema is not supported for engine %q", instance.Engine.String())
-		}
-	}
 	return &v1pb.DatabaseSchema{Schema: schema}, nil
 }
 
@@ -610,18 +586,8 @@ func (s *DatabaseService) DiffSchema(ctx context.Context, request *v1pb.DiffSche
 
 	strictMode := true
 
-	switch engine {
-	case storepb.Engine_ORACLE:
+	if engine == storepb.Engine_ORACLE {
 		strictMode = false
-	case storepb.Engine_POSTGRES:
-		source, err = pg.FilterBackupSchema(source)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to filter backup schema, error: %v", err)
-		}
-		target, err = pg.FilterBackupSchema(target)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to filter backup schema, error: %v", err)
-		}
 	}
 
 	diff, err := base.SchemaDiff(engine, base.DiffContext{

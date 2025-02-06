@@ -230,7 +230,9 @@
     "finish": "Finalizar",
     "title": "Título",
     "text-wrap": "Ajuste de texto",
-    "catalog": "Catálogo"
+    "catalog": "Catálogo",
+    "summary": "Resumen",
+    "errors": "Errores"
   },
   "error-page": {
     "go-back-home": "Volver al inicio"
@@ -258,7 +260,10 @@
       "connection": "Conexión",
       "sql-review": "Revisión de SQL",
       "ghost-sync": "Sincronización gh-ost",
-      "affected-rows": "Filas afectadas (estimación basada en información estadística)",
+      "affected-rows": {
+        "self": "Filas afectadas",
+        "description": "Estimado por información estadística."
+      },
       "summary-report": "Informe resumido"
     },
     "rollout-time": "Tiempo de implementación",
@@ -316,6 +321,7 @@
     }
   },
   "banner": {
+    "license-expired": "Su licencia para {plan} ha expirado el {expireAt}.",
     "license-expires": "Su licencia para {plan} ha caducado el {expireAt}.",
     "trial-expires": "Su prueba gratuita para {plan} caducará en {days} días el {expireAt}.",
     "trial-expired": "Su prueba gratuita de {plan} ha caducado.",
@@ -659,11 +665,6 @@
         },
         "select": "Seleccionar tipo semántico"
       },
-      "column-detail": {
-        "masking-setting-for-column": "Configuración de enmascaramiento para \"{columna}\"",
-        "access-user-list": "Acceder a la lista de usuarios",
-        "access-user-list-desc": "Usuarios autorizados a acceder a datos desenmascarados."
-      },
       "algorithms": {
         "add": "Agregar algoritmo",
         "edit": "Editar algoritmo",
@@ -764,8 +765,6 @@
       "skipped": "omitido",
       "rolled-out": "implementado",
       "xxx-automatically": "{verb} automáticamente",
-      "verb-type-target-by-people": "{verb} {type} {target}",
-      "verb-type-target-by-system-bot": "{type} {target} {verb}",
       "failed-to-backup": "No se pudo realizar la copia de seguridad de los datos: {error}",
       "prior-back-table": "Copia de seguridad de datos en la base de datos {database} y tablas {tables}",
       "prior-back-table-for-line": "Copia de seguridad de datos en la base de datos {database} y la tabla {tables} para DML en la línea {line}"
@@ -979,7 +978,7 @@
           "database-sync": "Sincronización de base de datos",
           "prior-backup": "Copia de seguridad previa"
         },
-        "affected-rows-n": "Filas afectadas: {n}",
+        "estimated-affected-rows-n": "Filas afectadas estimadas: {n}",
         "prior-backup-tables": "Tablas de respaldo anteriores",
         "status-update": {
           "waiting": "Listo para ser ejecutado",
@@ -1189,11 +1188,13 @@
     "external-secret-vault": {
       "vault-url": "Vault URL",
       "vault-auth-type": {
+        "self": "Tipo de autenticación",
         "token": {
           "self": "Simbólico",
           "tips": "Un token raíz sin TTL."
         },
         "approle": {
+          "self": "AppRole",
           "role-id": "Auth role id",
           "secret-id": "Auth secret id",
           "secret-id-plain-text": "Texto sin formato para identificación secreta de rol",
@@ -1955,6 +1956,7 @@
     "search-database-and-table": "Buscar base de datos y tabla",
     "search-table": "Buscar tabla",
     "search-column": "Buscar columna",
+    "nothing-changed-for-database": "Nada cambió para la base de datos {database}",
     "actions": {
       "create-schema": "Crear esquema",
       "drop-schema": "Eliminar esquema",
@@ -2117,21 +2119,6 @@
     "overuse-warning": "{neededPlan} puede estar restringido en {currentPlan}, actualice ahora para asegurar un uso adecuado.",
     "overuse-modal": {
       "description": "Está utilizando una función que actualmente no está incluida en {plan}. Actualice ahora para evitar interrupciones:"
-    },
-    "features": {
-      "bb-feature-instance-count": {
-        "remaining": "Tu cuota total de instancias es de {total}, sólo te quedan {count} instancias.",
-        "runoutof": "Te has quedado sin tu cuota de instancias {total}.",
-        "upgrade": "@:{'subscription.upgrade'} para obtener más cuota de instancias."
-      },
-      "bb-feature-user-count": {
-        "remaining": "Su cuota total de usuarios es {total}, solo quedan {count} usuarios.",
-        "runoutof": "Se ha quedado sin su cuota de usuario {total}.",
-        "upgrade": "@:{'subscription.upgrade'} para obtener una cuota de usuario ilimitada."
-      },
-      "bb-feature-index-advisor": {
-        "title": "Asesor de índice"
-      }
     }
   },
   "sheet": {
@@ -2721,9 +2708,10 @@
     "messages": {
       "succeed-to-create-release": "Tener éxito en crear el lanzamiento",
       "files-will-always-be-sorted-and-executed-in-version-order": "Los archivos siempre se ordenarán y ejecutarán en orden de versión.",
-      "cannot-modify-files-after-created": "No es posible modificar archivos una vez creada la versión."
+      "cannot-modify-files-after-created": "No es posible modificar archivos una vez creada la versión.",
+      "bytebase-will-skip-those-files-has-been-applied-on-target-database": "Bytebase omitirá automáticamente aquellos archivos que ya se hayan ejecutado en la base de datos de destino."
     },
-    "usage-description": "La versión se utiliza principalmente en GitOps personalizado con integración de API."
+    "usage-description": "El lanzamiento solo se utiliza en GitOps personalizado con integración de API."
   },
   "export-data": {
     "export-rows": "Exportar filas",
