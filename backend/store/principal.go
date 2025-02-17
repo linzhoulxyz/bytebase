@@ -58,7 +58,7 @@ type UserMessage struct {
 	// Phone conforms E.164 format.
 	Phone string
 	// output only
-	CreatedTime time.Time
+	CreatedAt time.Time
 }
 
 // GetSystemBotUser gets the system bot.
@@ -166,13 +166,13 @@ func listUserImpl(ctx context.Context, tx *Tx, find *FindUserMessage) ([]*UserMe
 		where, args = append(where, fmt.Sprintf("principal.type = $%d", len(args)+1)), append(args, *v)
 	}
 	if !find.ShowDeleted {
-		where, args = append(where, fmt.Sprintf("principal.row_status = $%d", len(args)+1)), append(args, api.Normal)
+		where, args = append(where, fmt.Sprintf("principal.deleted = $%d", len(args)+1)), append(args, false)
 	}
 
 	query := `
 	SELECT
 		principal.id AS user_id,
-		principal.row_status AS row_status,
+		principal.deleted,
 		principal.email,
 		principal.name,
 		principal.type,
@@ -180,7 +180,7 @@ func listUserImpl(ctx context.Context, tx *Tx, find *FindUserMessage) ([]*UserMe
 		principal.mfa_config,
 		principal.phone,
 		principal.profile,
-		principal.created_ts
+		principal.created_at
 	FROM principal
 	WHERE ` + strings.Join(where, " AND ")
 
@@ -196,13 +196,11 @@ func listUserImpl(ctx context.Context, tx *Tx, find *FindUserMessage) ([]*UserMe
 	defer rows.Close()
 	for rows.Next() {
 		var userMessage UserMessage
-		var rowStatus string
 		var mfaConfigBytes []byte
 		var profileBytes []byte
-		var createdTs int64
 		if err := rows.Scan(
 			&userMessage.ID,
-			&rowStatus,
+			&userMessage.MemberDeleted,
 			&userMessage.Email,
 			&userMessage.Name,
 			&userMessage.Type,
@@ -210,12 +208,11 @@ func listUserImpl(ctx context.Context, tx *Tx, find *FindUserMessage) ([]*UserMe
 			&mfaConfigBytes,
 			&userMessage.Phone,
 			&profileBytes,
-			&createdTs,
+			&userMessage.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
 
-		userMessage.MemberDeleted = convertRowStatusToDeleted(rowStatus)
 		mfaConfig := storepb.MFAConfig{}
 		if err := common.ProtojsonUnmarshaler.Unmarshal(mfaConfigBytes, &mfaConfig); err != nil {
 			return nil, err
@@ -226,7 +223,6 @@ func listUserImpl(ctx context.Context, tx *Tx, find *FindUserMessage) ([]*UserMe
 			return nil, err
 		}
 		userMessage.Profile = &profile
-		userMessage.CreatedTime = time.Unix(createdTs, 0)
 
 		userMessages = append(userMessages, &userMessage)
 	}
@@ -238,7 +234,7 @@ func listUserImpl(ctx context.Context, tx *Tx, find *FindUserMessage) ([]*UserMe
 }
 
 // CreateUser creates an user.
-func (s *Store) CreateUser(ctx context.Context, create *UserMessage, creatorID int) (*UserMessage, error) {
+func (s *Store) CreateUser(ctx context.Context, create *UserMessage) (*UserMessage, error) {
 	// Double check the passing-in emails.
 	// We use lower-case for emails.
 	if create.Email != strings.ToLower(create.Email) {
@@ -259,24 +255,23 @@ func (s *Store) CreateUser(ctx context.Context, create *UserMessage, creatorID i
 		return nil, err
 	}
 
-	set := []string{"creator_id", "updater_id", "email", "name", "type", "password_hash", "phone", "profile"}
-	args := []any{creatorID, creatorID, create.Email, create.Name, create.Type, create.PasswordHash, create.Phone, profileBytes}
+	set := []string{"email", "name", "type", "password_hash", "phone", "profile"}
+	args := []any{create.Email, create.Name, create.Type, create.PasswordHash, create.Phone, profileBytes}
 	placeholder := []string{}
 	for index := range set {
 		placeholder = append(placeholder, fmt.Sprintf("$%d", index+1))
 	}
 
 	var userID int
-	var createdTs int64
 	if err := tx.QueryRowContext(ctx, fmt.Sprintf(`
 			INSERT INTO principal (
 				%s
 			)
 			VALUES (%s)
-			RETURNING id, created_ts
+			RETURNING id, created_at
 		`, strings.Join(set, ","), strings.Join(placeholder, ",")),
 		args...,
-	).Scan(&userID, &createdTs); err != nil {
+	).Scan(&userID, &create.CreatedAt); err != nil {
 		return nil, err
 	}
 
@@ -291,7 +286,7 @@ func (s *Store) CreateUser(ctx context.Context, create *UserMessage, creatorID i
 		Type:         create.Type,
 		PasswordHash: create.PasswordHash,
 		Phone:        create.Phone,
-		CreatedTime:  time.Unix(createdTs, 0),
+		CreatedAt:    create.CreatedAt,
 		Profile:      create.Profile,
 		MFAConfig:    &storepb.MFAConfig{},
 	}
@@ -301,18 +296,14 @@ func (s *Store) CreateUser(ctx context.Context, create *UserMessage, creatorID i
 }
 
 // UpdateUser updates a user.
-func (s *Store) UpdateUser(ctx context.Context, currentUser *UserMessage, patch *UpdateUserMessage, updaterID int) (*UserMessage, error) {
+func (s *Store) UpdateUser(ctx context.Context, currentUser *UserMessage, patch *UpdateUserMessage) (*UserMessage, error) {
 	if currentUser.ID == api.SystemBotID {
 		return nil, errors.Errorf("cannot update system bot")
 	}
 
-	principalSet, principalArgs := []string{"updater_id = $1", "updated_ts = $2"}, []any{updaterID, time.Now().Unix()}
+	principalSet, principalArgs := []string{}, []any{}
 	if v := patch.Delete; v != nil {
-		rowStatus := api.Normal
-		if *patch.Delete {
-			rowStatus = api.Archived
-		}
-		principalSet, principalArgs = append(principalSet, fmt.Sprintf("row_status = $%d", len(principalArgs)+1)), append(principalArgs, rowStatus)
+		principalSet, principalArgs = append(principalSet, fmt.Sprintf("deleted = $%d", len(principalArgs)+1)), append(principalArgs, *v)
 	}
 	if v := patch.Email; v != nil {
 		principalSet, principalArgs = append(principalSet, fmt.Sprintf("email = $%d", len(principalArgs)+1)), append(principalArgs, strings.ToLower(*v))
@@ -345,6 +336,10 @@ func (s *Store) UpdateUser(ctx context.Context, currentUser *UserMessage, patch 
 		principalSet, principalArgs = append(principalSet, fmt.Sprintf("profile = $%d", len(principalArgs)+1)), append(principalArgs, profileBytes)
 	}
 	principalArgs = append(principalArgs, currentUser.ID)
+
+	if len(principalSet) == 0 {
+		return currentUser, nil
+	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

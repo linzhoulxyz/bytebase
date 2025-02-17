@@ -7,6 +7,7 @@
     :row-key="(changelog: Changelog) => changelog.name"
     :striped="true"
     :row-props="rowProps"
+    :loading="loading"
     :checked-row-keys="selectedChangelogs"
     @update:checked-row-keys="(keys) => $emit('update:selected-changelogs', keys as string[])"
   />
@@ -18,8 +19,6 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { RouterLink } from "vue-router";
-import { BBAvatar } from "@/bbkit";
-import { useUserStore } from "@/store";
 import { getDateForPbTimestamp } from "@/types";
 import type { Changelog } from "@/types/proto/v1/database_service";
 import {
@@ -29,7 +28,6 @@ import {
 import {
   extractIssueUID,
   getAffectedTableDisplayName,
-  extractUserResourceName,
 } from "@/utils";
 import {
   changelogLink,
@@ -44,6 +42,7 @@ const props = defineProps<{
   selectedChangelogs?: string[];
   customClick?: boolean;
   showSelection?: boolean;
+  loading?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -101,7 +100,7 @@ const columnList = computed(() => {
     {
       key: "issue",
       title: t("common.issue"),
-      width: "6rem",
+      width: 96,
       resizable: true,
       render: (changelog) => {
         const uid = extractIssueUID(changelog.issue);
@@ -131,7 +130,7 @@ const columnList = computed(() => {
     {
       key: "version",
       title: t("common.version"),
-      width: "6rem",
+      width: 128,
       resizable: true,
       render: (changelog) => changelog.version || "-",
     },
@@ -156,8 +155,8 @@ const columnList = computed(() => {
       },
     },
     {
-      key: "SQL",
-      title: "SQL",
+      key: "statement",
+      title: t("common.statement"),
       resizable: true,
       minWidth: "13rem",
       ellipsis: true,
@@ -168,31 +167,12 @@ const columnList = computed(() => {
     {
       key: "created",
       title: t("common.created-at"),
-      width: "7rem",
+      width: 128,
       resizable: true,
       ellipsis: true,
       render: (changelog) => {
         return (
           <HumanizeDate date={getDateForPbTimestamp(changelog.createTime)} />
-        );
-      },
-    },
-    {
-      key: "creator",
-      title: t("common.creator"),
-      width: "8rem",
-      resizable: true,
-      ellipsis: true,
-      render: (changelog) => {
-        const creator = useUserStore().getUserByEmail(
-          extractUserResourceName(changelog.creator)
-        );
-        if (!creator) return null;
-        return (
-          <div class="flex flex-row items-center overflow-hidden gap-x-1">
-            <BBAvatar size="SMALL" username={creator.title} />
-            <span class="truncate">{creator.title}</span>
-          </div>
         );
       },
     },

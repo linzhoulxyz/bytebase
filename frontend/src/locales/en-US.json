@@ -15,7 +15,6 @@
     "overview": "Overview",
     "changelog": "Changelog",
     "webhooks": "Webhooks",
-    "key": "Key",
     "activity": "Activity",
     "sign-in": "Sign in",
     "sign-in-as-admin": "Sign in as administrator",
@@ -162,6 +161,7 @@
     "success": "Succeed",
     "failed": "Failed",
     "load-more": "Load more",
+    "rows-per-page": "Rows per page",
     "access-denied": "Access denied",
     "restart": "Restart",
     "want-help": "Want help",
@@ -236,19 +236,6 @@
   },
   "error-page": {
     "go-back-home": "Go back home"
-  },
-  "kbar": {
-    "recently-visited": "Recently Visited",
-    "navigation": "Navigation",
-    "help": {
-      "navigate": "to navigate",
-      "perform": "to perform",
-      "close": "to close",
-      "back": "to back"
-    },
-    "options": {
-      "placeholder": "Type a command or search…"
-    }
   },
   "task": {
     "checking": "Checking...",
@@ -409,7 +396,6 @@
       "action": {
         "deactivate": "Deactivate",
         "deactivate-confirm-title": "Are you sure to deactivate?",
-        "reactivate": "Reactivate",
         "reactivate-confirm-title": "Are you sure to reactivate"
       },
       "tooltip": {
@@ -668,7 +654,6 @@
       "algorithms": {
         "add": "Add algorithm",
         "edit": "Edit algorithm",
-        "default": "Default",
         "table": {
           "masking-type": "Masking Type"
         },
@@ -1289,7 +1274,6 @@
     "visit-database": "@:common.visit @:common.databases",
     "visit-environment": "@:common.visit @:common.environments",
     "visit-member": "@:common.visit @:common.members",
-    "use-kbar": "Use kbar ({shortcut})",
     "query-data": "Query data",
     "notice": {
       "title": "Quickstart guide dismissed",
@@ -1551,12 +1535,10 @@
   },
   "project": {
     "table": {
-      "key": "@:common.key",
       "name": "@:common.name"
     },
     "create-modal": {
       "project-name": "@:common.project @:common.name",
-      "key": "@:common.key",
       "success-prompt": "Successfully created project {name}."
     },
     "overview": {
@@ -1698,7 +1680,6 @@
     },
     "select": "Select Project",
     "all": "All projects",
-    "key-hint": "Short descriptive alphanumberic letters to identify this project.",
     "gitops-connector": {
       "add": "Add GitOps connector",
       "delete": "Delete GitOps connector",

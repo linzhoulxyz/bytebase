@@ -6,7 +6,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/pkg/errors"
 
@@ -47,12 +46,6 @@ func (s *ReviewConfigService) CreateReviewConfig(ctx context.Context, request *v
 		return nil, err
 	}
 
-	principalID, ok := ctx.Value(common.PrincipalIDContextKey).(int)
-	if !ok {
-		return nil, status.Errorf(codes.Internal, "principal ID not found")
-	}
-
-	reviewConfigMessage.CreatorUID = principalID
 	created, err := s.store.CreateReviewConfig(ctx, reviewConfigMessage)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -104,10 +97,6 @@ func (s *ReviewConfigService) UpdateReviewConfig(ctx context.Context, request *v
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	principalID, ok := ctx.Value(common.PrincipalIDContextKey).(int)
-	if !ok {
-		return nil, status.Errorf(codes.Internal, "principal ID not found")
-	}
 
 	existed, err := s.store.GetReviewConfig(ctx, id)
 	if err != nil {
@@ -123,8 +112,7 @@ func (s *ReviewConfigService) UpdateReviewConfig(ctx context.Context, request *v
 	}
 
 	patch := &store.PatchReviewConfigMessage{
-		ID:        id,
-		UpdaterID: principalID,
+		ID: id,
 	}
 
 	for _, path := range request.UpdateMask.Paths {
@@ -193,31 +181,20 @@ func convertToReviewConfigMessage(reviewConfig *v1pb.ReviewConfig) (*store.Revie
 }
 
 func (s *ReviewConfigService) convertToV1ReviewConfig(ctx context.Context, reviewConfigMessage *store.ReviewConfigMessage) (*v1pb.ReviewConfig, error) {
-	creator, err := s.store.GetUserByID(ctx, reviewConfigMessage.CreatorUID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get creator, error %v", err)
-	}
-	if creator == nil {
-		return nil, status.Errorf(codes.NotFound, "creator %d not found", reviewConfigMessage.CreatorUID)
-	}
-
 	policyType := api.PolicyTypeTag
 	tagPolicies, err := s.store.ListPoliciesV2(ctx, &store.FindPolicyMessage{
-		Type:        &policyType,
-		ShowDeleted: false,
+		Type:    &policyType,
+		ShowAll: false,
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list tag policy, error %v", err)
 	}
 
 	config := &v1pb.ReviewConfig{
-		Name:       common.FormatReviewConfig(reviewConfigMessage.ID),
-		Creator:    common.FormatUserEmail(creator.Email),
-		CreateTime: timestamppb.New(reviewConfigMessage.CreatedTime),
-		UpdateTime: timestamppb.New(reviewConfigMessage.CreatedTime),
-		Title:      reviewConfigMessage.Name,
-		Enabled:    reviewConfigMessage.Enforce,
-		Rules:      convertToV1PBSQLReviewRules(reviewConfigMessage.Payload.SqlReviewRules),
+		Name:    common.FormatReviewConfig(reviewConfigMessage.ID),
+		Title:   reviewConfigMessage.Name,
+		Enabled: reviewConfigMessage.Enforce,
+		Rules:   convertToV1PBSQLReviewRules(reviewConfigMessage.Payload.SqlReviewRules),
 	}
 
 	for _, policy := range tagPolicies {
@@ -231,41 +208,37 @@ func (s *ReviewConfigService) convertToV1ReviewConfig(ctx context.Context, revie
 
 		switch policy.ResourceType {
 		case api.PolicyResourceTypeEnvironment:
+			environmentID, err := common.GetEnvironmentID(policy.Resource)
+			if err != nil {
+				return nil, err
+			}
 			environment, err := s.store.GetEnvironmentV2(ctx, &store.FindEnvironmentMessage{
-				UID:         &policy.ResourceUID,
+				ResourceID:  &environmentID,
 				ShowDeleted: false,
 			})
 			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to get environment %d with error: %v", policy.ResourceUID, err)
+				return nil, status.Errorf(codes.Internal, "failed to get environment %s with error: %v", environmentID, err)
 			}
 			if environment == nil {
 				continue
 			}
 			config.Resources = append(config.Resources, common.FormatEnvironment(environment.ResourceID))
 		case api.PolicyResourceTypeProject:
+			projectID, err := common.GetProjectID(policy.Resource)
+			if err != nil {
+				return nil, err
+			}
 			project, err := s.store.GetProjectV2(ctx, &store.FindProjectMessage{
-				UID:         &policy.ResourceUID,
+				ResourceID:  &projectID,
 				ShowDeleted: false,
 			})
 			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to get project %d with error: %v", policy.ResourceUID, err)
+				return nil, status.Errorf(codes.Internal, "failed to get project %s with error: %v", projectID, err)
 			}
 			if project == nil {
 				continue
 			}
 			config.Resources = append(config.Resources, common.FormatProject(project.ResourceID))
-		case api.PolicyResourceTypeDatabase:
-			database, err := s.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{
-				UID:         &policy.ResourceUID,
-				ShowDeleted: false,
-			})
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to get database %d with error: %v", policy.ResourceUID, err)
-			}
-			if database == nil {
-				continue
-			}
-			config.Resources = append(config.Resources, common.FormatDatabase(database.InstanceID, database.DatabaseName))
 		}
 	}
 

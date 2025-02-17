@@ -5,28 +5,20 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/bytebase/bytebase/backend/common"
-	api "github.com/bytebase/bytebase/backend/legacyapi"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 // ReviewConfigMessage is the API message for sql review.
 type ReviewConfigMessage struct {
-	ID         string
-	CreatorUID int
-	UpdaterUID int
-	Enforce    bool
-	Name       string
-	Payload    *storepb.ReviewConfigPayload
-
-	// Output only fields
-	CreatedTime time.Time
-	UpdatedTime time.Time
+	ID      string
+	Enforce bool
+	Name    string
+	Payload *storepb.ReviewConfigPayload
 }
 
 // FindReviewConfigMessage is the API message for finding sql review.
@@ -36,11 +28,10 @@ type FindReviewConfigMessage struct {
 
 // PatchReviewConfigMessage is the message to patch a sql review.
 type PatchReviewConfigMessage struct {
-	ID        string
-	UpdaterID int
-	Name      *string
-	Enforce   *bool
-	Payload   *storepb.ReviewConfigPayload
+	ID      string
+	Name    *string
+	Enforce *bool
+	Payload *storepb.ReviewConfigPayload
 }
 
 // GetReviewConfig gets sql review by id.
@@ -76,11 +67,7 @@ func (s *Store) ListReviewConfigs(ctx context.Context, find *FindReviewConfigMes
 	rows, err := tx.QueryContext(ctx, fmt.Sprintf(`
 		SELECT
 			id,
-			row_status,
-			creator_id,
-			created_ts,
-			updater_id,
-			updated_ts,
+			enabled,
 			name,
 			payload
 		FROM review_config
@@ -95,18 +82,11 @@ func (s *Store) ListReviewConfigs(ctx context.Context, find *FindReviewConfigMes
 	var sqlReviewList []*ReviewConfigMessage
 	for rows.Next() {
 		var sqlReview ReviewConfigMessage
-		var createdTs int64
-		var updatedTs int64
 		var payload []byte
-		var rowStatus string
 
 		if err := rows.Scan(
 			&sqlReview.ID,
-			&rowStatus,
-			&sqlReview.CreatorUID,
-			&createdTs,
-			&sqlReview.UpdaterUID,
-			&updatedTs,
+			&sqlReview.Enforce,
 			&sqlReview.Name,
 			&payload,
 		); err != nil {
@@ -118,10 +98,7 @@ func (s *Store) ListReviewConfigs(ctx context.Context, find *FindReviewConfigMes
 			return nil, err
 		}
 
-		sqlReview.Enforce = rowStatus == string(api.Normal)
 		sqlReview.Payload = reviewConfigPyload
-		sqlReview.CreatedTime = time.Unix(createdTs, 0)
-		sqlReview.UpdatedTime = time.Unix(updatedTs, 0)
 		sqlReviewList = append(sqlReviewList, &sqlReview)
 	}
 	if err := rows.Err(); err != nil {
@@ -147,13 +124,10 @@ func (s *Store) CreateReviewConfig(ctx context.Context, create *ReviewConfigMess
 	query := `
 		INSERT INTO review_config (
 			id,
-			creator_id,
-			updater_id,
 			name,
 			payload
 		)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING created_ts, updated_ts
+		VALUES ($1, $2, $3)
 	`
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -161,19 +135,11 @@ func (s *Store) CreateReviewConfig(ctx context.Context, create *ReviewConfigMess
 		return nil, err
 	}
 	defer tx.Rollback()
-	create.UpdaterUID = create.CreatorUID
 
-	var createdTs int64
-	var updatedTs int64
-	if err := tx.QueryRowContext(ctx, query,
+	if _, err := tx.ExecContext(ctx, query,
 		create.ID,
-		create.CreatorUID,
-		create.CreatorUID,
 		create.Name,
 		payload,
-	).Scan(
-		&createdTs,
-		&updatedTs,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, common.FormatDBErrorEmptyRowWithQuery(query)
@@ -185,8 +151,6 @@ func (s *Store) CreateReviewConfig(ctx context.Context, create *ReviewConfigMess
 	}
 
 	create.Enforce = true
-	create.CreatedTime = time.Unix(createdTs, 0)
-	create.UpdatedTime = time.Unix(updatedTs, 0)
 
 	return create, nil
 }
@@ -208,13 +172,9 @@ func (s *Store) DeleteReviewConfig(ctx context.Context, id string) error {
 
 // UpdateReviewConfig updates the sql review.
 func (s *Store) UpdateReviewConfig(ctx context.Context, patch *PatchReviewConfigMessage) (*ReviewConfigMessage, error) {
-	set, args := []string{"updater_id = $1", "updated_ts = $2"}, []any{patch.UpdaterID, time.Now().Unix()}
+	set, args := []string{}, []any{}
 	if v := patch.Enforce; v != nil {
-		rowStatus := api.Normal
-		if !*patch.Enforce {
-			rowStatus = api.Archived
-		}
-		set, args = append(set, fmt.Sprintf(`"row_status" = $%d`, len(args)+1)), append(args, rowStatus)
+		set, args = append(set, fmt.Sprintf("enabled = $%d", len(args)+1)), append(args, *v)
 	}
 	if v := patch.Name; v != nil {
 		set, args = append(set, fmt.Sprintf("name = $%d", len(args)+1)), append(args, *v)
@@ -240,28 +200,17 @@ func (s *Store) UpdateReviewConfig(ctx context.Context, patch *PatchReviewConfig
 		WHERE id = $%d
 		RETURNING
 			id,
-			row_status,
-			creator_id,
-			created_ts,
-			updater_id,
-			updated_ts,
+			enabled,
 			name,
 			payload
 		`, len(args))
 
 	var sqlReview ReviewConfigMessage
-	var createdTs int64
-	var updatedTs int64
 	var payload []byte
-	var rowStatus string
 
 	if err := tx.QueryRowContext(ctx, query, args...).Scan(
 		&sqlReview.ID,
-		&rowStatus,
-		&sqlReview.CreatorUID,
-		&createdTs,
-		&sqlReview.UpdaterUID,
-		&updatedTs,
+		&sqlReview.Enforce,
 		&sqlReview.Name,
 		&payload,
 	); err != nil {
@@ -276,10 +225,7 @@ func (s *Store) UpdateReviewConfig(ctx context.Context, patch *PatchReviewConfig
 		return nil, err
 	}
 
-	sqlReview.Enforce = rowStatus == string(api.Normal)
 	sqlReview.Payload = reviewConfigPyload
-	sqlReview.CreatedTime = time.Unix(createdTs, 0)
-	sqlReview.UpdatedTime = time.Unix(updatedTs, 0)
 
 	if err := tx.Commit(); err != nil {
 		return nil, err

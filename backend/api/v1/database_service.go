@@ -51,6 +51,9 @@ const (
 	orderByKeyMaximumRowsSent     = "maximum_rows_sent"
 	orderByKeyAverageRowsExamined = "average_rows_examined"
 	orderByKeyMaximumRowsExamined = "maximum_rows_examined"
+
+	// TODO: the frontend not support pagination yet.
+	maximumListDatabasePageSize = 1000000
 )
 
 // DatabaseService implements the database service.
@@ -116,10 +119,9 @@ func (s *DatabaseService) ListInstanceDatabases(ctx context.Context, request *v1
 	}
 
 	offset, err := parseLimitAndOffset(&pageSize{
-		token: request.PageToken,
-		limit: int(request.PageSize),
-		// TODO: the frontend not support pagination yet.
-		maximum: 1000000,
+		token:   request.PageToken,
+		limit:   int(request.PageSize),
+		maximum: maximumListDatabasePageSize,
 	})
 	if err != nil {
 		return nil, err
@@ -191,10 +193,9 @@ func (s *DatabaseService) ListDatabases(ctx context.Context, request *v1pb.ListD
 	}
 
 	offset, err := parseLimitAndOffset(&pageSize{
-		token: request.PageToken,
-		limit: int(request.PageSize),
-		// TODO: the frontend not support pagination yet.
-		maximum: 1000,
+		token:   request.PageToken,
+		limit:   int(request.PageSize),
+		maximum: maximumListDatabasePageSize,
 	})
 	if err != nil {
 		return nil, err
@@ -324,11 +325,7 @@ func (s *DatabaseService) UpdateDatabase(ctx context.Context, request *v1pb.Upda
 		}
 	}
 
-	principalID, ok := ctx.Value(common.PrincipalIDContextKey).(int)
-	if !ok {
-		return nil, status.Errorf(codes.Internal, "principal ID not found")
-	}
-	updatedDatabase, err := s.store.UpdateDatabase(ctx, patch, principalID)
+	updatedDatabase, err := s.store.UpdateDatabase(ctx, patch)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -432,12 +429,8 @@ func (s *DatabaseService) BatchUpdateDatabases(ctx context.Context, request *v1p
 	}
 
 	response := &v1pb.BatchUpdateDatabasesResponse{}
-	principalID, ok := ctx.Value(common.PrincipalIDContextKey).(int)
-	if !ok {
-		return nil, status.Errorf(codes.Internal, "principal ID not found")
-	}
 	if len(databases) > 0 {
-		updatedDatabases, err := s.store.BatchUpdateDatabaseProject(ctx, databases, project.ResourceID, principalID)
+		updatedDatabases, err := s.store.BatchUpdateDatabaseProject(ctx, databases, project.ResourceID)
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -476,7 +469,7 @@ func (s *DatabaseService) GetDatabaseMetadata(ctx context.Context, request *v1pb
 	if database == nil {
 		return nil, status.Errorf(codes.NotFound, "database %q not found", databaseName)
 	}
-	dbSchema, err := s.store.GetDBSchema(ctx, database.UID)
+	dbSchema, err := s.store.GetDBSchema(ctx, database.InstanceID, database.DatabaseName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -484,7 +477,7 @@ func (s *DatabaseService) GetDatabaseMetadata(ctx context.Context, request *v1pb
 		if err := s.schemaSyncer.SyncDatabaseSchema(ctx, database, true /* force */); err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to sync database schema for database %q, error %v", databaseName, err)
 		}
-		newDBSchema, err := s.store.GetDBSchema(ctx, database.UID)
+		newDBSchema, err := s.store.GetDBSchema(ctx, database.InstanceID, database.DatabaseName)
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -535,7 +528,7 @@ func (s *DatabaseService) GetDatabaseSchema(ctx context.Context, request *v1pb.G
 	if database == nil {
 		return nil, status.Errorf(codes.NotFound, "database %q not found", databaseName)
 	}
-	dbSchema, err := s.store.GetDBSchema(ctx, database.UID)
+	dbSchema, err := s.store.GetDBSchema(ctx, database.InstanceID, database.DatabaseName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -543,7 +536,7 @@ func (s *DatabaseService) GetDatabaseSchema(ctx context.Context, request *v1pb.G
 		if err := s.schemaSyncer.SyncDatabaseSchema(ctx, database, true /* force */); err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to sync database schema for database %q, error %v", databaseName, err)
 		}
-		newDBSchema, err := s.store.GetDBSchema(ctx, database.UID)
+		newDBSchema, err := s.store.GetDBSchema(ctx, database.InstanceID, database.DatabaseName)
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -859,11 +852,7 @@ func (s *DatabaseService) UpdateSecret(ctx context.Context, request *v1pb.Update
 	}
 	updateDatabaseMessage.InstanceID = database.InstanceID
 	updateDatabaseMessage.DatabaseName = database.DatabaseName
-	principalID, ok := ctx.Value(common.PrincipalIDContextKey).(int)
-	if !ok {
-		return nil, status.Errorf(codes.Internal, "principal ID not found")
-	}
-	updatedDatabase, err := s.store.UpdateDatabase(ctx, &updateDatabaseMessage, principalID)
+	updatedDatabase, err := s.store.UpdateDatabase(ctx, &updateDatabaseMessage)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -932,11 +921,7 @@ func (s *DatabaseService) DeleteSecret(ctx context.Context, request *v1pb.Delete
 	}
 	updateDatabaseMessage.InstanceID = database.InstanceID
 	updateDatabaseMessage.DatabaseName = database.DatabaseName
-	principalID, ok := ctx.Value(common.PrincipalIDContextKey).(int)
-	if !ok {
-		return nil, status.Errorf(codes.Internal, "principal ID not found")
-	}
-	if _, err := s.store.UpdateDatabase(ctx, &updateDatabaseMessage, principalID); err != nil {
+	if _, err := s.store.UpdateDatabase(ctx, &updateDatabaseMessage); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -1066,8 +1051,8 @@ func (s *DatabaseService) ListSlowQueries(ctx context.Context, request *v1pb.Lis
 			return nil, status.Errorf(codes.NotFound, "instance %q not found", database.InstanceID)
 		}
 		listSlowQuery := &store.ListSlowQueryMessage{
-			InstanceUID:  &instance.UID,
-			DatabaseUID:  &database.UID,
+			InstanceID:   &database.InstanceID,
+			DatabaseName: &database.DatabaseName,
 			StartLogDate: startLogDate,
 			EndLogDate:   endLogDate,
 		}
@@ -1256,7 +1241,7 @@ func (s *DatabaseService) convertToDatabase(ctx context.Context, database *store
 	return &v1pb.Database{
 		Name:                 common.FormatDatabase(database.InstanceID, database.DatabaseName),
 		SyncState:            syncState,
-		SuccessfulSyncTime:   timestamppb.New(time.Unix(database.SuccessfulSyncTimeTs, 0)),
+		SuccessfulSyncTime:   timestamppb.New(database.SyncAt),
 		Project:              common.FormatProject(database.ProjectID),
 		Environment:          environment,
 		EffectiveEnvironment: effectiveEnvironment,
@@ -1402,7 +1387,7 @@ func (s *DatabaseService) mysqlAdviseIndex(ctx context.Context, request *v1pb.Ad
 		if database == nil {
 			return nil, status.Errorf(codes.NotFound, "database %q not found", db)
 		}
-		schema, err := s.store.GetDBSchema(ctx, database.UID)
+		schema, err := s.store.GetDBSchema(ctx, database.InstanceID, database.DatabaseName)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Failed to get database schema: %v", err)
 		}
@@ -1535,7 +1520,7 @@ func (s *DatabaseService) pgAdviseIndex(ctx context.Context, request *v1pb.Advis
 	if err != nil {
 		return nil, err
 	}
-	schema, err := s.store.GetDBSchema(ctx, database.UID)
+	schema, err := s.store.GetDBSchema(ctx, database.InstanceID, database.DatabaseName)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to get database schema: %v", err)
 	}
@@ -1637,6 +1622,9 @@ func getOpenAIResponse(ctx context.Context, messages []openai.ChatCompletionMess
 	var result v1pb.AdviseIndexResponse
 	successful := false
 	var retErr error
+	if model == "" {
+		model = openai.GPT3Dot5Turbo
+	}
 	// Retry 5 times if failed.
 	for i := 0; i < 5; i++ {
 		cfg := openai.DefaultConfig(key)

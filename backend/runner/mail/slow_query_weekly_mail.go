@@ -180,7 +180,7 @@ func (s *SlowQueryWeeklyMailSender) sendEmail(ctx context.Context, now time.Time
 			continue
 		}
 
-		policyMessage, err := s.store.GetProjectIamPolicy(ctx, project.UID)
+		policyMessage, err := s.store.GetProjectIamPolicy(ctx, project.ResourceID)
 		if err != nil {
 			slog.Error("Failed to get project policy", log.BBError(err))
 			continue
@@ -264,7 +264,7 @@ func (s *SlowQueryWeeklyMailSender) generateWeeklyEmailForProject(ctx context.Co
 	headerString = strings.ReplaceAll(headerString, "{{END_DATE}}", endDate.UTC().Format("2006.01.02"))
 	beginUnix := beginDate.Truncate(24 * time.Hour).Unix()
 	endUnix := now.Truncate(24 * time.Hour).Add(-1 * time.Second).Unix()
-	projectURL := fmt.Sprintf("%s/slow-query?project=%d&fromTime=%d&toTime=%d", strings.TrimSuffix(visitURL, "/"), project.UID, beginUnix, endUnix)
+	projectURL := fmt.Sprintf("%s/%s/slow-queries?fromTime=%d&toTime=%d", strings.TrimSuffix(visitURL, "/"), common.FormatProject(project.ResourceID), beginUnix, endUnix)
 	headerString = strings.ReplaceAll(headerString, "{{PROJECT_LINK}}", projectURL)
 	if _, err := buf.WriteString(headerString); err != nil {
 		return "", err
@@ -281,7 +281,11 @@ func (s *SlowQueryWeeklyMailSender) generateWeeklyEmailForProject(ctx context.Co
 
 	instanceMap := make(map[string]*store.InstanceMessage)
 	for _, policy := range policies {
-		instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{UID: &policy.ResourceUID})
+		instanceID, err := common.GetInstanceID(policy.Resource)
+		if err != nil {
+			return "", err
+		}
+		instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{ResourceID: &instanceID})
 		if err != nil {
 			slog.Warn("Failed to get instance", log.BBError(err))
 			continue
@@ -334,8 +338,8 @@ func (s *SlowQueryWeeklyMailSender) generateWeeklyEmailForProject(ctx context.Co
 		for _, database := range databases {
 			instance := instanceMap[database.InstanceID]
 			listSlowQuery := &store.ListSlowQueryMessage{
-				InstanceUID:  &instance.UID,
-				DatabaseUID:  &database.UID,
+				InstanceID:   &instance.ResourceID,
+				DatabaseName: &database.DatabaseName,
 				StartLogDate: &beginDate,
 				EndLogDate:   &endDate,
 			}
@@ -515,7 +519,11 @@ func (s *SlowQueryWeeklyMailSender) generateWeeklyEmailForDBA(ctx context.Contex
 	instanceMap := make(map[string][]*store.InstanceMessage)
 
 	for _, policy := range policies {
-		instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{UID: &policy.ResourceUID})
+		instanceID, err := common.GetInstanceID(policy.Resource)
+		if err != nil {
+			return "", err
+		}
+		instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{ResourceID: &instanceID})
 		if err != nil {
 			slog.Warn("Failed to get instance", log.BBError(err))
 			continue
@@ -617,8 +625,8 @@ func (s *SlowQueryWeeklyMailSender) generateEnvironmentContent(
 		hasSlowQueryInInstance := false
 		for _, database := range databases {
 			listSlowQuery := &store.ListSlowQueryMessage{
-				InstanceUID:  &instance.UID,
-				DatabaseUID:  &database.UID,
+				InstanceID:   &instance.ResourceID,
+				DatabaseName: &database.DatabaseName,
 				StartLogDate: &beginDate,
 				EndLogDate:   &endDate,
 			}

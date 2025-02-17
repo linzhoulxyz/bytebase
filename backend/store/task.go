@@ -15,41 +15,81 @@ import (
 
 	"github.com/bytebase/bytebase/backend/common"
 	api "github.com/bytebase/bytebase/backend/legacyapi"
+	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 // TaskMessage is the message for tasks.
 type TaskMessage struct {
 	ID int
 
-	// Standard fields
-	CreatorID int
-	CreatedTs int64
-	UpdaterID int
-	UpdatedTs int64
-
 	// Related fields
-	PipelineID int
-	StageID    int
-	InstanceID int
-	// Could be empty for creating database task when the task isn't yet completed successfully.
-	DatabaseID     *int
+	PipelineID     int
+	StageID        int
+	InstanceID     string
+	DatabaseName   *string
 	TaskRunRawList []*TaskRunMessage
 
 	// Domain specific fields
 	Name              string
 	Type              api.TaskType
 	Payload           string
-	EarliestAllowedTs int64
+	EarliestAllowedAt *time.Time
 	DependsOn         []int
-
-	DatabaseName string
 
 	LatestTaskRunStatus api.TaskRunStatus
 }
 
+// TaskFind is the API message for finding tasks.
+type TaskFind struct {
+	ID  *int
+	IDs *[]int
+
+	// Related fields
+	PipelineID   *int
+	StageID      *int
+	InstanceID   *string
+	DatabaseName *string
+
+	// Domain specific fields
+	TypeList *[]api.TaskType
+	// Payload contains JSONB expressions
+	// Ref: https://www.postgresql.org/docs/current/functions-json.html
+	Payload         string
+	NoBlockingStage bool
+	NonRollbackTask bool
+
+	LatestTaskRunStatusList *[]api.TaskRunStatus
+}
+
+// TaskPatch is the API message for patching a task.
+type TaskPatch struct {
+	ID int
+
+	// Standard fields
+	// Value is assigned from the jwt subject field passed by the client.
+	UpdaterID int
+
+	// Domain specific fields
+	DatabaseName            *string
+	EarliestAllowedTs       *time.Time
+	UpdateEarliestAllowedTs bool
+
+	// Payload and others cannot be set at the same time.
+	Payload *string
+
+	SheetID               *int
+	SchemaVersion         *string
+	ExportFormat          *storepb.ExportFormat
+	ExportPassword        *string
+	PreUpdateBackupDetail *storepb.PreUpdateBackupDetail
+
+	// Flags for gh-ost.
+	Flags *map[string]string
+}
+
 // GetTaskV2ByID gets a task by ID.
 func (s *Store) GetTaskV2ByID(ctx context.Context, id int) (*TaskMessage, error) {
-	tasks, err := s.ListTasks(ctx, &api.TaskFind{ID: &id})
+	tasks, err := s.ListTasks(ctx, &TaskFind{ID: &id})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get Task with ID %d", id)
 	}
@@ -61,7 +101,7 @@ func (s *Store) GetTaskV2ByID(ctx context.Context, id int) (*TaskMessage, error)
 	return tasks[0], nil
 }
 
-func (s *Store) FindBlockingTasksByVersion(ctx context.Context, databaseUID int, version string) ([]int, error) {
+func (s *Store) FindBlockingTasksByVersion(ctx context.Context, instanceID, databaseName string, version string) ([]int, error) {
 	query := `
 		SELECT
 			task.id
@@ -79,16 +119,16 @@ func (s *Store) FindBlockingTasksByVersion(ctx context.Context, databaseUID int,
 				), 'NOT_STARTED'
 			) AS status
 		) AS latest_task_run ON TRUE
-		WHERE task.database_id = $1
+		WHERE task.instance = $1 AND task.db_name = $2
 		AND task.payload->>'schemaVersion' IS NOT NULL
-		AND task.payload->>'schemaVersion' < $2
+		AND task.payload->>'schemaVersion' < $3
 		AND (task.payload->>'skipped')::BOOLEAN IS NOT TRUE
 		AND latest_task_run.status != 'DONE'
 		AND COALESCE(issue.status, 'OPEN') = 'OPEN'
 		ORDER BY task.id ASC
 	`
 
-	rows, err := s.db.db.QueryContext(ctx, query, databaseUID, version)
+	rows, err := s.db.db.QueryContext(ctx, query, instanceID, databaseName, version)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query rows")
 	}
@@ -117,17 +157,15 @@ func (*Store) createTasks(ctx context.Context, tx *Tx, creates ...*TaskMessage) 
 
 	_, _ = query.WriteString(
 		`INSERT INTO task (
-			creator_id,
-			updater_id,
 			pipeline_id,
 			stage_id,
-			instance_id,
-			database_id,
+			instance,
+			db_name,
 			name,
 			status,
 			type,
 			payload,
-			earliest_allowed_ts
+			earliest_allowed_at
 		)
 		VALUES
     `)
@@ -136,22 +174,20 @@ func (*Store) createTasks(ctx context.Context, tx *Tx, creates ...*TaskMessage) 
 			create.Payload = "{}"
 		}
 		values = append(values,
-			create.CreatorID,
-			create.CreatorID,
 			create.PipelineID,
 			create.StageID,
 			create.InstanceID,
-			create.DatabaseID,
+			create.DatabaseName,
 			create.Name,
 			create.Type,
 			create.Payload,
-			create.EarliestAllowedTs,
+			create.EarliestAllowedAt,
 		)
-		const count = 10
-		queryValues = append(queryValues, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, 'PENDING_APPROVAL', $%d, $%d, $%d)", i*count+1, i*count+2, i*count+3, i*count+4, i*count+5, i*count+6, i*count+7, i*count+8, i*count+9, i*count+10))
+		const count = 8
+		queryValues = append(queryValues, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, 'PENDING_APPROVAL', $%d, $%d, $%d)", i*count+1, i*count+2, i*count+3, i*count+4, i*count+5, i*count+6, i*count+7, i*count+8))
 	}
 	_, _ = query.WriteString(strings.Join(queryValues, ","))
-	_, _ = query.WriteString(` RETURNING id, creator_id, created_ts, updater_id, updated_ts, pipeline_id, stage_id, instance_id, database_id, name, type, payload, earliest_allowed_ts`)
+	_, _ = query.WriteString(` RETURNING id, pipeline_id, stage_id, instance, db_name, name, type, payload, earliest_allowed_at`)
 
 	var tasks []*TaskMessage
 	rows, err := tx.QueryContext(ctx, query.String(), values...)
@@ -161,27 +197,22 @@ func (*Store) createTasks(ctx context.Context, tx *Tx, creates ...*TaskMessage) 
 	defer rows.Close()
 	for rows.Next() {
 		task := &TaskMessage{}
-		var databaseID sql.NullInt32
+		var earliestAllowedAt sql.NullTime
 		if err := rows.Scan(
 			&task.ID,
-			&task.CreatorID,
-			&task.CreatedTs,
-			&task.UpdaterID,
-			&task.UpdatedTs,
 			&task.PipelineID,
 			&task.StageID,
 			&task.InstanceID,
-			&databaseID,
+			&task.DatabaseName,
 			&task.Name,
 			&task.Type,
 			&task.Payload,
-			&task.EarliestAllowedTs,
+			&earliestAllowedAt,
 		); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan rows")
 		}
-		if databaseID.Valid {
-			val := int(databaseID.Int32)
-			task.DatabaseID = &val
+		if earliestAllowedAt.Valid {
+			task.EarliestAllowedAt = &earliestAllowedAt.Time
 		}
 		tasks = append(tasks, task)
 	}
@@ -212,7 +243,7 @@ func (s *Store) CreateTasksV2(ctx context.Context, creates ...*TaskMessage) ([]*
 }
 
 // ListTasks retrieves a list of tasks based on find.
-func (s *Store) ListTasks(ctx context.Context, find *api.TaskFind) ([]*TaskMessage, error) {
+func (s *Store) ListTasks(ctx context.Context, find *TaskFind) ([]*TaskMessage, error) {
 	where, args := []string{"TRUE"}, []any{}
 	if v := find.ID; v != nil {
 		where, args = append(where, fmt.Sprintf("task.id = $%d", len(args)+1)), append(args, *v)
@@ -226,8 +257,11 @@ func (s *Store) ListTasks(ctx context.Context, find *api.TaskFind) ([]*TaskMessa
 	if v := find.StageID; v != nil {
 		where, args = append(where, fmt.Sprintf("task.stage_id = $%d", len(args)+1)), append(args, *v)
 	}
-	if v := find.DatabaseID; v != nil {
-		where, args = append(where, fmt.Sprintf("task.database_id = $%d", len(args)+1)), append(args, *v)
+	if v := find.InstanceID; v != nil {
+		where, args = append(where, fmt.Sprintf("task.instance = $%d", len(args)+1)), append(args, *v)
+	}
+	if v := find.DatabaseName; v != nil {
+		where, args = append(where, fmt.Sprintf("task.db_name = $%d", len(args)+1)), append(args, *v)
 	}
 	if v := find.LatestTaskRunStatusList; v != nil {
 		where = append(where, fmt.Sprintf("latest_task_run.status = ANY($%d)", len(args)+1))
@@ -261,19 +295,15 @@ func (s *Store) ListTasks(ctx context.Context, find *api.TaskFind) ([]*TaskMessa
 	rows, err := tx.QueryContext(ctx, fmt.Sprintf(`
 		SELECT
 			task.id,
-			task.creator_id,
-			task.created_ts,
-			task.updater_id,
-			task.updated_ts,
 			task.pipeline_id,
 			task.stage_id,
-			task.instance_id,
-			task.database_id,
+			task.instance,
+			task.db_name,
 			task.name,
 			latest_task_run.status AS latest_task_run_status,
 			task.type,
 			task.payload,
-			task.earliest_allowed_ts,
+			task.earliest_allowed_at,
 			(SELECT ARRAY_AGG (task_dag.from_task_id) FROM task_dag WHERE task_dag.to_task_id = task.id) blocked_by
 		FROM task
 		LEFT JOIN LATERAL (
@@ -299,28 +329,28 @@ func (s *Store) ListTasks(ctx context.Context, find *api.TaskFind) ([]*TaskMessa
 	var tasks []*TaskMessage
 	for rows.Next() {
 		task := &TaskMessage{}
+		var earliestAllowedAt sql.NullTime
 		var dependsOn pgtype.Int4Array
 		if err := rows.Scan(
 			&task.ID,
-			&task.CreatorID,
-			&task.CreatedTs,
-			&task.UpdaterID,
-			&task.UpdatedTs,
 			&task.PipelineID,
 			&task.StageID,
 			&task.InstanceID,
-			&task.DatabaseID,
+			&task.DatabaseName,
 			&task.Name,
 			&task.LatestTaskRunStatus,
 			&task.Type,
 			&task.Payload,
-			&task.EarliestAllowedTs,
+			&earliestAllowedAt,
 			&dependsOn,
 		); err != nil {
 			return nil, err
 		}
 		if err := dependsOn.AssignTo(&task.DependsOn); err != nil {
 			return nil, err
+		}
+		if earliestAllowedAt.Valid {
+			task.EarliestAllowedAt = &earliestAllowedAt.Time
 		}
 		tasks = append(tasks, task)
 	}
@@ -335,10 +365,10 @@ func (s *Store) ListTasks(ctx context.Context, find *api.TaskFind) ([]*TaskMessa
 
 // UpdateTaskV2 updates an existing task.
 // Returns ENOTFOUND if task does not exist.
-func (s *Store) UpdateTaskV2(ctx context.Context, patch *api.TaskPatch) (*TaskMessage, error) {
-	set, args := []string{"updater_id = $1", "updated_ts = $2"}, []any{patch.UpdaterID, time.Now().Unix()}
-	if v := patch.DatabaseID; v != nil {
-		set, args = append(set, fmt.Sprintf("database_id = $%d", len(args)+1)), append(args, *v)
+func (s *Store) UpdateTaskV2(ctx context.Context, patch *TaskPatch) (*TaskMessage, error) {
+	set, args := []string{}, []any{}
+	if v := patch.DatabaseName; v != nil {
+		set, args = append(set, fmt.Sprintf("db_name = $%d", len(args)+1)), append(args, *v)
 	}
 	if (patch.SchemaVersion != nil || patch.SheetID != nil) && patch.Payload != nil {
 		return nil, errors.Errorf("cannot set both sheetID/schemaVersion and payload for TaskPatch")
@@ -380,8 +410,12 @@ func (s *Store) UpdateTaskV2(ctx context.Context, patch *api.TaskPatch) (*TaskMe
 		}
 		set, args = append(set, fmt.Sprintf("payload = $%d", len(args)+1)), append(args, payload)
 	}
-	if v := patch.EarliestAllowedTs; v != nil {
-		set, args = append(set, fmt.Sprintf("earliest_allowed_ts = $%d", len(args)+1)), append(args, *v)
+	if patch.UpdateEarliestAllowedTs {
+		if patch.EarliestAllowedTs == nil {
+			set = append(set, "earliest_allowed_at = null")
+		} else {
+			set, args = append(set, fmt.Sprintf("earliest_allowed_at = $%d", len(args)+1)), append(args, *patch.EarliestAllowedTs)
+		}
 	}
 	args = append(args, patch.ID)
 
@@ -392,28 +426,24 @@ func (s *Store) UpdateTaskV2(ctx context.Context, patch *api.TaskPatch) (*TaskMe
 	defer tx.Rollback()
 
 	task := &TaskMessage{}
-	// Execute update query with RETURNING.
+	var earliestAllowedAt sql.NullTime
 	if err := tx.QueryRowContext(ctx, fmt.Sprintf(`
 		UPDATE task
 		SET `+strings.Join(set, ", ")+`
 		WHERE id = $%d
-		RETURNING id, creator_id, created_ts, updater_id, updated_ts, pipeline_id, stage_id, instance_id, database_id, name, type, payload, earliest_allowed_ts
+		RETURNING id, pipeline_id, stage_id, instance, db_name, name, type, payload, earliest_allowed_at
 	`, len(args)),
 		args...,
 	).Scan(
 		&task.ID,
-		&task.CreatorID,
-		&task.CreatedTs,
-		&task.UpdaterID,
-		&task.UpdatedTs,
 		&task.PipelineID,
 		&task.StageID,
 		&task.InstanceID,
-		&task.DatabaseID,
+		&task.DatabaseName,
 		&task.Name,
 		&task.Type,
 		&task.Payload,
-		&task.EarliestAllowedTs,
+		&earliestAllowedAt,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, &common.Error{Code: common.NotFound, Err: errors.Errorf("task not found with ID %d", patch.ID)}
@@ -421,6 +451,9 @@ func (s *Store) UpdateTaskV2(ctx context.Context, patch *api.TaskPatch) (*TaskMe
 		return nil, err
 	}
 
+	if earliestAllowedAt.Valid {
+		task.EarliestAllowedAt = &earliestAllowedAt.Time
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -429,12 +462,12 @@ func (s *Store) UpdateTaskV2(ctx context.Context, patch *api.TaskPatch) (*TaskMe
 }
 
 // BatchSkipTasks batch skip tasks.
-func (s *Store) BatchSkipTasks(ctx context.Context, taskUIDs []int, comment string, updaterUID int) error {
+func (s *Store) BatchSkipTasks(ctx context.Context, taskUIDs []int, comment string) error {
 	query := `
 	UPDATE task
-	SET updater_id = $1, payload = payload || jsonb_build_object('skipped', $2::BOOLEAN) || jsonb_build_object('skippedReason', $3::TEXT)
-	WHERE id = ANY($4)`
-	args := []any{updaterUID, true, comment, taskUIDs}
+	SET payload = payload || jsonb_build_object('skipped', $1::BOOLEAN) || jsonb_build_object('skippedReason', $2::TEXT)
+	WHERE id = ANY($3)`
+	args := []any{true, comment, taskUIDs}
 
 	if _, err := s.db.db.ExecContext(ctx, query, args...); err != nil {
 		return errors.Wrapf(err, "failed to batch skip tasks")
@@ -450,7 +483,7 @@ func (s *Store) BatchSkipTasks(ctx context.Context, taskUIDs []int, comment stri
 // 4. are in an environment that has auto rollout enabled
 // 5. are in the stage that is the first among the selected stages in the pipeline
 // 6. are not data export tasks.
-func (s *Store) ListTasksToAutoRollout(ctx context.Context, environmentIDs []int) ([]int, error) {
+func (s *Store) ListTasksToAutoRollout(ctx context.Context, environments []string) ([]int, error) {
 	rows, err := s.db.db.QueryContext(ctx, `
 	SELECT
 		task.pipeline_id,
@@ -464,8 +497,8 @@ func (s *Store) ListTasksToAutoRollout(ctx context.Context, environmentIDs []int
 	AND task.type != 'bb.task.database.data.export'
 	AND COALESCE((task.payload->>'skipped')::BOOLEAN, FALSE) IS FALSE
 	AND COALESCE(issue.status, 'OPEN') = 'OPEN'
-	AND stage.environment_id = ANY($1)
-	`, environmentIDs)
+	AND stage.environment = ANY($1)
+	`, environments)
 	if err != nil {
 		return nil, err
 	}

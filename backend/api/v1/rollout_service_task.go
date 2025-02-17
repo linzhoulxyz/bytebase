@@ -76,7 +76,7 @@ func transformDatabaseGroupTargetToSpecs(ctx context.Context, s *store.Store, sp
 		return nil, errors.Errorf("project id %q in target %q does not match project id %q in plan config", projectID, c.Target, project.ResourceID)
 	}
 
-	databaseGroup, err := s.GetDatabaseGroup(ctx, &store.FindDatabaseGroupMessage{ProjectUID: &project.UID, ResourceID: &databaseGroupID})
+	databaseGroup, err := s.GetDatabaseGroup(ctx, &store.FindDatabaseGroupMessage{ProjectID: &project.ResourceID, ResourceID: &databaseGroupID})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get database group %q", databaseGroupID)
 	}
@@ -225,10 +225,10 @@ func getTaskCreatesFromCreateDatabaseConfig(ctx context.Context, s *store.Store,
 			return nil, err
 		}
 		sheet, err := sheetManager.CreateSheet(ctx, &store.SheetMessage{
-			CreatorID:  api.SystemBotID,
-			ProjectUID: project.UID,
-			Title:      fmt.Sprintf("Sheet for creating database %v", databaseName),
-			Statement:  statement,
+			CreatorID: api.SystemBotID,
+			ProjectID: project.ResourceID,
+			Title:     fmt.Sprintf("Sheet for creating database %v", databaseName),
+			Statement: statement,
 			Payload: &storepb.SheetPayload{
 				Engine: instance.Engine,
 			},
@@ -239,7 +239,6 @@ func getTaskCreatesFromCreateDatabaseConfig(ctx context.Context, s *store.Store,
 
 		payload := &storepb.TaskDatabaseCreatePayload{
 			SpecId:        spec.Id,
-			ProjectId:     int32(project.UID),
 			CharacterSet:  c.CharacterSet,
 			TableName:     c.Table,
 			Collation:     c.Collation,
@@ -253,16 +252,19 @@ func getTaskCreatesFromCreateDatabaseConfig(ctx context.Context, s *store.Store,
 			return nil, errors.Wrap(err, "failed to create database creation task, unable to marshal payload")
 		}
 
+		v := &store.TaskMessage{
+			InstanceID:   instance.ResourceID,
+			DatabaseName: nil,
+			Name:         fmt.Sprintf("Create database %v", payload.DatabaseName),
+			Type:         api.TaskDatabaseCreate,
+			Payload:      string(bytes),
+		}
+		if spec.EarliestAllowedTime.GetSeconds() > 0 {
+			t := spec.EarliestAllowedTime.AsTime()
+			v.EarliestAllowedAt = &t
+		}
 		return []*store.TaskMessage{
-			{
-				InstanceID:        instance.UID,
-				DatabaseID:        nil,
-				Name:              fmt.Sprintf("Create database %v", payload.DatabaseName),
-				Type:              api.TaskDatabaseCreate,
-				DatabaseName:      payload.DatabaseName,
-				Payload:           string(bytes),
-				EarliestAllowedTs: spec.EarliestAllowedTime.GetSeconds(),
-			},
+			v,
 		}, nil
 	}()
 	if err != nil {
@@ -335,12 +337,15 @@ func getTaskCreatesFromExportDataConfig(ctx context.Context, s *store.Store, spe
 	}
 	payloadString := string(bytes)
 	taskCreate := &store.TaskMessage{
-		Name:              fmt.Sprintf("Export data from database %q", database.DatabaseName),
-		InstanceID:        instance.UID,
-		DatabaseID:        &database.UID,
-		Type:              api.TaskDatabaseDataExport,
-		EarliestAllowedTs: spec.EarliestAllowedTime.GetSeconds(),
-		Payload:           payloadString,
+		Name:         fmt.Sprintf("Export data from database %q", database.DatabaseName),
+		InstanceID:   database.InstanceID,
+		DatabaseName: &database.DatabaseName,
+		Type:         api.TaskDatabaseDataExport,
+		Payload:      payloadString,
+	}
+	if spec.EarliestAllowedTime.GetSeconds() > 0 {
+		t := spec.EarliestAllowedTime.AsTime()
+		taskCreate.EarliestAllowedAt = &t
 	}
 	return []*store.TaskMessage{taskCreate}, nil, nil
 }
@@ -380,7 +385,7 @@ func getTaskCreatesFromChangeDatabaseConfigDatabaseTarget(ctx context.Context, s
 	case storepb.PlanConfig_ChangeDatabaseConfig_BASELINE:
 		payload := &storepb.TaskDatabaseUpdatePayload{
 			SpecId:        spec.Id,
-			SchemaVersion: getOrDefaultSchemaVersion(c.SchemaVersion),
+			SchemaVersion: c.SchemaVersion,
 			TaskReleaseSource: &storepb.TaskReleaseSource{
 				File: spec.SpecReleaseSource.GetFile(),
 			},
@@ -391,12 +396,15 @@ func getTaskCreatesFromChangeDatabaseConfigDatabaseTarget(ctx context.Context, s
 		}
 		payloadString := string(bytes)
 		taskCreate := &store.TaskMessage{
-			Name:              fmt.Sprintf("Establish baseline for database %q", database.DatabaseName),
-			InstanceID:        instance.UID,
-			DatabaseID:        &database.UID,
-			Type:              api.TaskDatabaseSchemaBaseline,
-			EarliestAllowedTs: spec.EarliestAllowedTime.GetSeconds(),
-			Payload:           payloadString,
+			Name:         fmt.Sprintf("Establish baseline for database %q", database.DatabaseName),
+			InstanceID:   database.InstanceID,
+			DatabaseName: &database.DatabaseName,
+			Type:         api.TaskDatabaseSchemaBaseline,
+			Payload:      payloadString,
+		}
+		if spec.EarliestAllowedTime.GetSeconds() > 0 {
+			t := spec.EarliestAllowedTime.AsTime()
+			taskCreate.EarliestAllowedAt = &t
 		}
 		return []*store.TaskMessage{taskCreate}, nil, nil
 
@@ -408,7 +416,7 @@ func getTaskCreatesFromChangeDatabaseConfigDatabaseTarget(ctx context.Context, s
 		payload := &storepb.TaskDatabaseUpdatePayload{
 			SpecId:        spec.Id,
 			SheetId:       int32(sheetUID),
-			SchemaVersion: getOrDefaultSchemaVersion(c.SchemaVersion),
+			SchemaVersion: c.SchemaVersion,
 			TaskReleaseSource: &storepb.TaskReleaseSource{
 				File: spec.SpecReleaseSource.GetFile(),
 			},
@@ -419,12 +427,15 @@ func getTaskCreatesFromChangeDatabaseConfigDatabaseTarget(ctx context.Context, s
 		}
 		payloadString := string(bytes)
 		taskCreate := &store.TaskMessage{
-			Name:              fmt.Sprintf("DDL(schema) for database %q", database.DatabaseName),
-			InstanceID:        instance.UID,
-			DatabaseID:        &database.UID,
-			Type:              api.TaskDatabaseSchemaUpdate,
-			EarliestAllowedTs: spec.EarliestAllowedTime.GetSeconds(),
-			Payload:           payloadString,
+			Name:         fmt.Sprintf("DDL(schema) for database %q", database.DatabaseName),
+			InstanceID:   database.InstanceID,
+			DatabaseName: &database.DatabaseName,
+			Type:         api.TaskDatabaseSchemaUpdate,
+			Payload:      payloadString,
+		}
+		if spec.EarliestAllowedTime.GetSeconds() > 0 {
+			t := spec.EarliestAllowedTime.AsTime()
+			taskCreate.EarliestAllowedAt = &t
 		}
 		return []*store.TaskMessage{taskCreate}, nil, nil
 
@@ -436,7 +447,7 @@ func getTaskCreatesFromChangeDatabaseConfigDatabaseTarget(ctx context.Context, s
 		payload := &storepb.TaskDatabaseUpdatePayload{
 			SpecId:        spec.Id,
 			SheetId:       int32(sheetUID),
-			SchemaVersion: getOrDefaultSchemaVersion(c.SchemaVersion),
+			SchemaVersion: c.SchemaVersion,
 			TaskReleaseSource: &storepb.TaskReleaseSource{
 				File: spec.SpecReleaseSource.GetFile(),
 			},
@@ -447,12 +458,15 @@ func getTaskCreatesFromChangeDatabaseConfigDatabaseTarget(ctx context.Context, s
 		}
 		payloadString := string(bytes)
 		taskCreate := &store.TaskMessage{
-			Name:              fmt.Sprintf("SDL for database %q", database.DatabaseName),
-			InstanceID:        instance.UID,
-			DatabaseID:        &database.UID,
-			Type:              api.TaskDatabaseSchemaUpdateSDL,
-			EarliestAllowedTs: spec.EarliestAllowedTime.GetSeconds(),
-			Payload:           payloadString,
+			Name:         fmt.Sprintf("SDL for database %q", database.DatabaseName),
+			InstanceID:   database.InstanceID,
+			DatabaseName: &database.DatabaseName,
+			Type:         api.TaskDatabaseSchemaUpdateSDL,
+			Payload:      payloadString,
+		}
+		if spec.EarliestAllowedTime.GetSeconds() > 0 {
+			t := spec.EarliestAllowedTime.AsTime()
+			taskCreate.EarliestAllowedAt = &t
 		}
 		return []*store.TaskMessage{taskCreate}, nil, nil
 
@@ -469,7 +483,7 @@ func getTaskCreatesFromChangeDatabaseConfigDatabaseTarget(ctx context.Context, s
 		payloadSync := &storepb.TaskDatabaseUpdatePayload{
 			SpecId:        spec.Id,
 			SheetId:       int32(sheetUID),
-			SchemaVersion: getOrDefaultSchemaVersion(c.SchemaVersion),
+			SchemaVersion: c.SchemaVersion,
 			Flags:         c.GhostFlags,
 			TaskReleaseSource: &storepb.TaskReleaseSource{
 				File: spec.SpecReleaseSource.GetFile(),
@@ -479,14 +493,18 @@ func getTaskCreatesFromChangeDatabaseConfigDatabaseTarget(ctx context.Context, s
 		if err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to marshal database schema update gh-ost sync payload")
 		}
-		taskCreateList = append(taskCreateList, &store.TaskMessage{
-			Name:              fmt.Sprintf("Update schema gh-ost sync for database %q", database.DatabaseName),
-			InstanceID:        instance.UID,
-			DatabaseID:        &database.UID,
-			Type:              api.TaskDatabaseSchemaUpdateGhostSync,
-			EarliestAllowedTs: spec.EarliestAllowedTime.GetSeconds(),
-			Payload:           string(bytesSync),
-		})
+		v := &store.TaskMessage{
+			Name:         fmt.Sprintf("Update schema gh-ost sync for database %q", database.DatabaseName),
+			InstanceID:   database.InstanceID,
+			DatabaseName: &database.DatabaseName,
+			Type:         api.TaskDatabaseSchemaUpdateGhostSync,
+			Payload:      string(bytesSync),
+		}
+		if spec.EarliestAllowedTime.GetSeconds() > 0 {
+			t := spec.EarliestAllowedTime.AsTime()
+			v.EarliestAllowedAt = &t
+		}
+		taskCreateList = append(taskCreateList, v)
 
 		// task "cutover"
 		payloadCutover := &storepb.TaskDatabaseUpdatePayload{
@@ -496,14 +514,18 @@ func getTaskCreatesFromChangeDatabaseConfigDatabaseTarget(ctx context.Context, s
 		if err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to marshal database schema update ghost cutover payload")
 		}
-		taskCreateList = append(taskCreateList, &store.TaskMessage{
-			Name:              fmt.Sprintf("Update schema gh-ost cutover for database %q", database.DatabaseName),
-			InstanceID:        instance.UID,
-			DatabaseID:        &database.UID,
-			Type:              api.TaskDatabaseSchemaUpdateGhostCutover,
-			EarliestAllowedTs: spec.EarliestAllowedTime.GetSeconds(),
-			Payload:           string(bytesCutover),
-		})
+		cutoverV := &store.TaskMessage{
+			Name:         fmt.Sprintf("Update schema gh-ost cutover for database %q", database.DatabaseName),
+			InstanceID:   database.InstanceID,
+			DatabaseName: &database.DatabaseName,
+			Type:         api.TaskDatabaseSchemaUpdateGhostCutover,
+			Payload:      string(bytesCutover),
+		}
+		if spec.EarliestAllowedTime.GetSeconds() > 0 {
+			t := spec.EarliestAllowedTime.AsTime()
+			cutoverV.EarliestAllowedAt = &t
+		}
+		taskCreateList = append(taskCreateList, cutoverV)
 
 		// The below list means that taskCreateList[0] blocks taskCreateList[1].
 		// In other words, task "sync" blocks task "cutover".
@@ -524,7 +546,7 @@ func getTaskCreatesFromChangeDatabaseConfigDatabaseTarget(ctx context.Context, s
 		payload := &storepb.TaskDatabaseUpdatePayload{
 			SpecId:                spec.Id,
 			SheetId:               int32(sheetUID),
-			SchemaVersion:         getOrDefaultSchemaVersion(c.SchemaVersion),
+			SchemaVersion:         c.SchemaVersion,
 			PreUpdateBackupDetail: preUpdateBackupDetail,
 			TaskReleaseSource: &storepb.TaskReleaseSource{
 				File: spec.SpecReleaseSource.GetFile(),
@@ -536,12 +558,15 @@ func getTaskCreatesFromChangeDatabaseConfigDatabaseTarget(ctx context.Context, s
 		}
 		payloadString := string(bytes)
 		taskCreate := &store.TaskMessage{
-			Name:              fmt.Sprintf("DML(data) for database %q", database.DatabaseName),
-			InstanceID:        instance.UID,
-			DatabaseID:        &database.UID,
-			Type:              api.TaskDatabaseDataUpdate,
-			EarliestAllowedTs: spec.EarliestAllowedTime.GetSeconds(),
-			Payload:           payloadString,
+			Name:         fmt.Sprintf("DML(data) for database %q", database.DatabaseName),
+			InstanceID:   database.InstanceID,
+			DatabaseName: &database.DatabaseName,
+			Type:         api.TaskDatabaseDataUpdate,
+			Payload:      payloadString,
+		}
+		if spec.EarliestAllowedTime.GetSeconds() > 0 {
+			t := spec.EarliestAllowedTime.AsTime()
+			taskCreate.EarliestAllowedAt = &t
 		}
 		return []*store.TaskMessage{taskCreate}, nil, nil
 	default:
@@ -695,11 +720,4 @@ func getCreateDatabaseStatement(dbType storepb.Engine, c *storepb.PlanConfig_Cre
 		return fmt.Sprintf("CREATE DATABASE %s;", databaseName), nil
 	}
 	return "", errors.Errorf("unsupported database type %s", dbType)
-}
-
-func getOrDefaultSchemaVersion(v string) string {
-	if v != "" {
-		return v
-	}
-	return ""
 }

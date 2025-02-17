@@ -28,29 +28,25 @@ const (
 
 // WorkSheetMessage is the message for a sheet.
 type WorkSheetMessage struct {
-	ProjectUID int
+	ProjectID string
 	// The DatabaseUID is optional.
 	// If not NULL, the sheet ProjectID should always be equal to the id of the database related project.
 	// A project must remove all linked sheets for a particular database before that database can be transferred to a different project.
-	DatabaseUID *int
+	InstanceID   *string
+	DatabaseName *string
 
 	CreatorID int
-	UpdaterID int
 
 	Title      string
 	Statement  string
 	Visibility WorkSheetVisibility
 
 	// Output only fields
-	UID         int
-	Size        int64
-	CreatedTime time.Time
-	UpdatedTime time.Time
-	Starred     bool
-
-	// Internal fields
-	createdTs int64
-	updatedTs int64
+	UID       int
+	Size      int64
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	Starred   bool
 }
 
 // FindWorkSheetMessage is the API message for finding sheets.
@@ -78,12 +74,12 @@ type FindWorkSheetMessage struct {
 
 // PatchWorkSheetMessage is the message to patch a sheet.
 type PatchWorkSheetMessage struct {
-	UID         int
-	UpdaterID   int
-	Title       *string
-	Statement   *string
-	Visibility  *string
-	DatabaseUID *int
+	UID          int
+	Title        *string
+	Statement    *string
+	Visibility   *string
+	InstanceID   *string
+	DatabaseName *string
 }
 
 // GetWorkSheet gets a sheet.
@@ -148,11 +144,11 @@ func (s *Store) ListWorkSheets(ctx context.Context, find *FindWorkSheetMessage, 
 		SELECT
 			worksheet.id,
 			worksheet.creator_id,
-			worksheet.created_ts,
-			worksheet.updater_id,
-			worksheet.updated_ts,
-			worksheet.project_id,
-			worksheet.database_id,
+			worksheet.created_at,
+			worksheet.updated_at,
+			worksheet.project,
+			worksheet.instance,
+			worksheet.db_name,
 			worksheet.name,
 			%s,
 			worksheet.visibility,
@@ -174,11 +170,11 @@ func (s *Store) ListWorkSheets(ctx context.Context, find *FindWorkSheetMessage, 
 		if err := rows.Scan(
 			&sheet.UID,
 			&sheet.CreatorID,
-			&sheet.createdTs,
-			&sheet.UpdaterID,
-			&sheet.updatedTs,
-			&sheet.ProjectUID,
-			&sheet.DatabaseUID,
+			&sheet.CreatedAt,
+			&sheet.UpdatedAt,
+			&sheet.ProjectID,
+			&sheet.InstanceID,
+			&sheet.DatabaseName,
 			&sheet.Title,
 			&sheet.Statement,
 			&sheet.Visibility,
@@ -197,11 +193,6 @@ func (s *Store) ListWorkSheets(ctx context.Context, find *FindWorkSheetMessage, 
 		return nil, err
 	}
 
-	for _, sheet := range sheets {
-		sheet.CreatedTime = time.Unix(sheet.createdTs, 0)
-		sheet.UpdatedTime = time.Unix(sheet.updatedTs, 0)
-	}
-
 	return sheets, nil
 }
 
@@ -215,16 +206,16 @@ func (s *Store) CreateWorkSheet(ctx context.Context, create *WorkSheetMessage) (
 	query := `
 		INSERT INTO worksheet (
 			creator_id,
-			updater_id,
-			project_id,
-			database_id,
+			project,
+			instance,
+			db_name,
 			name,
 			statement,
 			visibility,
 			payload
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		RETURNING id, created_ts, updated_ts, OCTET_LENGTH(statement)
+		RETURNING id, created_at, updated_at, OCTET_LENGTH(statement)
 	`
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -232,20 +223,19 @@ func (s *Store) CreateWorkSheet(ctx context.Context, create *WorkSheetMessage) (
 		return nil, err
 	}
 	defer tx.Rollback()
-	create.UpdaterID = create.CreatorID
 	if err := tx.QueryRowContext(ctx, query,
 		create.CreatorID,
-		create.CreatorID,
-		create.ProjectUID,
-		create.DatabaseUID,
+		create.ProjectID,
+		create.InstanceID,
+		create.DatabaseName,
 		create.Title,
 		create.Statement,
 		create.Visibility,
 		payload,
 	).Scan(
 		&create.UID,
-		&create.createdTs,
-		&create.updatedTs,
+		&create.CreatedAt,
+		&create.UpdatedAt,
 		&create.Size,
 	); err != nil {
 		if err == sql.ErrNoRows {
@@ -256,9 +246,6 @@ func (s *Store) CreateWorkSheet(ctx context.Context, create *WorkSheetMessage) (
 	if err := tx.Commit(); err != nil {
 		return nil, errors.Wrapf(err, "failed to commit transaction")
 	}
-
-	create.CreatedTime = time.Unix(create.createdTs, 0)
-	create.UpdatedTime = time.Unix(create.updatedTs, 0)
 
 	return create, nil
 }
@@ -298,9 +285,9 @@ func (s *Store) DeleteWorkSheet(ctx context.Context, sheetUID int) error {
 	return tx.Commit()
 }
 
-// patchWorkSheetImpl updates a sheet's name/statement/visibility/database_id/project_id.
+// patchWorkSheetImpl updates a sheet's name/statement/visibility/instance/db_name/project.
 func patchWorkSheetImpl(ctx context.Context, tx *Tx, patch *PatchWorkSheetMessage) error {
-	set, args := []string{"updater_id = $1", "updated_ts = $2"}, []any{patch.UpdaterID, time.Now().Unix()}
+	set, args := []string{"updated_at = $1"}, []any{time.Now()}
 	if v := patch.Title; v != nil {
 		set, args = append(set, fmt.Sprintf("name = $%d", len(args)+1)), append(args, *v)
 	}
@@ -310,8 +297,11 @@ func patchWorkSheetImpl(ctx context.Context, tx *Tx, patch *PatchWorkSheetMessag
 	if v := patch.Visibility; v != nil {
 		set, args = append(set, fmt.Sprintf("visibility = $%d", len(args)+1)), append(args, *v)
 	}
-	if v := patch.DatabaseUID; v != nil {
-		set, args = append(set, fmt.Sprintf("database_id = $%d", len(args)+1)), append(args, *v)
+	if v := patch.InstanceID; v != nil {
+		set, args = append(set, fmt.Sprintf("instance = $%d", len(args)+1)), append(args, *v)
+	}
+	if v := patch.DatabaseName; v != nil {
+		set, args = append(set, fmt.Sprintf("db_name = $%d", len(args)+1)), append(args, *v)
 	}
 	args = append(args, patch.UID)
 

@@ -158,6 +158,7 @@
     - [Changelog.Status](#bytebase-v1-Changelog-Status)
     - [Changelog.Type](#bytebase-v1-Changelog-Type)
     - [ChangelogView](#bytebase-v1-ChangelogView)
+    - [ColumnMetadata.IdentityGeneration](#bytebase-v1-ColumnMetadata-IdentityGeneration)
     - [DatabaseMetadataView](#bytebase-v1-DatabaseMetadataView)
     - [GenerationMetadata.Type](#bytebase-v1-GenerationMetadata-Type)
     - [StreamMetadata.Mode](#bytebase-v1-StreamMetadata-Mode)
@@ -320,24 +321,28 @@
   
     - [AuditLogService](#bytebase-v1-AuditLogService)
   
-- [v1/auth_service.proto](#v1_auth_service-proto)
+- [v1/user_service.proto](#v1_user_service-proto)
     - [CreateUserRequest](#bytebase-v1-CreateUserRequest)
     - [DeleteUserRequest](#bytebase-v1-DeleteUserRequest)
     - [GetUserRequest](#bytebase-v1-GetUserRequest)
-    - [IdentityProviderContext](#bytebase-v1-IdentityProviderContext)
     - [ListUsersRequest](#bytebase-v1-ListUsersRequest)
     - [ListUsersResponse](#bytebase-v1-ListUsersResponse)
-    - [LoginRequest](#bytebase-v1-LoginRequest)
-    - [LoginResponse](#bytebase-v1-LoginResponse)
-    - [LogoutRequest](#bytebase-v1-LogoutRequest)
-    - [OAuth2IdentityProviderContext](#bytebase-v1-OAuth2IdentityProviderContext)
-    - [OIDCIdentityProviderContext](#bytebase-v1-OIDCIdentityProviderContext)
     - [UndeleteUserRequest](#bytebase-v1-UndeleteUserRequest)
     - [UpdateUserRequest](#bytebase-v1-UpdateUserRequest)
     - [User](#bytebase-v1-User)
     - [User.Profile](#bytebase-v1-User-Profile)
   
     - [UserType](#bytebase-v1-UserType)
+  
+    - [UserService](#bytebase-v1-UserService)
+  
+- [v1/auth_service.proto](#v1_auth_service-proto)
+    - [IdentityProviderContext](#bytebase-v1-IdentityProviderContext)
+    - [LoginRequest](#bytebase-v1-LoginRequest)
+    - [LoginResponse](#bytebase-v1-LoginResponse)
+    - [LogoutRequest](#bytebase-v1-LogoutRequest)
+    - [OAuth2IdentityProviderContext](#bytebase-v1-OAuth2IdentityProviderContext)
+    - [OIDCIdentityProviderContext](#bytebase-v1-OIDCIdentityProviderContext)
   
     - [AuthService](#bytebase-v1-AuthService)
   
@@ -587,6 +592,7 @@
     - [UndeleteReleaseRequest](#bytebase-v1-UndeleteReleaseRequest)
     - [UpdateReleaseRequest](#bytebase-v1-UpdateReleaseRequest)
   
+    - [CheckReleaseResponse.RiskLevel](#bytebase-v1-CheckReleaseResponse-RiskLevel)
     - [Release.File.ChangeType](#bytebase-v1-Release-File-ChangeType)
     - [ReleaseFileType](#bytebase-v1-ReleaseFileType)
   
@@ -1114,7 +1120,6 @@
 | catalog | [DatabaseCatalog](#bytebase-v1-DatabaseCatalog) |  | The database catalog to update.
 
 The catalog&#39;s `name` field is used to identify the database catalog to update. Format: instances/{instance}/databases/{database}/catalog |
-| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | The list of fields to update. |
 
 
 
@@ -2042,7 +2047,6 @@ AdviseIndexResponse is the response of advising index.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | Format: instances/{instance}/databases/{database}/changelogs/{changelog} |
-| creator | [string](#string) |  | Format: users/hello@world.com |
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | status | [Changelog.Status](#bytebase-v1-Changelog-Status) |  |  |
 | statement | [string](#string) |  | The statement is used for preview purpose. |
@@ -2102,6 +2106,7 @@ ColumnMetadata is the metadata for columns.
 | comment | [string](#string) |  | The comment is the comment of a column. classification and user_comment is parsed from the comment. |
 | user_comment | [string](#string) |  | The user_comment is the user comment of a column parsed from the comment. |
 | generation | [GenerationMetadata](#bytebase-v1-GenerationMetadata) |  | The generation is the generation of a column. |
+| identity_generation | [ColumnMetadata.IdentityGeneration](#bytebase-v1-ColumnMetadata-IdentityGeneration) |  | The identity_generation is for identity columns, PG only. |
 
 
 
@@ -2823,7 +2828,6 @@ ProcedureMetadata is the metadata for procedures.
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | Format: instances/{instance}/databases/{database}/revisions/{revision} |
 | release | [string](#string) |  | Format: projects/{project}/releases/{release} Can be empty. |
-| creator | [string](#string) |  | Format: users/hello@world.com |
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | deleter | [string](#string) |  | Format: users/hello@world.com Can be empty. |
 | delete_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | Can be empty. |
@@ -3222,6 +3226,19 @@ ViewMetadata is the metadata for views.
 | CHANGELOG_VIEW_UNSPECIFIED | 0 | The default / unset value. The API will default to the BASIC view. |
 | CHANGELOG_VIEW_BASIC | 1 |  |
 | CHANGELOG_VIEW_FULL | 2 |  |
+
+
+
+<a name="bytebase-v1-ColumnMetadata-IdentityGeneration"></a>
+
+### ColumnMetadata.IdentityGeneration
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| IDENTITY_GENERATION_UNSPECIFIED | 0 |  |
+| ALWAYS | 1 |  |
+| BY_DEFAULT | 2 |  |
 
 
 
@@ -5201,7 +5218,6 @@ The theme resources.
 | type | [Anomaly.AnomalyType](#bytebase-v1-Anomaly-AnomalyType) |  | type is the type of the anomaly. |
 | severity | [Anomaly.AnomalySeverity](#bytebase-v1-Anomaly-AnomalySeverity) |  | severity is the severity of the anomaly. |
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
-| update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 
 
 
@@ -5594,10 +5610,10 @@ Metadata about the request.
 
 
 
-<a name="v1_auth_service-proto"></a>
+<a name="v1_user_service-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## v1/auth_service.proto
+## v1/user_service.proto
 
 
 
@@ -5646,22 +5662,6 @@ Metadata about the request.
 
 
 
-<a name="bytebase-v1-IdentityProviderContext"></a>
-
-### IdentityProviderContext
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| oauth2_context | [OAuth2IdentityProviderContext](#bytebase-v1-OAuth2IdentityProviderContext) |  |  |
-| oidc_context | [OIDCIdentityProviderContext](#bytebase-v1-OIDCIdentityProviderContext) |  |  |
-
-
-
-
-
-
 <a name="bytebase-v1-ListUsersRequest"></a>
 
 ### ListUsersRequest
@@ -5691,81 +5691,6 @@ When paginating, all other parameters provided to `ListUsers` must match the cal
 | ----- | ---- | ----- | ----------- |
 | users | [User](#bytebase-v1-User) | repeated | The users from the specified request. |
 | next_page_token | [string](#string) |  | A token, which can be sent as `page_token` to retrieve the next page. If this field is omitted, there are no subsequent pages. |
-
-
-
-
-
-
-<a name="bytebase-v1-LoginRequest"></a>
-
-### LoginRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| email | [string](#string) |  |  |
-| password | [string](#string) |  |  |
-| web | [bool](#bool) |  | If web is set, we will set access token, refresh token, and user to the cookie. |
-| idp_name | [string](#string) |  | The name of the identity provider. Format: idps/{idp} |
-| idp_context | [IdentityProviderContext](#bytebase-v1-IdentityProviderContext) |  | The idp_context is using to get the user information from identity provider. |
-| otp_code | [string](#string) | optional | The otp_code is used to verify the user&#39;s identity by MFA. |
-| recovery_code | [string](#string) | optional | The recovery_code is used to recovery the user&#39;s identity with MFA. |
-| mfa_temp_token | [string](#string) | optional | The mfa_temp_token is used to verify the user&#39;s identity by MFA. |
-
-
-
-
-
-
-<a name="bytebase-v1-LoginResponse"></a>
-
-### LoginResponse
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| token | [string](#string) |  |  |
-| mfa_temp_token | [string](#string) | optional |  |
-| require_reset_password | [bool](#bool) |  |  |
-| user | [User](#bytebase-v1-User) |  | The user of successful login. |
-
-
-
-
-
-
-<a name="bytebase-v1-LogoutRequest"></a>
-
-### LogoutRequest
-
-
-
-
-
-
-
-<a name="bytebase-v1-OAuth2IdentityProviderContext"></a>
-
-### OAuth2IdentityProviderContext
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| code | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="bytebase-v1-OIDCIdentityProviderContext"></a>
-
-### OIDCIdentityProviderContext
-
 
 
 
@@ -5871,9 +5796,9 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
  
 
 
-<a name="bytebase-v1-AuthService"></a>
+<a name="bytebase-v1-UserService"></a>
 
-### AuthService
+### UserService
 
 
 | Method Name | Request Type | Response Type | Description |
@@ -5884,6 +5809,122 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | UpdateUser | [UpdateUserRequest](#bytebase-v1-UpdateUserRequest) | [User](#bytebase-v1-User) | Only the user itself and the user with bb.users.update permission on the workspace can update the user. |
 | DeleteUser | [DeleteUserRequest](#bytebase-v1-DeleteUserRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Only the user with bb.users.delete permission on the workspace can delete the user. The last remaining workspace admin cannot be deleted. |
 | UndeleteUser | [UndeleteUserRequest](#bytebase-v1-UndeleteUserRequest) | [User](#bytebase-v1-User) | Only the user with bb.users.undelete permission on the workspace can undelete the user. |
+
+ 
+
+
+
+<a name="v1_auth_service-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/auth_service.proto
+
+
+
+<a name="bytebase-v1-IdentityProviderContext"></a>
+
+### IdentityProviderContext
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| oauth2_context | [OAuth2IdentityProviderContext](#bytebase-v1-OAuth2IdentityProviderContext) |  |  |
+| oidc_context | [OIDCIdentityProviderContext](#bytebase-v1-OIDCIdentityProviderContext) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-LoginRequest"></a>
+
+### LoginRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| email | [string](#string) |  |  |
+| password | [string](#string) |  |  |
+| web | [bool](#bool) |  | If web is set, we will set access token, refresh token, and user to the cookie. |
+| idp_name | [string](#string) |  | The name of the identity provider. Format: idps/{idp} |
+| idp_context | [IdentityProviderContext](#bytebase-v1-IdentityProviderContext) |  | The idp_context is using to get the user information from identity provider. |
+| otp_code | [string](#string) | optional | The otp_code is used to verify the user&#39;s identity by MFA. |
+| recovery_code | [string](#string) | optional | The recovery_code is used to recovery the user&#39;s identity with MFA. |
+| mfa_temp_token | [string](#string) | optional | The mfa_temp_token is used to verify the user&#39;s identity by MFA. |
+
+
+
+
+
+
+<a name="bytebase-v1-LoginResponse"></a>
+
+### LoginResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| token | [string](#string) |  |  |
+| mfa_temp_token | [string](#string) | optional |  |
+| require_reset_password | [bool](#bool) |  |  |
+| user | [User](#bytebase-v1-User) |  | The user of successful login. |
+
+
+
+
+
+
+<a name="bytebase-v1-LogoutRequest"></a>
+
+### LogoutRequest
+
+
+
+
+
+
+
+<a name="bytebase-v1-OAuth2IdentityProviderContext"></a>
+
+### OAuth2IdentityProviderContext
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| code | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-OIDCIdentityProviderContext"></a>
+
+### OIDCIdentityProviderContext
+
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="bytebase-v1-AuthService"></a>
+
+### AuthService
+
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
 | Login | [LoginRequest](#bytebase-v1-LoginRequest) | [LoginResponse](#bytebase-v1-LoginResponse) |  |
 | Logout | [LogoutRequest](#bytebase-v1-LogoutRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
 
@@ -5996,8 +6037,6 @@ The user&#39;s `name` field is used to identify the user to update. Format: user
 | name | [string](#string) |  | The name of the changelist resource. Canonical parent is project. Format: projects/{project}/changelists/{changelist} |
 | description | [string](#string) |  |  |
 | creator | [string](#string) |  | The creator of the changelist. Format: users/{email} |
-| updater | [string](#string) |  | The updater of the changelist. Format: users/{email} |
-| create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | The create time of the changelist. |
 | update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | The last update time of the changelist. |
 | changes | [Changelist.Change](#bytebase-v1-Changelist-Change) | repeated |  |
 
@@ -6574,9 +6613,7 @@ The environment&#39;s `name` field is used to identify the environment to update
 | name | [string](#string) |  | The name of the group to retrieve. Format: groups/{group}, group is an email. |
 | title | [string](#string) |  |  |
 | description | [string](#string) |  |  |
-| creator | [string](#string) |  | The name for the creator. Format: users/hello@world.com |
 | members | [GroupMember](#bytebase-v1-GroupMember) | repeated |  |
-| create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | The timestamp when the group was created. |
 | source | [string](#string) |  | source means where the group comes from. For now we support Entra ID SCIM sync, so the source could be Entra ID. |
 
 
@@ -7757,7 +7794,6 @@ When paginating, all other parameters provided to `ListProjects` must match the 
 | name | [string](#string) |  | The name of the project. Format: projects/{project} |
 | state | [State](#bytebase-v1-State) |  |  |
 | title | [string](#string) |  | The title or name of a project. It&#39;s not unique within the workspace. |
-| key | [string](#string) |  | The key is a short and upper-case identifier for a project. It&#39;s unique within the workspace. |
 | workflow | [Workflow](#bytebase-v1-Workflow) |  |  |
 | webhooks | [Webhook](#bytebase-v1-Webhook) | repeated |  |
 | data_classification_config_id | [string](#string) |  |  |
@@ -9372,6 +9408,8 @@ for field description.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | results | [CheckReleaseResponse.CheckResult](#bytebase-v1-CheckReleaseResponse-CheckResult) | repeated |  |
+| affected_rows | [int32](#int32) |  | The affected rows of the check. |
+| risk_level | [CheckReleaseResponse.RiskLevel](#bytebase-v1-CheckReleaseResponse-RiskLevel) |  | The aggregated risk level of the check. |
 
 
 
@@ -9389,6 +9427,8 @@ for field description.
 | file | [string](#string) |  | The file path that is being checked. |
 | target | [string](#string) |  | The target that the check is performed on. Should be a database. Format: instances/{instance}/databases/{database} |
 | advices | [Advice](#bytebase-v1-Advice) | repeated | The list of advice for the file and the target. |
+| affected_rows | [int32](#int32) |  | The count of affected rows of the statement on the target. |
+| risk_level | [CheckReleaseResponse.RiskLevel](#bytebase-v1-CheckReleaseResponse-RiskLevel) |  | The risk level of the statement on the target. |
 
 
 
@@ -9570,6 +9610,20 @@ When paginating, all other parameters provided to `ListReleases` must match the 
  
 
 
+<a name="bytebase-v1-CheckReleaseResponse-RiskLevel"></a>
+
+### CheckReleaseResponse.RiskLevel
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| RISK_LEVEL_UNSPECIFIED | 0 |  |
+| LOW | 1 |  |
+| MODERATE | 2 |  |
+| HIGH | 3 |  |
+
+
+
 <a name="bytebase-v1-Release-File-ChangeType"></a>
 
 ### Release.File.ChangeType
@@ -9716,9 +9770,6 @@ When paginating, all other parameters provided to `ListReviewConfigs` must match
 | name | [string](#string) |  | The name of the sql review to retrieve. Format: reviewConfigs/{reviewConfig} |
 | title | [string](#string) |  |  |
 | enabled | [bool](#bool) |  |  |
-| creator | [string](#string) |  | Format: users/hello@world.com |
-| create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
-| update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | rules | [SQLReviewRule](#bytebase-v1-SQLReviewRule) | repeated |  |
 | resources | [string](#string) | repeated | resources using the config. Format: {resurce}/{resource id}, for example, environments/test. |
 
@@ -10374,7 +10425,6 @@ When paginating, all other parameters provided to `ListTaskRuns` must match the 
 | stages | [Stage](#bytebase-v1-Stage) | repeated | stages and thus tasks of the rollout. |
 | creator | [string](#string) |  | Format: users/hello@world.com |
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
-| update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | issue | [string](#string) |  | The issue associated with the rollout. Could be empty. Format: projects/{project}/issues/{issue} |
 
 
@@ -10540,7 +10590,6 @@ When paginating, all other parameters provided to `ListTaskRuns` must match the 
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task}/taskRuns/{taskRun} |
 | creator | [string](#string) |  | Format: user/hello@world.com |
-| updater | [string](#string) |  | Format: user/hello@world.com |
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | title | [string](#string) |  |  |
@@ -11098,7 +11147,6 @@ Read from `pg_stat_activity`
 | title | [string](#string) |  | The title of the sheet. |
 | creator | [string](#string) |  | The creator of the Sheet. Format: users/{email} |
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | The create time of the sheet. |
-| update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | The last update time of the sheet. |
 | content | [bytes](#bytes) |  | The content of the sheet. By default, it will be cut off, if it doesn&#39;t match the `content_size`, you can set the `raw` to true in GetSheet request to retrieve the full content. |
 | content_size | [int64](#int64) |  | content_size is the full size of the content, may not match the size of the `content` field. |
 | payload | [SheetPayload](#bytebase-v1-SheetPayload) |  |  |
@@ -11312,10 +11360,6 @@ The vcsConnector&#39;s `name` field is used to identify the vcsConnector to upda
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | The name of the vcsConnector resource. Canonical parent is project. Format: projects/{project}/vcsConnectors/{vcsConnector} |
 | title | [string](#string) |  | The title of the vcs connector. |
-| creator | [string](#string) |  | The creator of the vcsConnector. Format: users/{email} |
-| updater | [string](#string) |  | The updater of the vcsConnector. Format: users/{email} |
-| create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | The create time of the vcsConnector. |
-| update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | The last update time of the vcsConnector. |
 | vcs_provider | [string](#string) |  | The name of the VCS. Format: vcsProviders/{vcsProvider} |
 | external_id | [string](#string) |  | The reposition external id in target VCS. |
 | base_directory | [string](#string) |  | The root directory where Bytebase observes the file change. If empty, then it observes the entire repository. |

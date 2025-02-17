@@ -68,11 +68,7 @@ func (s *VCSProviderService) CreateVCSProvider(ctx context.Context, request *v1p
 		return nil, err
 	}
 
-	principalID, ok := ctx.Value(common.PrincipalIDContextKey).(int)
-	if !ok {
-		return nil, status.Errorf(codes.Internal, "principal ID not found")
-	}
-	storeVCSProvider, err := s.store.CreateVCSProvider(ctx, principalID, vcsProvider)
+	storeVCSProvider, err := s.store.CreateVCSProvider(ctx, vcsProvider)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to create vcs provider: %v", err)
 	}
@@ -108,11 +104,7 @@ func (s *VCSProviderService) UpdateVCSProvider(ctx context.Context, request *v1p
 		}
 	}
 
-	principalID, ok := ctx.Value(common.PrincipalIDContextKey).(int)
-	if !ok {
-		return nil, status.Errorf(codes.Internal, "principal ID not found")
-	}
-	vcsProvider, err = s.store.UpdateVCSProvider(ctx, principalID, vcsProvider.ID, update)
+	vcsProvider, err = s.store.UpdateVCSProvider(ctx, vcsProvider.ResourceID, update)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -126,7 +118,7 @@ func (s *VCSProviderService) DeleteVCSProvider(ctx context.Context, request *v1p
 		return nil, err
 	}
 
-	if err := s.store.DeleteVCSProvider(ctx, vcsProvider.ID); err != nil {
+	if err := s.store.DeleteVCSProvider(ctx, vcsProvider.ResourceID); err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to delete vcs provider: %v", err)
 	}
 	return &emptypb.Empty{}, nil
@@ -169,7 +161,7 @@ func (s *VCSProviderService) ListVCSConnectorsInProvider(ctx context.Context, re
 		return nil, err
 	}
 	vcsConnectors, err := s.store.ListVCSConnectors(ctx, &store.FindVCSConnectorMessage{
-		VCSUID: &vcs.ID,
+		VCSID: &vcs.ResourceID,
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to fetch external repository list: %v", err)
@@ -177,7 +169,7 @@ func (s *VCSProviderService) ListVCSConnectorsInProvider(ctx context.Context, re
 
 	resp := &v1pb.ListVCSConnectorsInProviderResponse{}
 	for _, vcsConnector := range vcsConnectors {
-		v1VCSConnector, err := convertStoreVCSConnector(ctx, s.store, vcsConnector)
+		v1VCSConnector, err := convertStoreVCSConnector(vcsConnector)
 		if err != nil {
 			return nil, err
 		}

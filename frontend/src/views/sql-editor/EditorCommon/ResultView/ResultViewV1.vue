@@ -6,11 +6,18 @@
   >
     <template v-if="executeParams && resultSet && !showPlaceholder">
       <template v-if="viewMode === 'SINGLE-RESULT'">
+        <ErrorView
+          v-if="resultSet.results[0]?.error"
+          :error="resultSet.results[0]?.error"
+          :execute-params="executeParams"
+          :result-set="resultSet"
+        />
         <SingleResultViewV1
+          v-else
           :params="executeParams"
           :database="database"
-          :sql-result-set="resultSet"
           :result="resultSet.results[0]"
+          :allow-export="resultSet.allowExport"
           :set-index="0"
         />
       </template>
@@ -22,7 +29,7 @@
           style="--n-tab-padding: 4px 12px"
         >
           <NTabPane
-            v-for="(result, i) in resultSet.results"
+            v-for="(result, i) in filteredResults"
             :key="i"
             :name="tabName(result, i)"
             class="flex-1 flex flex-col overflow-hidden"
@@ -34,11 +41,18 @@
                 class="ml-2 text-yellow-600 w-4 h-auto"
               />
             </template>
+            <ErrorView
+              v-if="result.error"
+              :error="result.error"
+              :execute-params="executeParams"
+              :result-set="resultSet"
+            />
             <SingleResultViewV1
+              v-else
               :params="executeParams"
-              :sql-result-set="resultSet"
               :database="database"
               :result="result"
+              :allow-export="resultSet.allowExport"
               :set-index="i"
             />
           </NTabPane>
@@ -255,6 +269,17 @@ const disallowCopyingData = computed(() => {
     return true;
   }
   return false;
+});
+
+const filteredResults = computed(() => {
+  if (!props.resultSet) {
+    return []; // If resultSet is undefined, return an empty array
+  }
+
+  // Skip SET commands when displaying results
+  return props.resultSet.results.filter(result => {
+    return !result.statement.trim().toUpperCase().startsWith("SET");
+  });
 });
 
 provideSQLResultViewContext({

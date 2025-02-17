@@ -21,7 +21,6 @@ import (
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	"github.com/bytebase/bytebase/backend/runner/schemasync"
 	"github.com/bytebase/bytebase/backend/store"
-	"github.com/bytebase/bytebase/backend/store/model"
 	"github.com/bytebase/bytebase/backend/utils"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
@@ -57,11 +56,11 @@ func (e *SchemaUpdateGhostCutoverExecutor) RunOnce(ctx context.Context, taskCont
 	syncTaskID := task.DependsOn[0]
 	defer e.stateCfg.GhostTaskState.Delete(syncTaskID)
 
-	instance, err := e.store.GetInstanceV2(ctx, &store.FindInstanceMessage{UID: &task.InstanceID})
+	instance, err := e.store.GetInstanceV2(ctx, &store.FindInstanceMessage{ResourceID: &task.InstanceID})
 	if err != nil {
 		return true, nil, err
 	}
-	database, err := e.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{UID: task.DatabaseID})
+	database, err := e.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{InstanceID: &task.InstanceID, DatabaseName: task.DatabaseName})
 	if err != nil {
 		return true, nil, err
 	}
@@ -88,7 +87,7 @@ func (e *SchemaUpdateGhostCutoverExecutor) RunOnce(ctx context.Context, taskCont
 		return true, nil, common.Wrapf(err, common.Internal, "failed to parse table name from statement, statement: %v", statement)
 	}
 
-	postponeFilename := ghost.GetPostponeFlagFilename(syncTaskID, syncTask.CreatedTs, database.UID, database.DatabaseName, tableName)
+	postponeFilename := ghost.GetPostponeFlagFilename(syncTaskID, database.UID, database.DatabaseName, tableName)
 
 	value, ok := e.stateCfg.GhostTaskState.Load(syncTaskID)
 	if !ok {
@@ -99,9 +98,7 @@ func (e *SchemaUpdateGhostCutoverExecutor) RunOnce(ctx context.Context, taskCont
 		return true, nil, errors.Errorf("failed to convert shared gh-ost state")
 	}
 
-	// not using the rendered statement here because we want to avoid leaking the rendered statement
-	version := model.Version{Version: payload.SchemaVersion}
-	terminated, result, err := cutover(ctx, taskContext, e.store, e.dbFactory, e.profile, e.schemaSyncer, task, taskRunUID, statement, sheetID, version, postponeFilename, sharedGhost.migrationContext, sharedGhost.errCh)
+	terminated, result, err := cutover(ctx, taskContext, e.store, e.dbFactory, e.profile, e.schemaSyncer, task, taskRunUID, statement, sheetID, payload.SchemaVersion, postponeFilename, sharedGhost.migrationContext, sharedGhost.errCh)
 	if err := e.schemaSyncer.SyncDatabaseSchema(ctx, database, false /* force */); err != nil {
 		slog.Error("failed to sync database schema",
 			slog.String("instanceName", instance.ResourceID),
@@ -113,7 +110,7 @@ func (e *SchemaUpdateGhostCutoverExecutor) RunOnce(ctx context.Context, taskCont
 	return terminated, result, err
 }
 
-func cutover(ctx context.Context, taskContext context.Context, stores *store.Store, dbFactory *dbfactory.DBFactory, profile *config.Profile, syncer *schemasync.Syncer, task *store.TaskMessage, taskRunUID int, statement string, sheetID int, schemaVersion model.Version, postponeFilename string, migrationContext *base.MigrationContext, errCh <-chan error) (terminated bool, result *storepb.TaskRunResult, err error) {
+func cutover(ctx context.Context, taskContext context.Context, stores *store.Store, dbFactory *dbfactory.DBFactory, profile *config.Profile, syncer *schemasync.Syncer, task *store.TaskMessage, taskRunUID int, statement string, sheetID int, schemaVersion string, postponeFilename string, migrationContext *base.MigrationContext, errCh <-chan error) (terminated bool, result *storepb.TaskRunResult, err error) {
 	statement = strings.TrimSpace(statement)
 	// wait for heartbeat lag.
 	// try to make the time gap between the migration history insertion and the actual cutover as close as possible.

@@ -70,7 +70,7 @@ func (s *Service) RegisterDirectorySyncRoutes(g *echo.Group) {
 				Profile: &storepb.UserProfile{
 					Source: entraIDSource,
 				},
-			}, api.SystemBotID)
+			})
 			if err != nil {
 				return c.String(http.StatusInternalServerError, fmt.Sprintf(`failed to create user "%s", error %v`, aadUser.UserName, err))
 			}
@@ -85,7 +85,7 @@ func (s *Service) RegisterDirectorySyncRoutes(g *echo.Group) {
 					LastLoginTime:          user.Profile.LastLoginTime,
 					LastChangePasswordTime: user.Profile.LastChangePasswordTime,
 				},
-			}, api.SystemBotID)
+			})
 			if err != nil {
 				return c.String(http.StatusInternalServerError, fmt.Sprintf(`failed to update user "%s", error %v`, user.Email, err))
 			}
@@ -208,7 +208,7 @@ func (s *Service) RegisterDirectorySyncRoutes(g *echo.Group) {
 		deleteUser := true
 		if _, err := s.store.UpdateUser(ctx, user, &store.UpdateUserMessage{
 			Delete: &deleteUser,
-		}, api.SystemBotID); err != nil {
+		}); err != nil {
 			return c.String(http.StatusInternalServerError, fmt.Sprintf("failed to delete user, error %v", err))
 		}
 
@@ -281,7 +281,7 @@ func (s *Service) RegisterDirectorySyncRoutes(g *echo.Group) {
 			}
 		}
 
-		updatedUser, err := s.store.UpdateUser(ctx, user, updateUser, api.SystemBotID)
+		updatedUser, err := s.store.UpdateUser(ctx, user, updateUser)
 		if err != nil {
 			return c.String(http.StatusInternalServerError, fmt.Sprintf("failed to update user, error %v", err))
 		}
@@ -318,7 +318,7 @@ func (s *Service) RegisterDirectorySyncRoutes(g *echo.Group) {
 			Payload: &storepb.GroupPayload{
 				Source: entraIDSource,
 			},
-		}, api.SystemBotID)
+		})
 		if err != nil {
 			return c.String(http.StatusInternalServerError, fmt.Sprintf("failed to create group, error %v", err))
 		}
@@ -544,7 +544,7 @@ func (s *Service) RegisterDirectorySyncRoutes(g *echo.Group) {
 			}
 		}
 
-		updatedGroup, err := s.store.UpdateGroup(ctx, group.Email, updateGroup, api.SystemBotID)
+		updatedGroup, err := s.store.UpdateGroup(ctx, group.Email, updateGroup)
 		if err != nil {
 			return c.String(http.StatusInternalServerError, fmt.Sprintf("failed to update group, error %v", err))
 		}

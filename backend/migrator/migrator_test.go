@@ -19,7 +19,7 @@ import (
 )
 
 func TestGetMinorMigrationVersions(t *testing.T) {
-	names := []string{latestDataFile, latestSchemaFile, "1.0", "1.1", "1.2", "1.3", "1.4"}
+	names := []string{latestSchemaFile, "1.0", "1.1", "1.2", "1.3", "1.4"}
 
 	tests := []struct {
 		names          []string
@@ -60,11 +60,11 @@ func TestGetMinorVersions(t *testing.T) {
 		want  []semver.Version
 	}{
 		{
-			names: []string{fmt.Sprintf("migration/release/%s", latestDataFile), fmt.Sprintf("migration/dev/%s", latestSchemaFile), "migration/release/1.1", "migration/release/1.0"},
+			names: []string{fmt.Sprintf("migration/dev/%s", latestSchemaFile), "migration/release/1.1", "migration/release/1.0"},
 			want:  []semver.Version{semver.MustParse("1.0.0"), semver.MustParse("1.1.0")},
 		},
 		{
-			names: []string{fmt.Sprintf("migration/release/%s", latestDataFile), fmt.Sprintf("migration/dev/%s", latestSchemaFile)},
+			names: []string{fmt.Sprintf("migration/dev/%s", latestSchemaFile)},
 			want:  nil,
 		},
 	}
@@ -139,8 +139,7 @@ func TestGetPatchVersions(t *testing.T) {
 }
 
 var (
-	pgPort        = 6000
-	serverVersion = "server-version"
+	pgPort = 6000
 )
 
 func TestMigrationCompatibility(t *testing.T) {
@@ -193,23 +192,19 @@ func TestMigrationCompatibility(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create initial schema.
-	err = initializeSchema(ctx, storeInstance, metadataDriver, releaseVersion, serverVersion)
+	err = initializeSchema(ctx, storeInstance, metadataDriver, releaseVersion)
 	require.NoError(t, err)
 	// Check migration history.
-	histories, err := storeInstance.ListInstanceChangeHistoryForMigrator(ctx, &store.FindInstanceChangeHistoryMessage{
-		InstanceID: nil,
-	})
+	histories, err := storeInstance.ListInstanceChangeHistoryForMigrator(ctx, &store.FindInstanceChangeHistoryMessage{})
 	require.NoError(t, err)
 	require.Len(t, histories, 1)
 	require.Equal(t, histories[0].Version.Version, releaseVersion.String())
 
 	// Check no migration after passing current version as the release cutoff version.
-	_, err = migrate(ctx, storeInstance, metadataDriver, releaseVersion, serverVersion, databaseName)
+	_, err = migrate(ctx, storeInstance, metadataDriver, releaseVersion)
 	require.NoError(t, err)
 	// Check migration history.
-	histories, err = storeInstance.ListInstanceChangeHistoryForMigrator(ctx, &store.FindInstanceChangeHistoryMessage{
-		InstanceID: nil,
-	})
+	histories, err = storeInstance.ListInstanceChangeHistoryForMigrator(ctx, &store.FindInstanceChangeHistoryMessage{})
 	require.NoError(t, err)
 	require.Len(t, histories, 1)
 }
@@ -217,5 +212,5 @@ func TestMigrationCompatibility(t *testing.T) {
 func TestGetCutoffVersion(t *testing.T) {
 	releaseVersion, err := getProdCutoffVersion()
 	require.NoError(t, err)
-	require.Equal(t, semver.MustParse("3.3.8"), releaseVersion)
+	require.Equal(t, semver.MustParse("3.4.14"), releaseVersion)
 }

@@ -77,8 +77,13 @@ func (h *Handler) handleTextDocumentCompletion(ctx context.Context, _ *jsonrpc2.
 
 	var items []lsp.CompletionItem
 	for _, candidate := range candidates {
+		label := candidate.Text
+		// Remove quotes or brackets from label.
+		if len(label) > 1 && (label[0] == '"' && label[len(label)-1] == '"' || label[0] == '`' && label[len(label)-1] == '`' || label[0] == '[' && label[len(label)-1] == ']') {
+			label = label[1 : len(label)-1]
+		}
 		completionItem := lsp.CompletionItem{
-			Label: candidate.Text,
+			Label: label,
 			LabelDetails: &lsp.CompletionItemLabelDetails{
 				Detail:      fmt.Sprintf("(%s)", string(candidate.Type)),
 				Description: candidate.Definition,
@@ -156,7 +161,7 @@ func (h *Handler) GetDatabaseMetadataFunc(ctx context.Context, instanceID, datab
 	if database == nil {
 		return "", nil, errors.Errorf("database %s for instance %s not found", databaseName, instanceID)
 	}
-	metadata, err := h.store.GetDBSchema(ctx, database.UID)
+	metadata, err := h.store.GetDBSchema(ctx, database.InstanceID, database.DatabaseName)
 	if err != nil {
 		return "", nil, errors.Wrap(err, "failed to get database schema")
 	}

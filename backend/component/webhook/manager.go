@@ -68,7 +68,7 @@ func (m *Manager) CreateEvent(ctx context.Context, e *Event) {
 		return
 	}
 	webhookList, err := m.store.FindProjectWebhookV2(ctx, &store.FindProjectWebhookMessage{
-		ProjectID:    &e.Project.UID,
+		ProjectID:    &e.Project.ResourceID,
 		ActivityType: &activityType,
 	})
 	if err != nil {
@@ -202,7 +202,7 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, acti
 			}
 			for _, projectRole := range u.RolloutPolicy.GetProjectRoles() {
 				role := api.Role(strings.TrimPrefix(projectRole, "roles/"))
-				usersGetters = append(usersGetters, getUsersFromProjectRole(m.store, role, e.Project.UID))
+				usersGetters = append(usersGetters, getUsersFromProjectRole(m.store, role, e.Project.ResourceID))
 			}
 			for _, issueRole := range u.RolloutPolicy.GetIssueRoles() {
 				switch issueRole {
@@ -269,15 +269,15 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, acti
 			case storepb.ApprovalNode_WORKSPACE_DBA:
 				usersGetter = m.getUsersFromWorkspaceRole(api.WorkspaceDBA)
 			case storepb.ApprovalNode_PROJECT_OWNER:
-				usersGetter = getUsersFromProjectRole(m.store, api.ProjectOwner, e.Project.UID)
+				usersGetter = getUsersFromProjectRole(m.store, api.ProjectOwner, e.Project.ResourceID)
 			case storepb.ApprovalNode_PROJECT_MEMBER:
-				usersGetter = getUsersFromProjectRole(m.store, api.ProjectDeveloper, e.Project.UID)
+				usersGetter = getUsersFromProjectRole(m.store, api.ProjectDeveloper, e.Project.ResourceID)
 			default:
 				return nil, errors.Errorf("invalid group value")
 			}
 		case *storepb.ApprovalNode_Role:
 			role := api.Role(strings.TrimPrefix(val.Role, "roles/"))
-			usersGetter = getUsersFromProjectRole(m.store, role, e.Project.UID)
+			usersGetter = getUsersFromProjectRole(m.store, role, e.Project.ResourceID)
 		case *storepb.ApprovalNode_ExternalNodeId:
 			usersGetter = func(_ context.Context) ([]*store.UserMessage, error) {
 				return nil, nil
@@ -400,9 +400,9 @@ func (m *Manager) getUsersFromWorkspaceRole(role api.Role) func(context.Context)
 	}
 }
 
-func getUsersFromProjectRole(s *store.Store, role api.Role, projectUID int) func(context.Context) ([]*store.UserMessage, error) {
+func getUsersFromProjectRole(s *store.Store, role api.Role, projectID string) func(context.Context) ([]*store.UserMessage, error) {
 	return func(ctx context.Context) ([]*store.UserMessage, error) {
-		policyMessage, err := s.GetProjectIamPolicy(ctx, projectUID)
+		policyMessage, err := s.GetProjectIamPolicy(ctx, projectID)
 		if err != nil {
 			return nil, err
 		}
@@ -457,7 +457,7 @@ func maybeGetPhoneFromUser(user *store.UserMessage) (string, error) {
 // ChangeIssueStatus changes the status of an issue.
 func ChangeIssueStatus(ctx context.Context, stores *store.Store, webhookManager *Manager, issue *store.IssueMessage, newStatus api.IssueStatus, updater *store.UserMessage, comment string) error {
 	updateIssueMessage := &store.UpdateIssueMessage{Status: &newStatus}
-	updatedIssue, err := stores.UpdateIssueV2(ctx, issue.UID, updateIssueMessage, updater.ID)
+	updatedIssue, err := stores.UpdateIssueV2(ctx, issue.UID, updateIssueMessage)
 	if err != nil {
 		return errors.Wrapf(err, "failed to update issue %q's status", issue.Title)
 	}

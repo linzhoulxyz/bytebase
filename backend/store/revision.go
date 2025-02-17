@@ -15,21 +15,22 @@ import (
 )
 
 type RevisionMessage struct {
-	DatabaseUID int
-	Version     string
-	Payload     *storepb.RevisionPayload
+	InstanceID   string
+	DatabaseName string
+	Version      string
+	Payload      *storepb.RevisionPayload
 
 	// output only
 	UID        int64
-	CreatorUID int
-	CreateTime time.Time
+	CreatedAt  time.Time
 	DeleterUID *int
-	DeleteTime *time.Time
+	DeletedAt  *time.Time
 }
 
 type FindRevisionMessage struct {
-	UID         *int64
-	DatabaseUID *int
+	UID          *int64
+	InstanceID   *string
+	DatabaseName *string
 
 	Version *string
 
@@ -46,8 +47,12 @@ func (s *Store) ListRevisions(ctx context.Context, find *FindRevisionMessage) ([
 		where = append(where, fmt.Sprintf("id = $%d", len(args)+1))
 		args = append(args, *v)
 	}
-	if v := find.DatabaseUID; v != nil {
-		where = append(where, fmt.Sprintf("database_id = $%d", len(args)+1))
+	if v := find.InstanceID; v != nil {
+		where = append(where, fmt.Sprintf("instance = $%d", len(args)+1))
+		args = append(args, *v)
+	}
+	if v := find.DatabaseName; v != nil {
+		where = append(where, fmt.Sprintf("db_name = $%d", len(args)+1))
 		args = append(args, *v)
 	}
 	if v := find.Version; v != nil {
@@ -55,7 +60,7 @@ func (s *Store) ListRevisions(ctx context.Context, find *FindRevisionMessage) ([
 		args = append(args, *v)
 	}
 	if !find.ShowDeleted {
-		where = append(where, "deleted_ts IS NULL")
+		where = append(where, "deleted_at IS NULL")
 	}
 
 	limitOffsetClause := ""
@@ -69,11 +74,11 @@ func (s *Store) ListRevisions(ctx context.Context, find *FindRevisionMessage) ([
 	query := fmt.Sprintf(`
 		SELECT
 			id,
-			database_id,
-			creator_id,
-			created_ts,
+			instance,
+			db_name,
+			created_at,
 			deleter_id,
-			deleted_ts,
+			deleted_at,
 			version,
 			payload
 		FROM revision
@@ -102,11 +107,11 @@ func (s *Store) ListRevisions(ctx context.Context, find *FindRevisionMessage) ([
 		var p []byte
 		if err := rows.Scan(
 			&r.UID,
-			&r.DatabaseUID,
-			&r.CreatorUID,
-			&r.CreateTime,
+			&r.InstanceID,
+			&r.DatabaseName,
+			&r.CreatedAt,
 			&r.DeleterUID,
-			&r.DeleteTime,
+			&r.DeletedAt,
 			&r.Version,
 			&p,
 		); err != nil {
@@ -145,11 +150,11 @@ func (s *Store) GetRevision(ctx context.Context, uid int64) (*RevisionMessage, e
 	return revisions[0], nil
 }
 
-func (s *Store) CreateRevision(ctx context.Context, revision *RevisionMessage, creatorUID int) (*RevisionMessage, error) {
+func (s *Store) CreateRevision(ctx context.Context, revision *RevisionMessage) (*RevisionMessage, error) {
 	query := `
 		INSERT INTO revision (
-			database_id,
-			creator_id,
+			instance,
+			db_name,
 			version,
 			payload
 		) VALUES (
@@ -158,7 +163,7 @@ func (s *Store) CreateRevision(ctx context.Context, revision *RevisionMessage, c
 			$3,
 			$4
 		)
-		RETURNING id, created_ts
+		RETURNING id, created_at
 	`
 
 	p, err := protojson.Marshal(revision.Payload)
@@ -173,13 +178,12 @@ func (s *Store) CreateRevision(ctx context.Context, revision *RevisionMessage, c
 	defer tx.Rollback()
 
 	var id int64
-	var createTime time.Time
 	if err := tx.QueryRowContext(ctx, query,
-		revision.DatabaseUID,
-		creatorUID,
+		revision.InstanceID,
+		revision.DatabaseName,
 		revision.Version,
 		p,
-	).Scan(&id, &createTime); err != nil {
+	).Scan(&id, &revision.CreatedAt); err != nil {
 		return nil, errors.Wrapf(err, "failed to query and scan")
 	}
 
@@ -188,7 +192,6 @@ func (s *Store) CreateRevision(ctx context.Context, revision *RevisionMessage, c
 	}
 
 	revision.UID = id
-	revision.CreateTime = createTime
 
 	return revision, nil
 }
@@ -196,7 +199,7 @@ func (s *Store) CreateRevision(ctx context.Context, revision *RevisionMessage, c
 func (s *Store) DeleteRevision(ctx context.Context, uid int64, deleterUID int) error {
 	query :=
 		`UPDATE revision
-		SET deleter_id = $1, deleted_ts = now()
+		SET deleter_id = $1, deleted_at = now()
 		WHERE id = $2`
 
 	tx, err := s.db.BeginTx(ctx, nil)

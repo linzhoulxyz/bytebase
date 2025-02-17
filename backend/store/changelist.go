@@ -21,12 +21,8 @@ type ChangelistMessage struct {
 
 	Payload *storepb.Changelist
 
-	// Output only fields
-	UID         int
-	CreatorID   int
-	UpdaterID   int
-	CreatedTime time.Time
-	UpdatedTime time.Time
+	CreatorID int
+	UpdatedAt time.Time
 }
 
 // FindChangelistMessage is the API message for finding changelists.
@@ -63,7 +59,7 @@ func (s *Store) ListChangelists(ctx context.Context, find *FindChangelistMessage
 	where, args := []string{"TRUE"}, []any{}
 
 	if v := find.ProjectID; v != nil {
-		where, args = append(where, fmt.Sprintf("project.resource_id = $%d", len(args)+1)), append(args, *v)
+		where, args = append(where, fmt.Sprintf("changelist.project = $%d", len(args)+1)), append(args, *v)
 	}
 	if v := find.ResourceID; v != nil {
 		where, args = append(where, fmt.Sprintf("changelist.name = $%d", len(args)+1)), append(args, *v)
@@ -77,16 +73,12 @@ func (s *Store) ListChangelists(ctx context.Context, find *FindChangelistMessage
 
 	rows, err := tx.QueryContext(ctx, fmt.Sprintf(`
 		SELECT
-			changelist.id,
-			changelist.creator_id,
-			changelist.created_ts,
-			changelist.updater_id,
-			changelist.updated_ts,
-			project.resource_id AS project_id,
-			changelist.name,
-			changelist.payload
+			creator_id,
+			updated_at,
+			project,
+			name,
+			payload
 		FROM changelist
-		LEFT JOIN project ON changelist.project_id = project.id
 		WHERE %s`, strings.Join(where, " AND ")),
 		args...,
 	)
@@ -98,14 +90,10 @@ func (s *Store) ListChangelists(ctx context.Context, find *FindChangelistMessage
 	var changelists []*ChangelistMessage
 	for rows.Next() {
 		var changelist ChangelistMessage
-		var createdTs, updatedTs int64
 		var payload []byte
 		if err := rows.Scan(
-			&changelist.UID,
 			&changelist.CreatorID,
-			&createdTs,
-			&changelist.UpdaterID,
-			&updatedTs,
+			&changelist.UpdatedAt,
 			&changelist.ProjectID,
 			&changelist.ResourceID,
 			&payload,
@@ -117,8 +105,6 @@ func (s *Store) ListChangelists(ctx context.Context, find *FindChangelistMessage
 			return nil, err
 		}
 		changelist.Payload = changelistPayload
-		changelist.CreatedTime = time.Unix(createdTs, 0)
-		changelist.UpdatedTime = time.Unix(updatedTs, 0)
 
 		changelists = append(changelists, &changelist)
 	}
@@ -134,14 +120,9 @@ func (s *Store) ListChangelists(ctx context.Context, find *FindChangelistMessage
 
 // CreateChangelist creates a changelist.
 func (s *Store) CreateChangelist(ctx context.Context, create *ChangelistMessage) (*ChangelistMessage, error) {
-	project, err := s.GetProjectV2(ctx, &FindProjectMessage{ResourceID: &create.ProjectID})
-	if err != nil {
-		return nil, err
-	}
 	if create.Payload == nil {
 		create.Payload = &storepb.Changelist{}
 	}
-	create.UpdaterID = create.CreatorID
 	payload, err := protojson.Marshal(create.Payload)
 	if err != nil {
 		return nil, err
@@ -150,13 +131,12 @@ func (s *Store) CreateChangelist(ctx context.Context, create *ChangelistMessage)
 	query := `
 		INSERT INTO changelist (
 			creator_id,
-			updater_id,
-			project_id,
+			project,
 			name,
 			payload
 		)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, created_ts, updated_ts;
+		VALUES ($1, $2, $3, $4)
+		RETURNING updated_at;
 	`
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -164,22 +144,16 @@ func (s *Store) CreateChangelist(ctx context.Context, create *ChangelistMessage)
 		return nil, err
 	}
 	defer tx.Rollback()
-	var createdTs, updatedTs int64
 	if err := tx.QueryRowContext(ctx, query,
 		create.CreatorID,
-		create.CreatorID,
-		project.UID,
+		create.ProjectID,
 		create.ResourceID,
 		payload,
 	).Scan(
-		&create.UID,
-		&createdTs,
-		&updatedTs,
+		&create.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
-	create.CreatedTime = time.Unix(createdTs, 0)
-	create.UpdatedTime = time.Unix(updatedTs, 0)
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -189,17 +163,12 @@ func (s *Store) CreateChangelist(ctx context.Context, create *ChangelistMessage)
 
 // UpdateChangelist updates a changelist.
 func (s *Store) UpdateChangelist(ctx context.Context, update *UpdateChangelistMessage) error {
-	project, err := s.GetProjectV2(ctx, &FindProjectMessage{ResourceID: &update.ProjectID})
-	if err != nil {
-		return err
-	}
-
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return errors.Wrapf(err, "failed to begin transaction")
 	}
 
-	set, args := []string{"updater_id = $1", "updated_ts = $2"}, []any{update.UpdaterID, time.Now().Unix()}
+	set, args := []string{"updated_at = $1"}, []any{time.Now()}
 	if v := update.Payload; v != nil {
 		payload, err := protojson.Marshal(update.Payload)
 		if err != nil {
@@ -207,12 +176,12 @@ func (s *Store) UpdateChangelist(ctx context.Context, update *UpdateChangelistMe
 		}
 		set, args = append(set, fmt.Sprintf("payload = $%d", len(args)+1)), append(args, payload)
 	}
-	args = append(args, project.UID, update.ResourceID)
+	args = append(args, update.ProjectID, update.ResourceID)
 
 	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
 		UPDATE changelist
 		SET `+strings.Join(set, ", ")+`
-		WHERE changelist.project_id = $%d AND changelist.name = $%d`, len(set)+1, len(set)+2), args...); err != nil {
+		WHERE project = $%d AND name = $%d`, len(set)+1, len(set)+2), args...); err != nil {
 		return err
 	}
 
@@ -229,8 +198,7 @@ func (s *Store) DeleteChangelist(ctx context.Context, projectID, resourceID stri
 
 	if _, err := tx.ExecContext(ctx, `
 		DELETE FROM changelist
-		USING project
-		WHERE changelist.project_id = project.id AND project.resource_id = $1 AND changelist.name = $2;`,
+		WHERE changelist.project = $1 AND changelist.name = $2;`,
 		projectID, resourceID); err != nil {
 		return err
 	}

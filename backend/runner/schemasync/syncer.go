@@ -115,14 +115,14 @@ func (s *Syncer) Run(ctx context.Context, wg *sync.WaitGroup) {
 							log.BBError(err))
 						return true
 					}
-					if s.stateCfg.InstanceOutstandingConnections.Increment(instance.UID, int(instance.Options.GetMaximumConnections())) {
+					if s.stateCfg.InstanceOutstandingConnections.Increment(instance.ResourceID, int(instance.Options.GetMaximumConnections())) {
 						return true
 					}
 
 					s.databaseSyncMap.Delete(key)
 					dbwp.Go(func() {
 						defer func() {
-							s.stateCfg.InstanceOutstandingConnections.Decrement(instance.UID)
+							s.stateCfg.InstanceOutstandingConnections.Decrement(instance.ResourceID)
 						}()
 						slog.Debug("Sync database schema", slog.String("instance", database.InstanceID), slog.String("database", database.DatabaseName))
 						if err := s.SyncDatabaseSchema(ctx, database, false /* force */); err != nil {
@@ -291,7 +291,6 @@ func (s *Syncer) SyncInstance(ctx context.Context, instance *store.InstanceMessa
 	updateInstance := &store.UpdateInstanceMessage{
 		ResourceID: instance.ResourceID,
 		Metadata:   instanceMeta.Metadata,
-		UpdaterID:  api.SystemBotID,
 	}
 	if instanceMeta.Version != instance.EngineVersion {
 		updateInstance.EngineVersion = &instanceMeta.Version
@@ -327,7 +326,9 @@ func (s *Syncer) SyncInstance(ctx context.Context, instance *store.InstanceMessa
 			if err != nil {
 				return nil, nil, nil, errors.Wrapf(err, "failed to create instance %q database %q in sync runner", instance.ResourceID, databaseMetadata.Name)
 			}
-			newDatabases = append(newDatabases, newDatabase)
+			if newDatabase != nil {
+				newDatabases = append(newDatabases, newDatabase)
+			}
 		}
 	}
 
@@ -339,7 +340,7 @@ func (s *Syncer) SyncInstance(ctx context.Context, instance *store.InstanceMessa
 				InstanceID:   instance.ResourceID,
 				DatabaseName: database.DatabaseName,
 				SyncState:    &syncStatus,
-			}, api.SystemBotID); err != nil {
+			}); err != nil {
 				return nil, nil, nil, errors.Errorf("failed to update database %q for instance %q", database.DatabaseName, instance.ResourceID)
 			}
 		}
@@ -363,11 +364,11 @@ func (s *Syncer) SyncDatabaseSchemaToHistory(ctx context.Context, database *stor
 	}
 	driver, err := s.dbFactory.GetAdminDatabaseDriver(ctx, instance, database, db.ConnectionContext{})
 	if err != nil {
-		s.upsertDatabaseConnectionAnomaly(ctx, instance, database, err)
+		s.upsertDatabaseConnectionAnomaly(ctx, database, err)
 		return 0, err
 	}
 	defer driver.Close(ctx)
-	s.upsertDatabaseConnectionAnomaly(ctx, instance, database, nil)
+	s.upsertDatabaseConnectionAnomaly(ctx, database, nil)
 	// Sync database schema
 	deadlineCtx, cancelFunc := context.WithDeadline(ctx, time.Now().Add(syncTimeout))
 	defer cancelFunc()
@@ -376,7 +377,7 @@ func (s *Syncer) SyncDatabaseSchemaToHistory(ctx context.Context, database *stor
 		return 0, errors.Wrapf(err, "failed to sync database schema for database %q", database.DatabaseName)
 	}
 
-	dbSchema, err := s.store.GetDBSchema(ctx, database.UID)
+	dbSchema, err := s.store.GetDBSchema(ctx, database.InstanceID, database.DatabaseName)
 	if err != nil {
 		return 0, errors.Wrapf(err, "failed to get database schema for database %q", database.DatabaseName)
 	}
@@ -410,17 +411,17 @@ func (s *Syncer) SyncDatabaseSchemaToHistory(ctx context.Context, database *stor
 	}
 
 	syncStatus := api.OK
-	ts := time.Now().Unix()
+	ts := time.Now()
 	if _, err := s.store.UpdateDatabase(ctx, &store.UpdateDatabaseMessage{
-		InstanceID:           database.InstanceID,
-		DatabaseName:         database.DatabaseName,
-		SyncState:            &syncStatus,
-		SuccessfulSyncTimeTs: &ts,
+		InstanceID:   database.InstanceID,
+		DatabaseName: database.DatabaseName,
+		SyncState:    &syncStatus,
+		SyncAt:       &ts,
 		MetadataUpsert: &storepb.DatabaseMetadata{
-			LastSyncTime:    timestamppb.New(time.Unix(ts, 0)),
+			LastSyncTime:    timestamppb.New(ts),
 			BackupAvailable: s.hasBackupSchema(ctx, instance, databaseMetadata),
 		},
-	}, api.SystemBotID); err != nil {
+	}); err != nil {
 		return 0, errors.Wrapf(err, "failed to update database %q for instance %q", database.DatabaseName, database.InstanceID)
 	}
 
@@ -442,9 +443,8 @@ func (s *Syncer) SyncDatabaseSchemaToHistory(ctx context.Context, database *stor
 	}
 
 	if err := s.store.UpsertDBSchema(ctx,
-		database.UID,
+		database.InstanceID, database.DatabaseName,
 		model.NewDBSchema(databaseMetadata, rawDump, dbModelConfig.BuildDatabaseConfig()),
-		api.SystemBotID,
 	); err != nil {
 		if strings.Contains(err.Error(), "escape sequence") {
 			if metadataBytes, err := protojson.Marshal(databaseMetadata); err == nil {
@@ -454,7 +454,7 @@ func (s *Syncer) SyncDatabaseSchemaToHistory(ctx context.Context, database *stor
 		return 0, errors.Wrapf(err, "failed to upsert database schema for database %q", database.DatabaseName)
 	}
 
-	id, err := s.store.CreateSyncHistory(ctx, database.UID, databaseMetadata, string(rawDump), api.SystemBotID)
+	id, err := s.store.CreateSyncHistory(ctx, database.InstanceID, database.DatabaseName, databaseMetadata, string(rawDump))
 	if err != nil {
 		if strings.Contains(err.Error(), "escape sequence") {
 			if metadataBytes, err := protojson.Marshal(databaseMetadata); err == nil {
@@ -482,11 +482,11 @@ func (s *Syncer) SyncDatabaseSchema(ctx context.Context, database *store.Databas
 	}
 	driver, err := s.dbFactory.GetAdminDatabaseDriver(ctx, instance, database, db.ConnectionContext{})
 	if err != nil {
-		s.upsertDatabaseConnectionAnomaly(ctx, instance, database, err)
+		s.upsertDatabaseConnectionAnomaly(ctx, database, err)
 		return err
 	}
 	defer driver.Close(ctx)
-	s.upsertDatabaseConnectionAnomaly(ctx, instance, database, nil)
+	s.upsertDatabaseConnectionAnomaly(ctx, database, nil)
 	// Sync database schema
 	deadlineCtx, cancelFunc := context.WithDeadline(ctx, time.Now().Add(syncTimeout))
 	defer cancelFunc()
@@ -495,7 +495,7 @@ func (s *Syncer) SyncDatabaseSchema(ctx context.Context, database *store.Databas
 		return errors.Wrapf(err, "failed to sync database schema for database %q", database.DatabaseName)
 	}
 
-	dbSchema, err := s.store.GetDBSchema(ctx, database.UID)
+	dbSchema, err := s.store.GetDBSchema(ctx, database.InstanceID, database.DatabaseName)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get database schema for database %q", database.DatabaseName)
 	}
@@ -529,17 +529,17 @@ func (s *Syncer) SyncDatabaseSchema(ctx context.Context, database *store.Databas
 	}
 
 	syncStatus := api.OK
-	ts := time.Now().Unix()
+	ts := time.Now()
 	if _, err := s.store.UpdateDatabase(ctx, &store.UpdateDatabaseMessage{
-		InstanceID:           database.InstanceID,
-		DatabaseName:         database.DatabaseName,
-		SyncState:            &syncStatus,
-		SuccessfulSyncTimeTs: &ts,
+		InstanceID:   database.InstanceID,
+		DatabaseName: database.DatabaseName,
+		SyncState:    &syncStatus,
+		SyncAt:       &ts,
 		MetadataUpsert: &storepb.DatabaseMetadata{
-			LastSyncTime:    timestamppb.New(time.Unix(ts, 0)),
+			LastSyncTime:    timestamppb.New(ts),
 			BackupAvailable: s.hasBackupSchema(ctx, instance, databaseMetadata),
 		},
-	}, api.SystemBotID); err != nil {
+	}); err != nil {
 		return errors.Wrapf(err, "failed to update database %q for instance %q", database.DatabaseName, database.InstanceID)
 	}
 
@@ -561,9 +561,8 @@ func (s *Syncer) SyncDatabaseSchema(ctx context.Context, database *store.Databas
 	}
 
 	if err := s.store.UpsertDBSchema(ctx,
-		database.UID,
+		database.InstanceID, database.DatabaseName,
 		model.NewDBSchema(databaseMetadata, rawDump, dbModelConfig.BuildDatabaseConfig()),
-		api.SystemBotID,
 	); err != nil {
 		if strings.Contains(err.Error(), "escape sequence") {
 			if metadataBytes, err := protojson.Marshal(databaseMetadata); err == nil {
@@ -582,7 +581,8 @@ func (s *Syncer) SyncDatabaseSchema(ctx context.Context, database *store.Databas
 			}
 			limit := 1
 			list, err := s.store.ListChangelogs(ctx, &store.FindChangelogMessage{
-				DatabaseUID:    &database.UID,
+				InstanceID:     &database.InstanceID,
+				DatabaseName:   &database.DatabaseName,
 				TypeList:       []string{string(db.Migrate), string(db.Baseline)},
 				HasSyncHistory: true,
 				Limit:          &limit,
@@ -601,18 +601,19 @@ func (s *Syncer) SyncDatabaseSchema(ctx context.Context, database *store.Databas
 			}
 			latestSchema := string(rawDump)
 			if changelog.Schema != latestSchema {
-				if _, err = s.store.UpsertActiveAnomalyV2(ctx, api.SystemBotID, &store.AnomalyMessage{
-					ProjectID:   database.ProjectID,
-					InstanceUID: instance.UID,
-					DatabaseUID: database.UID,
-					Type:        api.AnomalyDatabaseSchemaDrift,
+				if _, err = s.store.UpsertActiveAnomalyV2(ctx, &store.AnomalyMessage{
+					ProjectID:    database.ProjectID,
+					InstanceID:   database.InstanceID,
+					DatabaseName: database.DatabaseName,
+					Type:         api.AnomalyDatabaseSchemaDrift,
 				}); err != nil {
 					return errors.Wrapf(err, "failed to create anomaly")
 				}
 			} else {
 				err := s.store.DeleteAnomalyV2(ctx, &store.DeleteAnomalyMessage{
-					DatabaseUID: database.UID,
-					Type:        api.AnomalyDatabaseSchemaDrift,
+					InstanceID:   database.InstanceID,
+					DatabaseName: database.DatabaseName,
+					Type:         api.AnomalyDatabaseSchemaDrift,
 				})
 				if err != nil && common.ErrorCode(err) != common.NotFound {
 					return errors.Wrapf(err, "failed to close anomaly")
@@ -621,7 +622,7 @@ func (s *Syncer) SyncDatabaseSchema(ctx context.Context, database *store.Databas
 			return nil
 		}(); err != nil {
 			slog.Error("failed to check anomaly",
-				slog.String("instance", instance.ResourceID),
+				slog.String("instance", database.InstanceID),
 				slog.String("database", database.DatabaseName),
 				slog.String("type", string(api.AnomalyDatabaseSchemaDrift)),
 				log.BBError(err))
@@ -667,16 +668,16 @@ func (s *Syncer) hasBackupSchema(ctx context.Context, instance *store.InstanceMe
 	return false
 }
 
-func (s *Syncer) upsertDatabaseConnectionAnomaly(ctx context.Context, instance *store.InstanceMessage, database *store.DatabaseMessage, connErr error) {
+func (s *Syncer) upsertDatabaseConnectionAnomaly(ctx context.Context, database *store.DatabaseMessage, connErr error) {
 	if connErr != nil {
-		if _, err := s.store.UpsertActiveAnomalyV2(ctx, api.SystemBotID, &store.AnomalyMessage{
-			ProjectID:   database.ProjectID,
-			InstanceUID: instance.UID,
-			DatabaseUID: database.UID,
-			Type:        api.AnomalyDatabaseConnection,
+		if _, err := s.store.UpsertActiveAnomalyV2(ctx, &store.AnomalyMessage{
+			ProjectID:    database.ProjectID,
+			InstanceID:   database.InstanceID,
+			DatabaseName: database.DatabaseName,
+			Type:         api.AnomalyDatabaseConnection,
 		}); err != nil {
 			slog.Error("Failed to create anomaly",
-				slog.String("instance", instance.ResourceID),
+				slog.String("instance", database.InstanceID),
 				slog.String("database", database.DatabaseName),
 				slog.String("type", string(api.AnomalyDatabaseConnection)),
 				log.BBError(err))
@@ -685,12 +686,13 @@ func (s *Syncer) upsertDatabaseConnectionAnomaly(ctx context.Context, instance *
 	}
 
 	err := s.store.DeleteAnomalyV2(ctx, &store.DeleteAnomalyMessage{
-		DatabaseUID: database.UID,
-		Type:        api.AnomalyDatabaseConnection,
+		InstanceID:   database.InstanceID,
+		DatabaseName: database.DatabaseName,
+		Type:         api.AnomalyDatabaseConnection,
 	})
 	if err != nil && common.ErrorCode(err) != common.NotFound {
 		slog.Error("Failed to close anomaly",
-			slog.String("instance", instance.ResourceID),
+			slog.String("instance", database.InstanceID),
 			slog.String("database", database.DatabaseName),
 			slog.String("type", string(api.AnomalyDatabaseConnection)),
 			log.BBError(err))

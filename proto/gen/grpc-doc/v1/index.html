@@ -779,6 +779,10 @@
                 </li>
               
                 <li>
+                  <a href="#bytebase.v1.ColumnMetadata.IdentityGeneration"><span class="badge">E</span>ColumnMetadata.IdentityGeneration</a>
+                </li>
+              
+                <li>
                   <a href="#bytebase.v1.DatabaseMetadataView"><span class="badge">E</span>DatabaseMetadataView</a>
                 </li>
               
@@ -1398,7 +1402,7 @@
         
           
           <li>
-            <a href="#v1%2fauth_service.proto">v1/auth_service.proto</a>
+            <a href="#v1%2fuser_service.proto">v1/user_service.proto</a>
             <ul>
               
                 <li>
@@ -1414,35 +1418,11 @@
                 </li>
               
                 <li>
-                  <a href="#bytebase.v1.IdentityProviderContext"><span class="badge">M</span>IdentityProviderContext</a>
-                </li>
-              
-                <li>
                   <a href="#bytebase.v1.ListUsersRequest"><span class="badge">M</span>ListUsersRequest</a>
                 </li>
               
                 <li>
                   <a href="#bytebase.v1.ListUsersResponse"><span class="badge">M</span>ListUsersResponse</a>
-                </li>
-              
-                <li>
-                  <a href="#bytebase.v1.LoginRequest"><span class="badge">M</span>LoginRequest</a>
-                </li>
-              
-                <li>
-                  <a href="#bytebase.v1.LoginResponse"><span class="badge">M</span>LoginResponse</a>
-                </li>
-              
-                <li>
-                  <a href="#bytebase.v1.LogoutRequest"><span class="badge">M</span>LogoutRequest</a>
-                </li>
-              
-                <li>
-                  <a href="#bytebase.v1.OAuth2IdentityProviderContext"><span class="badge">M</span>OAuth2IdentityProviderContext</a>
-                </li>
-              
-                <li>
-                  <a href="#bytebase.v1.OIDCIdentityProviderContext"><span class="badge">M</span>OIDCIdentityProviderContext</a>
                 </li>
               
                 <li>
@@ -1465,6 +1445,45 @@
                 <li>
                   <a href="#bytebase.v1.UserType"><span class="badge">E</span>UserType</a>
                 </li>
+              
+              
+              
+                <li>
+                  <a href="#bytebase.v1.UserService"><span class="badge">S</span>UserService</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#v1%2fauth_service.proto">v1/auth_service.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#bytebase.v1.IdentityProviderContext"><span class="badge">M</span>IdentityProviderContext</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.LoginRequest"><span class="badge">M</span>LoginRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.LoginResponse"><span class="badge">M</span>LoginResponse</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.LogoutRequest"><span class="badge">M</span>LogoutRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.OAuth2IdentityProviderContext"><span class="badge">M</span>OAuth2IdentityProviderContext</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.OIDCIdentityProviderContext"><span class="badge">M</span>OIDCIdentityProviderContext</a>
+                </li>
+              
               
               
               
@@ -2414,6 +2433,10 @@
                   <a href="#bytebase.v1.UpdateReleaseRequest"><span class="badge">M</span>UpdateReleaseRequest</a>
                 </li>
               
+              
+                <li>
+                  <a href="#bytebase.v1.CheckReleaseResponse.RiskLevel"><span class="badge">E</span>CheckReleaseResponse.RiskLevel</a>
+                </li>
               
                 <li>
                   <a href="#bytebase.v1.Release.File.ChangeType"><span class="badge">E</span>Release.File.ChangeType</a>
@@ -3859,13 +3882,6 @@ Format: instances/{instance}/databases/{database}/catalog </p></td>
 
 The catalog&#39;s `name` field is used to identify the database catalog to update.
 Format: instances/{instance}/databases/{database}/catalog </p></td>
-                </tr>
-              
-                <tr>
-                  <td>update_mask</td>
-                  <td><a href="#google.protobuf.FieldMask">google.protobuf.FieldMask</a></td>
-                  <td></td>
-                  <td><p>The list of fields to update. </p></td>
                 </tr>
               
             </tbody>
@@ -6325,13 +6341,6 @@ A maximum of 1000 databases can be modified in a batch. </p></td>
                 </tr>
               
                 <tr>
-                  <td>creator</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>Format: users/hello@world.com </p></td>
-                </tr>
-              
-                <tr>
                   <td>create_time</td>
                   <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
                   <td></td>
@@ -6585,6 +6594,13 @@ classification and user_comment is parsed from the comment. </p></td>
                   <td><a href="#bytebase.v1.GenerationMetadata">GenerationMetadata</a></td>
                   <td></td>
                   <td><p>The generation is the generation of a column. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>identity_generation</td>
+                  <td><a href="#bytebase.v1.ColumnMetadata.IdentityGeneration">ColumnMetadata.IdentityGeneration</a></td>
+                  <td></td>
+                  <td><p>The identity_generation is for identity columns, PG only. </p></td>
                 </tr>
               
             </tbody>
@@ -8395,13 +8411,6 @@ Can be empty. </p></td>
                 </tr>
               
                 <tr>
-                  <td>creator</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>Format: users/hello@world.com </p></td>
-                </tr>
-              
-                <tr>
                   <td>create_time</td>
                   <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
                   <td></td>
@@ -9709,6 +9718,35 @@ The API will default to the BASIC view.</p></td>
             
               <tr>
                 <td>CHANGELOG_VIEW_FULL</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+        <h3 id="bytebase.v1.ColumnMetadata.IdentityGeneration">ColumnMetadata.IdentityGeneration</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>IDENTITY_GENERATION_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ALWAYS</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>BY_DEFAULT</td>
                 <td>2</td>
                 <td><p></p></td>
               </tr>
@@ -15004,13 +15042,6 @@ Format:
                   <td><p> </p></td>
                 </tr>
               
-                <tr>
-                  <td>update_time</td>
-                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
             </tbody>
           </table>
 
@@ -16010,7 +16041,7 @@ to retrieve the next page of log entities. </p></td>
     
       
       <div class="file-heading">
-        <h2 id="v1/auth_service.proto">v1/auth_service.proto</h2><a href="#title">Top</a>
+        <h2 id="v1/user_service.proto">v1/user_service.proto</h2><a href="#title">Top</a>
       </div>
       <p></p>
 
@@ -16080,37 +16111,6 @@ Format: users/{user} </p></td>
                   <td></td>
                   <td><p>The name of the user to retrieve.
 Format: users/{user uid or user email} </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="bytebase.v1.IdentityProviderContext">IdentityProviderContext</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>oauth2_context</td>
-                  <td><a href="#bytebase.v1.OAuth2IdentityProviderContext">OAuth2IdentityProviderContext</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>oidc_context</td>
-                  <td><a href="#bytebase.v1.OIDCIdentityProviderContext">OIDCIdentityProviderContext</a></td>
-                  <td></td>
-                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -16196,163 +16196,6 @@ If this field is omitted, there are no subsequent pages. </p></td>
           </table>
 
           
-
-        
-      
-        <h3 id="bytebase.v1.LoginRequest">LoginRequest</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>email</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>password</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>web</td>
-                  <td><a href="#bool">bool</a></td>
-                  <td></td>
-                  <td><p>If web is set, we will set access token, refresh token, and user to the cookie. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>idp_name</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>The name of the identity provider.
-Format: idps/{idp} </p></td>
-                </tr>
-              
-                <tr>
-                  <td>idp_context</td>
-                  <td><a href="#bytebase.v1.IdentityProviderContext">IdentityProviderContext</a></td>
-                  <td></td>
-                  <td><p>The idp_context is using to get the user information from identity provider. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>otp_code</td>
-                  <td><a href="#string">string</a></td>
-                  <td>optional</td>
-                  <td><p>The otp_code is used to verify the user&#39;s identity by MFA. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>recovery_code</td>
-                  <td><a href="#string">string</a></td>
-                  <td>optional</td>
-                  <td><p>The recovery_code is used to recovery the user&#39;s identity with MFA. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>mfa_temp_token</td>
-                  <td><a href="#string">string</a></td>
-                  <td>optional</td>
-                  <td><p>The mfa_temp_token is used to verify the user&#39;s identity by MFA. </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="bytebase.v1.LoginResponse">LoginResponse</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>token</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>mfa_temp_token</td>
-                  <td><a href="#string">string</a></td>
-                  <td>optional</td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>require_reset_password</td>
-                  <td><a href="#bool">bool</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>user</td>
-                  <td><a href="#bytebase.v1.User">User</a></td>
-                  <td></td>
-                  <td><p>The user of successful login. </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="bytebase.v1.LogoutRequest">LogoutRequest</h3>
-        <p></p>
-
-        
-
-        
-      
-        <h3 id="bytebase.v1.OAuth2IdentityProviderContext">OAuth2IdentityProviderContext</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>code</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="bytebase.v1.OIDCIdentityProviderContext">OIDCIdentityProviderContext</h3>
-        <p></p>
-
-        
 
         
       
@@ -16619,7 +16462,7 @@ Could be empty. </p></td>
       
 
       
-        <h3 id="bytebase.v1.AuthService">AuthService</h3>
+        <h3 id="bytebase.v1.UserService">UserService</h3>
         <p></p>
         <table class="enum-table">
           <thead>
@@ -16672,20 +16515,6 @@ The last remaining workspace admin cannot be deleted.</p></td>
                 <td><a href="#bytebase.v1.UndeleteUserRequest">UndeleteUserRequest</a></td>
                 <td><a href="#bytebase.v1.User">User</a></td>
                 <td><p>Only the user with bb.users.undelete permission on the workspace can undelete the user.</p></td>
-              </tr>
-            
-              <tr>
-                <td>Login</td>
-                <td><a href="#bytebase.v1.LoginRequest">LoginRequest</a></td>
-                <td><a href="#bytebase.v1.LoginResponse">LoginResponse</a></td>
-                <td><p></p></td>
-              </tr>
-            
-              <tr>
-                <td>Logout</td>
-                <td><a href="#bytebase.v1.LogoutRequest">LogoutRequest</a></td>
-                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
-                <td><p></p></td>
               </tr>
             
           </tbody>
@@ -16765,6 +16594,252 @@ The last remaining workspace admin cannot be deleted.</p></td>
                 <td>*</td>
               </tr>
               
+            
+            </tbody>
+          </table>
+          
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="v1/auth_service.proto">v1/auth_service.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="bytebase.v1.IdentityProviderContext">IdentityProviderContext</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>oauth2_context</td>
+                  <td><a href="#bytebase.v1.OAuth2IdentityProviderContext">OAuth2IdentityProviderContext</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>oidc_context</td>
+                  <td><a href="#bytebase.v1.OIDCIdentityProviderContext">OIDCIdentityProviderContext</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.LoginRequest">LoginRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>email</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>password</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>web</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>If web is set, we will set access token, refresh token, and user to the cookie. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>idp_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The name of the identity provider.
+Format: idps/{idp} </p></td>
+                </tr>
+              
+                <tr>
+                  <td>idp_context</td>
+                  <td><a href="#bytebase.v1.IdentityProviderContext">IdentityProviderContext</a></td>
+                  <td></td>
+                  <td><p>The idp_context is using to get the user information from identity provider. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>otp_code</td>
+                  <td><a href="#string">string</a></td>
+                  <td>optional</td>
+                  <td><p>The otp_code is used to verify the user&#39;s identity by MFA. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>recovery_code</td>
+                  <td><a href="#string">string</a></td>
+                  <td>optional</td>
+                  <td><p>The recovery_code is used to recovery the user&#39;s identity with MFA. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mfa_temp_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td>optional</td>
+                  <td><p>The mfa_temp_token is used to verify the user&#39;s identity by MFA. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.LoginResponse">LoginResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mfa_temp_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td>optional</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>require_reset_password</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>user</td>
+                  <td><a href="#bytebase.v1.User">User</a></td>
+                  <td></td>
+                  <td><p>The user of successful login. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.LogoutRequest">LogoutRequest</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="bytebase.v1.OAuth2IdentityProviderContext">OAuth2IdentityProviderContext</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>code</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.OIDCIdentityProviderContext">OIDCIdentityProviderContext</h3>
+        <p></p>
+
+        
+
+        
+      
+
+      
+
+      
+
+      
+        <h3 id="bytebase.v1.AuthService">AuthService</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>Login</td>
+                <td><a href="#bytebase.v1.LoginRequest">LoginRequest</a></td>
+                <td><a href="#bytebase.v1.LoginResponse">LoginResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>Logout</td>
+                <td><a href="#bytebase.v1.LogoutRequest">LogoutRequest</a></td>
+                <td><a href="#google.protobuf.Empty">.google.protobuf.Empty</a></td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+          
+          
+          <h4>Methods with HTTP bindings</h4>
+          <table>
+            <thead>
+              <tr>
+                <td>Method Name</td>
+                <td>Method</td>
+                <td>Pattern</td>
+                <td>Body</td>
+              </tr>
+            </thead>
+            <tbody>
             
               
               
@@ -17004,21 +17079,6 @@ Format: projects/{project}/changelists/{changelist} </p></td>
                   <td></td>
                   <td><p>The creator of the changelist.
 Format: users/{email} </p></td>
-                </tr>
-              
-                <tr>
-                  <td>updater</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>The updater of the changelist.
-Format: users/{email} </p></td>
-                </tr>
-              
-                <tr>
-                  <td>create_time</td>
-                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
-                  <td></td>
-                  <td><p>The create time of the changelist. </p></td>
                 </tr>
               
                 <tr>
@@ -18457,25 +18517,10 @@ Format: groups/{group}, group is an email. </p></td>
                 </tr>
               
                 <tr>
-                  <td>creator</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>The name for the creator.
-Format: users/hello@world.com </p></td>
-                </tr>
-              
-                <tr>
                   <td>members</td>
                   <td><a href="#bytebase.v1.GroupMember">GroupMember</a></td>
                   <td>repeated</td>
                   <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>create_time</td>
-                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
-                  <td></td>
-                  <td><p>The timestamp when the group was created. </p></td>
                 </tr>
               
                 <tr>
@@ -21468,13 +21513,6 @@ Format: projects/{project} </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>The title or name of a project. It&#39;s not unique within the workspace. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>key</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>The key is a short and upper-case identifier for a project. It&#39;s unique within the workspace. </p></td>
                 </tr>
               
                 <tr>
@@ -26022,6 +26060,20 @@ instances/{instance}/databases/{database} </p></td>
                   <td><p> </p></td>
                 </tr>
               
+                <tr>
+                  <td>affected_rows</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>The affected rows of the check. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>risk_level</td>
+                  <td><a href="#bytebase.v1.CheckReleaseResponse.RiskLevel">CheckReleaseResponse.RiskLevel</a></td>
+                  <td></td>
+                  <td><p>The aggregated risk level of the check. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -26059,6 +26111,20 @@ Should be a database. Format: instances/{instance}/databases/{database} </p></td
                   <td><a href="#bytebase.v1.Advice">Advice</a></td>
                   <td>repeated</td>
                   <td><p>The list of advice for the file and the target. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>affected_rows</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>The count of affected rows of the statement on the target. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>risk_level</td>
+                  <td><a href="#bytebase.v1.CheckReleaseResponse.RiskLevel">CheckReleaseResponse.RiskLevel</a></td>
+                  <td></td>
+                  <td><p>The risk level of the statement on the target. </p></td>
                 </tr>
               
             </tbody>
@@ -26468,6 +26534,41 @@ Format: projects/{project}/releases/{release} </p></td>
       
 
       
+        <h3 id="bytebase.v1.CheckReleaseResponse.RiskLevel">CheckReleaseResponse.RiskLevel</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>RISK_LEVEL_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>LOW</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>MODERATE</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>HIGH</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
         <h3 id="bytebase.v1.Release.File.ChangeType">Release.File.ChangeType</h3>
         <p></p>
         <table class="enum-table">
@@ -26860,27 +26961,6 @@ Format: reviewConfigs/{reviewConfig} </p></td>
                 <tr>
                   <td>enabled</td>
                   <td><a href="#bool">bool</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>creator</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>Format: users/hello@world.com </p></td>
-                </tr>
-              
-                <tr>
-                  <td>create_time</td>
-                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>update_time</td>
-                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -28446,13 +28526,6 @@ Format: projects/{project}/plans/{plan} </p></td>
                 </tr>
               
                 <tr>
-                  <td>update_time</td>
-                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
                   <td>issue</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
@@ -28882,13 +28955,6 @@ Leave it empty if no needs to encrypt the zip file. </p></td>
               
                 <tr>
                   <td>creator</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>Format: user/hello@world.com </p></td>
-                </tr>
-              
-                <tr>
-                  <td>updater</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>Format: user/hello@world.com </p></td>
@@ -30480,13 +30546,6 @@ Format: users/{email} </p></td>
                 </tr>
               
                 <tr>
-                  <td>update_time</td>
-                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
-                  <td></td>
-                  <td><p>The last update time of the sheet. </p></td>
-                </tr>
-              
-                <tr>
                   <td>content</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
@@ -30990,36 +31049,6 @@ Format: projects/{project}/vcsConnectors/{vcsConnector} </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>The title of the vcs connector. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>creator</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>The creator of the vcsConnector.
-Format: users/{email} </p></td>
-                </tr>
-              
-                <tr>
-                  <td>updater</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>The updater of the vcsConnector.
-Format: users/{email} </p></td>
-                </tr>
-              
-                <tr>
-                  <td>create_time</td>
-                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
-                  <td></td>
-                  <td><p>The create time of the vcsConnector. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>update_time</td>
-                  <td><a href="#google.protobuf.Timestamp">google.protobuf.Timestamp</a></td>
-                  <td></td>
-                  <td><p>The last update time of the vcsConnector. </p></td>
                 </tr>
               
                 <tr>

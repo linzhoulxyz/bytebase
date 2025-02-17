@@ -11,23 +11,22 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/bytebase/bytebase/backend/common"
-	api "github.com/bytebase/bytebase/backend/legacyapi"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 type ReleaseMessage struct {
-	ProjectUID int
-	Payload    *storepb.ReleasePayload
+	ProjectID string
+	Payload   *storepb.ReleasePayload
 
 	// output only
-	UID         int64
-	Deleted     bool
-	CreatorUID  int
-	CreatedTime time.Time
+	UID        int64
+	Deleted    bool
+	CreatorUID int
+	At         time.Time
 }
 
 type FindReleaseMessage struct {
-	ProjectUID  *int
+	ProjectID   *string
 	UID         *int64
 	Limit       *int
 	Offset      *int
@@ -45,13 +44,13 @@ func (s *Store) CreateRelease(ctx context.Context, release *ReleaseMessage, crea
 	query := `
 		INSERT INTO release (
 			creator_id,
-			project_id,
+			project,
 			payload
 		) VALUES (
 			$1,
 			$2,
 			$3
-		) RETURNING id, created_ts
+		) RETURNING id, created_at
 	`
 
 	p, err := protojson.Marshal(release.Payload)
@@ -69,7 +68,7 @@ func (s *Store) CreateRelease(ctx context.Context, release *ReleaseMessage, crea
 	var createdTime time.Time
 	if err := tx.QueryRowContext(ctx, query,
 		creatorUID,
-		release.ProjectUID,
+		release.ProjectID,
 		p,
 	).Scan(&id, &createdTime); err != nil {
 		return nil, errors.Wrapf(err, "failed to insert release")
@@ -81,7 +80,7 @@ func (s *Store) CreateRelease(ctx context.Context, release *ReleaseMessage, crea
 
 	release.UID = id
 	release.CreatorUID = creatorUID
-	release.CreatedTime = createdTime
+	release.At = createdTime
 
 	return release, nil
 }
@@ -102,25 +101,25 @@ func (s *Store) GetRelease(ctx context.Context, uid int64) (*ReleaseMessage, err
 
 func (s *Store) ListReleases(ctx context.Context, find *FindReleaseMessage) ([]*ReleaseMessage, error) {
 	where, args := []string{"TRUE"}, []any{}
-	if v := find.ProjectUID; v != nil {
-		where = append(where, fmt.Sprintf("release.project_id = $%d", len(args)+1))
+	if v := find.ProjectID; v != nil {
+		where = append(where, fmt.Sprintf("project = $%d", len(args)+1))
 		args = append(args, *v)
 	}
 	if v := find.UID; v != nil {
-		where = append(where, fmt.Sprintf("release.id= $%d", len(args)+1))
+		where = append(where, fmt.Sprintf("id= $%d", len(args)+1))
 		args = append(args, *v)
 	}
 	if !find.ShowDeleted {
-		where, args = append(where, fmt.Sprintf("release.row_status = $%d", len(args)+1)), append(args, api.Normal)
+		where, args = append(where, fmt.Sprintf("deleted = $%d", len(args)+1)), append(args, false)
 	}
 
 	query := fmt.Sprintf(`
 		SELECT
 			id,
-			row_status,
-			project_id,
+			deleted,
+			project,
 			creator_id,
-			created_ts,
+			created_at,
 			payload
 		FROM release
 		WHERE %s
@@ -151,21 +150,19 @@ func (s *Store) ListReleases(ctx context.Context, find *FindReleaseMessage) ([]*
 		r := ReleaseMessage{
 			Payload: &storepb.ReleasePayload{},
 		}
-		var rowStatus string
 		var payload []byte
 
 		if err := rows.Scan(
 			&r.UID,
-			&rowStatus,
-			&r.ProjectUID,
+			&r.Deleted,
+			&r.ProjectID,
 			&r.CreatorUID,
-			&r.CreatedTime,
+			&r.At,
 			&payload,
 		); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan rows")
 		}
 
-		r.Deleted = convertRowStatusToDeleted(rowStatus)
 		if err := common.ProtojsonUnmarshaler.Unmarshal(payload, r.Payload); err != nil {
 			return nil, errors.Wrapf(err, "failed to unmarshal payload")
 		}
@@ -188,11 +185,7 @@ func (s *Store) UpdateRelease(ctx context.Context, update *UpdateReleaseMessage)
 	set, args := []string{}, []any{}
 
 	if v := update.Deleted; v != nil {
-		rowStatus := api.Normal
-		if *v {
-			rowStatus = api.Archived
-		}
-		set, args = append(set, fmt.Sprintf(`row_status = $%d`, len(args)+1)), append(args, rowStatus)
+		set, args = append(set, fmt.Sprintf(`deleted = $%d`, len(args)+1)), append(args, *v)
 	}
 	if v := update.Payload; v != nil {
 		payload, err := protojson.Marshal(update.Payload)

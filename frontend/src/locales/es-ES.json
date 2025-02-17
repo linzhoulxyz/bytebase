@@ -15,7 +15,6 @@
     "overview": "Resumen",
     "changelog": "Historial de cambios",
     "webhooks": "Webhooks",
-    "key": "Clave",
     "activity": "Actividad",
     "sign-in": "Iniciar sesión",
     "sign-in-as-admin": "Iniciar sesión como administrador",
@@ -162,6 +161,7 @@
     "success": "Éxito",
     "failed": "Falló",
     "load-more": "Cargar más",
+    "rows-per-page": "Filas por página",
     "access-denied": "Acceso denegado",
     "restart": "Reiniciar",
     "want-help": "Buscar Ayuda",
@@ -236,19 +236,6 @@
   },
   "error-page": {
     "go-back-home": "Volver al inicio"
-  },
-  "kbar": {
-    "recently-visited": "Visitado Recientemente",
-    "navigation": "Navegación",
-    "help": {
-      "navigate": "navegar",
-      "perform": "realizar",
-      "close": "cerrar",
-      "back": "volver"
-    },
-    "options": {
-      "placeholder": "Escriba un comando o búsqueda…"
-    }
   },
   "task": {
     "checking": "Comprobando...",
@@ -409,7 +396,6 @@
       "action": {
         "deactivate": "Desactivar",
         "deactivate-confirm-title": "¿Estás seguro de que deseas desactivar?",
-        "reactivate": "Reactivar",
         "reactivate-confirm-title": "¿Estás seguro de que deseas reactivar?"
       },
       "tooltip": {
@@ -668,7 +654,6 @@
       "algorithms": {
         "add": "Agregar algoritmo",
         "edit": "Editar algoritmo",
-        "default": "Por defecto",
         "table": {
           "masking-type": "Tipo De Enmascaramiento"
         },
@@ -1289,7 +1274,6 @@
     "visit-database": "@:common.visit @:common.databases",
     "visit-environment": "@:common.visit @:common.environments",
     "visit-member": "@:common.visit @:common.members",
-    "use-kbar": "Usar kbar ({shortcut})",
     "query-data": "Consultar datos",
     "notice": {
       "title": "Guía de inicio rápido omitida",
@@ -1551,12 +1535,10 @@
   },
   "project": {
     "table": {
-      "key": "@:common.key",
       "name": "@:common.name"
     },
     "create-modal": {
       "project-name": "@:common.project @:common.name",
-      "key": "@:common.key",
       "success-prompt": "Proyecto {name} creado exitosamente."
     },
     "overview": {
@@ -1698,7 +1680,6 @@
     },
     "select": "Seleccionar Proyecto",
     "all": "Todos los proyectos",
-    "key-hint": "Letras alfanuméricas descriptivas cortas para identificar este proyecto..",
     "gitops-connector": {
       "add": "Agregar conector GitOps",
       "delete": "Eliminar conector GitOps",

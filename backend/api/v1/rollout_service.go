@@ -356,7 +356,7 @@ func (s *RolloutService) GetTaskRunSession(ctx context.Context, request *v1pb.Ge
 		return nil, status.Errorf(codes.Internal, "failed to get task, error: %v", err)
 	}
 
-	instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{UID: &task.InstanceID})
+	instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{ResourceID: &task.InstanceID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get instance, error: %v", err)
 	}
@@ -538,7 +538,7 @@ func (s *RolloutService) BatchRunTasks(ctx context.Context, request *v1pb.BatchR
 		return nil, status.Errorf(codes.Internal, "failed to find the stage to run")
 	}
 
-	stageToRunTasks, err := s.store.ListTasks(ctx, &api.TaskFind{PipelineID: &rolloutID, StageID: &stageToRun.ID})
+	stageToRunTasks, err := s.store.ListTasks(ctx, &store.TaskFind{PipelineID: &rolloutID, StageID: &stageToRun.ID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list tasks, error: %v", err)
 	}
@@ -655,7 +655,7 @@ func (s *RolloutService) BatchSkipTasks(ctx context.Context, request *v1pb.Batch
 		return nil, status.Errorf(codes.Internal, "failed to find issue, error: %v", err)
 	}
 
-	tasks, err := s.store.ListTasks(ctx, &api.TaskFind{PipelineID: &rolloutID})
+	tasks, err := s.store.ListTasks(ctx, &store.TaskFind{PipelineID: &rolloutID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list tasks, error: %v", err)
 	}
@@ -708,7 +708,7 @@ func (s *RolloutService) BatchSkipTasks(ctx context.Context, request *v1pb.Batch
 		}
 	}
 
-	if err := s.store.BatchSkipTasks(ctx, taskUIDs, request.Reason, user.ID); err != nil {
+	if err := s.store.BatchSkipTasks(ctx, taskUIDs, request.Reason); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to skip tasks, error: %v", err)
 	}
 
@@ -846,7 +846,7 @@ func (s *RolloutService) BatchCancelTaskRuns(ctx context.Context, request *v1pb.
 		}
 	}
 
-	if err := s.store.BatchCancelTaskRuns(ctx, taskRunIDs, principalID); err != nil {
+	if err := s.store.BatchCancelTaskRuns(ctx, taskRunIDs); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to batch patch task run status to canceled, error: %v", err)
 	}
 
@@ -910,7 +910,7 @@ func (s *RolloutService) PreviewTaskRunRollback(ctx context.Context, request *v1
 		return nil, status.Errorf(codes.Internal, "failed to get task, error: %v", err)
 	}
 
-	instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{UID: &task.InstanceID})
+	instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{ResourceID: &task.InstanceID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get instance, error: %v", err)
 	}
@@ -982,7 +982,7 @@ func GetPipelineCreate(ctx context.Context, s *store.Store, sheetManager *sheet.
 	if filterByDeploymentConfig {
 		deploymentConfig := snapshot.GetDeploymentConfigSnapshot().GetDeploymentConfig()
 		if deploymentConfig == nil {
-			deploymentConfigMessage, err := s.GetDeploymentConfigV2(ctx, project.UID)
+			deploymentConfigMessage, err := s.GetDeploymentConfigV2(ctx, project.ResourceID)
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to get deployment config")
 			}
@@ -1107,7 +1107,7 @@ func GetPipelineCreate(ctx context.Context, s *store.Store, sheetManager *sheet.
 		if environment == nil {
 			return nil, errors.Errorf("environment %q not found", stageEnvironmentID)
 		}
-		stageCreate.EnvironmentID = environment.UID
+		stageCreate.Environment = stageEnvironmentID
 		stageCreate.Name = fmt.Sprintf("%s Stage", environment.Title)
 		if step.Title != "" {
 			stageCreate.Name = step.Title
@@ -1115,14 +1115,14 @@ func GetPipelineCreate(ctx context.Context, s *store.Store, sheetManager *sheet.
 
 		if serializeTasks {
 			hasDAG := map[store.TaskIndexDAG]bool{}
-			databaseTaskIndexes := map[int][]int{}
+			databaseTaskIndexes := map[string][]int{}
 
 			for i, task := range stageCreate.TaskList {
-				if task.DatabaseID == nil {
+				if task.DatabaseName == nil {
 					continue
 				}
-				db := *task.DatabaseID
-				databaseTaskIndexes[db] = append(databaseTaskIndexes[db], i)
+				dbKey := fmt.Sprintf("%s/%s", task.InstanceID, *task.DatabaseName)
+				databaseTaskIndexes[dbKey] = append(databaseTaskIndexes[dbKey], i)
 			}
 
 			for _, dag := range stageCreate.TaskIndexDAGList {
@@ -1174,7 +1174,7 @@ func getPipelineCreateToTargetStage(ctx context.Context, s *store.Store, snapsho
 		return pipelineCreate, nil
 	}
 	if snapshot == nil {
-		deploymentConfigMessage, err := s.GetDeploymentConfigV2(ctx, project.UID)
+		deploymentConfigMessage, err := s.GetDeploymentConfigV2(ctx, project.ResourceID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get deployment config")
 		}
@@ -1218,7 +1218,7 @@ func GetValidRolloutPolicyForStage(ctx context.Context, stores *store.Store, lic
 	}
 
 	for _, task := range stage.TaskList {
-		instance, err := stores.GetInstanceV2(ctx, &store.FindInstanceMessage{UID: &task.InstanceID})
+		instance, err := stores.GetInstanceV2(ctx, &store.FindInstanceMessage{ResourceID: &task.InstanceID})
 		if err != nil {
 			return nil, err
 		}
@@ -1233,9 +1233,9 @@ func GetValidRolloutPolicyForStage(ctx context.Context, stores *store.Store, lic
 		}
 	}
 
-	policy, err := stores.GetRolloutPolicy(ctx, stage.EnvironmentID)
+	policy, err := stores.GetRolloutPolicy(ctx, stage.Environment)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get rollout policy for stageEnvironmentID %d", stage.EnvironmentID)
+		return nil, errors.Wrapf(err, "failed to get rollout policy for stageEnvironmentID %s", stage.Environment)
 	}
 	return policy, nil
 }
@@ -1262,9 +1262,9 @@ func (s *RolloutService) canUserRunStageTasks(ctx context.Context, user *store.U
 		return false, err
 	}
 
-	policy, err := s.store.GetProjectIamPolicy(ctx, project.UID)
+	policy, err := s.store.GetProjectIamPolicy(ctx, project.ResourceID)
 	if err != nil {
-		return false, common.Wrapf(err, common.Internal, "failed to get project %d policy", project.UID)
+		return false, common.Wrapf(err, common.Internal, "failed to get project %s policy", project.ResourceID)
 	}
 
 	roles := utils.GetUserFormattedRolesMap(ctx, s.store, user, policy.Policy)

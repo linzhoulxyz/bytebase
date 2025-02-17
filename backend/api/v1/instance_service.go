@@ -173,13 +173,8 @@ func (s *InstanceService) CreateInstance(ctx context.Context, request *v1pb.Crea
 		return nil, err
 	}
 
-	principalID, ok := ctx.Value(common.PrincipalIDContextKey).(int)
-	if !ok {
-		return nil, status.Errorf(codes.Internal, "principal ID not found")
-	}
 	instance, err := s.store.CreateInstanceV2(ctx,
 		instanceMessage,
-		principalID,
 		instanceCountLimit,
 	)
 	if err != nil {
@@ -267,13 +262,8 @@ func (s *InstanceService) UpdateInstance(ctx context.Context, request *v1pb.Upda
 		return nil, status.Errorf(codes.NotFound, "instance %q has been deleted", request.Instance.Name)
 	}
 
-	principalID, ok := ctx.Value(common.PrincipalIDContextKey).(int)
-	if !ok {
-		return nil, status.Errorf(codes.Internal, "principal ID not found")
-	}
 	patch := &store.UpdateInstanceMessage{
 		ResourceID: instance.ResourceID,
-		UpdaterID:  principalID,
 	}
 	for _, path := range request.UpdateMask.Paths {
 		switch path {
@@ -371,7 +361,7 @@ func (s *InstanceService) syncSlowQueriesForInstance(ctx context.Context, instan
 		return nil, status.Errorf(codes.NotFound, "instance %q has been deleted", instanceName)
 	}
 
-	slowQueryPolicy, err := s.store.GetSlowQueryPolicy(ctx, api.PolicyResourceTypeInstance, instance.UID)
+	slowQueryPolicy, err := s.store.GetSlowQueryPolicy(ctx, instance.ResourceID)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -485,7 +475,7 @@ func (s *InstanceService) syncSlowQueriesForProject(ctx context.Context, project
 				continue
 			}
 
-			slowQueryPolicy, err := s.store.GetSlowQueryPolicy(ctx, api.PolicyResourceTypeInstance, instance.UID)
+			slowQueryPolicy, err := s.store.GetSlowQueryPolicy(ctx, instance.ResourceID)
 			if err != nil {
 				return nil, status.Error(codes.Internal, err.Error())
 			}
@@ -540,7 +530,7 @@ func (s *InstanceService) DeleteInstance(ctx context.Context, request *v1pb.Dele
 	}
 	if request.Force {
 		if len(databases) > 0 {
-			if _, err := s.store.BatchUpdateDatabaseProject(ctx, databases, api.DefaultProjectID, api.SystemBotID); err != nil {
+			if _, err := s.store.BatchUpdateDatabaseProject(ctx, databases, api.DefaultProjectID); err != nil {
 				return nil, err
 			}
 		}
@@ -556,14 +546,9 @@ func (s *InstanceService) DeleteInstance(ctx context.Context, request *v1pb.Dele
 		}
 	}
 
-	principalID, ok := ctx.Value(common.PrincipalIDContextKey).(int)
-	if !ok {
-		return nil, status.Errorf(codes.Internal, "principal ID not found")
-	}
 	if _, err := s.store.UpdateInstanceV2(ctx, &store.UpdateInstanceMessage{
 		ResourceID: instance.ResourceID,
 		Deleted:    &deletePatch,
-		UpdaterID:  principalID,
 	}, -1 /* don't need to pass the instance limition */); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -581,14 +566,9 @@ func (s *InstanceService) UndeleteInstance(ctx context.Context, request *v1pb.Un
 		return nil, status.Errorf(codes.InvalidArgument, "instance %q is active", request.Name)
 	}
 
-	principalID, ok := ctx.Value(common.PrincipalIDContextKey).(int)
-	if !ok {
-		return nil, status.Errorf(codes.Internal, "principal ID not found")
-	}
 	ins, err := s.store.UpdateInstanceV2(ctx, &store.UpdateInstanceMessage{
 		ResourceID: instance.ResourceID,
 		Deleted:    &undeletePatch,
-		UpdaterID:  principalID,
 	}, -1 /* don't need to pass the instance limition */)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -705,16 +685,12 @@ func (s *InstanceService) AddDataSource(ctx context.Context, request *v1pb.AddDa
 		return nil, status.Error(codes.PermissionDenied, err.Error())
 	}
 
-	principalID, ok := ctx.Value(common.PrincipalIDContextKey).(int)
-	if !ok {
-		return nil, status.Errorf(codes.Internal, "principal ID not found")
-	}
-	if err := s.store.AddDataSourceToInstanceV2(ctx, instance.UID, principalID, instance.ResourceID, dataSource); err != nil {
+	if err := s.store.AddDataSourceToInstanceV2(ctx, instance.UID, instance.ResourceID, dataSource); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	instance, err = s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{
-		UID: &instance.UID,
+		ResourceID: &instance.ResourceID,
 	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -759,12 +735,7 @@ func (s *InstanceService) UpdateDataSource(ctx context.Context, request *v1pb.Up
 		}
 	}
 
-	principalID, ok := ctx.Value(common.PrincipalIDContextKey).(int)
-	if !ok {
-		return nil, status.Errorf(codes.Internal, "principal ID not found")
-	}
 	patch := &store.UpdateDataSourceMessage{
-		UpdaterID:    principalID,
 		InstanceUID:  instance.UID,
 		InstanceID:   instance.ResourceID,
 		DataSourceID: request.DataSource.Id,
@@ -918,7 +889,7 @@ func (s *InstanceService) UpdateDataSource(ctx context.Context, request *v1pb.Up
 	}
 
 	instance, err = s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{
-		UID: &instance.UID,
+		ResourceID: &instance.ResourceID,
 	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -972,7 +943,7 @@ func (s *InstanceService) RemoveDataSource(ctx context.Context, request *v1pb.Re
 	}
 
 	instance, err = s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{
-		UID: &instance.UID,
+		ResourceID: &instance.ResourceID,
 	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())

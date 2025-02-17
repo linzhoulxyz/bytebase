@@ -9,10 +9,10 @@ import (
 
 // StageMessage is the message for stage.
 type StageMessage struct {
-	Name          string
-	EnvironmentID int
-	PipelineID    int
-	TaskList      []*TaskMessage
+	Name        string
+	Environment string
+	PipelineID  int
+	TaskList    []*TaskMessage
 
 	// empty for legacy stages
 	DeploymentID string
@@ -33,37 +33,33 @@ type TaskIndexDAG struct {
 	ToIndex   int
 }
 
-func (*Store) createStages(ctx context.Context, tx *Tx, stagesCreate []*StageMessage, pipelineUID int, creatorID int) ([]*StageMessage, error) {
+func (*Store) createStages(ctx context.Context, tx *Tx, stagesCreate []*StageMessage, pipelineUID int) ([]*StageMessage, error) {
 	if len(stagesCreate) == 0 {
 		return nil, nil
 	}
-	var environmentIDs []int
+	var environments []string
 	var names []string
 	var deploymentIDs []string
 	for _, create := range stagesCreate {
-		environmentIDs = append(environmentIDs, create.EnvironmentID)
+		environments = append(environments, create.Environment)
 		names = append(names, create.Name)
 		deploymentIDs = append(deploymentIDs, create.DeploymentID)
 	}
 
 	query := `
 		INSERT INTO stage (
-			creator_id,
-			updater_id,
 			pipeline_id,
-			environment_id,
+			environment,
 			name,
 			deployment_id
 		) SELECT
 			$1,
-			$1,
-			$2,
-			unnest(CAST($3 AS INTEGER[])) AS environment_id,
-			unnest(CAST($4 AS TEXT[])),
-			unnest(CAST($5 AS TEXT[])) AS deployment_id
+			unnest(CAST($2 AS TEXT[])) AS environment,
+			unnest(CAST($3 AS TEXT[])),
+			unnest(CAST($4 AS TEXT[])) AS deployment_id
 		RETURNING id
     `
-	rows, err := tx.QueryContext(ctx, query, creatorID, pipelineUID, environmentIDs, names, deploymentIDs)
+	rows, err := tx.QueryContext(ctx, query, pipelineUID, environments, names, deploymentIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +87,7 @@ func (*Store) listStages(ctx context.Context, tx *Tx, pipelineUID int) ([]*Stage
 		SELECT
 			stage.id,
 			stage.pipeline_id,
-			stage.environment_id,
+			stage.environment,
 			stage.deployment_id,
 			stage.name,
 			(
@@ -131,7 +127,7 @@ func (*Store) listStages(ctx context.Context, tx *Tx, pipelineUID int) ([]*Stage
 		if err := rows.Scan(
 			&stage.ID,
 			&stage.PipelineID,
-			&stage.EnvironmentID,
+			&stage.Environment,
 			&stage.DeploymentID,
 			&stage.Name,
 			&stage.Active,

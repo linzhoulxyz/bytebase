@@ -756,6 +756,15 @@ message ColumnMetadata {
 
   // The generation is the generation of a column.
   GenerationMetadata generation = 16;
+
+  enum IdentityGeneration {
+    IDENTITY_GENERATION_UNSPECIFIED = 0;
+    ALWAYS = 1;
+    BY_DEFAULT = 2;
+  }
+
+  // The identity_generation is for identity columns, PG only.
+  IdentityGeneration identity_generation = 17;
 }
 
 message GenerationMetadata {
@@ -1403,9 +1412,6 @@ message Revision {
   // Can be empty.
   string release = 2 [(google.api.resource_reference) = {type: "bytebase.com/Release"}];
 
-  // Format: users/hello@world.com
-  string creator = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
-
   google.protobuf.Timestamp create_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Format: users/hello@world.com
@@ -1537,8 +1543,6 @@ message Changelog {
   // Format: instances/{instance}/databases/{database}/changelogs/{changelog}
   string name = 1;
 
-  // Format: users/hello@world.com
-  string creator = 2;
   google.protobuf.Timestamp create_time = 3;
 
   enum Status {

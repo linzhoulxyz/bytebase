@@ -162,19 +162,17 @@ func (s *IssueService) getIssueFind(ctx context.Context, filter string, query st
 			if err != nil {
 				return nil, status.Errorf(codes.InvalidArgument, "failed to parse create_time %s, err: %v", spec.Value, err)
 			}
-			ts := t.Unix()
 			if spec.Operator == ComparatorTypeGreaterEqual {
-				issueFind.CreatedTsAfter = &ts
+				issueFind.CreatedAtAfter = &t
 			} else {
-				issueFind.CreatedTsBefore = &ts
+				issueFind.CreatedAtBefore = &t
 			}
 		case "create_time_after":
 			t, err := time.Parse(time.RFC3339, spec.Value)
 			if err != nil {
 				return nil, status.Errorf(codes.InvalidArgument, "failed to parse create_time_after %s, err: %v", spec.Value, err)
 			}
-			ts := t.Unix()
-			issueFind.CreatedTsAfter = &ts
+			issueFind.CreatedAtAfter = &t
 		case "type":
 			if spec.Operator != ComparatorTypeEqual {
 				return nil, status.Errorf(codes.InvalidArgument, `only support "=" operation for "type" filter`)
@@ -234,7 +232,8 @@ func (s *IssueService) getIssueFind(ctx context.Context, filter string, query st
 			if database == nil {
 				return nil, status.Errorf(codes.InvalidArgument, `database "%q" not found`, spec.Value)
 			}
-			issueFind.DatabaseUID = &database.UID
+			issueFind.InstanceID = &database.InstanceID
+			issueFind.DatabaseName = &database.DatabaseName
 		case "labels":
 			if spec.Operator != ComparatorTypeEqual {
 				return nil, status.Errorf(codes.InvalidArgument, `only support "=" operation for "%s" filter`, spec.Key)
@@ -729,7 +728,7 @@ func (s *IssueService) ApproveIssue(ctx context.Context, request *v1pb.ApproveIs
 		return nil, status.Errorf(codes.Internal, "failed to find user by id %v", principalID)
 	}
 
-	policy, err := s.store.GetProjectIamPolicy(ctx, issue.Project.UID)
+	policy, err := s.store.GetProjectIamPolicy(ctx, issue.Project.ResourceID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get project policy, error: %v", err)
 	}
@@ -767,7 +766,7 @@ func (s *IssueService) ApproveIssue(ctx context.Context, request *v1pb.ApproveIs
 		PayloadUpsert: &storepb.IssuePayload{
 			Approval: payload.Approval,
 		},
-	}, api.SystemBotID)
+	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update issue, error: %v", err)
 	}
@@ -950,7 +949,7 @@ func (s *IssueService) RejectIssue(ctx context.Context, request *v1pb.RejectIssu
 		return nil, status.Errorf(codes.Internal, "failed to find user by id %v", principalID)
 	}
 
-	policy, err := s.store.GetProjectIamPolicy(ctx, issue.Project.UID)
+	policy, err := s.store.GetProjectIamPolicy(ctx, issue.Project.ResourceID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get project policy, error: %v", err)
 	}
@@ -976,7 +975,7 @@ func (s *IssueService) RejectIssue(ctx context.Context, request *v1pb.RejectIssu
 		PayloadUpsert: &storepb.IssuePayload{
 			Approval: payload.Approval,
 		},
-	}, api.SystemBotID)
+	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update issue, error: %v", err)
 	}
@@ -1064,7 +1063,7 @@ func (s *IssueService) RequestIssue(ctx context.Context, request *v1pb.RequestIs
 		PayloadUpsert: &storepb.IssuePayload{
 			Approval: payload.Approval,
 		},
-	}, api.SystemBotID)
+	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update issue, error: %v", err)
 	}
@@ -1283,7 +1282,7 @@ func (s *IssueService) UpdateIssue(ctx context.Context, request *v1pb.UpdateIssu
 		}
 	}
 
-	issue, err = s.store.UpdateIssueV2(ctx, issue.UID, patch, user.ID)
+	issue, err = s.store.UpdateIssueV2(ctx, issue.UID, patch)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update issue, error: %v", err)
 	}
@@ -1350,7 +1349,7 @@ func (s *IssueService) BatchUpdateIssuesStatus(ctx context.Context, request *v1p
 		return nil, status.Errorf(codes.InvalidArgument, "failed to convert to issue status, err: %v", err)
 	}
 
-	if err := s.store.BatchUpdateIssueStatuses(ctx, issueIDs, newStatus, user.ID); err != nil {
+	if err := s.store.BatchUpdateIssueStatuses(ctx, issueIDs, newStatus); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to batch update issues, err: %v", err)
 	}
 
@@ -1490,7 +1489,7 @@ func (s *IssueService) CreateIssueComment(ctx context.Context, request *v1pb.Cre
 		issue.Subscribers = append(issue.Subscribers, user)
 		if _, err := s.store.UpdateIssueV2(ctx, issue.UID, &store.UpdateIssueMessage{
 			Subscribers: &issue.Subscribers,
-		}, user.ID); err != nil {
+		}); err != nil {
 			return nil, err
 		}
 	}
@@ -1516,13 +1515,8 @@ func (s *IssueService) UpdateIssueComment(ctx context.Context, request *v1pb.Upd
 		return nil, status.Errorf(codes.NotFound, "issue comment not found")
 	}
 
-	user, ok := ctx.Value(common.UserContextKey).(*store.UserMessage)
-	if !ok {
-		return nil, status.Errorf(codes.Internal, "user not found")
-	}
 	update := &store.UpdateIssueCommentMessage{
-		UID:       issueCommentUID,
-		UpdaterID: user.ID,
+		UID: issueCommentUID,
 	}
 	for _, path := range request.UpdateMask.Paths {
 		switch path {
@@ -1577,10 +1571,7 @@ func (s *IssueService) updateExternalApprovalWithStatus(ctx context.Context, iss
 		}
 	}
 
-	if _, err := s.store.UpdateExternalApprovalV2(ctx, &store.UpdateExternalApprovalMessage{
-		ID:        approval.ID,
-		RowStatus: api.Archived,
-	}); err != nil {
+	if err := s.store.DeleteExternalApprovalV2(ctx, approval.ID); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update external approval, error: %v", err)
 	}
 

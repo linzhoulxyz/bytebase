@@ -15,7 +15,6 @@
     "overview": "概要",
     "changelog": "変更履歴",
     "webhooks": "Webhook",
-    "key": "キー値",
     "activity": "活動",
     "sign-in": "ログイン",
     "sign-in-as-admin": "管理者としてサインイン",
@@ -162,6 +161,7 @@
     "success": "成功",
     "failed": "失敗",
     "load-more": "もっと読み込む",
+    "rows-per-page": "ページあたりの行数",
     "access-denied": "アクセスが拒否されました",
     "restart": "再起動",
     "want-help": "ユーザーグループに参加する",
@@ -236,19 +236,6 @@
   },
   "error-page": {
     "go-back-home": "ホームページに戻る"
-  },
-  "kbar": {
-    "recently-visited": "最近の訪問",
-    "navigation": "ナビゲーション",
-    "help": {
-      "navigate": "選ぶ",
-      "perform": "埋め込む",
-      "close": "閉じる",
-      "back": "戻る"
-    },
-    "options": {
-      "placeholder": "コマンドを入力するか検索してください…"
-    }
   },
   "task": {
     "checking": "検査中…",
@@ -409,7 +396,6 @@
       "action": {
         "deactivate": "無効にする",
         "deactivate-confirm-title": "無効にしてもOK",
-        "reactivate": "有効にする",
         "reactivate-confirm-title": "[OK] を有効にします"
       },
       "tooltip": {
@@ -668,7 +654,6 @@
       "algorithms": {
         "add": "アルゴリズムを追加",
         "edit": "アルゴリズムを編集",
-        "default": "デフォルト",
         "table": {
           "masking-type": "アルゴリズムの種類"
         },
@@ -1289,7 +1274,6 @@
     "visit-database": "@:{'common.databases'}に@:{'common.visit'}する",
     "visit-environment": "@:{'common.environments'}に@:{'common.visit'}する",
     "visit-member": "@:{'common.members'}に@:{'common.visit'}する",
-    "use-kbar": "kbar ({shortcut}) を使用する",
     "query-data": "クエリデータ",
     "notice": {
       "title": "クイックスタートガイドを終了しました",
@@ -1551,12 +1535,10 @@
   },
   "project": {
     "table": {
-      "key": "@:common.key",
       "name": "@:common.name"
     },
     "create-modal": {
       "project-name": "@:{'common.project'}@:{'common.name'}",
-      "key": "@:common.key",
       "success-prompt": "{name} が正常に作成されました。"
     },
     "overview": {
@@ -1698,7 +1680,6 @@
     },
     "select": "アイテムを選択",
     "all": "全てのアイテム",
-    "key-hint": "アイテムを識別するには、短く識別可能な英数字の組み合わせが使用されます。",
     "gitops-connector": {
       "add": "新しい GitOps 接続を追加",
       "delete": "GitOps接続を削除する",

@@ -29,7 +29,6 @@ func (s *Server) generateOnboardingData(ctx context.Context, user *store.UserMes
 	project, err := s.store.CreateProjectV2(ctx, &store.ProjectMessage{
 		ResourceID: "project-sample",
 		Title:      "Sample Project",
-		Key:        "SAM",
 		Setting:    setting,
 	}, userID)
 	if err != nil {
@@ -55,7 +54,7 @@ func (s *Server) generateOnboardingData(ctx context.Context, user *store.UserMes
 		},
 		EnvironmentID: api.DefaultTestEnvironmentID,
 		Activation:    false,
-	}, userID, -1)
+	}, -1)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create test onboarding instance")
 	}
@@ -71,7 +70,7 @@ func (s *Server) generateOnboardingData(ctx context.Context, user *store.UserMes
 		DatabaseName: postgres.SampleDatabaseTest,
 		ProjectID:    &project.ResourceID,
 	}
-	_, err = s.store.UpdateDatabase(ctx, transferDatabaseMessage, userID)
+	_, err = s.store.UpdateDatabase(ctx, transferDatabaseMessage)
 	if err != nil {
 		return errors.Wrapf(err, "failed to transfer test sample database")
 	}
@@ -114,7 +113,7 @@ func (s *Server) generateOnboardingData(ctx context.Context, user *store.UserMes
 		},
 		EnvironmentID: api.DefaultProdEnvironmentID,
 		Activation:    false,
-	}, userID, -1)
+	}, -1)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create prod onboarding instance")
 	}
@@ -130,7 +129,7 @@ func (s *Server) generateOnboardingData(ctx context.Context, user *store.UserMes
 		DatabaseName: postgres.SampleDatabaseProd,
 		ProjectID:    &project.ResourceID,
 	}
-	_, err = s.store.UpdateDatabase(ctx, transferDatabaseMessage, userID)
+	_, err = s.store.UpdateDatabase(ctx, transferDatabaseMessage)
 	if err != nil {
 		return errors.Wrapf(err, "failed to transfer prod sample database")
 	}
@@ -157,11 +156,10 @@ func (s *Server) generateOnboardingData(ctx context.Context, user *store.UserMes
 	// Add a sample SQL Review policy to the prod environment. This pairs with the following schema
 	// change issue to demonstrate the SQL Review feature.
 	sqlReviewConfig := &store.ReviewConfigMessage{
-		ID:         "sample",
-		Name:       "SQL Review Sample Policy",
-		CreatorUID: userID,
-		Enforce:    true,
-		Payload:    getSampleSQLReviewPayload(),
+		ID:      "sample",
+		Name:    "SQL Review Sample Policy",
+		Enforce: true,
+		Payload: getSampleSQLReviewPayload(),
 	}
 
 	config, err := s.store.CreateReviewConfig(ctx, sqlReviewConfig)
@@ -179,14 +177,14 @@ func (s *Server) generateOnboardingData(ctx context.Context, user *store.UserMes
 	}
 
 	_, err = s.store.CreatePolicyV2(ctx, &store.PolicyMessage{
-		ResourceUID:       api.DefaultProdEnvironmentUID,
+		Resource:          common.FormatEnvironment(api.DefaultProdEnvironmentID),
 		ResourceType:      api.PolicyResourceTypeEnvironment,
 		Payload:           string(policyPayload),
 		Type:              api.PolicyTypeTag,
 		InheritFromParent: true,
 		// Enforce cannot be false while creating a policy.
 		Enforce: true,
-	}, userID)
+	})
 	if err != nil {
 		return errors.Wrapf(err, "failed to create onboarding environment tag policy")
 	}
@@ -195,12 +193,13 @@ func (s *Server) generateOnboardingData(ctx context.Context, user *store.UserMes
 	// This is different from another sample SQL sheet created below, which is created as part of
 	// creating a schema change issue.
 	if _, err = s.store.CreateWorkSheet(ctx, &store.WorkSheetMessage{
-		CreatorID:   userID,
-		ProjectUID:  project.UID,
-		DatabaseUID: &prodDatabase.UID,
-		Title:       "Sample Sheet",
-		Statement:   "SELECT * FROM salary;",
-		Visibility:  store.ProjectReadWorkSheet,
+		CreatorID:    userID,
+		ProjectID:    project.ResourceID,
+		InstanceID:   &prodDatabase.InstanceID,
+		DatabaseName: &prodDatabase.DatabaseName,
+		Title:        "Sample Sheet",
+		Statement:    "SELECT * FROM salary;",
+		Visibility:   store.ProjectReadWorkSheet,
 	}); err != nil {
 		return errors.Wrapf(err, "failed to create sample work sheet")
 	}
@@ -208,9 +207,7 @@ func (s *Server) generateOnboardingData(ctx context.Context, user *store.UserMes
 	// Create a schema update issue and start with creating the sheet for the schema update.
 	testSheet, err := s.sheetManager.CreateSheet(ctx, &store.SheetMessage{
 		CreatorID: api.SystemBotID,
-
-		ProjectUID: project.UID,
-
+		ProjectID: project.ResourceID,
 		Title:     "Alter table to test sample instance for sample issue",
 		Statement: "ALTER TABLE employee ADD COLUMN IF NOT EXISTS email TEXT DEFAULT '';",
 
@@ -224,12 +221,9 @@ func (s *Server) generateOnboardingData(ctx context.Context, user *store.UserMes
 
 	prodSheet, err := s.sheetManager.CreateSheet(ctx, &store.SheetMessage{
 		CreatorID: api.SystemBotID,
-
-		ProjectUID: project.UID,
-
+		ProjectID: project.ResourceID,
 		Title:     "Alter table to prod sample instance for sample issue",
 		Statement: "ALTER TABLE employee ADD COLUMN IF NOT EXISTS email TEXT DEFAULT '';",
-
 		Payload: &storepb.SheetPayload{
 			Engine: prodInstance.Engine,
 		},
@@ -308,7 +302,7 @@ func (s *Server) generateOnboardingData(ctx context.Context, user *store.UserMes
 
 	// Add a sensitive data policy to pair it with the sample query below. So that user can
 	// experience the sensitive data masking feature from SQL Editor.
-	dbSchema, err := s.store.GetDBSchema(ctx, prodDatabase.UID)
+	dbSchema, err := s.store.GetDBSchema(ctx, prodDatabase.InstanceID, prodDatabase.DatabaseName)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get db schema for database %v", prodDatabase.UID)
 	}
@@ -321,7 +315,7 @@ func (s *Server) generateOnboardingData(ctx context.Context, user *store.UserMes
 	columnConfig := tableConfig.CreateOrGetColumnConfig("amount")
 	columnConfig.SemanticType = "default"
 
-	if err := s.store.UpdateDBSchema(ctx, prodDatabase.UID, &store.UpdateDBSchemaMessage{Config: dbModelConfig.BuildDatabaseConfig()}, userID); err != nil {
+	if err := s.store.UpdateDBSchema(ctx, prodDatabase.InstanceID, prodDatabase.DatabaseName, &store.UpdateDBSchemaMessage{Config: dbModelConfig.BuildDatabaseConfig()}); err != nil {
 		return errors.Wrapf(err, "failed to update db config for database %v", prodDatabase.UID)
 	}
 

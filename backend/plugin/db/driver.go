@@ -148,13 +148,7 @@ const (
 
 // MigrationInfo is the API message for migration info.
 type MigrationInfo struct {
-	// fields for instance change history
-	// InstanceID nil is metadata database.
-	InstanceID *int
 	DatabaseID *int
-	ProjectUID *int
-	IssueUID   *int
-	CreatorID  int
 
 	ReleaseVersion string
 	Namespace      string
@@ -164,7 +158,6 @@ type MigrationInfo struct {
 	Type           MigrationType
 	Status         MigrationStatus
 	Description    string
-	Creator        string
 	// Payload contains JSON-encoded string of VCS push event if the migration is triggered by a VCS push event.
 	Payload *storepb.InstanceChangeHistoryPayload
 

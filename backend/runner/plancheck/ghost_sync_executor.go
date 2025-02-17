@@ -76,7 +76,7 @@ func (e *GhostSyncExecutor) Run(ctx context.Context, config *storepb.PlanCheckRu
 
 	adminDataSource := utils.DataSourceFromInstanceWithType(instance, api.Admin)
 	if adminDataSource == nil {
-		return nil, common.Errorf(common.Internal, "admin data source not found for instance %d", instance.UID)
+		return nil, common.Errorf(common.Internal, "admin data source not found for instance %s", instance.ResourceID)
 	}
 
 	sheetUID := int(config.SheetUid)
@@ -101,7 +101,7 @@ func (e *GhostSyncExecutor) Run(ctx context.Context, config *storepb.PlanCheckRu
 		return nil, common.Wrapf(err, common.Internal, "failed to parse table name from statement, statement: %v", statement)
 	}
 
-	migrationContext, err := ghost.NewMigrationContext(ctx, rand.Intn(10000000), rand.Int63n(10000000), database, adminDataSource, e.secret, tableName, fmt.Sprintf("_dryrun_%d", time.Now().Unix()), renderedStatement, true, config.GhostFlags, 20000000)
+	migrationContext, err := ghost.NewMigrationContext(ctx, rand.Intn(10000000), database, adminDataSource, e.secret, tableName, fmt.Sprintf("_dryrun_%d", time.Now().Unix()), renderedStatement, true, config.GhostFlags, 20000000)
 	if err != nil {
 		return nil, common.Wrapf(err, common.Internal, "failed to create migration context")
 	}

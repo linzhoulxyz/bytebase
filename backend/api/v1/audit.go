@@ -54,6 +54,10 @@ func createAuditLog(ctx context.Context, request, response any, method string, s
 	var user string
 	if u, ok := ctx.Value(common.UserContextKey).(*store.UserMessage); ok {
 		user = common.FormatUserUID(u.ID)
+	} else {
+		if loginResponse, ok := response.(*v1pb.LoginResponse); ok {
+			user = loginResponse.GetUser().GetName()
+		}
 	}
 
 	st, _ := status.FromError(rerr)
@@ -97,7 +101,7 @@ func createAuditLog(ctx context.Context, request, response any, method string, s
 			RequestMetadata: requestMetadata,
 		}
 		if err := storage.CreateAuditLog(createAuditLogCtx, p); err != nil {
-			return errors.Wrapf(err, "failed to create audit log")
+			return err
 		}
 	}
 
@@ -114,7 +118,7 @@ func (in *AuditInterceptor) AuditInterceptor(ctx context.Context, request any, s
 
 	if needAudit(ctx) {
 		if err := createAuditLog(ctx, request, response, serverInfo.FullMethod, in.store, serviceData, rerr); err != nil {
-			slog.Warn("audit interceptor: failed to create audit log", log.BBError(err))
+			slog.Warn("audit interceptor: failed to create audit log", log.BBError(err), slog.String("method", serverInfo.FullMethod))
 		}
 	}
 
@@ -311,6 +315,7 @@ func getRequestString(request any) (string, error) {
 	if m == nil {
 		return "", nil
 	}
+
 	b, err := protojson.Marshal(m)
 	if err != nil {
 		return "", err

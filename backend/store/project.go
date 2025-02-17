@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	"google.golang.org/genproto/googleapis/type/expr"
@@ -20,14 +19,11 @@ import (
 type ProjectMessage struct {
 	ResourceID                 string
 	Title                      string
-	Key                        string
 	Webhooks                   []*ProjectWebhookMessage
 	DataClassificationConfigID string
 	Setting                    *storepb.Project
 	VCSConnectorsCount         int
-	// The following fields are output only and not used for create().
-	UID     int
-	Deleted bool
+	Deleted                    bool
 }
 
 func (p *ProjectMessage) GetName() string {
@@ -36,20 +32,15 @@ func (p *ProjectMessage) GetName() string {
 
 // FindProjectMessage is the message for finding projects.
 type FindProjectMessage struct {
-	// We should only set either UID or ResourceID.
-	// Deprecate UID later once we fully migrate to ResourceID.
-	UID         *int
 	ResourceID  *string
 	ShowDeleted bool
 }
 
 // UpdateProjectMessage is the message for updating a project.
 type UpdateProjectMessage struct {
-	UpdaterID  int
 	ResourceID string
 
 	Title                      *string
-	Key                        *string
 	DataClassificationConfigID *string
 	Setting                    *storepb.Project
 	Delete                     *bool
@@ -59,11 +50,6 @@ type UpdateProjectMessage struct {
 func (s *Store) GetProjectV2(ctx context.Context, find *FindProjectMessage) (*ProjectMessage, error) {
 	if find.ResourceID != nil {
 		if v, ok := s.projectCache.Get(*find.ResourceID); ok {
-			return v, nil
-		}
-	}
-	if find.UID != nil {
-		if v, ok := s.projectIDCache.Get(*find.UID); ok {
 			return v, nil
 		}
 	}
@@ -143,36 +129,23 @@ func (s *Store) CreateProjectV2(ctx context.Context, create *ProjectMessage, cre
 	project := &ProjectMessage{
 		ResourceID:                 create.ResourceID,
 		Title:                      create.Title,
-		Key:                        create.Key,
 		DataClassificationConfigID: create.DataClassificationConfigID,
 		Setting:                    create.Setting,
 	}
-	if err := tx.QueryRowContext(ctx, `
+	if _, err := tx.ExecContext(ctx, `
 			INSERT INTO project (
-				creator_id,
-				updater_id,
 				resource_id,
 				name,
-				key,
 				data_classification_config_id,
 				setting
 			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
-			RETURNING id
+			VALUES ($1, $2, $3, $4)
 		`,
-		creatorID,
-		creatorID,
 		create.ResourceID,
 		create.Title,
-		create.Key,
 		create.DataClassificationConfigID,
 		payload,
-	).Scan(
-		&project.UID,
 	); err != nil {
-		if err == sql.ErrNoRows {
-			return nil, common.FormatDBErrorEmptyRowWithQuery("failed to create project")
-		}
 		return nil, err
 	}
 
@@ -192,14 +165,14 @@ func (s *Store) CreateProjectV2(ctx context.Context, create *ProjectMessage, cre
 		return nil, err
 	}
 	if _, err := s.CreatePolicyV2(ctx, &PolicyMessage{
-		ResourceUID:       project.UID,
 		ResourceType:      api.PolicyResourceTypeProject,
+		Resource:          common.FormatProject(project.ResourceID),
 		Payload:           string(policyPayload),
 		Type:              api.PolicyTypeIAM,
 		InheritFromParent: false,
 		// Enforce cannot be false while creating a policy.
 		Enforce: true,
-	}, creatorID); err != nil {
+	}); err != nil {
 		return nil, err
 	}
 
@@ -233,19 +206,12 @@ func (s *Store) UpdateProjectV2(ctx context.Context, patch *UpdateProjectMessage
 }
 
 func updateProjectImplV2(ctx context.Context, tx *Tx, patch *UpdateProjectMessage) error {
-	set, args := []string{"updater_id = $1", "updated_ts = $2"}, []any{patch.UpdaterID, time.Now().Unix()}
+	set, args := []string{}, []any{}
 	if v := patch.Title; v != nil {
 		set, args = append(set, fmt.Sprintf("name = $%d", len(args)+1)), append(args, *v)
 	}
-	if v := patch.Key; v != nil {
-		set, args = append(set, fmt.Sprintf("key = $%d", len(args)+1)), append(args, *v)
-	}
 	if v := patch.Delete; v != nil {
-		rowStatus := api.Normal
-		if *patch.Delete {
-			rowStatus = api.Archived
-		}
-		set, args = append(set, fmt.Sprintf(`"row_status" = $%d`, len(args)+1)), append(args, rowStatus)
+		set, args = append(set, fmt.Sprintf("deleted = $%d", len(args)+1)), append(args, *v)
 	}
 	if v := patch.DataClassificationConfigID; v != nil {
 		set, args = append(set, fmt.Sprintf("data_classification_config_id = $%d", len(args)+1)), append(args, *v)
@@ -275,24 +241,19 @@ func (s *Store) listProjectImplV2(ctx context.Context, tx *Tx, find *FindProject
 	if v := find.ResourceID; v != nil {
 		where, args = append(where, fmt.Sprintf("resource_id = $%d", len(args)+1)), append(args, *v)
 	}
-	if v := find.UID; v != nil {
-		where, args = append(where, fmt.Sprintf("id = $%d", len(args)+1)), append(args, *v)
-	}
 	if !find.ShowDeleted {
-		where, args = append(where, fmt.Sprintf("row_status = $%d", len(args)+1)), append(args, api.Normal)
+		where, args = append(where, fmt.Sprintf("deleted = $%d", len(args)+1)), append(args, false)
 	}
 
 	var projectMessages []*ProjectMessage
 	rows, err := tx.QueryContext(ctx, fmt.Sprintf(`
 		SELECT
-			id,
 			resource_id,
 			name,
-			key,
 			data_classification_config_id,
-			(SELECT COUNT(1) FROM vcs_connector WHERE project.id = vcs_connector.project_id) AS connectors,
+			(SELECT COUNT(1) FROM vcs_connector WHERE project.resource_id = vcs_connector.project) AS connectors,
 			setting,
-			row_status
+			deleted
 		FROM project
 		WHERE %s
 		ORDER BY project.resource_id`, strings.Join(where, " AND ")),
@@ -306,16 +267,13 @@ func (s *Store) listProjectImplV2(ctx context.Context, tx *Tx, find *FindProject
 	for rows.Next() {
 		var projectMessage ProjectMessage
 		var payload []byte
-		var rowStatus string
 		if err := rows.Scan(
-			&projectMessage.UID,
 			&projectMessage.ResourceID,
 			&projectMessage.Title,
-			&projectMessage.Key,
 			&projectMessage.DataClassificationConfigID,
 			&projectMessage.VCSConnectorsCount,
 			&payload,
-			&rowStatus,
+			&projectMessage.Deleted,
 		); err != nil {
 			return nil, err
 		}
@@ -324,7 +282,6 @@ func (s *Store) listProjectImplV2(ctx context.Context, tx *Tx, find *FindProject
 			return nil, err
 		}
 		projectMessage.Setting = setting
-		projectMessage.Deleted = convertRowStatusToDeleted(rowStatus)
 		projectMessages = append(projectMessages, &projectMessage)
 	}
 	if err := rows.Err(); err != nil {
@@ -332,7 +289,7 @@ func (s *Store) listProjectImplV2(ctx context.Context, tx *Tx, find *FindProject
 	}
 
 	for _, project := range projectMessages {
-		projectWebhooks, err := s.findProjectWebhookImplV2(ctx, tx, &FindProjectWebhookMessage{ProjectID: &project.UID})
+		projectWebhooks, err := s.findProjectWebhookImplV2(ctx, tx, &FindProjectWebhookMessage{ProjectID: &project.ResourceID})
 		if err != nil {
 			return nil, err
 		}
@@ -344,12 +301,8 @@ func (s *Store) listProjectImplV2(ctx context.Context, tx *Tx, find *FindProject
 
 func (s *Store) storeProjectCache(project *ProjectMessage) {
 	s.projectCache.Add(project.ResourceID, project)
-	s.projectIDCache.Add(project.UID, project)
 }
 
 func (s *Store) removeProjectCache(resourceID string) {
-	if project, ok := s.projectCache.Get(resourceID); ok {
-		s.projectIDCache.Remove(project.UID)
-	}
 	s.projectCache.Remove(resourceID)
 }

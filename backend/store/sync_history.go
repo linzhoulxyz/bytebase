@@ -13,22 +13,22 @@ import (
 )
 
 type SyncHistory struct {
-	UID         int64
-	DatabaseUID int
-	Schema      string
-	Metadata    *storepb.DatabaseSchemaMetadata
+	UID          int64
+	InstanceID   string
+	DatabaseName string
+	Schema       string
+	Metadata     *storepb.DatabaseSchemaMetadata
 
-	CreatorUID int
-	CreateTime time.Time
+	CreatedAt time.Time
 }
 
 func (s *Store) GetSyncHistoryByUID(ctx context.Context, uid int64) (*SyncHistory, error) {
 	query := `
 		SELECT
 			id,
-			creator_id,
-			created_ts,
-			database_id,
+			created_at,
+			instance,
+			db_name,
 			metadata,
 			raw_dump
 		FROM sync_history
@@ -41,9 +41,9 @@ func (s *Store) GetSyncHistoryByUID(ctx context.Context, uid int64) (*SyncHistor
 	var m []byte
 	if err := s.db.db.QueryRowContext(ctx, query, uid).Scan(
 		&h.UID,
-		&h.CreatorUID,
-		&h.CreateTime,
-		&h.DatabaseUID,
+		&h.CreatedAt,
+		&h.InstanceID,
+		&h.DatabaseName,
 		&m,
 		&h.Schema,
 	); err != nil {
@@ -58,7 +58,7 @@ func (s *Store) GetSyncHistoryByUID(ctx context.Context, uid int64) (*SyncHistor
 }
 
 // UpsertDBSchema upserts a database schema.
-func (s *Store) CreateSyncHistory(ctx context.Context, databaseID int, metadata *storepb.DatabaseSchemaMetadata, schema string, updaterID int) (int64, error) {
+func (s *Store) CreateSyncHistory(ctx context.Context, instanceID, databaseName string, metadata *storepb.DatabaseSchemaMetadata, schema string) (int64, error) {
 	metadataBytes, err := protojson.Marshal(metadata)
 	if err != nil {
 		return 0, errors.Wrapf(err, "failed to marshal")
@@ -66,8 +66,8 @@ func (s *Store) CreateSyncHistory(ctx context.Context, databaseID int, metadata 
 
 	query := `
 		INSERT INTO sync_history (
-			creator_id,
-			database_id,
+			instance,
+			db_name,
 			metadata,
 			raw_dump
 		)
@@ -82,8 +82,8 @@ func (s *Store) CreateSyncHistory(ctx context.Context, databaseID int, metadata 
 
 	var id int64
 	if err := tx.QueryRowContext(ctx, query,
-		updaterID,
-		databaseID,
+		instanceID,
+		databaseName,
 		metadataBytes,
 		schema,
 	).Scan(

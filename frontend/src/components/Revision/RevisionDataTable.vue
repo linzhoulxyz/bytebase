@@ -7,6 +7,7 @@
     :row-key="(revision: Revision) => revision.name"
     :striped="true"
     :row-props="rowProps"
+    :loading="loading"
     @update:checked-row-keys="
       (val) => (state.selectedRevisionNameList = new Set(val as string[]))
     "
@@ -31,11 +32,10 @@ import { type DataTableColumn, NDataTable, NButton, useDialog } from "naive-ui";
 import { computed, reactive } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRouter } from "vue-router";
-import { BBAvatar } from "@/bbkit";
-import { useRevisionStore, useUserStore } from "@/store";
+import { useRevisionStore } from "@/store";
 import { getDateForPbTimestamp } from "@/types";
 import type { Revision } from "@/types/proto/v1/database_service";
-import { extractIssueUID, extractUserResourceName } from "@/utils";
+import { extractIssueUID } from "@/utils";
 import { useDatabaseDetailContext } from "../Database/context";
 import HumanizeDate from "../misc/HumanizeDate.vue";
 
@@ -43,6 +43,7 @@ const props = defineProps<{
   revisions: Revision[];
   customClick?: boolean;
   showSelection?: boolean;
+  loading?: boolean;
 }>();
 
 interface LocalState {
@@ -77,23 +78,9 @@ const columnList = computed(() => {
       hide: !props.showSelection,
     },
     {
-      key: "applied-at",
-      title: t("database.revision.applied-at"),
-      width: 128,
-      render: (revision) => (
-        <HumanizeDate date={getDateForPbTimestamp(revision.createTime)} />
-      ),
-    },
-    {
-      key: "version",
-      title: t("common.version"),
-      width: 128,
-      render: (revision) => revision.version,
-    },
-    {
       key: "issue",
       title: t("common.issue"),
-      width: "5rem",
+      width: 96,
       render: (revision) => {
         const uid = extractIssueUID(revision.issue);
         if (!uid) return null;
@@ -120,27 +107,29 @@ const columnList = computed(() => {
       },
     },
     {
+      key: "version",
+      title: t("common.version"),
+      width: 128,
+      render: (revision) => revision.version,
+    },
+    {
       key: "statement",
       title: t("common.statement"),
-      minWidth: "12rem",
+      resizable: true,
+      minWidth: "13rem",
+      ellipsis: true,
       render: (revision) => {
         return <p class="truncate whitespace-nowrap">{revision.statement}</p>;
       },
     },
     {
-      key: "creator",
-      title: t("common.creator"),
+      key: "created-at",
+      title: t("common.created-at"),
       width: 128,
-      render: (revision) => {
-        const creator = creatorOfRevision(revision);
-        if (!creator) return null;
-        return (
-          <div class="flex flex-row items-center overflow-hidden gap-x-1">
-            <BBAvatar size="SMALL" username={creator.title} />
-            <span class="truncate">{creator.title}</span>
-          </div>
-        );
-      },
+      resizable: true,
+      render: (revision) => (
+        <HumanizeDate date={getDateForPbTimestamp(revision.createTime)} />
+      ),
     },
   ];
   return columns.filter((col) => !col.hide);
@@ -162,11 +151,6 @@ const rowProps = (revision: Revision) => {
       }
     },
   };
-};
-
-const creatorOfRevision = (revision: Revision) => {
-  const email = extractUserResourceName(revision.creator);
-  return useUserStore().getUserByEmail(email);
 };
 
 const onDelete = () => {

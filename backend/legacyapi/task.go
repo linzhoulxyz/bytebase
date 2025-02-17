@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 
 	"github.com/pkg/errors"
-
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 // TaskStatus is the status of a task.
@@ -97,60 +95,6 @@ type Progress struct {
 	// Payload is reserved for the future
 	// Might be something like {comment:"postponing due to network lag"}
 	Payload string `json:"payload"`
-}
-
-// TaskFind is the API message for finding tasks.
-type TaskFind struct {
-	ID  *int
-	IDs *[]int
-
-	// Related fields
-	PipelineID *int
-	StageID    *int
-	DatabaseID *int
-
-	// Domain specific fields
-	TypeList *[]TaskType
-	// Payload contains JSONB expressions
-	// Ref: https://www.postgresql.org/docs/current/functions-json.html
-	Payload         string
-	NoBlockingStage bool
-	NonRollbackTask bool
-
-	LatestTaskRunStatusList *[]TaskRunStatus
-}
-
-func (find *TaskFind) String() string {
-	str, err := json.Marshal(*find)
-	if err != nil {
-		return err.Error()
-	}
-	return string(str)
-}
-
-// TaskPatch is the API message for patching a task.
-type TaskPatch struct {
-	ID int
-
-	// Standard fields
-	// Value is assigned from the jwt subject field passed by the client.
-	UpdaterID int
-
-	// Domain specific fields
-	DatabaseID        *int
-	EarliestAllowedTs *int64 `jsonapi:"attr,earliestAllowedTs"`
-
-	// Payload and others cannot be set at the same time.
-	Payload *string
-
-	SheetID               *int `jsonapi:"attr,sheetId"`
-	SchemaVersion         *string
-	ExportFormat          *storepb.ExportFormat
-	ExportPassword        *string
-	PreUpdateBackupDetail *storepb.PreUpdateBackupDetail
-
-	// Flags for gh-ost.
-	Flags *map[string]string
 }
 
 func GetSheetUIDFromTaskPayload(payload string) (*int, error) {

@@ -77,7 +77,6 @@ const resetQuickstart = () => {
     "instance.visit",
     "database.visit",
     "member.visit",
-    "kbar.open",
     "data.query",
     "help.issue.detail",
     "help.project",
@@ -130,6 +129,10 @@ const languageOptions = computed((): DropdownOption[] => {
     {
       label: "日本語",
       value: "ja-JP",
+    },
+    {
+      label: "Tiếng việt",
+      value: "vi-VN",
     },
   ];
 

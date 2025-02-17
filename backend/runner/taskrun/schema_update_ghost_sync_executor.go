@@ -72,19 +72,19 @@ func (exec *SchemaUpdateGhostSyncExecutor) runGhostMigration(ctx context.Context
 		return true, nil, err
 	}
 
-	instance, err := exec.store.GetInstanceV2(ctx, &store.FindInstanceMessage{UID: &task.InstanceID})
+	instance, err := exec.store.GetInstanceV2(ctx, &store.FindInstanceMessage{ResourceID: &task.InstanceID})
 	if err != nil {
 		return true, nil, err
 	}
 	if instance == nil {
-		return true, nil, errors.Errorf("instance %d not found", task.InstanceID)
+		return true, nil, errors.Errorf("instance %s not found", task.InstanceID)
 	}
 	adminDataSource := utils.DataSourceFromInstanceWithType(instance, api.Admin)
 	if adminDataSource == nil {
-		return true, nil, common.Errorf(common.Internal, "admin data source not found for instance %d", instance.UID)
+		return true, nil, common.Errorf(common.Internal, "admin data source not found for instance %s", instance.ResourceID)
 	}
 
-	database, err := exec.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{UID: task.DatabaseID})
+	database, err := exec.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{InstanceID: &task.InstanceID, DatabaseName: task.DatabaseName})
 	if err != nil {
 		return true, nil, err
 	}
@@ -96,7 +96,7 @@ func (exec *SchemaUpdateGhostSyncExecutor) runGhostMigration(ctx context.Context
 	// To avoid leaking the rendered statement, the error message should use the original statement and not the rendered statement.
 	renderedStatement := utils.RenderStatement(statement, materials)
 
-	migrationContext, err := ghost.NewMigrationContext(ctx, task.ID, task.CreatedTs, database, adminDataSource, exec.secret, tableName, "", renderedStatement, false, flags, 10000000)
+	migrationContext, err := ghost.NewMigrationContext(ctx, task.ID, database, adminDataSource, exec.secret, tableName, "", renderedStatement, false, flags, 10000000)
 	if err != nil {
 		return true, nil, errors.Wrap(err, "failed to init migrationContext for gh-ost")
 	}

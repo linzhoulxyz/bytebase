@@ -13,7 +13,6 @@ import (
 	"github.com/bytebase/bytebase/backend/common/log"
 	"github.com/bytebase/bytebase/backend/component/state"
 	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
-	api "github.com/bytebase/bytebase/backend/legacyapi"
 	"github.com/bytebase/bytebase/backend/store"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
@@ -114,7 +113,7 @@ func (s *Scheduler) runPlanCheckRun(ctx context.Context, planCheckRun *store.Pla
 	}
 
 	maximumConnections := int(instance.Options.GetMaximumConnections())
-	if s.stateCfg.InstanceOutstandingConnections.Increment(instanceUID, maximumConnections) {
+	if s.stateCfg.InstanceOutstandingConnections.Increment(instance.ResourceID, maximumConnections) {
 		return
 	}
 
@@ -123,7 +122,7 @@ func (s *Scheduler) runPlanCheckRun(ctx context.Context, planCheckRun *store.Pla
 		defer func() {
 			s.stateCfg.RunningPlanChecks.Delete(planCheckRun.UID)
 			s.stateCfg.RunningPlanCheckRunsCancelFunc.Delete(planCheckRun.UID)
-			s.stateCfg.InstanceOutstandingConnections.Decrement(instanceUID)
+			s.stateCfg.InstanceOutstandingConnections.Decrement(instance.ResourceID)
 		}()
 
 		ctxWithCancel, cancel := context.WithCancel(ctx)
@@ -148,7 +147,6 @@ func (s *Scheduler) markPlanCheckRunDone(ctx context.Context, planCheckRun *stor
 		Results: results,
 	}
 	if err := s.store.UpdatePlanCheckRun(ctx,
-		api.SystemBotID,
 		store.PlanCheckRunStatusDone,
 		result,
 		planCheckRun.UID,
@@ -162,7 +160,6 @@ func (s *Scheduler) markPlanCheckRunFailed(ctx context.Context, planCheckRun *st
 		Error: reason,
 	}
 	if err := s.store.UpdatePlanCheckRun(ctx,
-		api.SystemBotID,
 		store.PlanCheckRunStatusFailed,
 		result,
 		planCheckRun.UID,
@@ -176,7 +173,6 @@ func (s *Scheduler) markPlanCheckRunCanceled(ctx context.Context, planCheckRun *
 		Error: reason,
 	}
 	if err := s.store.UpdatePlanCheckRun(ctx,
-		api.SystemBotID,
 		store.PlanCheckRunStatusCanceled,
 		result,
 		planCheckRun.UID,

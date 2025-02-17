@@ -343,7 +343,7 @@ func handleApprovalNodeExternalNode(ctx context.Context, s *store.Store, relayCl
 		Title:       issue.Title,
 		Description: issue.Description,
 		Project:     issue.Project.ResourceID,
-		CreateTime:  issue.CreatedTime,
+		CreateTime:  issue.CreatedAt,
 		Creator:     issue.Creator.Email,
 	})
 	if err != nil {
@@ -370,9 +370,9 @@ func handleApprovalNodeExternalNode(ctx context.Context, s *store.Store, relayCl
 
 // UpdateProjectPolicyFromGrantIssue updates the project policy from grant issue.
 func UpdateProjectPolicyFromGrantIssue(ctx context.Context, stores *store.Store, issue *store.IssueMessage, grantRequest *storepb.GrantRequest) error {
-	policyMessage, err := stores.GetProjectIamPolicy(ctx, issue.Project.UID)
+	policyMessage, err := stores.GetProjectIamPolicy(ctx, issue.Project.ResourceID)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get project policy for project %q", issue.Project.UID)
+		return errors.Wrapf(err, "failed to get project policy for project %s", issue.Project.ResourceID)
 	}
 
 	var newConditionExpr string
@@ -426,14 +426,14 @@ func UpdateProjectPolicyFromGrantIssue(ctx context.Context, stores *store.Store,
 		return err
 	}
 	if _, err := stores.CreatePolicyV2(ctx, &store.PolicyMessage{
-		ResourceUID:       issue.Project.UID,
+		Resource:          common.FormatProject(issue.Project.ResourceID),
 		ResourceType:      api.PolicyResourceTypeProject,
 		Payload:           string(policyPayload),
 		Type:              api.PolicyTypeIAM,
 		InheritFromParent: false,
 		// Enforce cannot be false while creating a policy.
 		Enforce: true,
-	}, api.SystemBotID); err != nil {
+	}); err != nil {
 		return err
 	}
 

@@ -734,7 +734,64 @@ export interface ColumnMetadata {
   /** The user_comment is the user comment of a column parsed from the comment. */
   userComment: string;
   /** The generation is the generation of a column. */
-  generation: GenerationMetadata | undefined;
+  generation:
+    | GenerationMetadata
+    | undefined;
+  /** The identity_generation is for identity columns, PG only. */
+  identityGeneration: ColumnMetadata_IdentityGeneration;
+}
+
+export enum ColumnMetadata_IdentityGeneration {
+  IDENTITY_GENERATION_UNSPECIFIED = "IDENTITY_GENERATION_UNSPECIFIED",
+  ALWAYS = "ALWAYS",
+  BY_DEFAULT = "BY_DEFAULT",
+  UNRECOGNIZED = "UNRECOGNIZED",
+}
+
+export function columnMetadata_IdentityGenerationFromJSON(object: any): ColumnMetadata_IdentityGeneration {
+  switch (object) {
+    case 0:
+    case "IDENTITY_GENERATION_UNSPECIFIED":
+      return ColumnMetadata_IdentityGeneration.IDENTITY_GENERATION_UNSPECIFIED;
+    case 1:
+    case "ALWAYS":
+      return ColumnMetadata_IdentityGeneration.ALWAYS;
+    case 2:
+    case "BY_DEFAULT":
+      return ColumnMetadata_IdentityGeneration.BY_DEFAULT;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return ColumnMetadata_IdentityGeneration.UNRECOGNIZED;
+  }
+}
+
+export function columnMetadata_IdentityGenerationToJSON(object: ColumnMetadata_IdentityGeneration): string {
+  switch (object) {
+    case ColumnMetadata_IdentityGeneration.IDENTITY_GENERATION_UNSPECIFIED:
+      return "IDENTITY_GENERATION_UNSPECIFIED";
+    case ColumnMetadata_IdentityGeneration.ALWAYS:
+      return "ALWAYS";
+    case ColumnMetadata_IdentityGeneration.BY_DEFAULT:
+      return "BY_DEFAULT";
+    case ColumnMetadata_IdentityGeneration.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export function columnMetadata_IdentityGenerationToNumber(object: ColumnMetadata_IdentityGeneration): number {
+  switch (object) {
+    case ColumnMetadata_IdentityGeneration.IDENTITY_GENERATION_UNSPECIFIED:
+      return 0;
+    case ColumnMetadata_IdentityGeneration.ALWAYS:
+      return 1;
+    case ColumnMetadata_IdentityGeneration.BY_DEFAULT:
+      return 2;
+    case ColumnMetadata_IdentityGeneration.UNRECOGNIZED:
+    default:
+      return -1;
+  }
 }
 
 export interface GenerationMetadata {
@@ -1502,8 +1559,6 @@ export interface Revision {
    * Can be empty.
    */
   release: string;
-  /** Format: users/hello@world.com */
-  creator: string;
   createTime:
     | Timestamp
     | undefined;
@@ -1627,8 +1682,6 @@ export interface GetChangelogRequest {
 export interface Changelog {
   /** Format: instances/{instance}/databases/{database}/changelogs/{changelog} */
   name: string;
-  /** Format: users/hello@world.com */
-  creator: string;
   createTime: Timestamp | undefined;
   status: Changelog_Status;
   /** The statement is used for preview purpose. */
@@ -5046,6 +5099,7 @@ function createBaseColumnMetadata(): ColumnMetadata {
     comment: "",
     userComment: "",
     generation: undefined,
+    identityGeneration: ColumnMetadata_IdentityGeneration.IDENTITY_GENERATION_UNSPECIFIED,
   };
 }
 
@@ -5092,6 +5146,9 @@ export const ColumnMetadata: MessageFns<ColumnMetadata> = {
     }
     if (message.generation !== undefined) {
       GenerationMetadata.encode(message.generation, writer.uint32(130).fork()).join();
+    }
+    if (message.identityGeneration !== ColumnMetadata_IdentityGeneration.IDENTITY_GENERATION_UNSPECIFIED) {
+      writer.uint32(136).int32(columnMetadata_IdentityGenerationToNumber(message.identityGeneration));
     }
     return writer;
   },
@@ -5215,6 +5272,14 @@ export const ColumnMetadata: MessageFns<ColumnMetadata> = {
           message.generation = GenerationMetadata.decode(reader, reader.uint32());
           continue;
         }
+        case 17: {
+          if (tag !== 136) {
+            break;
+          }
+
+          message.identityGeneration = columnMetadata_IdentityGenerationFromJSON(reader.int32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5240,6 +5305,9 @@ export const ColumnMetadata: MessageFns<ColumnMetadata> = {
       comment: isSet(object.comment) ? globalThis.String(object.comment) : "",
       userComment: isSet(object.userComment) ? globalThis.String(object.userComment) : "",
       generation: isSet(object.generation) ? GenerationMetadata.fromJSON(object.generation) : undefined,
+      identityGeneration: isSet(object.identityGeneration)
+        ? columnMetadata_IdentityGenerationFromJSON(object.identityGeneration)
+        : ColumnMetadata_IdentityGeneration.IDENTITY_GENERATION_UNSPECIFIED,
     };
   },
 
@@ -5287,6 +5355,9 @@ export const ColumnMetadata: MessageFns<ColumnMetadata> = {
     if (message.generation !== undefined) {
       obj.generation = GenerationMetadata.toJSON(message.generation);
     }
+    if (message.identityGeneration !== ColumnMetadata_IdentityGeneration.IDENTITY_GENERATION_UNSPECIFIED) {
+      obj.identityGeneration = columnMetadata_IdentityGenerationToJSON(message.identityGeneration);
+    }
     return obj;
   },
 
@@ -5311,6 +5382,8 @@ export const ColumnMetadata: MessageFns<ColumnMetadata> = {
     message.generation = (object.generation !== undefined && object.generation !== null)
       ? GenerationMetadata.fromPartial(object.generation)
       : undefined;
+    message.identityGeneration = object.identityGeneration ??
+      ColumnMetadata_IdentityGeneration.IDENTITY_GENERATION_UNSPECIFIED;
     return message;
   },
 };
@@ -9599,7 +9672,6 @@ function createBaseRevision(): Revision {
   return {
     name: "",
     release: "",
-    creator: "",
     createTime: undefined,
     deleter: "",
     deleteTime: undefined,
@@ -9621,9 +9693,6 @@ export const Revision: MessageFns<Revision> = {
     }
     if (message.release !== "") {
       writer.uint32(18).string(message.release);
-    }
-    if (message.creator !== "") {
-      writer.uint32(26).string(message.creator);
     }
     if (message.createTime !== undefined) {
       Timestamp.encode(message.createTime, writer.uint32(34).fork()).join();
@@ -9682,14 +9751,6 @@ export const Revision: MessageFns<Revision> = {
           }
 
           message.release = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.creator = reader.string();
           continue;
         }
         case 4: {
@@ -9793,7 +9854,6 @@ export const Revision: MessageFns<Revision> = {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
       release: isSet(object.release) ? globalThis.String(object.release) : "",
-      creator: isSet(object.creator) ? globalThis.String(object.creator) : "",
       createTime: isSet(object.createTime) ? fromJsonTimestamp(object.createTime) : undefined,
       deleter: isSet(object.deleter) ? globalThis.String(object.deleter) : "",
       deleteTime: isSet(object.deleteTime) ? fromJsonTimestamp(object.deleteTime) : undefined,
@@ -9815,9 +9875,6 @@ export const Revision: MessageFns<Revision> = {
     }
     if (message.release !== "") {
       obj.release = message.release;
-    }
-    if (message.creator !== "") {
-      obj.creator = message.creator;
     }
     if (message.createTime !== undefined) {
       obj.createTime = fromTimestamp(message.createTime).toISOString();
@@ -9862,7 +9919,6 @@ export const Revision: MessageFns<Revision> = {
     const message = createBaseRevision();
     message.name = object.name ?? "";
     message.release = object.release ?? "";
-    message.creator = object.creator ?? "";
     message.createTime = (object.createTime !== undefined && object.createTime !== null)
       ? Timestamp.fromPartial(object.createTime)
       : undefined;
@@ -10181,7 +10237,6 @@ export const GetChangelogRequest: MessageFns<GetChangelogRequest> = {
 function createBaseChangelog(): Changelog {
   return {
     name: "",
-    creator: "",
     createTime: undefined,
     status: Changelog_Status.STATUS_UNSPECIFIED,
     statement: "",
@@ -10204,9 +10259,6 @@ export const Changelog: MessageFns<Changelog> = {
   encode(message: Changelog, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.name !== "") {
       writer.uint32(10).string(message.name);
-    }
-    if (message.creator !== "") {
-      writer.uint32(18).string(message.creator);
     }
     if (message.createTime !== undefined) {
       Timestamp.encode(message.createTime, writer.uint32(26).fork()).join();
@@ -10269,14 +10321,6 @@ export const Changelog: MessageFns<Changelog> = {
           }
 
           message.name = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.creator = reader.string();
           continue;
         }
         case 3: {
@@ -10411,7 +10455,6 @@ export const Changelog: MessageFns<Changelog> = {
   fromJSON(object: any): Changelog {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
-      creator: isSet(object.creator) ? globalThis.String(object.creator) : "",
       createTime: isSet(object.createTime) ? fromJsonTimestamp(object.createTime) : undefined,
       status: isSet(object.status) ? changelog_StatusFromJSON(object.status) : Changelog_Status.STATUS_UNSPECIFIED,
       statement: isSet(object.statement) ? globalThis.String(object.statement) : "",
@@ -10434,9 +10477,6 @@ export const Changelog: MessageFns<Changelog> = {
     const obj: any = {};
     if (message.name !== "") {
       obj.name = message.name;
-    }
-    if (message.creator !== "") {
-      obj.creator = message.creator;
     }
     if (message.createTime !== undefined) {
       obj.createTime = fromTimestamp(message.createTime).toISOString();
@@ -10492,7 +10532,6 @@ export const Changelog: MessageFns<Changelog> = {
   fromPartial(object: DeepPartial<Changelog>): Changelog {
     const message = createBaseChangelog();
     message.name = object.name ?? "";
-    message.creator = object.creator ?? "";
     message.createTime = (object.createTime !== undefined && object.createTime !== null)
       ? Timestamp.fromPartial(object.createTime)
       : undefined;

@@ -2,7 +2,6 @@ package v1
 
 import (
 	"context"
-	"time"
 
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
@@ -44,10 +43,8 @@ func (s *AnomalyService) SearchAnomalies(ctx context.Context, request *v1pb.Sear
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	rowStatus := api.Normal
 	find := &store.ListAnomalyMessage{
 		ProjectID: projectID,
-		RowStatus: &rowStatus,
 	}
 	if request.Filter != "" {
 		// We only support filter by type and resource now.
@@ -92,7 +89,7 @@ func (s *AnomalyService) SearchAnomalies(ctx context.Context, request *v1pb.Sear
 				return nil, status.Errorf(codes.NotFound, "cannot found the database %s", resources[0])
 			}
 			find.InstanceID = &insID
-			find.DatabaseUID = &database.UID
+			find.DatabaseName = &database.DatabaseName
 		}
 	}
 
@@ -114,19 +111,19 @@ func (s *AnomalyService) SearchAnomalies(ctx context.Context, request *v1pb.Sear
 
 func (s *AnomalyService) convertToAnomaly(ctx context.Context, anomaly *store.AnomalyMessage) (*v1pb.Anomaly, error) {
 	pbAnomaly := &v1pb.Anomaly{
-		CreateTime: timestamppb.New(time.Unix(anomaly.CreatedTs, 0)),
-		UpdateTime: timestamppb.New(time.Unix(anomaly.UpdatedTs, 0)),
+		CreateTime: timestamppb.New(anomaly.UpdatedAt),
 	}
 
 	database, err := s.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{
-		UID:         &anomaly.DatabaseUID,
-		ShowDeleted: true,
+		InstanceID:   &anomaly.InstanceID,
+		DatabaseName: &anomaly.DatabaseName,
+		ShowDeleted:  true,
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to find database with id %d", anomaly.DatabaseUID)
+		return nil, errors.Wrapf(err, "failed to find database %s", anomaly.DatabaseName)
 	}
 	if database == nil {
-		return nil, errors.Errorf("cannot found database with id %d", anomaly.DatabaseUID)
+		return nil, errors.Errorf("cannot found database %s", anomaly.DatabaseName)
 	}
 	pbAnomaly.Resource = common.FormatDatabase(database.InstanceID, database.DatabaseName)
 	pbAnomaly.Type = convertAnomalyType(anomaly.Type)

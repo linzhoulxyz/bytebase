@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 
@@ -43,8 +42,6 @@ type DataSourceMessage struct {
 	SASLConfig *storepb.SASLConfig
 	// Authentication
 	AuthenticationPrivateKeyObfuscated string
-	// (deprecated) Output only.
-	UID int
 	// external secret
 	ExternalSecret           *storepb.DataSourceExternalSecret
 	AuthenticationType       storepb.DataSourceOptions_AuthenticationType
@@ -91,7 +88,6 @@ func (m *DataSourceMessage) Copy() *DataSourceMessage {
 		SSHUser:                            m.SSHUser,
 		SSHObfuscatedPassword:              m.SSHObfuscatedPassword,
 		SSHObfuscatedPrivateKey:            m.SSHObfuscatedPrivateKey,
-		UID:                                m.UID,
 		AuthenticationPrivateKeyObfuscated: m.AuthenticationPrivateKeyObfuscated,
 		ExternalSecret:                     m.ExternalSecret,
 		AuthenticationType:                 m.AuthenticationType,
@@ -110,7 +106,6 @@ func (m *DataSourceMessage) Copy() *DataSourceMessage {
 
 // UpdateDataSourceMessage is the message for the data source.
 type UpdateDataSourceMessage struct {
-	UpdaterID    int
 	InstanceUID  int
 	InstanceID   string
 	DataSourceID string
@@ -159,36 +154,34 @@ type UpdateDataSourceMessage struct {
 func (*Store) listInstanceDataSourceMap(ctx context.Context, tx *Tx, find *FindDataSourceMessage) (map[string][]*DataSourceMessage, error) {
 	where, args := []string{"TRUE"}, []any{}
 	if find.ID != nil {
-		where, args = append(where, fmt.Sprintf("data_source.id = $%d", len(args)+1)), append(args, *find.ID)
+		where, args = append(where, fmt.Sprintf("id = $%d", len(args)+1)), append(args, *find.ID)
 	}
 	if find.Name != nil {
-		where, args = append(where, fmt.Sprintf("data_source.name = $%d", len(args)+1)), append(args, *find.Name)
+		where, args = append(where, fmt.Sprintf("name = $%d", len(args)+1)), append(args, *find.Name)
 	}
 	if find.InstanceID != nil {
-		where, args = append(where, fmt.Sprintf("instance.resource_id = $%d", len(args)+1)), append(args, *find.InstanceID)
+		where, args = append(where, fmt.Sprintf("instance = $%d", len(args)+1)), append(args, *find.InstanceID)
 	}
 	if find.Type != nil {
-		where, args = append(where, fmt.Sprintf("data_source.type = $%d", len(args)+1)), append(args, *find.Type)
+		where, args = append(where, fmt.Sprintf("type = $%d", len(args)+1)), append(args, *find.Type)
 	}
 
 	instanceDataSourcesMap := make(map[string][]*DataSourceMessage)
 	rows, err := tx.QueryContext(ctx, `
 		SELECT
-			instance.resource_id,
-			data_source.id,
-			data_source.name,
-			data_source.type,
-			data_source.username,
-			data_source.password,
-			data_source.ssl_key,
-			data_source.ssl_cert,
-			data_source.ssl_ca,
-			data_source.host,
-			data_source.port,
-			data_source.database,
-			data_source.options
+			instance,
+			name,
+			type,
+			username,
+			password,
+			ssl_key,
+			ssl_cert,
+			ssl_ca,
+			host,
+			port,
+			database,
+			options
 		FROM data_source
-		LEFT JOIN instance ON instance.id = data_source.instance_id
 		WHERE `+strings.Join(where, " AND "),
 		args...,
 	)
@@ -202,7 +195,6 @@ func (*Store) listInstanceDataSourceMap(ctx context.Context, tx *Tx, find *FindD
 		var dataSourceMessage DataSourceMessage
 		if err := rows.Scan(
 			&instanceID,
-			&dataSourceMessage.UID,
 			&dataSourceMessage.ID,
 			&dataSourceMessage.Type,
 			&dataSourceMessage.Username,
@@ -286,14 +278,14 @@ func (s *Store) GetDataSource(ctx context.Context, find *FindDataSourceMessage) 
 }
 
 // AddDataSourceToInstanceV2 adds a RO data source to an instance and return the instance where the data source is added.
-func (s *Store) AddDataSourceToInstanceV2(ctx context.Context, instanceUID, creatorID int, instanceID string, dataSource *DataSourceMessage) error {
+func (s *Store) AddDataSourceToInstanceV2(ctx context.Context, instanceUID int, instanceID string, dataSource *DataSourceMessage) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return errors.New("Failed to begin transaction")
 	}
 	defer tx.Rollback()
 
-	if err := s.addDataSourceToInstanceImplV2(ctx, tx, instanceUID, creatorID, dataSource); err != nil {
+	if err := s.addDataSourceToInstanceImplV2(ctx, tx, instanceID, dataSource); err != nil {
 		return err
 	}
 
@@ -315,8 +307,8 @@ func (s *Store) RemoveDataSourceV2(ctx context.Context, instanceUID int, instanc
 	defer tx.Rollback()
 
 	result, err := tx.ExecContext(ctx, `
-		DELETE FROM data_source WHERE data_source.instance_id = $1 AND data_source.name = $2;
-	`, instanceUID, dataSourceID)
+		DELETE FROM data_source WHERE instance = $1 AND name = $2;
+	`, instanceID, dataSourceID)
 	if err != nil {
 		return err
 	}
@@ -340,7 +332,7 @@ func (s *Store) RemoveDataSourceV2(ctx context.Context, instanceUID int, instanc
 
 // UpdateDataSourceV2 updates a data source and returns the instance.
 func (s *Store) UpdateDataSourceV2(ctx context.Context, patch *UpdateDataSourceMessage) error {
-	set, args := []string{"updater_id = $1", "updated_ts = $2"}, []any{patch.UpdaterID, time.Now().Unix()}
+	set, args := []string{}, []any{}
 
 	if v := patch.Username; v != nil {
 		set, args = append(set, fmt.Sprintf("username = $%d", len(args)+1)), append(args, *v)
@@ -468,10 +460,8 @@ func (s *Store) UpdateDataSourceV2(ctx context.Context, patch *UpdateDataSourceM
 	}
 	defer tx.Rollback()
 
-	// Only update the data source if the
-	query := `UPDATE data_source SET ` + strings.Join(set, ", ") +
-		` WHERE instance_id = ` + fmt.Sprintf("%d", patch.InstanceUID) +
-		` AND name = ` + fmt.Sprintf(`'%s'`, patch.DataSourceID)
+	query := fmt.Sprintf(`UPDATE data_source SET %s WHERE instance = $%d AND name = $%d`, strings.Join(set, ", "), len(args)+1, len(args)+2)
+	args = append(args, patch.InstanceID, patch.DataSourceID)
 	result, err := tx.ExecContext(ctx, query, args...)
 	if err != nil {
 		return err
@@ -494,7 +484,7 @@ func (s *Store) UpdateDataSourceV2(ctx context.Context, patch *UpdateDataSourceM
 	return nil
 }
 
-func (*Store) addDataSourceToInstanceImplV2(ctx context.Context, tx *Tx, instanceUID, creatorID int, dataSource *DataSourceMessage) error {
+func (*Store) addDataSourceToInstanceImplV2(ctx context.Context, tx *Tx, instanceID string, dataSource *DataSourceMessage) error {
 	// We flatten the data source fields in DataSourceMessage, so we need to compose them in store layer before INSERT.
 	dataSourceOptions := storepb.DataSourceOptions{
 		Srv:                                dataSource.SRV,
@@ -528,9 +518,7 @@ func (*Store) addDataSourceToInstanceImplV2(ctx context.Context, tx *Tx, instanc
 
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO data_source (
-			creator_id,
-			updater_id,
-			instance_id,
+			instance,
 			name,
 			type,
 			username,
@@ -543,8 +531,8 @@ func (*Store) addDataSourceToInstanceImplV2(ctx context.Context, tx *Tx, instanc
 			options,
 			database
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-	`, creatorID, creatorID, instanceUID, dataSource.ID,
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+	`, instanceID, dataSource.ID,
 		dataSource.Type, dataSource.Username, dataSource.ObfuscatedPassword, dataSource.ObfuscatedSslKey,
 		dataSource.ObfuscatedSslCert, dataSource.ObfuscatedSslCa, dataSource.Host, dataSource.Port,
 		protoBytes, dataSource.Database,
@@ -556,8 +544,8 @@ func (*Store) addDataSourceToInstanceImplV2(ctx context.Context, tx *Tx, instanc
 }
 
 // clearDataSourceImpl deletes dataSources by instance id and database id.
-func (*Store) clearDataSourceImpl(ctx context.Context, tx *Tx, instanceID int) error {
-	if _, err := tx.ExecContext(ctx, `DELETE FROM data_source WHERE instance_id = $1`, instanceID); err != nil {
+func (*Store) clearDataSourceImpl(ctx context.Context, tx *Tx, instanceID string) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM data_source WHERE instance = $1`, instanceID); err != nil {
 		return err
 	}
 	return nil

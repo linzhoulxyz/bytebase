@@ -5,11 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-	"time"
 
 	"google.golang.org/protobuf/encoding/protojson"
-
-	"github.com/pkg/errors"
 
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/store/model"
@@ -22,14 +19,14 @@ type UpdateDBSchemaMessage struct {
 }
 
 // GetDBSchema gets the schema for a database.
-func (s *Store) GetDBSchema(ctx context.Context, databaseID int) (*model.DBSchema, error) {
-	if v, ok := s.dbSchemaCache.Get(databaseID); ok {
+func (s *Store) GetDBSchema(ctx context.Context, instanceID, databaseName string) (*model.DBSchema, error) {
+	if v, ok := s.dbSchemaCache.Get(getDatabaseCacheKey(instanceID, databaseName)); ok {
 		return v, nil
 	}
 
-	// Build WHERE clause.
 	where, args := []string{"TRUE"}, []any{}
-	where, args = append(where, fmt.Sprintf("database_id = $%d", len(args)+1)), append(args, databaseID)
+	where, args = append(where, fmt.Sprintf("instance = $%d", len(args)+1)), append(args, instanceID)
+	where, args = append(where, fmt.Sprintf("db_name = $%d", len(args)+1)), append(args, databaseName)
 
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
@@ -65,12 +62,12 @@ func (s *Store) GetDBSchema(ctx context.Context, databaseID int) (*model.DBSchem
 		return nil, err
 	}
 
-	s.dbSchemaCache.Add(databaseID, dbSchema)
+	s.dbSchemaCache.Add(getDatabaseCacheKey(instanceID, databaseName), dbSchema)
 	return dbSchema, nil
 }
 
 // UpsertDBSchema upserts a database schema.
-func (s *Store) UpsertDBSchema(ctx context.Context, databaseID int, dbSchema *model.DBSchema, updaterID int) error {
+func (s *Store) UpsertDBSchema(ctx context.Context, instanceID, databaseName string, dbSchema *model.DBSchema) error {
 	metadataBytes, err := protojson.Marshal(dbSchema.GetMetadata())
 	if err != nil {
 		return err
@@ -82,19 +79,17 @@ func (s *Store) UpsertDBSchema(ctx context.Context, databaseID int, dbSchema *mo
 
 	query := `
 		INSERT INTO db_schema (
-			creator_id,
-			updater_id,
-			database_id,
+			instance,
+			db_name,
 			metadata,
 			raw_dump,
 			config
 		)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		ON CONFLICT(database_id) DO UPDATE SET
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT(instance, db_name) DO UPDATE SET
 			metadata = EXCLUDED.metadata,
 			raw_dump = EXCLUDED.raw_dump,
-			config = EXCLUDED.config,
-			updated_ts = extract(epoch from now())
+			config = EXCLUDED.config
 		RETURNING metadata, raw_dump, config
 	`
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -105,9 +100,8 @@ func (s *Store) UpsertDBSchema(ctx context.Context, databaseID int, dbSchema *mo
 
 	var metadata, schema, config []byte
 	if err := tx.QueryRowContext(ctx, query,
-		updaterID,
-		updaterID,
-		databaseID,
+		instanceID,
+		databaseName,
 		metadataBytes,
 		// Convert to string because []byte{} is null which violates db schema constraints.
 		string(dbSchema.GetSchema()),
@@ -127,44 +121,13 @@ func (s *Store) UpsertDBSchema(ctx context.Context, databaseID int, dbSchema *mo
 		return err
 	}
 
-	s.dbSchemaCache.Add(databaseID, updatedDBSchema)
+	s.dbSchemaCache.Add(getDatabaseCacheKey(instanceID, databaseName), updatedDBSchema)
 	return nil
 }
 
-func (s *Store) ListLegacyCatalog(ctx context.Context) ([]int, error) {
-	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-	rows, err := tx.QueryContext(ctx, `
-		SELECT database_id FROM db_schema WHERE config::text LIKE '%maskingLevel%';
-	`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var ids []int
-	for rows.Next() {
-		var databaseID int
-		if err := rows.Scan(
-			&databaseID,
-		); err != nil {
-			return nil, err
-		}
-		ids = append(ids, databaseID)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errors.Wrapf(err, "rows err")
-	}
-
-	return ids, nil
-}
-
 // UpdateDBSchema updates a database schema.
-func (s *Store) UpdateDBSchema(ctx context.Context, databaseID int, patch *UpdateDBSchemaMessage, updaterID int) error {
-	set, args := []string{"updater_id = $1", "updated_ts = $2"}, []any{updaterID, time.Now().Unix()}
+func (s *Store) UpdateDBSchema(ctx context.Context, instanceID, databaseName string, patch *UpdateDBSchemaMessage) error {
+	set, args := []string{}, []any{}
 	if v := patch.Config; v != nil {
 		bytes, err := protojson.Marshal(v)
 		if err != nil {
@@ -172,18 +135,20 @@ func (s *Store) UpdateDBSchema(ctx context.Context, databaseID int, patch *Updat
 		}
 		set, args = append(set, fmt.Sprintf("config = $%d", len(args)+1)), append(args, bytes)
 	}
-	args = append(args, databaseID)
+
+	where := []string{"TRUE"}
+	where, args = append(where, fmt.Sprintf("instance = $%d", len(args)+1)), append(args, instanceID)
+	where, args = append(where, fmt.Sprintf("db_name = $%d", len(args)+1)), append(args, databaseName)
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
+	if _, err := tx.ExecContext(ctx, `
 			UPDATE db_schema
 			SET `+strings.Join(set, ", ")+`
-			WHERE database_id = $%d
-		`, len(args)), args...,
+			WHERE `+strings.Join(where, " AND "), args...,
 	); err != nil {
 		return err
 	}
@@ -191,7 +156,7 @@ func (s *Store) UpdateDBSchema(ctx context.Context, databaseID int, patch *Updat
 		return err
 	}
 	// Invalid the cache and read the value again.
-	s.dbSchemaCache.Remove(databaseID)
+	s.dbSchemaCache.Remove(getDatabaseCacheKey(instanceID, databaseName))
 	return nil
 }
 

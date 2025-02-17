@@ -270,12 +270,16 @@ func (s *PlanService) CreatePlan(ctx context.Context, request *v1pb.CreatePlanRe
 		return nil, status.Errorf(codes.Internal, "failed to create plan, error: %v", err)
 	}
 
-	planCheckRuns, err := getPlanCheckRunsFromPlan(ctx, s.store, plan)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get plan check runs for plan, error: %v", err)
-	}
-	if err := s.store.CreatePlanCheckRuns(ctx, planCheckRuns...); err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create plan check runs, error: %v", err)
+	// Don't create plan checks if the plan comes from releases.
+	// Plan check results don't match release checks.
+	if !planHasRelease(request.Plan) {
+		planCheckRuns, err := getPlanCheckRunsFromPlan(ctx, s.store, plan)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get plan check runs for plan, error: %v", err)
+		}
+		if err := s.store.CreatePlanCheckRuns(ctx, planCheckRuns...); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to create plan check runs, error: %v", err)
+		}
 	}
 
 	// Tickle plan check scheduler.
@@ -333,8 +337,7 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 	}
 
 	planUpdate := &store.UpdatePlanMessage{
-		UID:       oldPlan.UID,
-		UpdaterID: user.ID,
+		UID: oldPlan.UID,
 	}
 
 	var planCheckRunsTrigger bool
@@ -394,7 +397,7 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 			}
 
 			tasksMap := map[int]*store.TaskMessage{}
-			var taskPatchList []*api.TaskPatch
+			var taskPatchList []*store.TaskPatch
 			var issueCommentCreates []*store.IssueCommentMessage
 			var taskDAGRebuildList []struct {
 				fromTaskIDs []int
@@ -402,7 +405,7 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 			}
 
 			if oldPlan.PipelineUID != nil {
-				tasks, err := s.store.ListTasks(ctx, &api.TaskFind{PipelineID: oldPlan.PipelineUID})
+				tasks, err := s.store.ListTasks(ctx, &store.TaskFind{PipelineID: oldPlan.PipelineUID})
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "failed to list tasks: %v", err)
 				}
@@ -418,7 +421,7 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 				}
 				for _, task := range tasks {
 					doUpdate := false
-					taskPatch := &api.TaskPatch{
+					taskPatch := &store.TaskPatch{
 						ID:        task.ID,
 						UpdaterID: user.ID,
 					}
@@ -458,17 +461,27 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 					}
 
 					// EarliestAllowedTs
-					if spec.EarliestAllowedTime.GetSeconds() != task.EarliestAllowedTs {
-						seconds := spec.EarliestAllowedTime.GetSeconds()
-						taskPatch.EarliestAllowedTs = &seconds
+					taskEarliest := int64(0)
+					if task.EarliestAllowedAt != nil {
+						taskEarliest = task.EarliestAllowedAt.Unix()
+					}
+					specEarliest := spec.EarliestAllowedTime.GetSeconds()
+					if specEarliest != taskEarliest {
+						taskPatch.UpdateEarliestAllowedTs = true
+						if specEarliest == 0 {
+							taskPatch.EarliestAllowedTs = nil
+						} else {
+							v := spec.EarliestAllowedTime.AsTime()
+							taskPatch.EarliestAllowedTs = &v
+						}
 						doUpdate = true
 
 						var fromEarliestAllowedTime, toEarliestAllowedTime *timestamppb.Timestamp
-						if task.EarliestAllowedTs != 0 {
-							fromEarliestAllowedTime = timestamppb.New(time.Unix(task.EarliestAllowedTs, 0))
+						if task.EarliestAllowedAt != nil {
+							fromEarliestAllowedTime = timestamppb.New(*task.EarliestAllowedAt)
 						}
-						if seconds != 0 {
-							toEarliestAllowedTime = timestamppb.New(time.Unix(seconds, 0))
+						if specEarliest != 0 {
+							toEarliestAllowedTime = spec.EarliestAllowedTime
 						}
 						issueCommentCreates = append(issueCommentCreates, &store.IssueCommentMessage{
 							IssueUID: issue.UID,
@@ -796,7 +809,7 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 								ApprovalFindingDone: false,
 							},
 						},
-					}, api.SystemBotID)
+					})
 					if err != nil {
 						return errors.Errorf("failed to update issue: %v", err)
 					}
@@ -921,18 +934,6 @@ func (s *PlanService) BatchCancelPlanCheckRuns(ctx context.Context, request *v1p
 		return nil, status.Errorf(codes.NotFound, "project %v not found", projectID)
 	}
 
-	principalID, ok := ctx.Value(common.PrincipalIDContextKey).(int)
-	if !ok {
-		return nil, status.Errorf(codes.Internal, "principal ID not found")
-	}
-	user, err := s.store.GetUserByID(ctx, principalID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to find user, error: %v", err)
-	}
-	if user == nil {
-		return nil, status.Errorf(codes.NotFound, "user %v not found", principalID)
-	}
-
 	var planCheckRunIDs []int
 	for _, planCheckRun := range request.PlanCheckRuns {
 		_, _, planCheckRunID, err := common.GetProjectIDPlanIDPlanCheckRunID(planCheckRun)
@@ -964,7 +965,7 @@ func (s *PlanService) BatchCancelPlanCheckRuns(ctx context.Context, request *v1p
 		}
 	}
 	// Update the status of the plan check runs to canceled.
-	if err := s.store.BatchCancelPlanCheckRuns(ctx, planCheckRunIDs, principalID); err != nil {
+	if err := s.store.BatchCancelPlanCheckRuns(ctx, planCheckRunIDs); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to batch patch task run status to canceled, error: %v", err)
 	}
 
@@ -995,11 +996,10 @@ func (s *PlanService) buildPlanFindWithFilter(ctx context.Context, planFind *sto
 			if err != nil {
 				return errors.Wrap(err, "failed to parse create_time value")
 			}
-			ts := t.Unix()
 			if spec.Operator == ComparatorTypeGreaterEqual {
-				planFind.CreatedTsAfter = &ts
+				planFind.CreatedAtAfter = &t
 			} else {
-				planFind.CreatedTsBefore = &ts
+				planFind.CreatedAtBefore = &t
 			}
 		case "has_pipeline":
 			if spec.Operator != ComparatorTypeEqual {
@@ -1101,7 +1101,7 @@ func (s *PlanService) PreviewPlan(ctx context.Context, request *v1pb.PreviewPlan
 			return nil, status.Errorf(codes.InvalidArgument, "databaseGroup target projectID %q doesn't match the projectID of request.project %q", projectID, request.Project)
 		}
 
-		databaseGroup, err := s.store.GetDatabaseGroup(ctx, &store.FindDatabaseGroupMessage{ProjectUID: &project.UID, ResourceID: &databaseGroupID})
+		databaseGroup, err := s.store.GetDatabaseGroup(ctx, &store.FindDatabaseGroupMessage{ProjectID: &project.ResourceID, ResourceID: &databaseGroupID})
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get database group %q", databaseGroupID)
 		}
@@ -1156,7 +1156,7 @@ func (s *PlanService) PreviewPlan(ctx context.Context, request *v1pb.PreviewPlan
 }
 
 func (s *PlanService) getSpecsForDatabase(ctx context.Context, database *store.DatabaseMessage, release *store.ReleaseMessage, releaseName string, allowOoo bool) ([]*v1pb.Plan_Spec, *v1pb.PreviewPlanResponse_DatabaseFiles, *v1pb.PreviewPlanResponse_DatabaseFiles, error) {
-	revisions, err := s.store.ListRevisions(ctx, &store.FindRevisionMessage{DatabaseUID: &database.UID})
+	revisions, err := s.store.ListRevisions(ctx, &store.FindRevisionMessage{InstanceID: &database.InstanceID, DatabaseName: &database.DatabaseName})
 	if err != nil {
 		return nil, nil, nil, errors.Wrapf(err, "failed to list revisions")
 	}
@@ -1382,7 +1382,7 @@ func getPlanSpecDatabaseGroups(steps []*storepb.PlanConfig_Step) []string {
 func getPlanSnapshot(ctx context.Context, s *store.Store, steps []*storepb.PlanConfig_Step, project *store.ProjectMessage) (*storepb.PlanConfig_DeploymentSnapshot, error) {
 	snapshot := &storepb.PlanConfig_DeploymentSnapshot{}
 
-	deploymentConfig, err := s.GetDeploymentConfigV2(ctx, project.UID)
+	deploymentConfig, err := s.GetDeploymentConfigV2(ctx, project.ResourceID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get deployment config")
 	}
@@ -1412,7 +1412,7 @@ func getPlanSnapshot(ctx context.Context, s *store.Store, steps []*storepb.PlanC
 		}
 		databaseGroup, err := s.GetDatabaseGroup(ctx, &store.FindDatabaseGroupMessage{
 			ResourceID: &id,
-			ProjectUID: &project.UID,
+			ProjectID:  &project.ResourceID,
 		})
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get database group")
@@ -1435,4 +1435,8 @@ func getPlanSnapshot(ctx context.Context, s *store.Store, steps []*storepb.PlanC
 	}
 
 	return snapshot, nil
+}
+
+func planHasRelease(plan *v1pb.Plan) bool {
+	return plan.GetReleaseSource().GetRelease() != ""
 }

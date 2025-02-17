@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -19,9 +20,7 @@ type PipelineMessage struct {
 	// Output only.
 	ID         int
 	CreatorUID int
-	CreatedTs  int64
-	UpdaterUID int
-	UpdatedTs  int64
+	CreatedAt  time.Time
 	IssueID    *int
 }
 
@@ -79,7 +78,7 @@ func (s *Store) CreatePipelineAIO(ctx context.Context, planUID int64, pipeline *
 		}
 	}
 
-	createdStages, err := s.createStages(ctx, tx, stagesToCreate, createdPipelineUID, creatorUID)
+	createdStages, err := s.createStages(ctx, tx, stagesToCreate, createdPipelineUID)
 	if err != nil {
 		return 0, errors.Wrapf(err, "failed to create stages")
 	}
@@ -88,7 +87,6 @@ func (s *Store) CreatePipelineAIO(ctx context.Context, planUID int64, pipeline *
 		var taskCreateList []*TaskMessage
 		for _, taskCreate := range stage.TaskList {
 			c := taskCreate
-			c.CreatorID = creatorUID
 			c.PipelineID = createdPipelineUID
 			c.StageID = stage.ID
 			taskCreateList = append(taskCreateList, c)
@@ -167,33 +165,29 @@ func lockPlanAndGetPipelineUID(ctx context.Context, tx *Tx, planUID int64) (*int
 func (*Store) createPipeline(ctx context.Context, tx *Tx, create *PipelineMessage, creatorUID int) (*PipelineMessage, error) {
 	query := `
 		INSERT INTO pipeline (
-			project_id,
+			project,
 			creator_id,
-			updater_id,
 			name
 		)
 		VALUES (
-			(SELECT project.id FROM project WHERE project.resource_id = $1),
+			$1,
 			$2,
-			$3,
-			$4
+			$3
 		)
-		RETURNING id, created_ts
+		RETURNING id, created_at
 	`
 	pipeline := &PipelineMessage{
 		ProjectID:  create.ProjectID,
 		CreatorUID: creatorUID,
-		UpdaterUID: creatorUID,
 		Name:       create.Name,
 	}
 	if err := tx.QueryRowContext(ctx, query,
 		create.ProjectID,
 		creatorUID,
-		creatorUID,
 		create.Name,
 	).Scan(
 		&pipeline.ID,
-		&pipeline.CreatedTs,
+		&pipeline.CreatedAt,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, common.FormatDBErrorEmptyRowWithQuery(query)
@@ -201,7 +195,6 @@ func (*Store) createPipeline(ctx context.Context, tx *Tx, create *PipelineMessag
 		return nil, errors.Wrapf(err, "failed to insert")
 	}
 
-	pipeline.UpdatedTs = pipeline.CreatedTs
 	return pipeline, nil
 }
 
@@ -231,20 +224,17 @@ func (s *Store) ListPipelineV2(ctx context.Context, find *PipelineFind) ([]*Pipe
 		where, args = append(where, fmt.Sprintf("pipeline.id = $%d", len(args)+1)), append(args, *v)
 	}
 	if v := find.ProjectID; v != nil {
-		where, args = append(where, fmt.Sprintf("project.resource_id = $%d", len(args)+1)), append(args, *v)
+		where, args = append(where, fmt.Sprintf("pipeline.project = $%d", len(args)+1)), append(args, *v)
 	}
 	query := fmt.Sprintf(`
 		SELECT
 			pipeline.id,
 			pipeline.creator_id,
-			pipeline.created_ts,
-			pipeline.updater_id,
-			pipeline.updated_ts,
-			project.resource_id,
+			pipeline.created_at,
+			pipeline.project,
 			pipeline.name,
 			issue.id
 		FROM pipeline
-		LEFT JOIN project ON pipeline.project_id = project.id
 		LEFT JOIN issue ON pipeline.id = issue.pipeline_id
 		WHERE %s
 		ORDER BY pipeline.id DESC`, strings.Join(where, " AND "))
@@ -273,9 +263,7 @@ func (s *Store) ListPipelineV2(ctx context.Context, find *PipelineFind) ([]*Pipe
 		if err := rows.Scan(
 			&pipeline.ID,
 			&pipeline.CreatorUID,
-			&pipeline.CreatedTs,
-			&pipeline.UpdaterUID,
-			&pipeline.UpdatedTs,
+			&pipeline.CreatedAt,
 			&pipeline.ProjectID,
 			&pipeline.Name,
 			&pipeline.IssueID,

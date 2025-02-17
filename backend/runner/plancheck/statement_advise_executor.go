@@ -3,14 +3,15 @@ package plancheck
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/pkg/errors"
 
 	"github.com/bytebase/bytebase/backend/common"
+	"github.com/bytebase/bytebase/backend/common/log"
 	"github.com/bytebase/bytebase/backend/component/dbfactory"
 	"github.com/bytebase/bytebase/backend/component/sheet"
 
-	v1api "github.com/bytebase/bytebase/backend/api/v1"
 	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
 	api "github.com/bytebase/bytebase/backend/legacyapi"
 	"github.com/bytebase/bytebase/backend/plugin/advisor"
@@ -146,7 +147,7 @@ func (e *StatementAdviseExecutor) runReview(
 	statement string,
 	preUpdateBackupDetail *storepb.PreUpdateBackupDetail,
 ) ([]*storepb.PlanCheckRunResult_Result, error) {
-	dbSchema, err := e.store.GetDBSchema(ctx, database.UID)
+	dbSchema, err := e.store.GetDBSchema(ctx, database.InstanceID, database.DatabaseName)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +168,7 @@ func (e *StatementAdviseExecutor) runReview(
 		}
 	}
 
-	catalog, err := catalog.NewCatalog(ctx, e.store, database.UID, instance.Engine, store.IgnoreDatabaseAndTableCaseSensitive(instance), nil /* Override Metadata */)
+	catalog, err := catalog.NewCatalog(ctx, e.store, database.InstanceID, database.DatabaseName, instance.Engine, store.IgnoreDatabaseAndTableCaseSensitive(instance), nil /* Override Metadata */)
 	if err != nil {
 		return nil, common.Wrapf(err, common.Internal, "failed to create a catalog")
 	}
@@ -189,7 +190,7 @@ func (e *StatementAdviseExecutor) runReview(
 	materials := utils.GetSecretMapFromDatabaseMessage(database)
 	// To avoid leaking the rendered statement, the error message should use the original statement and not the rendered statement.
 	renderedStatement := utils.RenderStatement(statement, materials)
-	classificationConfig := v1api.GetClassificationByProject(ctx, e.store, database.ProjectID)
+	classificationConfig := getClassificationByProject(ctx, e.store, database.ProjectID)
 
 	adviceList, err := advisor.SQLReviewCheck(e.sheetManager, renderedStatement, reviewConfig.SqlReviewRules, advisor.SQLReviewCheckContext{
 		Charset:                  dbSchema.GetMetadata().CharacterSet,
@@ -267,4 +268,26 @@ func (e *StatementAdviseExecutor) buildListDatabaseNamesFunc() base.ListDatabase
 		}
 		return names, nil
 	}
+}
+
+func getClassificationByProject(ctx context.Context, stores *store.Store, projectID string) *storepb.DataClassificationSetting_DataClassificationConfig {
+	project, err := stores.GetProjectV2(ctx, &store.FindProjectMessage{
+		ResourceID: &projectID,
+	})
+	if err != nil {
+		slog.Warn("failed to find project", slog.String("project", projectID), log.BBError(err))
+		return nil
+	}
+	if project == nil {
+		return nil
+	}
+	if project.DataClassificationConfigID == "" {
+		return nil
+	}
+	classificationConfig, err := stores.GetDataClassificationConfigByID(ctx, project.DataClassificationConfigID)
+	if err != nil {
+		slog.Warn("failed to find classification", slog.String("project", projectID), slog.String("classification", project.DataClassificationConfigID), log.BBError(err))
+		return nil
+	}
+	return classificationConfig
 }

@@ -15,14 +15,13 @@ import (
 
 type IssueCommentMessage struct {
 	UID       int
-	CreatedTs int64
-	UpdatedTs int64
+	CreatedAt time.Time
+	UpdatedAt time.Time
 	IssueUID  int
 	Payload   *storepb.IssueCommentPayload
 	Creator   *UserMessage
 
 	creatorUID int
-	updaterUID int
 }
 
 type FindIssueCommentMessage struct {
@@ -34,8 +33,7 @@ type FindIssueCommentMessage struct {
 }
 
 type UpdateIssueCommentMessage struct {
-	UID       int
-	UpdaterID int
+	UID int
 
 	Comment *string
 }
@@ -78,9 +76,8 @@ func (s *Store) ListIssueComment(ctx context.Context, find *FindIssueCommentMess
 		SELECT
 			id,
 			creator_id,
-			created_ts,
-			updater_id,
-			updated_ts,
+			created_at,
+			updated_at,
 			issue_id,
 			payload
 		FROM
@@ -103,9 +100,8 @@ func (s *Store) ListIssueComment(ctx context.Context, find *FindIssueCommentMess
 		if err := rows.Scan(
 			&ic.UID,
 			&ic.creatorUID,
-			&ic.CreatedTs,
-			&ic.updaterUID,
-			&ic.UpdatedTs,
+			&ic.CreatedAt,
+			&ic.UpdatedAt,
 			&ic.IssueUID,
 			&p,
 		); err != nil {
@@ -154,15 +150,13 @@ func (s *Store) CreateIssueComment(ctx context.Context, create *IssueCommentMess
 	query := `
 		INSERT INTO issue_comment (
 			creator_id,
-			updater_id,
 			issue_id,
 			payload
 		) VALUES (
 			$1,
 			$2,
-			$3,
-			$4
-		) RETURNING id, created_ts, updated_ts
+			$3
+		) RETURNING id, created_at, updated_at
 	`
 
 	payload, err := protojson.Marshal(create.Payload)
@@ -170,33 +164,22 @@ func (s *Store) CreateIssueComment(ctx context.Context, create *IssueCommentMess
 		return nil, errors.Wrapf(err, "failed to marshal payload")
 	}
 
-	var id int
-	var createdTs, updatedTs int64
-	if err := s.db.db.QueryRowContext(ctx, query, creatorUID, creatorUID, create.IssueUID, payload).Scan(&id, &createdTs, &updatedTs); err != nil {
+	if err := s.db.db.QueryRowContext(ctx, query, creatorUID, create.IssueUID, payload).Scan(&create.UID, &create.CreatedAt, &create.UpdatedAt); err != nil {
 		return nil, errors.Wrapf(err, "failed to insert")
 	}
 
-	ic := &IssueCommentMessage{
-		UID:        id,
-		CreatedTs:  createdTs,
-		UpdatedTs:  updatedTs,
-		IssueUID:   create.IssueUID,
-		Payload:    create.Payload,
-		creatorUID: creatorUID,
-		updaterUID: creatorUID,
-	}
-
-	creator, err := s.GetUserByID(ctx, ic.creatorUID)
+	create.creatorUID = creatorUID
+	creator, err := s.GetUserByID(ctx, creatorUID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get creator")
 	}
-	ic.Creator = creator
+	create.Creator = creator
 
-	return ic, nil
+	return create, nil
 }
 
 func (s *Store) UpdateIssueComment(ctx context.Context, patch *UpdateIssueCommentMessage) error {
-	set, args := []string{"updater_id = $1", "updated_ts = $2"}, []any{patch.UpdaterID, time.Now().Unix()}
+	set, args := []string{"updated_at = $1"}, []any{time.Now()}
 
 	if v := patch.Comment; v != nil {
 		set, args = append(set, fmt.Sprintf("payload = payload || jsonb_build_object('comment',$%d::TEXT)", len(args)+1)), append(args, *v)

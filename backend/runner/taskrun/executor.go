@@ -19,7 +19,6 @@ import (
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	"github.com/bytebase/bytebase/backend/runner/schemasync"
 	"github.com/bytebase/bytebase/backend/store"
-	"github.com/bytebase/bytebase/backend/store/model"
 	"github.com/bytebase/bytebase/backend/utils"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
@@ -90,12 +89,12 @@ type migrateContext struct {
 	changelog int64
 }
 
-func getMigrationInfo(ctx context.Context, stores *store.Store, profile *config.Profile, syncer *schemasync.Syncer, task *store.TaskMessage, migrationType db.MigrationType, statement string, schemaVersion model.Version, sheetID *int, taskRunUID int, dbFactory *dbfactory.DBFactory) (*db.MigrationInfo, *migrateContext, error) {
-	instance, err := stores.GetInstanceV2(ctx, &store.FindInstanceMessage{UID: &task.InstanceID})
+func getMigrationInfo(ctx context.Context, stores *store.Store, profile *config.Profile, syncer *schemasync.Syncer, task *store.TaskMessage, migrationType db.MigrationType, statement string, schemaVersion string, sheetID *int, taskRunUID int, dbFactory *dbfactory.DBFactory) (*db.MigrationInfo, *migrateContext, error) {
+	instance, err := stores.GetInstanceV2(ctx, &store.FindInstanceMessage{ResourceID: &task.InstanceID})
 	if err != nil {
 		return nil, nil, err
 	}
-	database, err := stores.GetDatabaseV2(ctx, &store.FindDatabaseMessage{UID: task.DatabaseID})
+	database, err := stores.GetDatabaseV2(ctx, &store.FindDatabaseMessage{InstanceID: &task.InstanceID, DatabaseName: task.DatabaseName})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -108,9 +107,7 @@ func getMigrationInfo(ctx context.Context, stores *store.Store, profile *config.
 	}
 
 	mi := &db.MigrationInfo{
-		InstanceID:     &instance.UID,
 		DatabaseID:     &database.UID,
-		CreatorID:      task.CreatorID,
 		ReleaseVersion: profile.Version,
 		Type:           migrationType,
 		Description:    task.Name,
@@ -135,7 +132,7 @@ func getMigrationInfo(ctx context.Context, stores *store.Store, profile *config.
 		instance:    instance,
 		database:    database,
 		task:        task,
-		version:     schemaVersion.Version,
+		version:     schemaVersion,
 		taskRunName: common.FormatTaskRun(pipeline.ProjectID, task.PipelineID, task.StageID, task.ID, taskRunUID),
 		taskRunUID:  taskRunUID,
 	}
@@ -191,7 +188,15 @@ func getMigrationInfo(ctx context.Context, stores *store.Store, profile *config.
 			if foundChangedResources {
 				break
 			}
-			if run.Config.InstanceUid != int32(task.InstanceID) {
+			taskInstance, err := stores.GetInstanceV2(ctx, &store.FindInstanceMessage{ResourceID: &task.InstanceID})
+			if err != nil {
+				return nil, nil, err
+			}
+			if taskInstance == nil {
+				return nil, nil, errors.Errorf("task %d instance not found", task.ID)
+			}
+
+			if run.Config.InstanceUid != int32(taskInstance.UID) {
 				continue
 			}
 			if run.Config.DatabaseName != database.DatabaseName {
@@ -224,25 +229,11 @@ func getMigrationInfo(ctx context.Context, stores *store.Store, profile *config.
 		// Concat issue title and task name as the migration description so that user can see
 		// more context of the migration.
 		mi.Description = fmt.Sprintf("%s - %s", issue.Title, task.Name)
-		mi.ProjectUID = &issue.Project.UID
-		mi.IssueUID = &issue.UID
 
 		mc.issueName = common.FormatIssue(issue.Project.ResourceID, issue.UID)
 	}
 
 	mi.Source = db.UI
-	creator, err := stores.GetUserByID(ctx, task.CreatorID)
-	if err != nil {
-		// If somehow we unable to find the principal, we just emit the error since it's not
-		// critical enough to fail the entire operation.
-		slog.Error("Failed to fetch creator for composing the migration info",
-			slog.Int("task_id", task.ID),
-			log.BBError(err),
-		)
-	} else {
-		mi.Creator = creator.Name
-		mi.CreatorID = creator.ID
-	}
 
 	statement = strings.TrimSpace(statement)
 	// Only baseline and SDL migration can have empty sql statement, which indicates empty database.
@@ -355,8 +346,9 @@ func postMigration(ctx context.Context, stores *store.Store, mi *db.MigrationInf
 
 	// Remove schema drift anomalies.
 	if err := stores.DeleteAnomalyV2(ctx, &store.DeleteAnomalyMessage{
-		DatabaseUID: *(mc.task.DatabaseID),
-		Type:        api.AnomalyDatabaseSchemaDrift,
+		InstanceID:   mc.task.InstanceID,
+		DatabaseName: *mc.task.DatabaseName,
+		Type:         api.AnomalyDatabaseSchemaDrift,
 	}); err != nil && common.ErrorCode(err) != common.NotFound {
 		slog.Error("Failed to archive anomaly",
 			slog.String("instance", instance.ResourceID),
@@ -377,7 +369,7 @@ func postMigration(ctx context.Context, stores *store.Store, mi *db.MigrationInf
 	}, nil
 }
 
-func runMigration(ctx context.Context, driverCtx context.Context, store *store.Store, dbFactory *dbfactory.DBFactory, stateCfg *state.State, syncer *schemasync.Syncer, profile *config.Profile, task *store.TaskMessage, taskRunUID int, migrationType db.MigrationType, statement string, schemaVersion model.Version, sheetID *int) (terminated bool, result *storepb.TaskRunResult, err error) {
+func runMigration(ctx context.Context, driverCtx context.Context, store *store.Store, dbFactory *dbfactory.DBFactory, stateCfg *state.State, syncer *schemasync.Syncer, profile *config.Profile, task *store.TaskMessage, taskRunUID int, migrationType db.MigrationType, statement string, schemaVersion string, sheetID *int) (terminated bool, result *storepb.TaskRunResult, err error) {
 	mi, mc, err := getMigrationInfo(ctx, store, profile, syncer, task, migrationType, statement, schemaVersion, sheetID, taskRunUID, dbFactory)
 	if err != nil {
 		return true, nil, err
@@ -469,8 +461,9 @@ func beginMigration(ctx context.Context, stores *store.Store, mi *db.MigrationIn
 	// what they are doing
 	if mc.version != "" {
 		list, err := stores.ListRevisions(ctx, &store.FindRevisionMessage{
-			DatabaseUID: &mc.database.UID,
-			Version:     &mc.version,
+			InstanceID:   &mc.database.InstanceID,
+			DatabaseName: &mc.database.DatabaseName,
+			Version:      &mc.version,
 		})
 		if err != nil {
 			return false, errors.Wrapf(err, "failed to list revisions")
@@ -497,7 +490,8 @@ func beginMigration(ctx context.Context, stores *store.Store, mi *db.MigrationIn
 
 	// create pending changelog
 	changelogUID, err := stores.CreateChangelog(ctx, &store.ChangelogMessage{
-		DatabaseUID:        mc.database.UID,
+		InstanceID:         mc.database.InstanceID,
+		DatabaseName:       mc.database.DatabaseName,
 		Status:             store.ChangelogStatusPending,
 		PrevSyncHistoryUID: syncHistoryPrevUID,
 		SyncHistoryUID:     nil,
@@ -509,7 +503,7 @@ func beginMigration(ctx context.Context, stores *store.Store, mi *db.MigrationIn
 			Sheet:            mc.sheetName,
 			Version:          mc.version,
 			Type:             convertTaskType(mc.task.Type),
-		}}, mi.CreatorID)
+		}})
 	if err != nil {
 		return false, errors.Wrapf(err, "failed to create changelog")
 	}
@@ -536,8 +530,9 @@ func endMigration(ctx context.Context, storeInstance *store.Store, mi *db.Migrat
 		// if isDone, record in revision
 		if mc.version != "" {
 			r := &store.RevisionMessage{
-				DatabaseUID: mc.database.UID,
-				Version:     mc.version,
+				InstanceID:   mc.database.InstanceID,
+				DatabaseName: mc.database.DatabaseName,
+				Version:      mc.version,
 				Payload: &storepb.RevisionPayload{
 					Release:     mc.release.release,
 					File:        mc.release.file,
@@ -551,7 +546,7 @@ func endMigration(ctx context.Context, storeInstance *store.Store, mi *db.Migrat
 				r.Payload.SheetSha256 = mc.sheet.GetSha256Hex()
 			}
 
-			revision, err := storeInstance.CreateRevision(ctx, r, mi.CreatorID)
+			revision, err := storeInstance.CreateRevision(ctx, r)
 			if err != nil {
 				return errors.Wrapf(err, "failed to create revision")
 			}

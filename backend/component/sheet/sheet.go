@@ -72,7 +72,7 @@ func (sm *Manager) CreateSheet(ctx context.Context, sheet *store.SheetMessage) (
 	return sm.store.CreateSheet(ctx, sheet)
 }
 
-func (sm *Manager) BatchCreateSheet(ctx context.Context, sheets []*store.SheetMessage, projectUID int, creatorUID int) ([]*store.SheetMessage, error) {
+func (sm *Manager) BatchCreateSheet(ctx context.Context, sheets []*store.SheetMessage, projectID string, creatorUID int) ([]*store.SheetMessage, error) {
 	for _, sheet := range sheets {
 		if sheet.Payload == nil {
 			sheet.Payload = &storepb.SheetPayload{}
@@ -80,7 +80,7 @@ func (sm *Manager) BatchCreateSheet(ctx context.Context, sheets []*store.SheetMe
 		sheet.Payload.Commands = getSheetCommands(sheet.Payload.Engine, sheet.Statement)
 	}
 
-	sheets, err := sm.store.BatchCreateSheet(ctx, projectUID, sheets, creatorUID)
+	sheets, err := sm.store.BatchCreateSheet(ctx, projectID, sheets, creatorUID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to batch create sheets")
 	}
@@ -229,7 +229,7 @@ func syntaxCheck(dbType storepb.Engine, statement string) (any, []*storepb.Advic
 		return tidbSyntaxCheck(statement)
 	case storepb.Engine_MYSQL, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
 		return mysqlSyntaxCheck(statement)
-	case storepb.Engine_POSTGRES:
+	case storepb.Engine_POSTGRES, storepb.Engine_REDSHIFT:
 		return postgresSyntaxCheck(statement)
 	case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
 		return oracleSyntaxCheck(statement)

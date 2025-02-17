@@ -25,9 +25,8 @@ type PlanMessage struct {
 	// output only
 	UID        int64
 	CreatorUID int
-	CreatedTs  int64
-	UpdaterUID int
-	UpdatedTs  int64
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 
 	PlanCheckRunStatusCount map[string]int32
 }
@@ -39,8 +38,8 @@ type FindPlanMessage struct {
 	ProjectIDs      *[]string
 	CreatorID       *int
 	PipelineID      *int
-	CreatedTsBefore *int64
-	CreatedTsAfter  *int64
+	CreatedAtBefore *time.Time
+	CreatedAtAfter  *time.Time
 
 	Limit  *int
 	Offset *int
@@ -56,7 +55,6 @@ type UpdatePlanMessage struct {
 	Name        *string
 	Description *string
 	Steps       *[]*storepb.PlanConfig_Step
-	UpdaterID   int
 }
 
 // CreatePlan creates a new plan.
@@ -64,8 +62,7 @@ func (s *Store) CreatePlan(ctx context.Context, plan *PlanMessage, creatorUID in
 	query := `
 		INSERT INTO plan (
 			creator_id,
-			updater_id,
-			project_id,
+			project,
 			pipeline_id,
 			name,
 			description,
@@ -73,12 +70,11 @@ func (s *Store) CreatePlan(ctx context.Context, plan *PlanMessage, creatorUID in
 		) VALUES (
 			$1,
 			$2,
-			(SELECT project.id FROM project WHERE project.resource_id = $3),
+			$3,
 			$4,
 			$5,
-			$6,
-			$7
-		) RETURNING id, created_ts
+			$6
+		) RETURNING id, created_at, updated_at
 	`
 
 	config, err := protojson.Marshal(plan.Config)
@@ -91,16 +87,15 @@ func (s *Store) CreatePlan(ctx context.Context, plan *PlanMessage, creatorUID in
 	}
 	defer tx.Rollback()
 
-	var id, createdTs int64
+	var id int64
 	if err := tx.QueryRowContext(ctx, query,
-		creatorUID,
 		creatorUID,
 		plan.ProjectID,
 		plan.PipelineUID,
 		plan.Name,
 		plan.Description,
 		config,
-	).Scan(&id, &createdTs); err != nil {
+	).Scan(&id, &plan.CreatedAt, &plan.UpdatedAt); err != nil {
 		return nil, errors.Wrap(err, "failed to insert plan")
 	}
 
@@ -110,9 +105,6 @@ func (s *Store) CreatePlan(ctx context.Context, plan *PlanMessage, creatorUID in
 
 	plan.UID = id
 	plan.CreatorUID = creatorUID
-	plan.CreatedTs = createdTs
-	plan.UpdaterUID = creatorUID
-	plan.UpdatedTs = createdTs
 	return plan, nil
 }
 
@@ -138,10 +130,10 @@ func (s *Store) ListPlans(ctx context.Context, find *FindPlanMessage) ([]*PlanMe
 		where, args = append(where, fmt.Sprintf("plan.id = $%d", len(args)+1)), append(args, *v)
 	}
 	if v := find.ProjectID; v != nil {
-		where, args = append(where, fmt.Sprintf("project.resource_id = $%d", len(args)+1)), append(args, *v)
+		where, args = append(where, fmt.Sprintf("plan.project = $%d", len(args)+1)), append(args, *v)
 	}
 	if v := find.ProjectIDs; v != nil {
-		where, args = append(where, fmt.Sprintf("project.resource_id = ANY($%d)", len(args)+1)), append(args, *v)
+		where, args = append(where, fmt.Sprintf("plan.project = ANY($%d)", len(args)+1)), append(args, *v)
 	}
 	if v := find.PipelineID; v != nil {
 		where, args = append(where, fmt.Sprintf("plan.pipeline_id = $%d", len(args)+1)), append(args, *v)
@@ -149,11 +141,11 @@ func (s *Store) ListPlans(ctx context.Context, find *FindPlanMessage) ([]*PlanMe
 	if v := find.CreatorID; v != nil {
 		where, args = append(where, fmt.Sprintf("plan.creator_id = $%d", len(args)+1)), append(args, *v)
 	}
-	if v := find.CreatedTsBefore; v != nil {
-		where, args = append(where, fmt.Sprintf("plan.created_ts < $%d", len(args)+1)), append(args, *v)
+	if v := find.CreatedAtBefore; v != nil {
+		where, args = append(where, fmt.Sprintf("plan.created_at < $%d", len(args)+1)), append(args, *v)
 	}
-	if v := find.CreatedTsAfter; v != nil {
-		where, args = append(where, fmt.Sprintf("plan.created_ts > $%d", len(args)+1)), append(args, *v)
+	if v := find.CreatedAtAfter; v != nil {
+		where, args = append(where, fmt.Sprintf("plan.created_at > $%d", len(args)+1)), append(args, *v)
 	}
 	if v := find.NoIssue; v {
 		where = append(where, "issue.id IS NULL")
@@ -166,17 +158,15 @@ func (s *Store) ListPlans(ctx context.Context, find *FindPlanMessage) ([]*PlanMe
 		SELECT
 			plan.id,
 			plan.creator_id,
-			plan.created_ts,
-			plan.updater_id,
-			plan.updated_ts,
-			project.resource_id,
+			plan.created_at,
+			plan.updated_at,
+			plan.project,
 			plan.pipeline_id,
 			plan.name,
 			plan.description,
 			plan.config,
 			COALESCE(plan_check_run_status_count.status_count, '{}'::jsonb)
 		FROM plan
-		LEFT JOIN project on plan.project_id = project.id
 		LEFT JOIN issue on plan.id = issue.plan_id
 		LEFT JOIN LATERAL (
 			SELECT
@@ -226,9 +216,8 @@ func (s *Store) ListPlans(ctx context.Context, find *FindPlanMessage) ([]*PlanMe
 		if err := rows.Scan(
 			&plan.UID,
 			&plan.CreatorUID,
-			&plan.CreatedTs,
-			&plan.UpdaterUID,
-			&plan.UpdatedTs,
+			&plan.CreatedAt,
+			&plan.UpdatedAt,
 			&plan.ProjectID,
 			&plan.PipelineUID,
 			&plan.Name,
@@ -259,7 +248,7 @@ func (s *Store) ListPlans(ctx context.Context, find *FindPlanMessage) ([]*PlanMe
 
 // UpdatePlan updates an existing plan.
 func (s *Store) UpdatePlan(ctx context.Context, patch *UpdatePlanMessage) error {
-	set, args := []string{"updater_id = $1", "updated_ts = $2"}, []any{patch.UpdaterID, time.Now().Unix()}
+	set, args := []string{"updated_at = $1"}, []any{time.Now()}
 	if v := patch.Name; v != nil {
 		set, args = append(set, fmt.Sprintf("name = $%d", len(args)+1)), append(args, *v)
 	}

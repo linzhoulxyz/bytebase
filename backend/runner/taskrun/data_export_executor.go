@@ -42,7 +42,6 @@ type DataExportExecutor struct {
 
 // RunOnce will run the data export task executor once.
 func (exec *DataExportExecutor) RunOnce(ctx context.Context, _ context.Context, task *store.TaskMessage, _ int) (terminated bool, result *storepb.TaskRunResult, err error) {
-	ctx = context.WithValue(ctx, common.PrincipalIDContextKey, task.CreatorID)
 	payload := &storepb.TaskDatabaseDataExportPayload{}
 	if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(task.Payload), payload); err != nil {
 		return true, nil, errors.Wrap(err, "invalid database data export payload")
@@ -53,7 +52,7 @@ func (exec *DataExportExecutor) RunOnce(ctx context.Context, _ context.Context, 
 		return true, nil, errors.Wrapf(err, "failed to get issue")
 	}
 
-	database, err := exec.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{UID: task.DatabaseID, ShowDeleted: true})
+	database, err := exec.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{InstanceID: &task.InstanceID, DatabaseName: task.DatabaseName, ShowDeleted: true})
 	if err != nil {
 		return true, nil, errors.Wrapf(err, "failed to get database")
 	}

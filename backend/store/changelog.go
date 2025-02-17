@@ -3,12 +3,17 @@ package store
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	"google.golang.org/protobuf/encoding/protojson"
 
+	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/checker/decls"
 	"github.com/pkg/errors"
+
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 
 	"github.com/bytebase/bytebase/backend/common"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
@@ -23,17 +28,17 @@ const (
 )
 
 type ChangelogMessage struct {
-	DatabaseUID int
-	Payload     *storepb.ChangelogPayload
+	InstanceID   string
+	DatabaseName string
+	Payload      *storepb.ChangelogPayload
 
 	PrevSyncHistoryUID *int64
 	SyncHistoryUID     *int64
 	Status             ChangelogStatus
 
 	// output only
-	UID         int64
-	CreatorUID  int
-	CreatedTime time.Time
+	UID       int64
+	CreatedAt time.Time
 
 	PrevSchema    string
 	Schema        string
@@ -42,8 +47,9 @@ type ChangelogMessage struct {
 }
 
 type FindChangelogMessage struct {
-	UID         *int64
-	DatabaseUID *int
+	UID          *int64
+	InstanceID   *string
+	DatabaseName *string
 
 	TypeList        []string
 	Status          *ChangelogStatus
@@ -65,11 +71,11 @@ type UpdateChangelogMessage struct {
 	Status         *ChangelogStatus
 }
 
-func (s *Store) CreateChangelog(ctx context.Context, create *ChangelogMessage, creatorUID int) (int64, error) {
+func (s *Store) CreateChangelog(ctx context.Context, create *ChangelogMessage) (int64, error) {
 	query := `
 		INSERT INTO changelog (
-			creator_id,
-			database_id,
+			instance,
+			db_name,
 			status,
 			prev_sync_history_id,
 			sync_history_id,
@@ -97,7 +103,7 @@ func (s *Store) CreateChangelog(ctx context.Context, create *ChangelogMessage, c
 	}
 
 	var id int64
-	if err := tx.QueryRowContext(ctx, query, creatorUID, create.DatabaseUID, create.Status, create.PrevSyncHistoryUID, create.SyncHistoryUID, p).Scan(&id); err != nil {
+	if err := tx.QueryRowContext(ctx, query, create.InstanceID, create.DatabaseName, create.Status, create.PrevSyncHistoryUID, create.SyncHistoryUID, p).Scan(&id); err != nil {
 		return 0, errors.Wrapf(err, "failed to insert")
 	}
 
@@ -156,8 +162,11 @@ func (s *Store) ListChangelogs(ctx context.Context, find *FindChangelogMessage) 
 	if v := find.UID; v != nil {
 		where, args = append(where, fmt.Sprintf("changelog.id = $%d", len(args)+1)), append(args, *v)
 	}
-	if v := find.DatabaseUID; v != nil {
-		where, args = append(where, fmt.Sprintf("changelog.database_id = $%d", len(args)+1)), append(args, *v)
+	if v := find.InstanceID; v != nil {
+		where, args = append(where, fmt.Sprintf("changelog.instance = $%d", len(args)+1)), append(args, *v)
+	}
+	if v := find.DatabaseName; v != nil {
+		where, args = append(where, fmt.Sprintf("changelog.db_name = $%d", len(args)+1)), append(args, *v)
 	}
 	if v := find.ResourcesFilter; v != nil {
 		text, err := generateResourceFilter(*v, "changelog.payload")
@@ -199,9 +208,9 @@ func (s *Store) ListChangelogs(ctx context.Context, find *FindChangelogMessage) 
 	query := fmt.Sprintf(`
 		SELECT
 			changelog.id,
-			changelog.creator_id,
-			changelog.created_ts,
-			changelog.database_id,
+			changelog.created_at,
+			changelog.instance,
+			changelog.db_name,
 			changelog.status,
 			changelog.prev_sync_history_id,
 			changelog.sync_history_id,
@@ -244,9 +253,9 @@ func (s *Store) ListChangelogs(ctx context.Context, find *FindChangelogMessage) 
 
 		if err := rows.Scan(
 			&c.UID,
-			&c.CreatorUID,
-			&c.CreatedTime,
-			&c.DatabaseUID,
+			&c.CreatedAt,
+			&c.InstanceID,
+			&c.DatabaseName,
 			&c.Status,
 			&c.PrevSyncHistoryUID,
 			&c.SyncHistoryUID,
@@ -285,4 +294,221 @@ func (s *Store) GetChangelog(ctx context.Context, find *FindChangelogMessage) (*
 		return nil, errors.Errorf("found %d changelogs with find %v, expect 1", len(changelogs), *find)
 	}
 	return changelogs[0], nil
+}
+
+type resourceDatabase struct {
+	name    string
+	schemas schemaMap
+}
+
+type databaseMap map[string]*resourceDatabase
+
+type resourceSchema struct {
+	name   string
+	tables tableMap
+}
+
+type schemaMap map[string]*resourceSchema
+
+type resourceTable struct {
+	name string
+}
+
+type tableMap map[string]*resourceTable
+
+// The CEL filter MUST be a Disjunctive Normal Form (DNF) expression.
+// In other words, the CEL expression consists of several parts connected by OR operators.
+// For example, the following expression is valid:
+// (
+//
+//	tableExists("db", "public", "table1") &&
+//	tableExists("db", "public", "table2")
+//
+// ) || (
+//
+//	tableExists("db", "public", "table3")
+//
+// )
+// .
+func generateResourceFilter(filter string, jsonbFieldName string) (string, error) {
+	env, err := cel.NewEnv(
+		cel.Declarations(
+			decls.NewFunction("tableExists", decls.NewOverload("tableExists_string", []*exprpb.Type{decls.String, decls.String, decls.String}, decls.Bool)),
+		),
+	)
+	if err != nil {
+		return "", err
+	}
+
+	ast, iss := env.Compile(filter)
+	if iss != nil && iss.Err() != nil {
+		return "", iss.Err()
+	}
+
+	rewriter := &expressionRewriter{
+		metaMap: make(databaseMap),
+	}
+
+	parsedExpr, err := cel.AstToParsedExpr(ast)
+	if err != nil {
+		return "", err
+	}
+	if err := rewriter.rewriteExpression(parsedExpr.Expr); err != nil {
+		return "", err
+	}
+
+	if len(rewriter.metaMap) != 0 {
+		if err := rewriter.appendDNFPart(); err != nil {
+			return "", err
+		}
+	}
+
+	if len(rewriter.dnfParts) == 0 {
+		return "", nil
+	}
+
+	var buf strings.Builder
+	if len(rewriter.dnfParts) > 1 {
+		if _, err := buf.WriteString("("); err != nil {
+			return "", err
+		}
+	}
+	for i, part := range rewriter.dnfParts {
+		if i > 0 {
+			if _, err := buf.WriteString(" OR "); err != nil {
+				return "", err
+			}
+		}
+		if _, err := buf.WriteString(fmt.Sprintf("(%s @> '", jsonbFieldName)); err != nil {
+			return "", err
+		}
+		if _, err := buf.WriteString(part); err != nil {
+			return "", err
+		}
+		if _, err := buf.WriteString("'::jsonb)"); err != nil {
+			return "", err
+		}
+	}
+	if len(rewriter.dnfParts) > 1 {
+		if _, err := buf.WriteString(")"); err != nil {
+			return "", err
+		}
+	}
+	return buf.String(), nil
+}
+
+type expressionRewriter struct {
+	metaMap  databaseMap
+	dnfParts []string
+}
+
+func (r *expressionRewriter) appendDNFPart() error {
+	if r.metaMap == nil {
+		return nil
+	}
+
+	defer func() {
+		r.metaMap = make(databaseMap)
+	}()
+
+	var meta storepb.ChangedResources
+	for _, dbMeta := range r.metaMap {
+		db := &storepb.ChangedResourceDatabase{
+			Name: dbMeta.name,
+		}
+		for _, schemaMeta := range dbMeta.schemas {
+			schema := &storepb.ChangedResourceSchema{
+				Name: schemaMeta.name,
+			}
+			for _, tableMeta := range schemaMeta.tables {
+				table := &storepb.ChangedResourceTable{
+					Name: tableMeta.name,
+				}
+				schema.Tables = append(schema.Tables, table)
+			}
+			sort.Slice(schema.Tables, func(i, j int) bool {
+				return schema.Tables[i].Name < schema.Tables[j].Name
+			})
+			db.Schemas = append(db.Schemas, schema)
+		}
+		sort.Slice(db.Schemas, func(i, j int) bool {
+			return db.Schemas[i].Name < db.Schemas[j].Name
+		})
+		meta.Databases = append(meta.Databases, db)
+	}
+	sort.Slice(meta.Databases, func(i, j int) bool {
+		return meta.Databases[i].Name < meta.Databases[j].Name
+	})
+
+	text, err := protojson.Marshal(&storepb.InstanceChangeHistoryPayload{
+		ChangedResources: &meta,
+	})
+	if err != nil {
+		return err
+	}
+	r.dnfParts = append(r.dnfParts, string(text))
+	return nil
+}
+
+func (r *expressionRewriter) rewriteExpression(expr *exprpb.Expr) error {
+	switch e := expr.ExprKind.(type) {
+	case *exprpb.Expr_CallExpr:
+		switch e.CallExpr.Function {
+		case "_||_":
+			for _, arg := range e.CallExpr.Args {
+				if err := r.rewriteExpression(arg); err != nil {
+					return err
+				}
+				if err := r.appendDNFPart(); err != nil {
+					return err
+				}
+			}
+		case "_&&_":
+			for _, arg := range e.CallExpr.Args {
+				if err := r.rewriteExpression(arg); err != nil {
+					return err
+				}
+			}
+		case "tableExists":
+			if len(e.CallExpr.Args) != 3 {
+				return errors.Errorf("invalid tableExists function call: %v, expected three arguments buf got %d", e.CallExpr, len(e.CallExpr.Args))
+			}
+			var args []string
+			for _, arg := range e.CallExpr.Args {
+				switch a := arg.ExprKind.(type) {
+				case *exprpb.Expr_ConstExpr:
+					switch a.ConstExpr.ConstantKind.(type) {
+					case *exprpb.Constant_StringValue:
+						args = append(args, a.ConstExpr.GetStringValue())
+					default:
+						return errors.Errorf("invalid tableExists function call: %v, expected string arguments buf got %v", e.CallExpr, arg)
+					}
+				default:
+					return errors.Errorf("invalid tableExists function call: %v, expected constant arguments buf got %v", e.CallExpr, arg)
+				}
+			}
+			database, ok := r.metaMap[args[0]]
+			if !ok {
+				database = &resourceDatabase{
+					name:    args[0],
+					schemas: make(schemaMap),
+				}
+				r.metaMap[args[0]] = database
+			}
+			schema, ok := database.schemas[args[1]]
+			if !ok {
+				schema = &resourceSchema{
+					name:   args[1],
+					tables: make(tableMap),
+				}
+				database.schemas[args[1]] = schema
+			}
+			schema.tables[args[2]] = &resourceTable{
+				name: args[2],
+			}
+		}
+	default:
+		return errors.Errorf("invalid expression: %v", expr)
+	}
+	return nil
 }

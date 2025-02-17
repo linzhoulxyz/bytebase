@@ -6,12 +6,10 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/pkg/errors"
 
@@ -44,10 +42,6 @@ func NewVCSConnectorService(store *store.Store) *VCSConnectorService {
 func (s *VCSConnectorService) CreateVCSConnector(ctx context.Context, request *v1pb.CreateVCSConnectorRequest) (*v1pb.VCSConnector, error) {
 	if request.VcsConnector == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "vcs connector must be set")
-	}
-	principalID, ok := ctx.Value(common.PrincipalIDContextKey).(int)
-	if !ok {
-		return nil, status.Errorf(codes.Internal, "principal ID not found")
 	}
 
 	setting, err := s.store.GetWorkspaceGeneralSetting(ctx)
@@ -122,11 +116,9 @@ func (s *VCSConnectorService) CreateVCSConnector(ctx context.Context, request *v
 		return nil, status.Errorf(codes.Internal, "failed to generate random secret token for vcs with error: %v", err.Error())
 	}
 	vcsConnectorCreate := &store.VCSConnectorMessage{
-		ProjectID:     project.ResourceID,
-		ResourceID:    request.VcsConnectorId,
-		CreatorID:     principalID,
-		VCSUID:        vcsProvider.ID,
-		VCSResourceID: vcsProvider.ResourceID,
+		ProjectID:  project.ResourceID,
+		ResourceID: request.VcsConnectorId,
+		VCSID:      vcsProvider.ResourceID,
 		Payload: &storepb.VCSConnector{
 			Title:              request.GetVcsConnector().Title,
 			FullPath:           request.GetVcsConnector().FullPath,
@@ -162,7 +154,7 @@ func (s *VCSConnectorService) CreateVCSConnector(ctx context.Context, request *v
 	if err != nil {
 		return nil, err
 	}
-	v1VCSConnector, err := convertStoreVCSConnector(ctx, s.store, vcsConnector)
+	v1VCSConnector, err := convertStoreVCSConnector(vcsConnector)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +184,7 @@ func (s *VCSConnectorService) GetVCSConnector(ctx context.Context, request *v1pb
 	if vcsConnector == nil {
 		return nil, status.Errorf(codes.NotFound, "vcs connector %q not found", vcsConnectorID)
 	}
-	v1VCSConnector, err := convertStoreVCSConnector(ctx, s.store, vcsConnector)
+	v1VCSConnector, err := convertStoreVCSConnector(vcsConnector)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +214,7 @@ func (s *VCSConnectorService) ListVCSConnectors(ctx context.Context, request *v1
 
 	resp := &v1pb.ListVCSConnectorsResponse{}
 	for _, vcsConnector := range vcsConnectors {
-		v1VCSConnector, err := convertStoreVCSConnector(ctx, s.store, vcsConnector)
+		v1VCSConnector, err := convertStoreVCSConnector(vcsConnector)
 		if err != nil {
 			return nil, err
 		}
@@ -262,22 +254,17 @@ func (s *VCSConnectorService) UpdateVCSConnector(ctx context.Context, request *v
 		return nil, status.Errorf(codes.NotFound, "vcs connector %q not found", vcsConnectorID)
 	}
 
-	vcsProvider, err := s.store.GetVCSProvider(ctx, &store.FindVCSProviderMessage{ResourceID: &vcsConnector.VCSResourceID})
+	vcsProvider, err := s.store.GetVCSProvider(ctx, &store.FindVCSProviderMessage{ResourceID: &vcsConnector.VCSID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to find vcs: %s", err.Error())
 	}
 	if vcsProvider == nil {
-		return nil, status.Errorf(codes.NotFound, "vcs provider %s not found", vcsConnector.VCSResourceID)
+		return nil, status.Errorf(codes.NotFound, "vcs provider %s not found", vcsConnector.VCSID)
 	}
 
-	user, ok := ctx.Value(common.UserContextKey).(*store.UserMessage)
-	if !ok {
-		return nil, status.Errorf(codes.Internal, "user not found")
-	}
 	update := &store.UpdateVCSConnectorMessage{
-		ProjectID: project.ResourceID,
-		UpdaterID: user.ID,
-		UID:       vcsConnector.UID,
+		ProjectID:  project.ResourceID,
+		ResourceID: vcsConnector.ResourceID,
 	}
 
 	for _, path := range request.UpdateMask.Paths {
@@ -315,7 +302,7 @@ func (s *VCSConnectorService) UpdateVCSConnector(ctx context.Context, request *v
 		return nil, err
 	}
 
-	v1VCSConnector, err := convertStoreVCSConnector(ctx, s.store, vcsConnector)
+	v1VCSConnector, err := convertStoreVCSConnector(vcsConnector)
 	if err != nil {
 		return nil, err
 	}
@@ -346,12 +333,12 @@ func (s *VCSConnectorService) DeleteVCSConnector(ctx context.Context, request *v
 		return nil, status.Errorf(codes.NotFound, "vcs connector %q not found", vcsConnectorID)
 	}
 
-	vcsProvider, err := s.store.GetVCSProvider(ctx, &store.FindVCSProviderMessage{ResourceID: &vcsConnector.VCSResourceID})
+	vcsProvider, err := s.store.GetVCSProvider(ctx, &store.FindVCSProviderMessage{ResourceID: &vcsConnector.VCSID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to find vcs: %s", err.Error())
 	}
 	if vcsProvider == nil {
-		return nil, status.Errorf(codes.NotFound, "vcs provider %d not found", vcsConnector.UID)
+		return nil, status.Errorf(codes.NotFound, "vcs provider %s not found", vcsConnector.VCSID)
 	}
 
 	if err := s.store.DeleteVCSConnector(ctx, project.ResourceID, vcsConnectorID); err != nil {
@@ -377,30 +364,11 @@ func (s *VCSConnectorService) DeleteVCSConnector(ctx context.Context, request *v
 	return &emptypb.Empty{}, nil
 }
 
-func convertStoreVCSConnector(ctx context.Context, stores *store.Store, vcsConnector *store.VCSConnectorMessage) (*v1pb.VCSConnector, error) {
-	creator, err := stores.GetUserByID(ctx, vcsConnector.CreatorID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get creator: %v", err)
-	}
-	if creator == nil {
-		return nil, status.Errorf(codes.NotFound, "cannot find the creator: %d", vcsConnector.CreatorID)
-	}
-	updater, err := stores.GetUserByID(ctx, vcsConnector.UpdaterID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get updater: %v", err)
-	}
-	if updater == nil {
-		return nil, status.Errorf(codes.NotFound, "cannot find the updater: %d", vcsConnector.UpdaterID)
-	}
-
+func convertStoreVCSConnector(vcsConnector *store.VCSConnectorMessage) (*v1pb.VCSConnector, error) {
 	v1VCSConnector := &v1pb.VCSConnector{
 		Name:          fmt.Sprintf("%s/%s%s", common.FormatProject(vcsConnector.ProjectID), common.VCSConnectorPrefix, vcsConnector.ResourceID),
-		CreateTime:    timestamppb.New(time.Unix(vcsConnector.CreatedTs, 0)),
-		UpdateTime:    timestamppb.New(time.Unix(vcsConnector.UpdatedTs, 0)),
-		Creator:       fmt.Sprintf("users/%s", creator.Email),
-		Updater:       fmt.Sprintf("users/%s", updater.Email),
 		Title:         vcsConnector.Payload.Title,
-		VcsProvider:   fmt.Sprintf("%s%s", common.VCSProviderPrefix, vcsConnector.VCSResourceID),
+		VcsProvider:   fmt.Sprintf("%s%s", common.VCSProviderPrefix, vcsConnector.VCSID),
 		ExternalId:    vcsConnector.Payload.ExternalId,
 		BaseDirectory: vcsConnector.Payload.BaseDirectory,
 		Branch:        vcsConnector.Payload.Branch,
