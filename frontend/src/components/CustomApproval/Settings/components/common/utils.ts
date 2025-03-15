@@ -1,12 +1,16 @@
 import { uniq, without } from "lodash-es";
+import { CheckIcon } from "lucide-vue-next";
 import type { SelectOption } from "naive-ui";
+import { h, type VNode } from "vue";
+import { type OptionConfig } from "@/components/ExprEditor/context";
 import { type Factor, SQLTypeList } from "@/plugins/cel";
 import { t } from "@/plugins/i18n";
-import { useEnvironmentV1Store, useProjectV1List } from "@/store";
+import { useEnvironmentV1Store, useProjectV1Store } from "@/store";
 import {
   PresetRiskLevelList,
   DEFAULT_PROJECT_NAME,
   useSupportedSourceList,
+  type ComposedProject,
 } from "@/types";
 import type { Risk } from "@/types/proto/v1/risk_service";
 import { Risk_Source, risk_SourceToJSON } from "@/types/proto/v1/risk_service";
@@ -78,110 +82,138 @@ const StringFactorList = [
   "table_name",
 ] as const;
 
-const FactorList = {
-  DDL: uniq(
-    without(
-      [...NumberFactorList, ...StringFactorList],
-      "level",
-      "source",
-      "expiration_days",
-      "export_rows"
-    )
-  ),
-  DML: uniq(
-    without(
-      [...NumberFactorList, ...StringFactorList],
-      "level",
-      "source",
-      "expiration_days",
-      "export_rows"
-    )
-  ),
-  CreateDatabase: without(
-    [...StringFactorList],
-    "sql_type",
-    "table_name",
-    "expiration_days",
-    "export_rows"
-  ),
-  DataExport: uniq(
-    without(
-      [...StringFactorList, ...NumberFactorList],
-      "level",
-      "affected_rows",
-      "table_rows",
-      "source",
-      "sql_type",
-      "table_name",
-      "expiration_days",
-      "export_rows"
-    )
-  ),
-  RequestQuery: uniq(
-    without(
-      [...StringFactorList, ...NumberFactorList],
-      "level",
-      "source",
-      "affected_rows",
-      "table_rows",
-      "sql_type",
-      "table_name",
-      "export_rows"
-    )
-  ),
-  RequestExport: uniq(
-    without(
-      [...StringFactorList, ...NumberFactorList],
-      "level",
-      "source",
-      "affected_rows",
-      "table_rows",
-      "sql_type",
-      "table_name"
-    )
-  ),
-};
+export const RiskSourceFactorMap: Map<Risk_Source, string[]> = new Map([
+  [
+    Risk_Source.DDL,
+    uniq(
+      without(
+        [...NumberFactorList, ...StringFactorList, "sql_statement"],
+        "level",
+        "source",
+        "expiration_days",
+        "export_rows"
+      )
+    ),
+  ],
+  [
+    Risk_Source.DML,
+    uniq(
+      without(
+        [...NumberFactorList, ...StringFactorList, "sql_statement"],
+        "level",
+        "source",
+        "expiration_days",
+        "export_rows"
+      )
+    ),
+  ],
+  [
+    Risk_Source.CREATE_DATABASE,
+    uniq(
+      without(
+        [...StringFactorList],
+        "sql_type",
+        "table_name",
+        "expiration_days",
+        "export_rows"
+      )
+    ),
+  ],
+  [
+    Risk_Source.DATA_EXPORT,
+    uniq(
+      without(
+        [...StringFactorList, ...NumberFactorList],
+        "level",
+        "affected_rows",
+        "table_rows",
+        "source",
+        "sql_type",
+        "table_name",
+        "expiration_days",
+        "export_rows"
+      )
+    ),
+  ],
+  [
+    Risk_Source.REQUEST_QUERY,
+    uniq(
+      without(
+        [...StringFactorList, ...NumberFactorList],
+        "level",
+        "source",
+        "affected_rows",
+        "table_rows",
+        "sql_type",
+        "table_name",
+        "export_rows"
+      )
+    ),
+  ],
+  [
+    Risk_Source.REQUEST_EXPORT,
+    uniq(
+      without(
+        [...StringFactorList, ...NumberFactorList],
+        "level",
+        "source",
+        "affected_rows",
+        "table_rows",
+        "sql_type",
+        "table_name"
+      )
+    ),
+  ],
+]);
 
 export const getFactorList = (source: Risk_Source) => {
-  switch (source) {
-    case Risk_Source.DDL:
-      return [...FactorList.DDL];
-    case Risk_Source.DML:
-      return [...FactorList.DML];
-    case Risk_Source.CREATE_DATABASE:
-      return [...FactorList.CreateDatabase];
-    case Risk_Source.DATA_EXPORT:
-      return [...FactorList.DataExport];
-    case Risk_Source.REQUEST_QUERY:
-      return [...FactorList.RequestQuery];
-    case Risk_Source.REQUEST_EXPORT:
-      return [...FactorList.RequestExport];
-    default:
-      // unsupported namespace
-      return [];
-  }
+  return RiskSourceFactorMap.get(source) ?? [];
 };
 
-const getEnvironmentIdOptions = () => {
+export const getRenderOptionFunc = (resource: {
+  title: string;
+  name: string;
+}): ((info: { node: VNode; selected: boolean }) => VNode) => {
+  return (info: { node: VNode; selected: boolean }) => {
+    return h(
+      info.node,
+      { class: "flex items-center justify-between space-x-4" },
+      [
+        h("div", { class: "flex flex-col px-1 py-1 z-10" }, [
+          h(
+            "div",
+            { class: `textlabel ${info.selected ? "!text-accent" : ""}` },
+            resource.title
+          ),
+          h("div", { class: "opacity-60 textinfolabel" }, resource.name),
+        ]),
+        info.selected ? h(CheckIcon, { class: "w-4 z-10" }) : undefined,
+      ]
+    );
+  };
+};
+
+export const getEnvironmentIdOptions = () => {
   const environmentList = useEnvironmentV1Store().getEnvironmentList();
   return environmentList.map<SelectOption>((env) => {
-    const environmentName = extractEnvironmentResourceName(env.name);
+    const environmentId = extractEnvironmentResourceName(env.name);
     return {
-      label: environmentName,
-      value: environmentName,
+      label: `${env.title} (${environmentId})`,
+      value: environmentId,
+      render: getRenderOptionFunc(env),
     };
   });
 };
 
-const getProjectIdOptions = () => {
-  const { projectList } = useProjectV1List();
-  return projectList.value
+export const getProjectIdOptions = (projects: ComposedProject[]) => {
+  return projects
     .filter((proj) => proj.name != DEFAULT_PROJECT_NAME)
     .map<SelectOption>((proj) => {
       const projectId = extractProjectResourceName(proj.name);
       return {
-        label: `${projectId} (${proj.title})`,
+        label: `${proj.title} (${projectId})`,
         value: projectId,
+        render: getRenderOptionFunc(proj),
       };
     });
 };
@@ -224,7 +256,7 @@ const getSQLTypeOptions = (source: Risk_Source) => {
   return [];
 };
 
-export const getFactorOptionsMap = (source: Risk_Source) => {
+export const getOptionConfigMap = (source: Risk_Source) => {
   const factorList = getFactorList(source);
   return factorList.reduce((map, factor) => {
     let options: SelectOption[] = [];
@@ -233,8 +265,17 @@ export const getFactorOptionsMap = (source: Risk_Source) => {
         options = getEnvironmentIdOptions();
         break;
       case "project_id":
-        options = getProjectIdOptions();
-        break;
+        const projectStore = useProjectV1Store();
+        map.set(factor, {
+          remote: true,
+          options: getProjectIdOptions(projectStore.getProjectList()),
+          search: async (keyword: string) => {
+            return projectStore
+              .fetchProjectList({ query: keyword })
+              .then((resp) => getProjectIdOptions(resp.projects));
+          },
+        });
+        return map;
       case "db_engine":
         options = getDBEndingOptions();
         break;
@@ -248,9 +289,12 @@ export const getFactorOptionsMap = (source: Risk_Source) => {
         options = getSQLTypeOptions(source);
         break;
     }
-    map.set(factor, options);
+    map.set(factor, {
+      remote: false,
+      options,
+    });
     return map;
-  }, new Map<Factor, SelectOption[]>());
+  }, new Map<Factor, OptionConfig>());
 };
 
 export const factorSupportDropdown: Factor[] = [

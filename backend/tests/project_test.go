@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
-	"github.com/bytebase/bytebase/backend/tests/fake"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
@@ -15,11 +14,7 @@ func TestArchiveProject(t *testing.T) {
 	a := require.New(t)
 	ctx := context.Background()
 	ctl := &controller{}
-	dataDir := t.TempDir()
-	ctx, err := ctl.StartServerWithExternalPg(ctx, &config{
-		dataDir:            dataDir,
-		vcsProviderCreator: fake.NewGitLab,
-	})
+	ctx, err := ctl.StartServerWithExternalPg(ctx)
 	a.NoError(err)
 	defer ctl.Close(ctx)
 
@@ -43,7 +38,7 @@ func TestArchiveProject(t *testing.T) {
 
 	t.Run("ArchiveProjectWithDatbase", func(_ *testing.T) {
 		databaseName := "db1"
-		err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil /* environment */, databaseName, "", nil)
+		err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil /* environment */, databaseName, "")
 		a.NoError(err)
 
 		_, err = ctl.projectServiceClient.DeleteProject(ctx, &v1pb.DeleteProjectRequest{

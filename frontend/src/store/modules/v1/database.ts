@@ -9,7 +9,6 @@ import {
   unknownEnvironment,
   unknownInstanceResource,
 } from "@/types";
-import { DEFAULT_PROJECT_NAME } from "@/types";
 import type {
   Database,
   UpdateDatabaseRequest,
@@ -17,12 +16,49 @@ import type {
   BatchUpdateDatabasesRequest,
 } from "@/types/proto/v1/database_service";
 import type { InstanceResource } from "@/types/proto/v1/instance_service";
-import { extractDatabaseResourceName, hasProjectPermissionV2 } from "@/utils";
+import {
+  extractDatabaseResourceName,
+  hasProjectPermissionV2,
+  hasWorkspacePermissionV2,
+} from "@/utils";
+import {
+  instanceNamePrefix,
+  projectNamePrefix,
+  workspaceNamePrefix,
+} from "./common";
+import { useDBSchemaV1Store } from "./dbSchema";
 import { useEnvironmentV1Store } from "./environment";
-import { useProjectV1Store } from "./project";
+import { batchGetOrFetchProjects, useProjectV1Store } from "./project";
+
+const formatListDatabaseParent = async (
+  parent: string
+): Promise<{ parent: string; filter?: string }> => {
+  if (parent.startsWith(projectNamePrefix)) {
+    const project = await useProjectV1Store().getOrFetchProjectByName(parent);
+    if (!hasProjectPermissionV2(project, "bb.projects.get")) {
+      return {
+        parent: `${workspaceNamePrefix}-`,
+        filter: `project == "${parent}"`,
+      };
+    }
+    return { parent };
+  }
+  if (parent.startsWith(instanceNamePrefix)) {
+    if (!hasWorkspacePermissionV2("bb.instances.get")) {
+      return {
+        parent: `${workspaceNamePrefix}-`,
+        filter: `instance == "${parent}"`,
+      };
+    }
+    return { parent };
+  }
+  return { parent: `${workspaceNamePrefix}-` };
+};
 
 export const useDatabaseV1Store = defineStore("database_v1", () => {
   const databaseMapByName = reactive(new Map<string, ComposedDatabase>());
+  const dbSchemaStore = useDBSchemaV1Store();
+  const databaseRequestCache = new Map<string, Promise<ComposedDatabase>>();
 
   // Getters
   const databaseList = computed(() => {
@@ -38,8 +74,42 @@ export const useDatabaseV1Store = defineStore("database_v1", () => {
     for (const db of databaseList.value) {
       if (db.instance === instance) {
         databaseMapByName.delete(db.name);
+        dbSchemaStore.removeCache(db.name);
       }
     }
+  };
+
+  const fetchDatabases = async (params: {
+    pageSize: number;
+    pageToken?: string;
+    parent: string;
+    filter?: string;
+    showDeleted?: boolean;
+  }): Promise<{
+    databases: ComposedDatabase[];
+    nextPageToken: string;
+  }> => {
+    const { parent, filter } = await formatListDatabaseParent(params.parent);
+
+    const { databases, nextPageToken } =
+      await databaseServiceClient.listDatabases({
+        ...params,
+        parent,
+        filter: filter
+          ? params.filter
+            ? `${params.filter} && ${filter}`
+            : filter
+          : params.filter,
+      });
+    if (parent.startsWith(instanceNamePrefix)) {
+      removeCacheByInstance(parent);
+    }
+
+    const composedDatabases = await upsertDatabaseMap(databases);
+    return {
+      databases: composedDatabases,
+      nextPageToken,
+    };
   };
 
   const upsertDatabaseMap = async (databaseList: Database[]) => {
@@ -70,23 +140,9 @@ export const useDatabaseV1Store = defineStore("database_v1", () => {
       await fetchDatabaseByName(database);
     }
   };
-  const databaseListByUser = computed(() => {
-    return databaseList.value.filter((db) => {
-      if (hasProjectPermissionV2(db.projectEntity, "bb.databases.get"))
-        return true;
-      return false;
-    });
-  });
+  // TODO(ed): deprecate it.
   const databaseListByProject = (project: string) => {
     return databaseList.value.filter((db) => db.project === project);
-  };
-  const databaseListByInstance = (instance: string) => {
-    return databaseList.value.filter((db) => db.instance === instance);
-  };
-  const databaseListByEnvironment = (environment: string) => {
-    return databaseList.value.filter(
-      (db) => db.effectiveEnvironment === environment
-    );
   };
   const getDatabaseByName = (name: string) => {
     return databaseMapByName.get(name) ?? unknownDatabase();
@@ -105,13 +161,19 @@ export const useDatabaseV1Store = defineStore("database_v1", () => {
 
     return composed;
   };
-  const getOrFetchDatabaseByName = async (name: string, silent = false) => {
+  const getOrFetchDatabaseByName = async (name: string, silent = true) => {
     const existed = databaseMapByName.get(name);
     if (existed) {
       return existed;
     }
-    await fetchDatabaseByName(name, silent);
-    return getDatabaseByName(name);
+    if (!isValidDatabaseName(name)) {
+      return unknownDatabase();
+    }
+    const cached = databaseRequestCache.get(name);
+    if (cached) return cached;
+    const request = fetchDatabaseByName(name, silent);
+    databaseRequestCache.set(name, request);
+    return request;
   };
   const batchUpdateDatabases = async (params: BatchUpdateDatabasesRequest) => {
     const updated = await databaseServiceClient.batchUpdateDatabases(params);
@@ -123,10 +185,7 @@ export const useDatabaseV1Store = defineStore("database_v1", () => {
     const [composed] = await upsertDatabaseMap([updated]);
     return composed;
   };
-  const fetchDatabaseSchema = async (
-    name: string,
-    sdlFormat = false
-  ) => {
+  const fetchDatabaseSchema = async (name: string, sdlFormat = false) => {
     const schema = await databaseServiceClient.getDatabaseSchema({
       name,
       sdlFormat,
@@ -138,39 +197,12 @@ export const useDatabaseV1Store = defineStore("database_v1", () => {
     return resp;
   };
 
-  const transferDatabases = async (
-    databaseList: Database[],
-    project: string
-  ) => {
-    const updates = databaseList.map((db) => {
-      const databasePatch = {
-        ...db,
-      };
-      databasePatch.project = project;
-      const updateMask = ["project"];
-      return {
-        database: databasePatch,
-        updateMask,
-      } as UpdateDatabaseRequest;
-    });
-
-    const response = await batchUpdateDatabases({
-      parent: "-",
-      requests: updates,
-    });
-    return response;
-  };
-
   return {
     reset,
     removeCacheByInstance,
-    databaseList,
     upsertDatabaseMap,
     syncDatabase,
-    databaseListByUser,
     databaseListByProject,
-    databaseListByInstance,
-    databaseListByEnvironment,
     getDatabaseByName,
     fetchDatabaseByName,
     getOrFetchDatabaseByName,
@@ -179,7 +211,7 @@ export const useDatabaseV1Store = defineStore("database_v1", () => {
     fetchDatabaseSchema,
     updateDatabaseInstance,
     diffSchema,
-    transferDatabases,
+    fetchDatabases,
   };
 });
 
@@ -189,12 +221,10 @@ export const useDatabaseV1ByName = (name: MaybeRef<string>) => {
   watch(
     () => unref(name),
     (name) => {
-      if (!isValidDatabaseName(store.getDatabaseByName(name).name)) {
-        ready.value = false;
-        store.fetchDatabaseByName(name).then(() => {
-          ready.value = true;
-        });
-      }
+      ready.value = false;
+      store.getOrFetchDatabaseByName(name).then(() => {
+        ready.value = true;
+      });
     },
     { immediate: true }
   );
@@ -206,20 +236,26 @@ export const useDatabaseV1ByName = (name: MaybeRef<string>) => {
   };
 };
 
-export const batchComposeDatabase = async (databaseList: Database[]) => {
-  const projectV1Store = useProjectV1Store();
-  const environmentV1Store = useEnvironmentV1Store();
+export const batchGetOrFetchDatabases = async (databaseNames: string[]) => {
+  const store = useDatabaseV1Store();
 
-  const distinctProjectList = uniq(databaseList.map((db) => db.project));
-
+  const distinctDatabaseList = uniq(databaseNames);
   await Promise.all(
-    distinctProjectList.map((project) => {
-      if (project === DEFAULT_PROJECT_NAME) {
+    distinctDatabaseList.map((databaseName) => {
+      if (!databaseName || !isValidDatabaseName(databaseName)) {
         return;
       }
-      return projectV1Store.getOrFetchProjectByName(project);
+      return store.getOrFetchDatabaseByName(databaseName, true /* silent */);
     })
   );
+};
+
+export const batchComposeDatabase = async (databaseList: Database[]) => {
+  const environmentV1Store = useEnvironmentV1Store();
+  const projectV1Store = useProjectV1Store();
+
+  await batchGetOrFetchProjects(databaseList.map((db) => db.project));
+
   return databaseList.map((db) => {
     const composed = db as ComposedDatabase;
     const { databaseName, instance } = extractDatabaseResourceName(db.name);

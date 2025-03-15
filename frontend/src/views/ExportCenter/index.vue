@@ -7,7 +7,6 @@
         <IssueSearch
           v-model:params="state.params"
           class="flex-1"
-          :readonly-scopes="readonlyScopes"
           :override-scope-id-list="overrideSearchScopeIdList"
         >
           <template #searchbox-suffix>
@@ -72,7 +71,7 @@ import { Drawer } from "@/components/v2";
 import PagedTable from "@/components/v2/Model/PagedTable.vue";
 import {
   useCurrentUserV1,
-  useProjectV1Store,
+  useProjectByName,
   useIssueV1Store,
   useRefreshIssueList,
 } from "@/store";
@@ -98,17 +97,16 @@ interface LocalState {
   params: SearchParams;
 }
 
-const specificProject = computed(() => {
-  return projectV1Store.getProjectByName(
-    `${projectNamePrefix}${props.projectId}`
-  );
-});
+const { project: specificProject } = useProjectByName(
+  `${projectNamePrefix}${props.projectId}`
+);
 
 const readonlyScopes = computed((): SearchScope[] => {
   return [
     {
       id: "project",
       value: extractProjectResourceName(specificProject.value.name),
+      readonly: true,
     },
   ];
 });
@@ -122,11 +120,18 @@ const defaultSearchParams = () => {
 };
 
 const currentUser = useCurrentUserV1();
-const projectV1Store = useProjectV1Store();
 const state = reactive<LocalState>({
   showRequestExportPanel: false,
   params: defaultSearchParams(),
 });
+
+watch(
+  () => props.projectId,
+  () => {
+    state.params = defaultSearchParams();
+  }
+);
+
 const issueStore = useIssueV1Store();
 const issuePagedTable =
   ref<ComponentExposed<typeof PagedTable<ComposedIssue>>>();
@@ -200,8 +205,6 @@ const allowExportData = computed(() => {
     return hasPermissionToCreateDataExportIssueInProject(specificProject.value);
   }
 
-  return projectV1Store.projectList.some((project) =>
-    hasPermissionToCreateDataExportIssueInProject(project)
-  );
+  return hasPermissionToCreateDataExportIssueInProject(specificProject.value);
 });
 </script>

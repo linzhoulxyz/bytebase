@@ -3,7 +3,6 @@ package tests
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -12,9 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/testing/protocmp"
 
-	"github.com/bytebase/bytebase/backend/resources/mysql"
-	"github.com/bytebase/bytebase/backend/resources/postgres"
-	"github.com/bytebase/bytebase/backend/tests/fake"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
@@ -24,11 +20,7 @@ func TestSchemaAndDataUpdate(t *testing.T) {
 	a := require.New(t)
 	ctx := context.Background()
 	ctl := &controller{}
-	dataDir := t.TempDir()
-	ctx, err := ctl.StartServerWithExternalPg(ctx, &config{
-		dataDir:            dataDir,
-		vcsProviderCreator: fake.NewGitLab,
-	})
+	ctx, err := ctl.StartServerWithExternalPg(ctx)
 	a.NoError(err)
 	defer ctl.Close(ctx)
 
@@ -52,7 +44,7 @@ func TestSchemaAndDataUpdate(t *testing.T) {
 
 	// Create an issue that creates a database.
 	databaseName := "testSchemaUpdate"
-	err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil /* environment */, databaseName, "", nil /* labelMap */)
+	err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil /* environment */, databaseName, "")
 	a.NoError(err)
 
 	database, err := ctl.databaseServiceClient.GetDatabase(ctx, &v1pb.GetDatabaseRequest{
@@ -231,7 +223,7 @@ CREATE TABLE "public"."book" (
 			wantSDL: ``,
 			wantDatabaseMetadata: &v1pb.DatabaseMetadata{
 				Name:         "instances/latest-schema-postgres/databases/latestSchema/metadata",
-				Owner:        "root",
+				Owner:        "postgres",
 				CharacterSet: "UTF8",
 				Collation:    "en_US.UTF-8",
 				Schemas: []*v1pb.SchemaMetadata{
@@ -241,7 +233,7 @@ CREATE TABLE "public"."book" (
 						Tables: []*v1pb.TableMetadata{
 							{
 								Name:     "book",
-								Owner:    "root",
+								Owner:    "postgres",
 								DataSize: 8192,
 								Columns: []*v1pb.ColumnMetadata{
 									{Name: "id", Position: 1, Nullable: true, Type: "integer"},
@@ -257,10 +249,7 @@ CREATE TABLE "public"."book" (
 	a := require.New(t)
 	ctx := context.Background()
 	ctl := &controller{}
-	ctx, err := ctl.StartServerWithExternalPg(ctx, &config{
-		dataDir:            t.TempDir(),
-		vcsProviderCreator: fake.NewGitLab,
-	})
+	ctx, err := ctl.StartServerWithExternalPg(ctx)
 	a.NoError(err)
 	defer func() {
 		_ = ctl.Close(ctx)
@@ -275,22 +264,15 @@ CREATE TABLE "public"."book" (
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			dbPort := getTestPort()
-			switch test.dbType {
-			case storepb.Engine_POSTGRES:
-				stopInstance := postgres.SetupTestInstance(pgBinDir, t.TempDir(), dbPort)
-				defer stopInstance()
-			case storepb.Engine_MYSQL:
-				stopInstance := mysql.SetupTestInstance(t, dbPort, mysqlBinDir)
-				defer stopInstance()
-			default:
-				a.FailNow("unsupported db type")
-			}
-
-			// Add an instance.
+			a := require.New(t)
 			var instance *v1pb.Instance
 			switch test.dbType {
 			case storepb.Engine_POSTGRES:
+				pgContainer, err := getPgContainer(ctx)
+				defer func() {
+					pgContainer.Close(ctx)
+				}()
+				a.NoError(err)
 				instance, err = ctl.instanceServiceClient.CreateInstance(ctx, &v1pb.CreateInstanceRequest{
 					InstanceId: test.instanceID,
 					Instance: &v1pb.Instance{
@@ -298,10 +280,17 @@ CREATE TABLE "public"."book" (
 						Engine:      v1pb.Engine_POSTGRES,
 						Environment: environment.Name,
 						Activation:  true,
-						DataSources: []*v1pb.DataSource{{Type: v1pb.DataSourceType_ADMIN, Host: "/tmp", Port: strconv.Itoa(dbPort), Username: "root", Id: "admin"}},
+						DataSources: []*v1pb.DataSource{{Type: v1pb.DataSourceType_ADMIN, Host: pgContainer.host, Port: pgContainer.port, Username: "postgres", Password: "root-password", Id: "admin"}},
 					},
 				})
+				a.NoError(err)
 			case storepb.Engine_MYSQL:
+				mysqlContainer, err := getMySQLContainer(ctx)
+				defer func() {
+					mysqlContainer.Close(ctx)
+				}()
+				a.NoError(err)
+
 				instance, err = ctl.instanceServiceClient.CreateInstance(ctx, &v1pb.CreateInstanceRequest{
 					InstanceId: test.instanceID,
 					Instance: &v1pb.Instance{
@@ -309,15 +298,15 @@ CREATE TABLE "public"."book" (
 						Engine:      v1pb.Engine_MYSQL,
 						Environment: environment.Name,
 						Activation:  true,
-						DataSources: []*v1pb.DataSource{{Type: v1pb.DataSourceType_ADMIN, Host: "127.0.0.1", Port: strconv.Itoa(dbPort), Username: "root", Id: "admin"}},
+						DataSources: []*v1pb.DataSource{{Type: v1pb.DataSourceType_ADMIN, Host: mysqlContainer.host, Port: mysqlContainer.port, Username: "root", Password: "root-password", Id: "admin"}},
 					},
 				})
+				a.NoError(err)
 			default:
 				a.FailNow("unsupported db type")
 			}
-			a.NoError(err)
 
-			err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil, test.databaseName, "root", nil /* labelMap */)
+			err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil, test.databaseName, "postgres")
 			a.NoError(err)
 
 			database, err := ctl.databaseServiceClient.GetDatabase(ctx, &v1pb.GetDatabaseRequest{
@@ -367,11 +356,7 @@ func TestMarkTaskAsDone(t *testing.T) {
 	a := require.New(t)
 	ctx := context.Background()
 	ctl := &controller{}
-	dataDir := t.TempDir()
-	ctx, err := ctl.StartServerWithExternalPg(ctx, &config{
-		dataDir:            dataDir,
-		vcsProviderCreator: fake.NewGitLab,
-	})
+	ctx, err := ctl.StartServerWithExternalPg(ctx)
 	a.NoError(err)
 	defer ctl.Close(ctx)
 
@@ -396,7 +381,7 @@ func TestMarkTaskAsDone(t *testing.T) {
 
 	// Create an issue that creates a database.
 	databaseName := "testSchemaUpdate"
-	err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil, databaseName, "", nil /* labelMap */)
+	err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil, databaseName, "")
 	a.NoError(err)
 
 	database, err := ctl.databaseServiceClient.GetDatabase(ctx, &v1pb.GetDatabaseRequest{

@@ -11,48 +11,31 @@ import (
 	"google.golang.org/grpc/status"
 
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/bytebase/bytebase/backend/common"
-	api "github.com/bytebase/bytebase/backend/legacyapi"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 // InstanceMessage is the message for instance.
 type InstanceMessage struct {
 	ResourceID    string
-	Title         string
-	Engine        storepb.Engine
-	ExternalLink  string
-	DataSources   []*DataSourceMessage
-	Activation    bool
-	Options       *storepb.InstanceOptions
 	EnvironmentID string
-	UID           int
 	Deleted       bool
-	EngineVersion string
-	Metadata      *storepb.InstanceMetadata
+	Metadata      *storepb.Instance
 }
 
 // UpdateInstanceMessage is the message for updating an instance.
 type UpdateInstanceMessage struct {
 	ResourceID string
 
-	Title         *string
-	ExternalLink  *string
 	Deleted       *bool
-	DataSources   *[]*DataSourceMessage
-	EngineVersion *string
-	Activation    *bool
-	// OptionsUpsert upserts the top-level messages of the instance options.
-	OptionsUpsert       *storepb.InstanceOptions
-	Metadata            *storepb.InstanceMetadata
-	UpdateEnvironmentID bool
-	EnvironmentID       string
+	EnvironmentID *string
+	Metadata      *storepb.Instance
 }
 
 // FindInstanceMessage is the message for finding instances.
 type FindInstanceMessage struct {
-	UID         *int
 	ResourceID  *string
 	ResourceIDs *[]string
 	ShowDeleted bool
@@ -65,21 +48,11 @@ func (s *Store) GetInstanceV2(ctx context.Context, find *FindInstanceMessage) (*
 			return v, nil
 		}
 	}
-	if find.UID != nil {
-		if v, ok := s.instanceIDCache.Get(*find.UID); ok {
-			return v, nil
-		}
-	}
 
 	// We will always return the resource regardless of its deleted state.
 	find.ShowDeleted = true
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
 
-	instances, err := s.listInstanceImplV2(ctx, tx, find)
+	instances, err := s.ListInstancesV2(ctx, find)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to list instances with find instance message %+v", find)
 	}
@@ -89,13 +62,9 @@ func (s *Store) GetInstanceV2(ctx context.Context, find *FindInstanceMessage) (*
 	if len(instances) > 1 {
 		return nil, errors.Errorf("find %d instances with find instance message %+v, expected 1", len(instances), find)
 	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
 
 	instance := instances[0]
 	s.instanceCache.Add(getInstanceCacheKey(instance.ResourceID), instance)
-	s.instanceIDCache.Add(instance.UID, instance)
 	return instance, nil
 }
 
@@ -118,14 +87,13 @@ func (s *Store) ListInstancesV2(ctx context.Context, find *FindInstanceMessage) 
 
 	for _, instance := range instances {
 		s.instanceCache.Add(getInstanceCacheKey(instance.ResourceID), instance)
-		s.instanceIDCache.Add(instance.UID, instance)
 	}
 	return instances, nil
 }
 
-// CreateInstanceV2 creates the instance.
-func (s *Store) CreateInstanceV2(ctx context.Context, instanceCreate *InstanceMessage, maximumActivation int) (*InstanceMessage, error) {
-	if err := validateDataSourceList(instanceCreate.DataSources); err != nil {
+// CreateInstanceV2 creates an instance.
+func (s *Store) CreateInstanceV2(ctx context.Context, instanceCreate *InstanceMessage) (*InstanceMessage, error) {
+	if err := validateDataSources(instanceCreate.Metadata); err != nil {
 		return nil, err
 	}
 
@@ -135,63 +103,29 @@ func (s *Store) CreateInstanceV2(ctx context.Context, instanceCreate *InstanceMe
 	}
 	defer tx.Rollback()
 
-	where := ""
-	if instanceCreate.Activation {
-		where = fmt.Sprintf("WHERE (%s) < %d", countActivateInstanceQuery, maximumActivation)
-	}
-
-	optionBytes, err := protojson.Marshal(instanceCreate.Options)
+	redacted, err := s.obfuscateInstance(ctx, instanceCreate.Metadata)
 	if err != nil {
 		return nil, err
 	}
-
-	metadataBytes, err := protojson.Marshal(instanceCreate.Metadata)
+	metadataBytes, err := protojson.Marshal(redacted)
 	if err != nil {
 		return nil, err
 	}
-
-	var instanceID int
 	var environment *string
 	if instanceCreate.EnvironmentID != "" {
 		environment = &instanceCreate.EnvironmentID
 	}
-	if err := tx.QueryRowContext(ctx, fmt.Sprintf(`
+	if _, err := tx.ExecContext(ctx, `
 			INSERT INTO instance (
 				resource_id,
 				environment,
-				name,
-				engine,
-				external_link,
-				activation,
-				options,
 				metadata
-			)
-			SELECT $1, $2, $3, $4, $5, $6, $7, $8
-			%s
-			RETURNING id
-		`, where),
+			) VALUES ($1, $2, $3)
+		`,
 		instanceCreate.ResourceID,
 		environment,
-		instanceCreate.Title,
-		instanceCreate.Engine.String(),
-		instanceCreate.ExternalLink,
-		instanceCreate.Activation,
-		optionBytes,
 		metadataBytes,
-	).Scan(&instanceID); err != nil {
-		return nil, err
-	}
-
-	for _, ds := range instanceCreate.DataSources {
-		if err := s.addDataSourceToInstanceImplV2(ctx, tx, instanceCreate.ResourceID, ds); err != nil {
-			return nil, err
-		}
-	}
-
-	instanceDataSourcesMap, err := s.listInstanceDataSourceMap(ctx, tx, &FindDataSourceMessage{
-		InstanceID: &instanceCreate.ResourceID,
-	})
-	if err != nil {
+	); err != nil {
 		return nil, err
 	}
 
@@ -202,73 +136,30 @@ func (s *Store) CreateInstanceV2(ctx context.Context, instanceCreate *InstanceMe
 	instance := &InstanceMessage{
 		EnvironmentID: instanceCreate.EnvironmentID,
 		ResourceID:    instanceCreate.ResourceID,
-		UID:           instanceID,
-		Title:         instanceCreate.Title,
-		Engine:        instanceCreate.Engine,
-		ExternalLink:  instanceCreate.ExternalLink,
-		DataSources:   instanceDataSourcesMap[instanceCreate.ResourceID],
-		Activation:    instanceCreate.Activation,
-		Options:       instanceCreate.Options,
 		Metadata:      instanceCreate.Metadata,
 	}
 	s.instanceCache.Add(getInstanceCacheKey(instance.ResourceID), instance)
-	s.instanceIDCache.Add(instance.UID, instance)
 	return instance, nil
 }
 
 // UpdateInstanceV2 updates an instance.
-func (s *Store) UpdateInstanceV2(ctx context.Context, patch *UpdateInstanceMessage, maximumActivation int) (*InstanceMessage, error) {
-	if patch.DataSources != nil {
-		if err := validateDataSourceList(*patch.DataSources); err != nil {
-			return nil, err
-		}
-	}
-
+func (s *Store) UpdateInstanceV2(ctx context.Context, patch *UpdateInstanceMessage) (*InstanceMessage, error) {
 	set, args, where := []string{}, []any{}, []string{}
-	if v := patch.Title; v != nil {
-		set, args = append(set, fmt.Sprintf("name = $%d", len(args)+1)), append(args, *v)
-	}
-	if patch.UpdateEnvironmentID {
-		var environment *string
-		if patch.EnvironmentID != "" {
-			environment = &patch.EnvironmentID
-		}
-		set, args = append(set, fmt.Sprintf("environment = $%d", len(args)+1)), append(args, environment)
-	}
-	if v := patch.ExternalLink; v != nil {
-		set, args = append(set, fmt.Sprintf("external_link = $%d", len(args)+1)), append(args, *v)
-	}
-	if v := patch.EngineVersion; v != nil {
-		set, args = append(set, fmt.Sprintf("engine_version = $%d", len(args)+1)), append(args, *v)
-	}
-	if v := patch.Activation; v != nil {
-		set, args = append(set, fmt.Sprintf("activation = $%d", len(args)+1)), append(args, *v)
-		if *v {
-			where = append(where, fmt.Sprintf("(%s) < %d", countActivateInstanceQuery, maximumActivation))
-		}
+	if v := patch.EnvironmentID; v != nil {
+		set, args = append(set, fmt.Sprintf("environment = $%d", len(args)+1)), append(args, *v)
 	}
 	if v := patch.Deleted; v != nil {
-		if patch.Activation != nil {
-			return nil, errors.Errorf(`cannot set "activation" and "deleted" at the same time`)
-		}
-		if *patch.Deleted {
-			set, args = append(set, fmt.Sprintf("activation = $%d", len(args)+1)), append(args, false)
-		}
 		set, args = append(set, fmt.Sprintf(`deleted = $%d`, len(args)+1)), append(args, *v)
 	}
-	if v := patch.OptionsUpsert; v != nil {
-		options, err := protojson.Marshal(v)
-		if err != nil {
-			return nil, err
-		}
-		set, args = append(set, fmt.Sprintf("options = $%d", len(args)+1)), append(args, options)
-	}
 	if v := patch.Metadata; v != nil {
-		metadata, err := protojson.Marshal(v)
+		redacted, err := s.obfuscateInstance(ctx, v)
 		if err != nil {
 			return nil, err
 		}
-
+		metadata, err := protojson.Marshal(redacted)
+		if err != nil {
+			return nil, err
+		}
 		set, args = append(set, fmt.Sprintf("metadata = $%d", len(args)+1)), append(args, metadata)
 	}
 	where, args = append(where, fmt.Sprintf("resource_id = $%d", len(args)+1)), append(args, patch.ResourceID)
@@ -279,103 +170,25 @@ func (s *Store) UpdateInstanceV2(ctx context.Context, patch *UpdateInstanceMessa
 	}
 	defer tx.Rollback()
 
-	instance := &InstanceMessage{}
 	if len(set) > 0 {
-		var engine string
 		query := fmt.Sprintf(`
 			UPDATE instance
 			SET `+strings.Join(set, ", ")+`
 			WHERE %s
-			RETURNING
-				id,
-				resource_id,
-				environment,
-				name,
-				engine,
-				engine_version,
-				external_link,
-				activation,
-				deleted,
-				options,
-				metadata
 		`, strings.Join(where, " AND "))
-		var environment sql.NullString
-		var options, metadata []byte
-		if err := tx.QueryRowContext(ctx, query, args...).Scan(
-			&instance.UID,
-			&instance.ResourceID,
-			&environment,
-			&instance.Title,
-			&engine,
-			&instance.EngineVersion,
-			&instance.ExternalLink,
-			&instance.Activation,
-			&instance.Deleted,
-			&options,
-			&metadata,
-		); err != nil {
+		if _, err := tx.ExecContext(ctx, query, args...); err != nil {
 			return nil, err
-		}
-		if environment.Valid {
-			instance.EnvironmentID = environment.String
-		}
-		engineTypeValue, ok := storepb.Engine_value[engine]
-		if !ok {
-			return nil, errors.Errorf("invalid engine %s", engine)
-		}
-		instance.Engine = storepb.Engine(engineTypeValue)
-
-		var instanceOptions storepb.InstanceOptions
-		if err := common.ProtojsonUnmarshaler.Unmarshal(options, &instanceOptions); err != nil {
-			return nil, err
-		}
-		instance.Options = &instanceOptions
-
-		var instanceMetadata storepb.InstanceMetadata
-		if err := common.ProtojsonUnmarshaler.Unmarshal(metadata, &instanceMetadata); err != nil {
-			return nil, err
-		}
-		instance.Metadata = &instanceMetadata
-	} else {
-		existedInstance, err := s.GetInstanceV2(ctx, &FindInstanceMessage{
-			ResourceID: &patch.ResourceID,
-		})
-		if err != nil {
-			return nil, err
-		}
-		instance = existedInstance
-	}
-
-	if patch.DataSources != nil {
-		if err := s.clearDataSourceImpl(ctx, tx, instance.ResourceID); err != nil {
-			return nil, err
-		}
-
-		for _, ds := range *patch.DataSources {
-			if err := s.addDataSourceToInstanceImplV2(ctx, tx, instance.ResourceID, ds); err != nil {
-				return nil, err
-			}
 		}
 	}
-
-	instanceDataSourcesMap, err := s.listInstanceDataSourceMap(ctx, tx, &FindDataSourceMessage{
-		InstanceID: &patch.ResourceID,
-	})
-	if err != nil {
-		return nil, err
-	}
-	instance.DataSources = instanceDataSourcesMap[patch.ResourceID]
-
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 
-	s.instanceCache.Add(getInstanceCacheKey(instance.ResourceID), instance)
-	s.instanceIDCache.Add(instance.UID, instance)
-	return instance, nil
+	s.instanceCache.Remove(getInstanceCacheKey(patch.ResourceID))
+	return s.GetInstanceV2(ctx, &FindInstanceMessage{ResourceID: &patch.ResourceID})
 }
 
-func (s *Store) listInstanceImplV2(ctx context.Context, tx *Tx, find *FindInstanceMessage) ([]*InstanceMessage, error) {
+func (s *Store) listInstanceImplV2(ctx context.Context, txn *sql.Tx, find *FindInstanceMessage) ([]*InstanceMessage, error) {
 	where, args := []string{"TRUE"}, []any{}
 	if v := find.ResourceID; v != nil {
 		where, args = append(where, fmt.Sprintf("instance.resource_id = $%d", len(args)+1)), append(args, *v)
@@ -383,26 +196,16 @@ func (s *Store) listInstanceImplV2(ctx context.Context, tx *Tx, find *FindInstan
 	if v := find.ResourceIDs; v != nil {
 		where, args = append(where, fmt.Sprintf("instance.resource_id = ANY($%d)", len(args)+1)), append(args, *v)
 	}
-	if v := find.UID; v != nil {
-		where, args = append(where, fmt.Sprintf("instance.id = $%d", len(args)+1)), append(args, *v)
-	}
 	if !find.ShowDeleted {
 		where, args = append(where, fmt.Sprintf("instance.deleted = $%d", len(args)+1)), append(args, false)
 	}
 
 	var instanceMessages []*InstanceMessage
-	rows, err := tx.QueryContext(ctx, fmt.Sprintf(`
+	rows, err := txn.QueryContext(ctx, fmt.Sprintf(`
 		SELECT
-			id,
 			resource_id,
-			name,
 			environment,
-			engine,
-			engine_version,
-			external_link,
-			activation,
 			deleted,
-			options,
 			metadata
 		FROM instance
 		WHERE %s
@@ -416,19 +219,11 @@ func (s *Store) listInstanceImplV2(ctx context.Context, tx *Tx, find *FindInstan
 	for rows.Next() {
 		var instanceMessage InstanceMessage
 		var environment sql.NullString
-		var engine string
-		var options, metadata []byte
+		var metadata []byte
 		if err := rows.Scan(
-			&instanceMessage.UID,
 			&instanceMessage.ResourceID,
-			&instanceMessage.Title,
 			&environment,
-			&engine,
-			&instanceMessage.EngineVersion,
-			&instanceMessage.ExternalLink,
-			&instanceMessage.Activation,
 			&instanceMessage.Deleted,
-			&options,
 			&metadata,
 		); err != nil {
 			return nil, err
@@ -436,68 +231,44 @@ func (s *Store) listInstanceImplV2(ctx context.Context, tx *Tx, find *FindInstan
 		if environment.Valid {
 			instanceMessage.EnvironmentID = environment.String
 		}
-		engineTypeValue, ok := storepb.Engine_value[engine]
-		if !ok {
-			return nil, errors.Errorf("invalid engine %s", engine)
-		}
-		instanceMessage.Engine = storepb.Engine(engineTypeValue)
 
-		var instanceOptions storepb.InstanceOptions
-		if err := common.ProtojsonUnmarshaler.Unmarshal(options, &instanceOptions); err != nil {
+		instanceMetadata := &storepb.Instance{}
+		if err := common.ProtojsonUnmarshaler.Unmarshal(metadata, instanceMetadata); err != nil {
 			return nil, err
 		}
-		instanceMessage.Options = &instanceOptions
-		var instanceMetadata storepb.InstanceMetadata
-		if err := common.ProtojsonUnmarshaler.Unmarshal(metadata, &instanceMetadata); err != nil {
+		if err := s.unObfuscateInstance(ctx, instanceMetadata); err != nil {
 			return nil, err
 		}
-		instanceMessage.Metadata = &instanceMetadata
+		instanceMessage.Metadata = instanceMetadata
 		instanceMessages = append(instanceMessages, &instanceMessage)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	// Use a single query to list all data sources if there are more than one instance to look at.
-	dataSourceFind := &FindDataSourceMessage{}
-	if len(instanceMessages) == 1 {
-		dataSourceFind.InstanceID = &instanceMessages[0].ResourceID
-	}
-	instanceDataSourcesMap, err := s.listInstanceDataSourceMap(ctx, tx, dataSourceFind)
-	if err != nil {
-		return nil, err
-	}
-	for _, instanceMessage := range instanceMessages {
-		instanceMessage.DataSources = instanceDataSourcesMap[instanceMessage.ResourceID]
-	}
-
 	return instanceMessages, nil
 }
 
-var countActivateInstanceQuery = "SELECT COUNT(*) FROM instance WHERE activation = TRUE AND deleted = FALSE"
+var countActivateInstanceQuery = "SELECT COUNT(1) FROM instance WHERE (metadata ? 'activation') AND (metadata->>'activation')::boolean = TRUE AND deleted = FALSE"
 
-// CheckActivationLimit checks if activation instance count reaches the limit.
-func (s *Store) CheckActivationLimit(ctx context.Context, maximumActivation int) error {
-	count := 0
-	if err := s.db.db.QueryRowContext(ctx, countActivateInstanceQuery).Scan(&count); err != nil {
-		return err
+// GetActivatedInstanceCount gets the number of activated instances.
+func (s *Store) GetActivatedInstanceCount(ctx context.Context) (int, error) {
+	var count int
+	if err := s.db.QueryRowContext(ctx, countActivateInstanceQuery).Scan(&count); err != nil {
+		return 0, err
 	}
-
-	if count >= maximumActivation {
-		return common.Errorf(common.Invalid, "activation instance count has reached the limit (%v)", count)
-	}
-	return nil
+	return count, nil
 }
 
-func validateDataSourceList(dataSources []*DataSourceMessage) error {
+func validateDataSources(metadata *storepb.Instance) error {
 	dataSourceMap := map[string]bool{}
 	adminCount := 0
-	for _, dataSource := range dataSources {
-		if dataSourceMap[dataSource.ID] {
-			return status.Errorf(codes.InvalidArgument, "duplicate data source ID %s", dataSource.ID)
+	for _, dataSource := range metadata.GetDataSources() {
+		if dataSourceMap[dataSource.GetId()] {
+			return status.Errorf(codes.InvalidArgument, "duplicate data source ID %s", dataSource.GetId())
 		}
-		dataSourceMap[dataSource.ID] = true
-		if dataSource.Type == api.Admin {
+		dataSourceMap[dataSource.GetId()] = true
+		if dataSource.GetType() == storepb.DataSourceType_ADMIN {
 			adminCount++
 		}
 	}
@@ -507,19 +278,124 @@ func validateDataSourceList(dataSources []*DataSourceMessage) error {
 	return nil
 }
 
-// IgnoreDatabaseAndTableCaseSensitive returns true if the engine ignores database and table case sensitive.
-func IgnoreDatabaseAndTableCaseSensitive(instance *InstanceMessage) bool {
-	switch instance.Engine {
+// IsObjectCaseSensitive returns true if the engine ignores database and table case sensitive.
+func IsObjectCaseSensitive(instance *InstanceMessage) bool {
+	switch instance.Metadata.GetEngine() {
 	case storepb.Engine_TIDB:
-		return true
-	case storepb.Engine_MYSQL, storepb.Engine_MARIADB:
-		return instance.Metadata != nil && instance.Metadata.MysqlLowerCaseTableNames != 0
+		return false
+	case storepb.Engine_MYSQL, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
+		return !(instance.Metadata != nil && instance.Metadata.MysqlLowerCaseTableNames != 0)
 	case storepb.Engine_MSSQL:
 		// In fact, SQL Server is possible to create a case-sensitive database and case-insensitive database on one instance.
 		// https://www.webucator.com/article/how-to-check-case-sensitivity-in-sql-server/
 		// But by default, SQL Server is case-insensitive.
-		return true
-	default:
 		return false
+	default:
+		return true
 	}
+}
+
+func (s *Store) obfuscateInstance(ctx context.Context, instance *storepb.Instance) (*storepb.Instance, error) {
+	secret, err := s.GetSecret(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	redacted, ok := proto.Clone(instance).(*storepb.Instance)
+	if !ok {
+		return nil, errors.Errorf("failed to clone instance")
+	}
+	for _, ds := range redacted.GetDataSources() {
+		ds.ObfuscatedPassword = common.Obfuscate(ds.GetPassword(), secret)
+		ds.Password = ""
+		ds.ObfuscatedSslCa = common.Obfuscate(ds.GetSslCa(), secret)
+		ds.SslCa = ""
+		ds.ObfuscatedSslCert = common.Obfuscate(ds.GetSslCert(), secret)
+		ds.SslCert = ""
+		ds.ObfuscatedSslKey = common.Obfuscate(ds.GetSslKey(), secret)
+		ds.SslKey = ""
+		ds.ObfuscatedSshPassword = common.Obfuscate(ds.GetSshPassword(), secret)
+		ds.SshPassword = ""
+		ds.ObfuscatedSshPrivateKey = common.Obfuscate(ds.GetSshPrivateKey(), secret)
+		ds.SshPrivateKey = ""
+		ds.ObfuscatedAuthenticationPrivateKey = common.Obfuscate(ds.GetAuthenticationPrivateKey(), secret)
+		ds.AuthenticationPrivateKey = ""
+		ds.ObfuscatedMasterPassword = common.Obfuscate(ds.GetMasterPassword(), secret)
+		ds.MasterPassword = ""
+		if ds.IamExtension != nil {
+			if _, ok := ds.IamExtension.(*storepb.DataSource_ClientSecretCredential_); ok {
+				ds.GetClientSecretCredential().ObfuscatedClientSecret = common.Obfuscate(ds.GetClientSecretCredential().GetClientSecret(), secret)
+				ds.GetClientSecretCredential().ClientSecret = ""
+			}
+		}
+	}
+	return redacted, nil
+}
+
+func (s *Store) unObfuscateInstance(ctx context.Context, instance *storepb.Instance) error {
+	secret, err := s.GetSecret(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, ds := range instance.GetDataSources() {
+		password, err := common.Unobfuscate(ds.GetObfuscatedPassword(), secret)
+		if err != nil {
+			return err
+		}
+		ds.Password = password
+
+		sslCa, err := common.Unobfuscate(ds.GetObfuscatedSslCa(), secret)
+		if err != nil {
+			return err
+		}
+		ds.SslCa = sslCa
+
+		sslCert, err := common.Unobfuscate(ds.GetObfuscatedSslCert(), secret)
+		if err != nil {
+			return err
+		}
+		ds.SslCert = sslCert
+
+		sslKey, err := common.Unobfuscate(ds.GetObfuscatedSslKey(), secret)
+		if err != nil {
+			return err
+		}
+		ds.SslKey = sslKey
+
+		sshPassword, err := common.Unobfuscate(ds.GetObfuscatedSshPassword(), secret)
+		if err != nil {
+			return err
+		}
+		ds.SshPassword = sshPassword
+
+		sshPrivateKey, err := common.Unobfuscate(ds.GetObfuscatedSshPrivateKey(), secret)
+		if err != nil {
+			return err
+		}
+		ds.SshPrivateKey = sshPrivateKey
+
+		authenticationPrivateKey, err := common.Unobfuscate(ds.GetObfuscatedAuthenticationPrivateKey(), secret)
+		if err != nil {
+			return err
+		}
+		ds.AuthenticationPrivateKey = authenticationPrivateKey
+
+		masterPassword, err := common.Unobfuscate(ds.GetObfuscatedMasterPassword(), secret)
+		if err != nil {
+			return err
+		}
+		ds.MasterPassword = masterPassword
+
+		if ds.IamExtension != nil {
+			if _, ok := ds.IamExtension.(*storepb.DataSource_ClientSecretCredential_); ok {
+				clientSecret, err := common.Unobfuscate(ds.GetClientSecretCredential().GetObfuscatedClientSecret(), secret)
+				if err != nil {
+					return err
+				}
+				ds.GetClientSecretCredential().ClientSecret = clientSecret
+			}
+		}
+	}
+	return nil
 }

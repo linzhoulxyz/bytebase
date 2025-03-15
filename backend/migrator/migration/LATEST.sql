@@ -115,14 +115,7 @@ CREATE TABLE instance (
     id serial PRIMARY KEY,
     deleted boolean NOT NULL DEFAULT FALSE,
     environment text REFERENCES environment(resource_id),
-    name text NOT NULL,
-    engine text NOT NULL,
-    engine_version text NOT NULL DEFAULT '',
-    external_link text NOT NULL DEFAULT '',
     resource_id text NOT NULL,
-    -- activation should set to be TRUE if users assign license to this instance.
-    activation boolean NOT NULL DEFAULT false,
-    options jsonb NOT NULL DEFAULT '{}',
     metadata jsonb NOT NULL DEFAULT '{}'
 );
 
@@ -134,17 +127,11 @@ ALTER SEQUENCE instance_id_seq RESTART WITH 101;
 -- data is synced periodically from the instance
 CREATE TABLE db (
     id serial PRIMARY KEY,
+    deleted boolean NOT NULL DEFAULT FALSE,
     project text NOT NULL REFERENCES project(resource_id),
     instance text NOT NULL REFERENCES instance(resource_id),
     name text NOT NULL,
     environment text REFERENCES environment(resource_id),
-    sync_status text NOT NULL CHECK (sync_status IN ('OK', 'NOT_FOUND')),
-    sync_at timestamptz NOT NULL DEFAULT now(),
-    schema_version text NOT NULL,
-    secrets jsonb NOT NULL DEFAULT '{}',
-    datashare boolean NOT NULL DEFAULT FALSE,
-    -- service_name is the Oracle specific field.
-    service_name text NOT NULL DEFAULT '',
     metadata jsonb NOT NULL DEFAULT '{}'
 );
 
@@ -169,24 +156,12 @@ CREATE UNIQUE INDEX idx_db_schema_unique_instance_db_name ON db_schema(instance,
 
 ALTER SEQUENCE db_schema_id_seq RESTART WITH 101;
 
--- data_source table stores the data source for a particular database
+-- Deprecated. To be deleted later.
 CREATE TABLE data_source (
     id serial PRIMARY KEY,
     instance text NOT NULL REFERENCES instance(resource_id),
-    name text NOT NULL,
-    type text NOT NULL CHECK (type IN ('ADMIN', 'RW', 'RO')),
-    username text NOT NULL,
-    password text NOT NULL,
-    ssl_key text NOT NULL DEFAULT '',
-    ssl_cert text NOT NULL DEFAULT '',
-    ssl_ca text NOT NULL DEFAULT '',
-    host text NOT NULL DEFAULT '',
-    port text NOT NULL DEFAULT '',
-    options jsonb NOT NULL DEFAULT '{}',
-    database text NOT NULL DEFAULT ''
+    options jsonb NOT NULL DEFAULT '{}'
 );
-
-CREATE UNIQUE INDEX idx_data_source_unique_instance_name ON data_source(instance, name);
 
 ALTER SEQUENCE data_source_id_seq RESTART WITH 101;
 
@@ -227,9 +202,7 @@ ALTER SEQUENCE pipeline_id_seq RESTART WITH 101;
 CREATE TABLE stage (
     id serial PRIMARY KEY,
     pipeline_id integer NOT NULL REFERENCES pipeline(id),
-    environment text NOT NULL REFERENCES environment(resource_id),
-    deployment_id text NOT NULL DEFAULT '',
-    name text NOT NULL
+    environment text NOT NULL REFERENCES environment(resource_id)
 );
 
 CREATE INDEX idx_stage_pipeline_id ON stage(pipeline_id);
@@ -243,8 +216,6 @@ CREATE TABLE task (
     stage_id integer NOT NULL REFERENCES stage(id),
     instance text NOT NULL REFERENCES instance(resource_id),
     db_name text,
-    name text NOT NULL,
-    status text NOT NULL CHECK (status IN ('PENDING', 'PENDING_APPROVAL', 'RUNNING', 'DONE', 'FAILED', 'CANCELED')),
     type text NOT NULL CHECK (type LIKE 'bb.task.%'),
     payload jsonb NOT NULL DEFAULT '{}',
     earliest_allowed_at timestamptz NULL
@@ -252,23 +223,7 @@ CREATE TABLE task (
 
 CREATE INDEX idx_task_pipeline_id_stage_id ON task(pipeline_id, stage_id);
 
-CREATE INDEX idx_task_status ON task(status);
-
 ALTER SEQUENCE task_id_seq RESTART WITH 101;
-
--- task_dag describes task dependency relationship
--- from_task_id blocks to_task_id
-CREATE TABLE task_dag (
-    id serial PRIMARY KEY,
-    from_task_id integer NOT NULL REFERENCES task(id),
-    to_task_id integer NOT NULL REFERENCES task(id)
-);
-
-CREATE INDEX idx_task_dag_from_task_id ON task_dag(from_task_id);
-
-CREATE INDEX idx_task_dag_to_task_id ON task_dag(to_task_id);
-
-ALTER SEQUENCE task_dag_id_seq RESTART WITH 101;
 
 -- task run table stores the task run
 CREATE TABLE task_run (
@@ -279,7 +234,6 @@ CREATE TABLE task_run (
     task_id integer NOT NULL REFERENCES task(id),
     sheet_id integer REFERENCES sheet(id),
     attempt integer NOT NULL,
-    name text NOT NULL,
     status text NOT NULL CHECK (status IN ('PENDING', 'RUNNING', 'DONE', 'FAILED', 'CANCELED')),
     started_at timestamptz NULL,
     code integer NOT NULL DEFAULT 0,
@@ -356,8 +310,6 @@ CREATE TABLE issue (
     status text NOT NULL CHECK (status IN ('OPEN', 'DONE', 'CANCELED')),
     type text NOT NULL CHECK (type LIKE 'bb.issue.%'),
     description text NOT NULL DEFAULT '',
-    assignee_id integer REFERENCES principal(id),
-    assignee_need_attention boolean NOT NULL DEFAULT FALSE, 
     payload jsonb NOT NULL DEFAULT '{}',
     ts_vector tsvector
 );
@@ -369,8 +321,6 @@ CREATE INDEX idx_issue_plan_id ON issue(plan_id);
 CREATE INDEX idx_issue_pipeline_id ON issue(pipeline_id);
 
 CREATE INDEX idx_issue_creator_id ON issue(creator_id);
-
-CREATE INDEX idx_issue_assignee_id ON issue(assignee_id);
 
 CREATE INDEX idx_issue_ts_vector ON issue USING GIN(ts_vector);
 
@@ -388,9 +338,7 @@ CREATE INDEX idx_issue_subscriber_subscriber_id ON issue_subscriber(subscriber_i
 -- instance change history records the changes an instance and its databases.
 CREATE TABLE instance_change_history (
     id bigserial PRIMARY KEY,
-    status text NOT NULL CONSTRAINT instance_change_history_status_check CHECK (status IN ('PENDING', 'DONE', 'FAILED')),
-    version text NOT NULL,
-    execution_duration_ns bigint NOT NULL
+    version text NOT NULL
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_instance_change_history_unique_version ON instance_change_history (version);
@@ -443,33 +391,6 @@ CREATE INDEX idx_query_history_creator_id_created_at_project_id ON query_history
 
 ALTER SEQUENCE query_history_id_seq RESTART WITH 101;
 
--- vcs table stores the version control provider config
-CREATE TABLE vcs (
-    id serial PRIMARY KEY,
-    resource_id text NOT NULL,
-    name text NOT NULL,
-    type text NOT NULL CHECK (type IN ('GITLAB', 'GITHUB', 'BITBUCKET', 'AZURE_DEVOPS')),
-    instance_url text NOT NULL CHECK ((instance_url LIKE 'http://%' OR instance_url LIKE 'https://%') AND instance_url = rtrim(instance_url, '/')),
-    access_token text NOT NULL DEFAULT ''
-);
-
-CREATE UNIQUE INDEX idx_vcs_unique_resource_id ON vcs(resource_id);
-
-ALTER SEQUENCE vcs_id_seq RESTART WITH 101;
-
--- vcs_connector table stores vcs connectors for a project
-CREATE TABLE vcs_connector (
-    id serial PRIMARY KEY,
-    vcs text NOT NULL REFERENCES vcs(resource_id),
-    project text NOT NULL REFERENCES project(resource_id),
-    resource_id text NOT NULL,
-    payload jsonb NOT NULL DEFAULT '{}'
-);
-
-CREATE UNIQUE INDEX idx_vcs_connector_unique_project_resource_id ON vcs_connector(project, resource_id);
-
-ALTER SEQUENCE vcs_connector_id_seq RESTART WITH 101;
-
 -- Anomaly
 -- anomaly stores various anomalies found by the scanner.
 -- For now, anomaly can be associated with a particular instance or database.
@@ -487,19 +408,6 @@ CREATE TABLE anomaly (
 CREATE UNIQUE INDEX idx_anomaly_unique_project_instance_dn_name_type ON anomaly(project, instance, db_name, type);
 
 ALTER SEQUENCE anomaly_id_seq RESTART WITH 101;
-
--- Deployment Configuration.
--- deployment_config stores deployment configurations at project level.
-CREATE TABLE deployment_config (
-    id serial PRIMARY KEY,
-    project text NOT NULL REFERENCES project(resource_id),
-    name text NOT NULL,
-    config jsonb NOT NULL DEFAULT '{}'
-);
-
-CREATE UNIQUE INDEX idx_deployment_config_unique_project ON deployment_config(project);
-
-ALTER SEQUENCE deployment_config_id_seq RESTART WITH 101;
 
 -- worksheet table stores worksheets in SQL Editor.
 CREATE TABLE worksheet (
@@ -532,20 +440,6 @@ CREATE UNIQUE INDEX idx_worksheet_organizer_unique_sheet_id_principal_id ON work
 
 CREATE INDEX idx_worksheet_organizer_principal_id ON worksheet_organizer(principal_id);
 
--- external_approval stores approval instances of third party applications.
-CREATE TABLE external_approval ( 
-    id serial PRIMARY KEY,
-    issue_id integer NOT NULL REFERENCES issue(id),
-    requester_id integer NOT NULL REFERENCES principal(id),
-    approver_id integer NOT NULL REFERENCES principal(id),
-    type text NOT NULL CHECK (type LIKE 'bb.plugin.app.%'),
-    payload jsonb NOT NULL
-);
-
-CREATE INDEX idx_external_approval_issue_id ON external_approval(issue_id);
-
-ALTER SEQUENCE external_approval_id_seq RESTART WITH 101;
-
 -- risk stores the definition of a risk.
 CREATE TABLE risk (
     id bigserial PRIMARY KEY,
@@ -558,26 +452,6 @@ CREATE TABLE risk (
 );
 
 ALTER SEQUENCE risk_id_seq RESTART WITH 101;
-
--- slow_query stores slow query statistics for each database.
-CREATE TABLE slow_query (
-    id serial PRIMARY KEY,
-    -- In MySQL, users can query without specifying a database. In this case, instance is used to identify the instance.
-    instance text NOT NULL REFERENCES instance(resource_id),
-    -- In MySQL, users can query without specifying a database. In this case, db_name is NULL.
-    db_name text,
-    -- It's hard to store all slow query logs, so the slow query is aggregated by day and database.
-    log_date_ts integer NOT NULL,
-    -- It's hard to store all slow query logs, we sample the slow query log and store the part of them as details.
-    slow_query_statistics jsonb NOT NULL DEFAULT '{}'
-);
-
--- The slow query log is aggregated by day and database and we usually query the slow query log by day and database.
-CREATE UNIQUE INDEX idx_slow_query_unique_instance_db_name_log_date_ts ON slow_query(instance, db_name, log_date_ts);
-
-CREATE INDEX idx_slow_query_instance_id_log_date_ts ON slow_query(instance, log_date_ts);
-
-ALTER SEQUENCE slow_query_id_seq RESTART WITH 101;
 
 CREATE TABLE db_group (
     id bigserial PRIMARY KEY,

@@ -31,7 +31,7 @@ import {
   usePolicyV1Store,
 } from "@/store";
 import { getProjectName } from "@/store/modules/v1/common";
-import { getUserEmailFromIdentifier } from "@/store/modules/v1/common";
+import { extractUserId } from "@/store/modules/v1/common";
 import { getGroupEmailInBinding } from "@/types";
 import { type Group, GroupMember_Role } from "@/types/proto/v1/group_service";
 import { PolicyType } from "@/types/proto/v1/org_policy_service";
@@ -55,8 +55,7 @@ const policyStore = usePolicyV1Store();
 
 const selfMemberInGroup = computed(() => {
   return props.group?.members.find(
-    (member) =>
-      getUserEmailFromIdentifier(member.member) === currentUserV1.value.email
+    (member) => extractUserId(member.member) === currentUserV1.value.email
   );
 });
 
@@ -76,7 +75,9 @@ const getProjectsBindingGroup = async (group: Group) => {
   }
   const response: ProjectGroupResource[] = [];
 
-  for (const project of projectStore.projectList) {
+  // TODO(ed): Do we need a API to get IAM permission by user?
+  // Or we can just don't need to be so strict, it's okay to keep this way.
+  for (const project of projectStore.getProjectList()) {
     let resource: ProjectGroupResource | undefined;
     for (const binding of project.iamPolicy.bindings) {
       if (binding.members.includes(member)) {

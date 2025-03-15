@@ -17,15 +17,6 @@ import (
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
-const (
-	// SlowQueryMaxLen is the max length of slow query.
-	SlowQueryMaxLen = 2048
-	// SlowQueryMaxSamplePerFingerprint is the max number of slow query samples per fingerprint.
-	SlowQueryMaxSamplePerFingerprint = 100
-	// SlowQueryMaxSamplePerDay is the max number of slow query samples per day.
-	SlowQueryMaxSamplePerDay = 10000
-)
-
 // User is the database user.
 type User struct {
 	Name  string
@@ -37,13 +28,19 @@ type InstanceMetadata struct {
 	Version string
 	// Simplified database metadata.
 	Databases []*storepb.DatabaseSchemaMetadata
-	Metadata  *storepb.InstanceMetadata
+	Metadata  *storepb.Instance
 }
 
 // TableKey is the map key for table metadata.
 type TableKey struct {
 	Schema string
 	Table  string
+}
+
+type TableKeyWithColumns struct {
+	Schema  string
+	Table   string
+	Columns []*storepb.ColumnMetadata
 }
 
 // ColumnKey is the map key for table metadata.
@@ -77,18 +74,6 @@ type DriverConfig struct {
 }
 
 type driverFunc func(DriverConfig) Driver
-
-// MigrationSource is the migration engine.
-type MigrationSource string
-
-const (
-	// UI is the migration source type for UI.
-	UI MigrationSource = "UI"
-	// VCS is the migration source type for VCS.
-	VCS MigrationSource = "VCS"
-	// LIBRARY is the migration source type for LIBRARY.
-	LIBRARY MigrationSource = "LIBRARY"
-)
 
 // MigrationType is the type of a migration.
 type MigrationType string
@@ -146,85 +131,13 @@ const (
 	Failed MigrationStatus = "FAILED"
 )
 
-// MigrationInfo is the API message for migration info.
-type MigrationInfo struct {
-	DatabaseID *int
-
-	ReleaseVersion string
-	Namespace      string
-	Database       string
-	Environment    string
-	Source         MigrationSource
-	Type           MigrationType
-	Status         MigrationStatus
-	Description    string
-	// Payload contains JSON-encoded string of VCS push event if the migration is triggered by a VCS push event.
-	Payload *storepb.InstanceChangeHistoryPayload
-
-	SheetUID *int
-	Sheet    *string
-}
-
 // ConnectionConfig is the configuration for connections.
 type ConnectionConfig struct {
-	Host string
-	Port string
-	// More hosts and ports are required by elasticsearch.
-	MultiHosts []string
-	MultiPorts []string
-	Username   string
-	Password   string
-	Database   string
-	// It's only set for Redshift datashare database.
-	DataShare bool
-	TLSConfig TLSConfig
-	// Only used for Hive.
-	SASLConfig SASLConfig
-	// ReadOnly is only supported for Postgres at the moment.
-	ReadOnly bool
-	// SRV is only supported for MongoDB now.
-	SRV bool
-	// AuthenticationDatabase is only supported for MongoDB now.
-	AuthenticationDatabase string
-	// SID and ServiceName are Oracle only.
-	SID         string
-	ServiceName string
-	SSHConfig   SSHConfig
-	// AuthenticationPrivateKey is used by Snowflake and Databricks (databricks access token).
-	AuthenticationPrivateKey string
-
+	DataSource        *storepb.DataSource
 	ConnectionContext ConnectionContext
-
-	// AuthenticationType is for the database connection, we support normal username & password or Google IAM.
-	AuthenticationType storepb.DataSourceOptions_AuthenticationType
-
-	// AdditionalAddresses and ReplicaSet name are used for MongoDB.
-	AdditionalAddresses []*storepb.DataSourceOptions_Address
-	ReplicaSet          string
-	DirectConnection    bool
-
-	// Region is the location of where the DB is, works for AWS RDS.
-	Region string
-
-	// WarehouseID is used by Databricks.
-	WarehouseID string
-
-	RedisType      storepb.DataSourceOptions_RedisType
-	MasterName     string
-	MasterUsername string
-	MasterPassword string
-
+	Password          string
 	// The maximum number of bytes for sql results in response body.
 	MaximumSQLResultSize int64
-}
-
-// SSHConfig is the configuration for connection over SSH.
-type SSHConfig struct {
-	Host       string
-	Port       string
-	User       string
-	Password   string
-	PrivateKey string
 }
 
 // ConnectionContext is the context for connection.
@@ -235,6 +148,11 @@ type ConnectionContext struct {
 	EngineVersion string
 	// UseDatabaseOwner is used by Postgres for using role of database owner.
 	UseDatabaseOwner bool
+	DatabaseName     string
+	// It's only set for Redshift datashare database.
+	DataShare bool
+	// ReadOnly is only supported for Postgres at the moment.
+	ReadOnly bool
 }
 
 // QueryContext is the context to query.
@@ -250,32 +168,6 @@ type QueryContext struct {
 	Explain       bool
 	OperatorEmail string
 	Option        *v1pb.QueryOption
-}
-
-// DatabaseRoleMessage is the API message for database role.
-type DatabaseRoleMessage struct {
-	// The role unique name.
-	Name string
-	// The connection count limit for this role.
-	ConnectionLimit int32
-	// The expiration for the role's password.
-	ValidUntil *string
-	// The role attribute.
-	Attribute *string
-}
-
-// DatabaseRoleUpsertMessage is the API message for upserting a database role.
-type DatabaseRoleUpsertMessage struct {
-	// The role unique name.
-	Name string
-	// A password is only significant if the client authentication method requires the user to supply a password when connecting to the database.
-	Password *string
-	// Connection limit can specify how many concurrent connections a role can make. -1 (the default) means no limit.
-	ConnectionLimit *int32
-	// The VALID UNTIL clause sets a date and time after which the role's password is no longer valid. If this clause is omitted the password will be valid for all time.
-	ValidUntil *string
-	// The role attribute.
-	Attribute *string
 }
 
 // Driver is the interface for database driver.
@@ -299,12 +191,6 @@ type Driver interface {
 	// SyncDBSchema syncs a single database schema.
 	SyncDBSchema(ctx context.Context) (*storepb.DatabaseSchemaMetadata, error)
 
-	// Sync slow query logs
-	// SyncSlowQuery syncs the slow query logs.
-	// The returned map is keyed by database name, and the value is list of slow query statistics grouped by query fingerprint.
-	SyncSlowQuery(ctx context.Context, logDateTs time.Time) (map[string]*storepb.SlowQueryStatistics, error)
-	// CheckSlowQueryLogEnabled checks if the slow query log is enabled.
-	CheckSlowQueryLogEnabled(ctx context.Context) error
 	// Dump dumps the schema of database.
 	Dump(ctx context.Context, out io.Writer, dbSchema *storepb.DatabaseSchemaMetadata) error
 }

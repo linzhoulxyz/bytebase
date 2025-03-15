@@ -7,6 +7,7 @@
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import Long from "long";
+import { Duration } from "../google/protobuf/duration";
 import { Expr } from "../google/type/expr";
 import { Engine, engineFromJSON, engineToJSON, engineToNumber } from "./common";
 
@@ -75,8 +76,7 @@ export function sQLReviewRuleLevelToNumber(object: SQLReviewRuleLevel): number {
 
 export interface RolloutPolicy {
   automatic: boolean;
-  workspaceRoles: string[];
-  projectRoles: string[];
+  roles: string[];
   /**
    * roles/LAST_APPROVER
    * roles/CREATOR
@@ -280,11 +280,6 @@ export function environmentTierPolicy_EnvironmentTierToNumber(object: Environmen
   }
 }
 
-/** SlowQueryPolicy is the policy configuration for slow query. */
-export interface SlowQueryPolicy {
-  active: boolean;
-}
-
 /** DisableCopyDataPolicy is the policy configuration for disabling copying data. */
 export interface DisableCopyDataPolicy {
   active: boolean;
@@ -293,6 +288,12 @@ export interface DisableCopyDataPolicy {
 /** ExportDataPolicy is the policy configuration for export data. */
 export interface ExportDataPolicy {
   disable: boolean;
+}
+
+/** QueryDataPolicy is the policy configuration for querying data. */
+export interface QueryDataPolicy {
+  /** The query timeout duration. */
+  timeout: Duration | undefined;
 }
 
 /** RestrictIssueCreationForSQLReviewPolicy is the policy configuration for restricting issue creation for SQL review. */
@@ -365,7 +366,7 @@ export function dataSourceQueryPolicy_RestrictionToNumber(object: DataSourceQuer
 }
 
 function createBaseRolloutPolicy(): RolloutPolicy {
-  return { automatic: false, workspaceRoles: [], projectRoles: [], issueRoles: [] };
+  return { automatic: false, roles: [], issueRoles: [] };
 }
 
 export const RolloutPolicy: MessageFns<RolloutPolicy> = {
@@ -373,14 +374,11 @@ export const RolloutPolicy: MessageFns<RolloutPolicy> = {
     if (message.automatic !== false) {
       writer.uint32(8).bool(message.automatic);
     }
-    for (const v of message.workspaceRoles) {
+    for (const v of message.roles) {
       writer.uint32(18).string(v!);
     }
-    for (const v of message.projectRoles) {
-      writer.uint32(26).string(v!);
-    }
     for (const v of message.issueRoles) {
-      writer.uint32(34).string(v!);
+      writer.uint32(26).string(v!);
     }
     return writer;
   },
@@ -405,19 +403,11 @@ export const RolloutPolicy: MessageFns<RolloutPolicy> = {
             break;
           }
 
-          message.workspaceRoles.push(reader.string());
+          message.roles.push(reader.string());
           continue;
         }
         case 3: {
           if (tag !== 26) {
-            break;
-          }
-
-          message.projectRoles.push(reader.string());
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
             break;
           }
 
@@ -436,12 +426,7 @@ export const RolloutPolicy: MessageFns<RolloutPolicy> = {
   fromJSON(object: any): RolloutPolicy {
     return {
       automatic: isSet(object.automatic) ? globalThis.Boolean(object.automatic) : false,
-      workspaceRoles: globalThis.Array.isArray(object?.workspaceRoles)
-        ? object.workspaceRoles.map((e: any) => globalThis.String(e))
-        : [],
-      projectRoles: globalThis.Array.isArray(object?.projectRoles)
-        ? object.projectRoles.map((e: any) => globalThis.String(e))
-        : [],
+      roles: globalThis.Array.isArray(object?.roles) ? object.roles.map((e: any) => globalThis.String(e)) : [],
       issueRoles: globalThis.Array.isArray(object?.issueRoles)
         ? object.issueRoles.map((e: any) => globalThis.String(e))
         : [],
@@ -453,11 +438,8 @@ export const RolloutPolicy: MessageFns<RolloutPolicy> = {
     if (message.automatic !== false) {
       obj.automatic = message.automatic;
     }
-    if (message.workspaceRoles?.length) {
-      obj.workspaceRoles = message.workspaceRoles;
-    }
-    if (message.projectRoles?.length) {
-      obj.projectRoles = message.projectRoles;
+    if (message.roles?.length) {
+      obj.roles = message.roles;
     }
     if (message.issueRoles?.length) {
       obj.issueRoles = message.issueRoles;
@@ -471,8 +453,7 @@ export const RolloutPolicy: MessageFns<RolloutPolicy> = {
   fromPartial(object: DeepPartial<RolloutPolicy>): RolloutPolicy {
     const message = createBaseRolloutPolicy();
     message.automatic = object.automatic ?? false;
-    message.workspaceRoles = object.workspaceRoles?.map((e) => e) || [];
-    message.projectRoles = object.projectRoles?.map((e) => e) || [];
+    message.roles = object.roles?.map((e) => e) || [];
     message.issueRoles = object.issueRoles?.map((e) => e) || [];
     return message;
   },
@@ -1315,64 +1296,6 @@ export const EnvironmentTierPolicy: MessageFns<EnvironmentTierPolicy> = {
   },
 };
 
-function createBaseSlowQueryPolicy(): SlowQueryPolicy {
-  return { active: false };
-}
-
-export const SlowQueryPolicy: MessageFns<SlowQueryPolicy> = {
-  encode(message: SlowQueryPolicy, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.active !== false) {
-      writer.uint32(8).bool(message.active);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SlowQueryPolicy {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSlowQueryPolicy();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.active = reader.bool();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): SlowQueryPolicy {
-    return { active: isSet(object.active) ? globalThis.Boolean(object.active) : false };
-  },
-
-  toJSON(message: SlowQueryPolicy): unknown {
-    const obj: any = {};
-    if (message.active !== false) {
-      obj.active = message.active;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<SlowQueryPolicy>): SlowQueryPolicy {
-    return SlowQueryPolicy.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<SlowQueryPolicy>): SlowQueryPolicy {
-    const message = createBaseSlowQueryPolicy();
-    message.active = object.active ?? false;
-    return message;
-  },
-};
-
 function createBaseDisableCopyDataPolicy(): DisableCopyDataPolicy {
   return { active: false };
 }
@@ -1485,6 +1408,66 @@ export const ExportDataPolicy: MessageFns<ExportDataPolicy> = {
   fromPartial(object: DeepPartial<ExportDataPolicy>): ExportDataPolicy {
     const message = createBaseExportDataPolicy();
     message.disable = object.disable ?? false;
+    return message;
+  },
+};
+
+function createBaseQueryDataPolicy(): QueryDataPolicy {
+  return { timeout: undefined };
+}
+
+export const QueryDataPolicy: MessageFns<QueryDataPolicy> = {
+  encode(message: QueryDataPolicy, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.timeout !== undefined) {
+      Duration.encode(message.timeout, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryDataPolicy {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryDataPolicy();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.timeout = Duration.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryDataPolicy {
+    return { timeout: isSet(object.timeout) ? Duration.fromJSON(object.timeout) : undefined };
+  },
+
+  toJSON(message: QueryDataPolicy): unknown {
+    const obj: any = {};
+    if (message.timeout !== undefined) {
+      obj.timeout = Duration.toJSON(message.timeout);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryDataPolicy>): QueryDataPolicy {
+    return QueryDataPolicy.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryDataPolicy>): QueryDataPolicy {
+    const message = createBaseQueryDataPolicy();
+    message.timeout = (object.timeout !== undefined && object.timeout !== null)
+      ? Duration.fromPartial(object.timeout)
+      : undefined;
     return message;
   },
 };

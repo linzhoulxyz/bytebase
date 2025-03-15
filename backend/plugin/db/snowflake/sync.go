@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 
@@ -49,7 +48,7 @@ func (driver *Driver) SyncInstance(ctx context.Context) (*db.InstanceMetadata, e
 	return &db.InstanceMetadata{
 		Version:   version,
 		Databases: databaseMetadataSlice,
-		Metadata: &storepb.InstanceMetadata{
+		Metadata: &storepb.Instance{
 			Roles: instanceRoles,
 		},
 	}, nil
@@ -538,14 +537,4 @@ func (driver *Driver) getTableSchema(ctx context.Context, database string) (map[
 	}
 
 	return tableMap, viewMap, nil
-}
-
-// SyncSlowQuery syncs the slow query.
-func (*Driver) SyncSlowQuery(_ context.Context, _ time.Time) (map[string]*storepb.SlowQueryStatistics, error) {
-	return nil, errors.Errorf("not implemented")
-}
-
-// CheckSlowQueryLogEnabled checks if slow query log is enabled.
-func (*Driver) CheckSlowQueryLogEnabled(_ context.Context) error {
-	return errors.Errorf("not implemented")
 }

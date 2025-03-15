@@ -440,7 +440,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
                         - MASKING_EXCEPTION
@@ -448,6 +447,7 @@ paths:
                         - TAG
                         - DATA_SOURCE_QUERY
                         - DATA_EXPORT
+                        - DATA_QUERY
                     type: string
                     format: enum
                 - name: pageSize
@@ -507,7 +507,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
                         - MASKING_EXCEPTION
@@ -515,6 +514,7 @@ paths:
                         - TAG
                         - DATA_SOURCE_QUERY
                         - DATA_EXPORT
+                        - DATA_QUERY
                     type: string
                     format: enum
             requestBody:
@@ -1254,7 +1254,7 @@ paths:
         get:
             tags:
                 - DatabaseService
-            operationId: DatabaseService_ListInstanceDatabases
+            operationId: DatabaseService_ListDatabases
             parameters:
                 - name: instance
                   in: path
@@ -1266,36 +1266,61 @@ paths:
                   in: query
                   description: |-
                     The maximum number of databases to return. The service may return fewer
-                     than this value. If unspecified, at most 10 databases will be returned.
+                     than this value.
+                     If unspecified, at most 10 databases will be returned.
+                     The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
                     format: int32
                 - name: pageToken
                   in: query
                   description: |-
-                    A page token, received from a previous `ListInstanceDatabases` call.
+                    A page token, received from a previous `ListDatabases` call.
                      Provide this to retrieve the subsequent page.
 
-                     When paginating, all other parameters provided to `ListInstanceDatabases`
-                     must match the call that provided the page token.
+                     When paginating, all other parameters provided to `ListDatabases` must
+                     match the call that provided the page token.
                   schema:
                     type: string
                 - name: filter
                   in: query
                   description: |-
-                    Deprecated.
-                     Filter is used to filter databases returned in the list.
-                     For example, `project == "projects/{project}"` can be used to list
-                     databases in a project. Note: the project filter will be moved to parent.
+                    Filter is used to filter databases returned in the list.
+                     Supported filter:
+                     - environment
+                     - name
+                     - project
+                     - instance
+                     - engine
+                     - label
+                     - exclude_unassigned: Not show unassigned databases if specified
+
+                     For example:
+                     environment == "environments/{environment resource id}"
+                     project == "projects/{project resource id}"
+                     instance == "instances/{instance resource id}"
+                     name.matches("database name")
+                     engine == "MYSQL"
+                     engine in ["MYSQL", "POSTGRES"]
+                     !(engine in ["MYSQL", "POSTGRES"])
+                     label == "region:asia"
+                     label == "tenant:asia,europe"
+                     label == "region:asia" && label == "tenant:bytebase"
+                     exclude_unassigned == true
                   schema:
                     type: string
+                - name: showDeleted
+                  in: query
+                  description: Show deleted database if specified.
+                  schema:
+                    type: boolean
             responses:
                 "200":
                     description: OK
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/ListInstanceDatabasesResponse'
+                                $ref: '#/components/schemas/ListDatabasesResponse'
                 default:
                     description: Default error response
                     content:
@@ -1497,7 +1522,7 @@ paths:
                      syntax. Support filter by type, source or table. For example: table =
                      "tableExists('{database}', '{schema}', '{table}')" table =
                      "tableExists('db', 'public', 'table1') || tableExists('db', 'public',
-                     'table2')" type = "MIGRATE | DATA" source = "UI" source = "VCS"
+                     'table2')"
 
                      The table filter follow the CEL syntax.
                      currently, we have one function for CEL:
@@ -1703,7 +1728,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
                         - MASKING_EXCEPTION
@@ -1711,6 +1735,7 @@ paths:
                         - TAG
                         - DATA_SOURCE_QUERY
                         - DATA_EXPORT
+                        - DATA_QUERY
                     type: string
                     format: enum
                 - name: pageSize
@@ -1776,7 +1801,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
                         - MASKING_EXCEPTION
@@ -1784,6 +1808,7 @@ paths:
                         - TAG
                         - DATA_SOURCE_QUERY
                         - DATA_EXPORT
+                        - DATA_QUERY
                     type: string
                     format: enum
             requestBody:
@@ -2126,6 +2151,84 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/instances/{instance}/databases/{database}/schemaString:
+        get:
+            tags:
+                - DatabaseService
+            operationId: DatabaseService_GetSchemaString
+            parameters:
+                - name: instance
+                  in: path
+                  description: The instance id.
+                  required: true
+                  schema:
+                    type: string
+                - name: database
+                  in: path
+                  description: The database id.
+                  required: true
+                  schema:
+                    type: string
+                - name: type
+                  in: query
+                  schema:
+                    enum:
+                        - OBJECT_TYPE_UNSPECIFIED
+                        - DATABASE
+                        - SCHEMA
+                        - TABLE
+                        - VIEW
+                        - MATERIALIZED_VIEW
+                        - FUNCTION
+                        - PROCEDURE
+                        - SEQUENCE
+                    type: string
+                    format: enum
+                - name: schema
+                  in: query
+                  description: It's empty for DATABASE.
+                  schema:
+                    type: string
+                - name: object
+                  in: query
+                  description: It's empty for DATABASE and SCHEMA.
+                  schema:
+                    type: string
+                - name: metadata.name
+                  in: query
+                  description: |-
+                    The database metadata name.
+
+                     Format: instances/{instance}/databases/{database}/metadata
+                  schema:
+                    type: string
+                - name: metadata.characterSet
+                  in: query
+                  description: The character_set is the character set of a database.
+                  schema:
+                    type: string
+                - name: metadata.collation
+                  in: query
+                  description: The collation is the collation of a database.
+                  schema:
+                    type: string
+                - name: metadata.owner
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetSchemaStringResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/instances/{instance}/databases/{database}/secrets:
         get:
             tags:
@@ -2260,42 +2363,6 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Secret'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
-    /v1/instances/{instance}/databases/{database}:adviseIndex:
-        post:
-            tags:
-                - DatabaseService
-            operationId: DatabaseService_AdviseIndex
-            parameters:
-                - name: instance
-                  in: path
-                  description: The instance id.
-                  required: true
-                  schema:
-                    type: string
-                - name: database
-                  in: path
-                  description: The database id.
-                  required: true
-                  schema:
-                    type: string
-                - name: statement
-                  in: query
-                  description: The statement to be advised.
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/AdviseIndexResponse'
                 default:
                     description: Default error response
                     content:
@@ -2499,7 +2566,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
                         - MASKING_EXCEPTION
@@ -2507,6 +2573,7 @@ paths:
                         - TAG
                         - DATA_SOURCE_QUERY
                         - DATA_EXPORT
+                        - DATA_QUERY
                     type: string
                     format: enum
                 - name: pageSize
@@ -2566,7 +2633,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
                         - MASKING_EXCEPTION
@@ -2574,6 +2640,7 @@ paths:
                         - TAG
                         - DATA_SOURCE_QUERY
                         - DATA_EXPORT
+                        - DATA_QUERY
                     type: string
                     format: enum
             requestBody:
@@ -2971,34 +3038,6 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
-    /v1/instances/{instance}:syncSlowQueries:
-        post:
-            tags:
-                - InstanceService
-            operationId: InstanceService_SyncSlowQueries
-            parameters:
-                - name: instance
-                  in: path
-                  description: The instance id.
-                  required: true
-                  schema:
-                    type: string
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/SyncSlowQueriesRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content: {}
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
     /v1/instances/{instance}:undelete:
         post:
             tags:
@@ -3104,7 +3143,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
                         - MASKING_EXCEPTION
@@ -3112,6 +3150,7 @@ paths:
                         - TAG
                         - DATA_SOURCE_QUERY
                         - DATA_EXPORT
+                        - DATA_QUERY
                     type: string
                     format: enum
                 - name: pageSize
@@ -3175,7 +3214,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
                         - MASKING_EXCEPTION
@@ -3183,6 +3221,7 @@ paths:
                         - TAG
                         - DATA_SOURCE_QUERY
                         - DATA_EXPORT
+                        - DATA_QUERY
                     type: string
                     format: enum
             requestBody:
@@ -3302,8 +3341,7 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    Not used.
-                     The maximum number of projects to return. The service may return fewer than
+                    The maximum number of projects to return. The service may return fewer than
                      this value.
                      If unspecified, at most 10 projects will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
@@ -3313,8 +3351,7 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    Not used.
-                     A page token, received from a previous `ListProjects` call.
+                    A page token, received from a previous `ListProjects` call.
                      Provide this to retrieve the subsequent page.
 
                      When paginating, all other parameters provided to `ListProjects` must match
@@ -3326,6 +3363,13 @@ paths:
                   description: Show deleted projects if specified.
                   schema:
                     type: boolean
+                - name: filter
+                  in: query
+                  description: |-
+                    Filter the project.
+                     Check filter for SearchProjectsRequest for details.
+                  schema:
+                    type: string
             responses:
                 "200":
                     description: OK
@@ -3958,7 +4002,9 @@ paths:
                   in: query
                   description: |-
                     The maximum number of databases to return. The service may return fewer
-                     than this value. If unspecified, at most 10 databases will be returned.
+                     than this value.
+                     If unspecified, at most 10 databases will be returned.
+                     The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
                     format: int32
@@ -3972,6 +4018,38 @@ paths:
                      match the call that provided the page token.
                   schema:
                     type: string
+                - name: filter
+                  in: query
+                  description: |-
+                    Filter is used to filter databases returned in the list.
+                     Supported filter:
+                     - environment
+                     - name
+                     - project
+                     - instance
+                     - engine
+                     - label
+                     - exclude_unassigned: Not show unassigned databases if specified
+
+                     For example:
+                     environment == "environments/{environment resource id}"
+                     project == "projects/{project resource id}"
+                     instance == "instances/{instance resource id}"
+                     name.matches("database name")
+                     engine == "MYSQL"
+                     engine in ["MYSQL", "POSTGRES"]
+                     !(engine in ["MYSQL", "POSTGRES"])
+                     label == "region:asia"
+                     label == "tenant:asia,europe"
+                     label == "region:asia" && label == "tenant:bytebase"
+                     exclude_unassigned == true
+                  schema:
+                    type: string
+                - name: showDeleted
+                  in: query
+                  description: Show deleted database if specified.
+                  schema:
+                    type: boolean
             responses:
                 "200":
                     description: OK
@@ -3979,73 +4057,6 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/ListDatabasesResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
-    /v1/projects/{project}/deploymentConfigs/{deploymentConfig}:
-        get:
-            tags:
-                - ProjectService
-            operationId: ProjectService_GetDeploymentConfig
-            parameters:
-                - name: project
-                  in: path
-                  description: The project id.
-                  required: true
-                  schema:
-                    type: string
-                - name: deploymentConfig
-                  in: path
-                  description: The deploymentConfig id.
-                  required: true
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/DeploymentConfig'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
-        patch:
-            tags:
-                - ProjectService
-            operationId: ProjectService_UpdateDeploymentConfig
-            parameters:
-                - name: project
-                  in: path
-                  description: The project id.
-                  required: true
-                  schema:
-                    type: string
-                - name: deploymentConfig
-                  in: path
-                  description: The deploymentConfig id.
-                  required: true
-                  schema:
-                    type: string
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/DeploymentConfig'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/DeploymentConfig'
                 default:
                     description: Default error response
                     content:
@@ -4897,7 +4908,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
                         - MASKING_EXCEPTION
@@ -4905,6 +4915,7 @@ paths:
                         - TAG
                         - DATA_SOURCE_QUERY
                         - DATA_EXPORT
+                        - DATA_QUERY
                     type: string
                     format: enum
                 - name: pageSize
@@ -4964,7 +4975,6 @@ paths:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
                         - MASKING_EXCEPTION
@@ -4972,6 +4982,7 @@ paths:
                         - TAG
                         - DATA_SOURCE_QUERY
                         - DATA_EXPORT
+                        - DATA_QUERY
                     type: string
                     format: enum
             requestBody:
@@ -5399,12 +5410,11 @@ paths:
                   required: true
                   schema:
                     type: string
-                - name: stageId
+                - name: target
                   in: query
                   description: |-
-                    stage_id is the id in the plan deployment_config_snapshot.
-                     The rollout is created according to the plan and the
-                     stages are created up to the stage_id.
+                    Create the rollout and the stages up to the target stage.
+                     Format: environments/{environment}
                      If unspecified, all stages are created.
                      If set to "", no stages are created.
                   schema:
@@ -6025,246 +6035,6 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
-    /v1/projects/{project}/slowQueries:
-        get:
-            tags:
-                - DatabaseService
-            operationId: DatabaseService_ListSlowQueries
-            parameters:
-                - name: project
-                  in: path
-                  description: The project id.
-                  required: true
-                  schema:
-                    type: string
-                - name: filter
-                  in: query
-                  description: |-
-                    The filter of the slow query log.
-                     follow the
-                     [ebnf](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form)
-                     syntax. Support filter by database and start_time in SlowQueryDetails for
-                     now. For example: Search the slow query log of the specific database:
-                       - the specific database: database =
-                       "instances/{instance}/databases/{database}"
-                     Search the slow query log that start_time after 2022-01-01T12:00:00.000Z:
-                       - start_time > "2022-01-01T12:00:00.000Z"
-                       - Should use [RFC-3339 format](https://www.rfc-editor.org/rfc/rfc3339).
-                       - Currently we only support filtering down to date granularity.
-                  schema:
-                    type: string
-                - name: orderBy
-                  in: query
-                  description: |-
-                    The order by of the slow query log.
-                     Support order by count, latest_log_time, average_query_time,
-                     maximum_query_time, average_rows_sent, maximum_rows_sent,
-                     average_rows_examined, maximum_rows_examined for now. For example:
-                      - order by count: order_by = "count"
-                      - order by latest_log_time desc: order_by = "latest_log_time desc"
-                     Default: order by average_query_time desc.
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ListSlowQueriesResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
-    /v1/projects/{project}/vcsConnectors:
-        get:
-            tags:
-                - VCSConnectorService
-            operationId: VCSConnectorService_ListVCSConnectors
-            parameters:
-                - name: project
-                  in: path
-                  description: The project id.
-                  required: true
-                  schema:
-                    type: string
-                - name: pageSize
-                  in: query
-                  description: |-
-                    Not used.
-                     The maximum number of vcs connectors to return. The service may return fewer than
-                     this value.
-                     If unspecified, at most 10 vcs connectors will be returned.
-                     The maximum value is 1000; values above 1000 will be coerced to 1000.
-                  schema:
-                    type: integer
-                    format: int32
-                - name: pageToken
-                  in: query
-                  description: |-
-                    Not used.
-                     A page token, received from a previous `ListVCSConnectors` call.
-                     Provide this to retrieve the subsequent page.
-
-                     When paginating, all other parameters provided to `ListVCSConnectors` must match
-                     the call that provided the page token.
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ListVCSConnectorsResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
-        post:
-            tags:
-                - VCSConnectorService
-            operationId: VCSConnectorService_CreateVCSConnector
-            parameters:
-                - name: project
-                  in: path
-                  description: The project id.
-                  required: true
-                  schema:
-                    type: string
-                - name: vcsConnectorId
-                  in: query
-                  description: |-
-                    The ID to use for the vcsConnector, which will become the final component of
-                     the vcsConnector's resource name.
-
-                     This value should be 4-63 characters, and valid characters
-                     are /[a-z][0-9]-/.
-                  schema:
-                    type: string
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/VCSConnector'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/VCSConnector'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
-    /v1/projects/{project}/vcsConnectors/{vcsConnector}:
-        get:
-            tags:
-                - VCSConnectorService
-            operationId: VCSConnectorService_GetVCSConnector
-            parameters:
-                - name: project
-                  in: path
-                  description: The project id.
-                  required: true
-                  schema:
-                    type: string
-                - name: vcsConnector
-                  in: path
-                  description: The vcsConnector id.
-                  required: true
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/VCSConnector'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
-        delete:
-            tags:
-                - VCSConnectorService
-            operationId: VCSConnectorService_DeleteVCSConnector
-            parameters:
-                - name: project
-                  in: path
-                  description: The project id.
-                  required: true
-                  schema:
-                    type: string
-                - name: vcsConnector
-                  in: path
-                  description: The vcsConnector id.
-                  required: true
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content: {}
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
-        patch:
-            tags:
-                - VCSConnectorService
-            operationId: VCSConnectorService_UpdateVCSConnector
-            parameters:
-                - name: project
-                  in: path
-                  description: The project id.
-                  required: true
-                  schema:
-                    type: string
-                - name: vcsConnector
-                  in: path
-                  description: The vcsConnector id.
-                  required: true
-                  schema:
-                    type: string
-                - name: updateMask
-                  in: query
-                  description: The list of fields to be updated.
-                  schema:
-                    type: string
-                    format: field-mask
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/VCSConnector'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/VCSConnector'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
     /v1/projects/{project}/webhooks/{webhook}:removeWebhook:
         post:
             tags:
@@ -6482,34 +6252,6 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/IamPolicy'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
-    /v1/projects/{project}:syncSlowQueries:
-        post:
-            tags:
-                - InstanceService
-            operationId: InstanceService_SyncSlowQueries
-            parameters:
-                - name: project
-                  in: path
-                  description: The project id.
-                  required: true
-                  schema:
-                    type: string
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/SyncSlowQueriesRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content: {}
                 default:
                     description: Default error response
                     content:
@@ -7086,30 +6828,6 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
-    /v1/schemaDesign:stringifyMetadata:
-        post:
-            tags:
-                - SQLService
-            operationId: SQLService_StringifyMetadata
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/StringifyMetadataRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/StringifyMetadataResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
     /v1/settings:
         get:
             tags:
@@ -7347,10 +7065,9 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    Not used.
-                     The maximum number of users to return. The service may return fewer than
+                    The maximum number of users to return. The service may return fewer than
                      this value.
-                     If unspecified, at most 50 users will be returned.
+                     If unspecified, at most 10 users will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
@@ -7358,8 +7075,7 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    Not used.
-                     A page token, received from a previous `ListUsers` call.
+                    A page token, received from a previous `ListUsers` call.
                      Provide this to retrieve the subsequent page.
 
                      When paginating, all other parameters provided to `ListUsers` must match
@@ -7371,6 +7087,27 @@ paths:
                   description: Show deleted users if specified.
                   schema:
                     type: boolean
+                - name: filter
+                  in: query
+                  description: |-
+                    Filter is used to filter users returned in the list.
+                     Supported filter:
+                     - name
+                     - email
+                     - user_type
+                     - state
+
+                     For example:
+                     name == "ed"
+                     name.matches("ed")
+                     email == "ed@bytebase.com"
+                     email.matches("ed")
+                     user_type == "SERVICE_ACCOUNT"
+                     user_type in ["SERVICE_ACCOUNT", "USER"]
+                     !(user_type in ["SERVICE_ACCOUNT", "USER"])
+                     state == "DELETED"
+                  schema:
+                    type: string
             responses:
                 "200":
                     description: OK
@@ -7549,63 +7286,19 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
-    /v1/vcsProviders:
-        get:
-            tags:
-                - VCSProviderService
-            operationId: VCSProviderService_ListVCSProviders
-            parameters:
-                - name: pageSize
-                  in: query
-                  description: |-
-                    Not used.
-                     The maximum number of vcs provider to return. The service may return fewer than this value.
-                     If unspecified, at most 10 vcs provider will be returned.
-                     The maximum value is 1000; values above 1000 will be coerced to 1000.
-                  schema:
-                    type: integer
-                    format: int32
-                - name: pageToken
-                  in: query
-                  description: |-
-                    Not used.
-                     A page token, received from a previous `ListVCSProviders` call.
-                     Provide this to retrieve the subsequent page.
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ListVCSProvidersResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
+    /v1/users:stat:
         post:
             tags:
-                - VCSProviderService
-            operationId: VCSProviderService_CreateVCSProvider
-            parameters:
-                - name: vcsProviderId
-                  in: query
-                  description: |-
-                    The ID to use for the VCS provider, which will become the final component of
-                     the VCS provider's name.
-
-                     This value should be 4-63 characters, and valid characters
-                     are /[a-z][0-9]-/.
-                  schema:
-                    type: string
+                - UserService
+            description: |-
+                Get user stat.
+                 Any authenticated user can get stat.
+            operationId: UserService_StatUsers
             requestBody:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/VCSProvider'
+                            $ref: '#/components/schemas/StatUsersRequest'
                 required: true
             responses:
                 "200":
@@ -7613,145 +7306,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/VCSProvider'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
-    /v1/vcsProviders/{vcsProvider}:
-        get:
-            tags:
-                - VCSProviderService
-            operationId: VCSProviderService_GetVCSProvider
-            parameters:
-                - name: vcsProvider
-                  in: path
-                  description: The vcsProvider id.
-                  required: true
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/VCSProvider'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
-        delete:
-            tags:
-                - VCSProviderService
-            operationId: VCSProviderService_DeleteVCSProvider
-            parameters:
-                - name: vcsProvider
-                  in: path
-                  description: The vcsProvider id.
-                  required: true
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content: {}
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
-        patch:
-            tags:
-                - VCSProviderService
-            operationId: VCSProviderService_UpdateVCSProvider
-            parameters:
-                - name: vcsProvider
-                  in: path
-                  description: The vcsProvider id.
-                  required: true
-                  schema:
-                    type: string
-                - name: updateMask
-                  in: query
-                  description: The list of fields to be updated.
-                  schema:
-                    type: string
-                    format: field-mask
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/VCSProvider'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/VCSProvider'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
-    /v1/vcsProviders/{vcsProvider}/vcsConnectors:
-        get:
-            tags:
-                - VCSProviderService
-            operationId: VCSProviderService_ListVCSConnectorsInProvider
-            parameters:
-                - name: vcsProvider
-                  in: path
-                  description: The vcsProvider id.
-                  required: true
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ListVCSConnectorsInProviderResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
-    /v1/vcsProviders/{vcsProvider}:searchRepositories:
-        post:
-            tags:
-                - VCSProviderService
-            operationId: VCSProviderService_SearchVCSProviderRepositories
-            parameters:
-                - name: vcsProvider
-                  in: path
-                  description: The vcsProvider id.
-                  required: true
-                  schema:
-                    type: string
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/SearchVCSProviderRepositoriesRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/SearchVCSProviderRepositoriesResponse'
+                                $ref: '#/components/schemas/StatUsersResponse'
                 default:
                     description: Default error response
                     content:
@@ -7976,7 +7531,9 @@ paths:
                   in: query
                   description: |-
                     The maximum number of databases to return. The service may return fewer
-                     than this value. If unspecified, at most 10 databases will be returned.
+                     than this value.
+                     If unspecified, at most 10 databases will be returned.
+                     The maximum value is 1000; values above 1000 will be coerced to 1000.
                   schema:
                     type: integer
                     format: int32
@@ -7990,6 +7547,38 @@ paths:
                      match the call that provided the page token.
                   schema:
                     type: string
+                - name: filter
+                  in: query
+                  description: |-
+                    Filter is used to filter databases returned in the list.
+                     Supported filter:
+                     - environment
+                     - name
+                     - project
+                     - instance
+                     - engine
+                     - label
+                     - exclude_unassigned: Not show unassigned databases if specified
+
+                     For example:
+                     environment == "environments/{environment resource id}"
+                     project == "projects/{project resource id}"
+                     instance == "instances/{instance resource id}"
+                     name.matches("database name")
+                     engine == "MYSQL"
+                     engine in ["MYSQL", "POSTGRES"]
+                     !(engine in ["MYSQL", "POSTGRES"])
+                     label == "region:asia"
+                     label == "tenant:asia,europe"
+                     label == "region:asia" && label == "tenant:bytebase"
+                     exclude_unassigned == true
+                  schema:
+                    type: string
+                - name: showDeleted
+                  in: query
+                  description: Show deleted database if specified.
+                  schema:
+                    type: boolean
             responses:
                 "200":
                     description: OK
@@ -8083,13 +7672,6 @@ paths:
                   schema:
                     type: integer
                     format: int32
-                - name: timeout
-                  in: query
-                  description: The timeout for the request.
-                  schema:
-                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
-                    type: string
-                    description: Represents a a duration between -315,576,000,000s and 315,576,000,000s (around 10000 years). Precision is in nanoseconds. 1 nanosecond is represented as 0.000000001s
                 - name: schema
                   in: query
                   description: |-
@@ -8138,10 +7720,10 @@ components:
                     readOnly: true
                     type: boolean
                     description: saas flag means if the Bytebase is running in SaaS mode, some features are not allowed to edit by users.
-                demoName:
+                demo:
                     readOnly: true
-                    type: string
-                    description: demo_name specifies the demo name, empty string means no demo.
+                    type: boolean
+                    description: demo flag means if the Bytebase is running in demo mode.
                 host:
                     readOnly: true
                     type: string
@@ -8175,22 +7757,9 @@ components:
                     readOnly: true
                     type: string
                     description: workspace_id is the identifier for the workspace.
-                gitopsWebhookUrl:
-                    readOnly: true
-                    type: string
-                    description: gitops_webhook_url is the webhook URL for GitOps.
                 debug:
                     type: boolean
                     description: debug flag means if the debug mode is enabled.
-                lsp:
-                    type: boolean
-                    description: lsp is the enablement of lsp in SQL Editor.
-                preUpdateBackup:
-                    type: boolean
-                    description: pre_update_backup is the enablement of data backup prior to data update.
-                iamGuard:
-                    type: boolean
-                    description: iam_guard is the enablement of IAM checks.
                 unlicensedFeatures:
                     type: array
                     items:
@@ -8277,19 +7846,6 @@ components:
                     description: 1-based positions of the sql statment.
                 endPosition:
                     $ref: '#/components/schemas/Position'
-        AdviseIndexResponse:
-            type: object
-            properties:
-                currentIndex:
-                    type: string
-                    description: The current index of the statement used.
-                suggestion:
-                    type: string
-                    description: The suggested index of the statement.
-                createIndexStatement:
-                    type: string
-                    description: The create index statement of the suggested index.
-            description: AdviseIndexResponse is the response of advising index.
         AgentPluginSetting:
             type: object
             properties:
@@ -8413,6 +7969,19 @@ components:
                     $ref: '#/components/schemas/AppIMSetting_Wecom'
                 lark:
                     $ref: '#/components/schemas/AppIMSetting_Lark'
+                dingtalk:
+                    $ref: '#/components/schemas/AppIMSetting_DingTalk'
+        AppIMSetting_DingTalk:
+            type: object
+            properties:
+                enabled:
+                    type: boolean
+                clientId:
+                    type: string
+                clientSecret:
+                    type: string
+                robotCode:
+                    type: string
         AppIMSetting_Feishu:
             type: object
             properties:
@@ -8477,8 +8046,6 @@ components:
                 role:
                     type: string
                     description: 'Format: roles/{role}'
-                externalNodeId:
-                    type: string
         ApprovalStep:
             type: object
             properties:
@@ -9090,13 +8657,6 @@ components:
                          Format: instances/{instance}/databases/{database}
                 statement:
                     type: string
-                metadata:
-                    allOf:
-                        - $ref: '#/components/schemas/DatabaseMetadata'
-                    description: |-
-                        The database metadata to check against. It can be used to check against an
-                         uncommitted metadata. If not provided, the database metadata will be
-                         fetched from the database.
                 changeType:
                     enum:
                         - CHANGE_TYPE_UNSPECIFIED
@@ -9113,6 +8673,10 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/Advice'
+                affectedRows:
+                    type: integer
+                    description: The count of affected rows of the statement on the target database.
+                    format: int32
         ColumnCatalog:
             type: object
             properties:
@@ -9274,19 +8838,23 @@ components:
                 username:
                     type: string
                 password:
-                    writeOnly: true
+                    type: string
+                obfuscatedPassword:
                     type: string
                 useSsl:
                     type: boolean
                     description: Use SSL to connect to the data source. By default, we use system default SSL configuration.
                 sslCa:
-                    writeOnly: true
+                    type: string
+                obfuscatedSslCa:
                     type: string
                 sslCert:
-                    writeOnly: true
+                    type: string
+                obfuscatedSslCert:
                     type: string
                 sslKey:
-                    writeOnly: true
+                    type: string
+                obfuscatedSslKey:
                     type: string
                 host:
                     type: string
@@ -9296,9 +8864,15 @@ components:
                     type: string
                 srv:
                     type: boolean
-                    description: srv, authentication_database and replica_set are used for MongoDB.
+                    description: |-
+                        srv, authentication_database and replica_set are used for MongoDB.
+                         srv is a boolean flag that indicates whether the host is a DNS SRV record.
                 authenticationDatabase:
                     type: string
+                    description: authentication_database is the database name to authenticate against, which stores the user credentials.
+                replicaSet:
+                    type: string
+                    description: replica_set is used for MongoDB replica set.
                 sid:
                     type: string
                     description: sid and service_name are used for Oracle.
@@ -9307,33 +8881,31 @@ components:
                 sshHost:
                     type: string
                     description: |-
-                        Connection over SSH.
+                        SSH related
                          The hostname of the SSH server agent.
-                         Required.
                 sshPort:
                     type: string
-                    description: |-
-                        The port of the SSH server agent. It's 22 typically.
-                         Required.
+                    description: The port of the SSH server agent. It's 22 typically.
                 sshUser:
                     type: string
-                    description: |-
-                        The user to login the server.
-                         Required.
+                    description: The user to login the server.
                 sshPassword:
-                    writeOnly: true
                     type: string
                     description: The password to login the server. If it's empty string, no password is required.
+                obfuscatedSshPassword:
+                    type: string
                 sshPrivateKey:
-                    writeOnly: true
                     type: string
                     description: The private key to login the server. If it's empty string, we will use the system default private key from os.Getenv("SSH_AUTH_SOCK").
+                obfuscatedSshPrivateKey:
+                    type: string
                 authenticationPrivateKey:
-                    writeOnly: true
                     type: string
                     description: |-
                         PKCS#8 private key in PEM format. If it's empty string, no private key is required.
                          Used for authentication when connecting to the data source.
+                obfuscatedAuthenticationPrivateKey:
+                    type: string
                 externalSecret:
                     $ref: '#/components/schemas/DataSourceExternalSecret'
                 authenticationType:
@@ -9342,8 +8914,11 @@ components:
                         - PASSWORD
                         - GOOGLE_CLOUD_SQL_IAM
                         - AWS_RDS_IAM
+                        - AZURE_IAM
                     type: string
                     format: enum
+                clientSecretCredential:
+                    $ref: '#/components/schemas/DataSource_ClientSecretCredential'
                 saslConfig:
                     $ref: '#/components/schemas/SASLConfig'
                 additionalAddresses:
@@ -9351,9 +8926,6 @@ components:
                     items:
                         $ref: '#/components/schemas/DataSource_Address'
                     description: additional_addresses is used for MongoDB replica set.
-                replicaSet:
-                    type: string
-                    description: replica_set is used for MongoDB replica set.
                 directConnection:
                     type: boolean
                     description: direct_connection is used for MongoDB to dispatch all the operations to the node specified in the connection string.
@@ -9368,8 +8940,10 @@ components:
                     description: master_name is the master name used by connecting redis-master via redis sentinel.
                 masterUsername:
                     type: string
-                    description: master_username and master_password are master credentials used by redis sentinel mode.
+                    description: master_username and master_obfuscated_password are master credentials used by redis sentinel mode.
                 masterPassword:
+                    type: string
+                obfuscatedMasterPassword:
                     type: string
                 redisType:
                     enum:
@@ -9382,6 +8956,13 @@ components:
                 cluster:
                     type: string
                     description: Cluster is the cluster name for the data source. Used by CockroachDB.
+                extraConnectionParameters:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: |-
+                        Extra connection parameters for the database connection.
+                         For PostgreSQL HA, this can be used to set target_session_attrs=read-write
         DataSourceExternalSecret:
             type: object
             properties:
@@ -9459,6 +9040,16 @@ components:
                     type: string
                 port:
                     type: string
+        DataSource_ClientSecretCredential:
+            type: object
+            properties:
+                tenantId:
+                    type: string
+                clientId:
+                    type: string
+                clientSecret:
+                    readOnly: true
+                    type: string
         Database:
             type: object
             properties:
@@ -9468,14 +9059,14 @@ components:
                         The name of the database.
                          Format: instances/{instance}/databases/{database}
                          {database} is the database name in the instance.
-                syncState:
+                state:
                     readOnly: true
                     enum:
                         - STATE_UNSPECIFIED
                         - ACTIVE
                         - DELETED
                     type: string
-                    description: The existence of a database on latest sync.
+                    description: The existence of a database.
                     format: enum
                 successfulSyncTime:
                     readOnly: true
@@ -9580,6 +9171,12 @@ components:
                     format: date-time
                 backupAvailable:
                     type: boolean
+                datashare:
+                    type: boolean
+                secrets:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Secret'
             description: DatabaseMetadata is the metadata for databases.
         DatabaseSchema:
             type: object
@@ -9588,16 +9185,17 @@ components:
                     type: string
                     description: The schema dump from database.
             description: DatabaseSchema is the metadata for databases.
-        DeploymentConfig:
+        Deployment_DatabaseGroupMapping:
             type: object
             properties:
-                schedule:
-                    $ref: '#/components/schemas/Schedule'
-        DeploymentSpec:
-            type: object
-            properties:
-                selector:
-                    $ref: '#/components/schemas/LabelSelector'
+                databaseGroup:
+                    type: string
+                    description: 'Format: projects/{project}/databaseGroups/{databaseGroup}.'
+                databases:
+                    type: array
+                    items:
+                        type: string
+                    description: 'Format: instances/{instance-id}/databases/{database-name}.'
         DiffMetadataRequest:
             required:
                 - sourceMetadata
@@ -9890,28 +9488,6 @@ components:
                  The exact variables and functions that may be referenced within an expression
                  are determined by the service that evaluates it. See the service
                  documentation for additional information.
-        ExternalApprovalSetting:
-            type: object
-            properties:
-                nodes:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/ExternalApprovalSetting_Node'
-        ExternalApprovalSetting_Node:
-            type: object
-            properties:
-                id:
-                    type: string
-                    description: |-
-                        A unique identifier for a node in UUID format.
-                         We will also include the id in the message sending to the external relay
-                         service to identify the node.
-                title:
-                    type: string
-                    description: The title of the node.
-                endpoint:
-                    type: string
-                    description: The external endpoint for the relay service, e.g. "http://hello:1234".
         Feature:
             type: object
             properties:
@@ -10002,6 +9578,11 @@ components:
                     type: string
                     format: enum
                 expression:
+                    type: string
+        GetSchemaStringResponse:
+            type: object
+            properties:
+                schemaString:
                     type: string
         GoogleProtobufAny:
             type: object
@@ -10183,18 +9764,6 @@ components:
         Instance:
             type: object
             properties:
-                name:
-                    type: string
-                    description: |-
-                        The name of the instance.
-                         Format: instances/{instance}
-                state:
-                    enum:
-                        - STATE_UNSPECIFIED
-                        - ACTIVE
-                        - DELETED
-                    type: string
-                    format: enum
                 title:
                     type: string
                 engine:
@@ -10228,8 +9797,9 @@ components:
                         - COSMOSDB
                     type: string
                     format: enum
-                engineVersion:
-                    readOnly: true
+                activation:
+                    type: boolean
+                version:
                     type: string
                 externalLink:
                     type: string
@@ -10237,23 +9807,6 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/DataSource'
-                environment:
-                    type: string
-                    description: |-
-                        The environment resource.
-                         Format: environments/prod where prod is the environment resource ID.
-                activation:
-                    type: boolean
-                options:
-                    $ref: '#/components/schemas/InstanceOptions'
-                roles:
-                    readOnly: true
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/InstanceRole'
-        InstanceOptions:
-            type: object
-            properties:
                 syncInterval:
                     pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
                     type: string
@@ -10271,7 +9824,20 @@ components:
                     description: |-
                         Enable sync for following databases.
                          Default empty, means sync all schemas & databases.
-            description: InstanceOptions is the option for instances.
+                mysqlLowerCaseTableNames:
+                    type: integer
+                    description: |-
+                        The lower_case_table_names config for MySQL instances.
+                         It is used to determine whether the table names and database names are case sensitive.
+                    format: int32
+                lastSyncTime:
+                    type: string
+                    format: date-time
+                roles:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/InstanceRole'
+            description: Instance is the proto for instances.
         InstanceResource:
             type: object
             properties:
@@ -10432,7 +9998,6 @@ components:
                     description: |-
                         The releasers of the pending stage of the issue rollout, judging
                          from the rollout policy.
-                         If the policy is auto rollout, the releasers are the project owners and the issue creator.
                          Format:
                          - roles/workspaceOwner
                          - roles/workspaceDBA
@@ -10695,32 +10260,6 @@ components:
                     type: string
                 group:
                     type: string
-        LabelSelector:
-            type: object
-            properties:
-                matchExpressions:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/LabelSelectorRequirement'
-                    description: match_expressions is a list of label selector requirements. The requirements are ANDed.
-        LabelSelectorRequirement:
-            type: object
-            properties:
-                key:
-                    type: string
-                operator:
-                    enum:
-                        - OPERATOR_TYPE_UNSPECIFIED
-                        - IN
-                        - EXISTS
-                        - NOT_IN
-                    type: string
-                    format: enum
-                values:
-                    type: array
-                    items:
-                        type: string
-                    description: Values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
         ListChangelistsResponse:
             type: object
             properties:
@@ -10835,19 +10374,6 @@ components:
                     items:
                         type: string
                     description: All database name list in the instance.
-        ListInstanceDatabasesResponse:
-            type: object
-            properties:
-                databases:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/Database'
-                    description: The databases from the specified request.
-                nextPageToken:
-                    type: string
-                    description: |-
-                        A token, which can be sent as `page_token` to retrieve the next page.
-                         If this field is omitted, there are no subsequent pages.
         ListInstanceRolesResponse:
             type: object
             properties:
@@ -11051,15 +10577,6 @@ components:
                     description: |-
                         A token, which can be sent as `page_token` to retrieve the next page.
                          If this field is omitted, there are no subsequent pages.
-        ListSlowQueriesResponse:
-            type: object
-            properties:
-                slowQueryLogs:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/SlowQueryLog'
-                    description: The slow query logs.
-            description: ListSlowQueriesResponse is the response of listing slow query.
         ListTaskRunsResponse:
             type: object
             properties:
@@ -11085,40 +10602,6 @@ components:
                     type: string
                     description: |-
                         A token, which can be sent as `page_token` to retrieve the next page.
-                         If this field is omitted, there are no subsequent pages.
-        ListVCSConnectorsInProviderResponse:
-            type: object
-            properties:
-                vcsConnectors:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/VCSConnector'
-                    description: The vcsConnectors from the specified request.
-        ListVCSConnectorsResponse:
-            type: object
-            properties:
-                vcsConnectors:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/VCSConnector'
-                    description: The vcsConnectors from the specified request.
-                nextPageToken:
-                    type: string
-                    description: |-
-                        A token, which can be sent as `page_token` to retrieve the next page.
-                         If this field is omitted, there are no subsequent pages.
-        ListVCSProvidersResponse:
-            type: object
-            properties:
-                vcsProviders:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/VCSProvider'
-                    description: The list of vcs providers.
-                nextPageToken:
-                    type: string
-                    description: |-
-                        Not used. A token, which can be sent as `page_token` to retrieve the next page.
                          If this field is omitted, there are no subsequent pages.
         LoginRequest:
             type: object
@@ -11393,8 +10876,6 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/Plan_Step'
-                vcsSource:
-                    $ref: '#/components/schemas/Plan_VCSSource'
                 creator:
                     readOnly: true
                     type: string
@@ -11421,13 +10902,8 @@ components:
                          - ERROR
                 releaseSource:
                     $ref: '#/components/schemas/Plan_ReleaseSource'
-                deploymentConfigSnapshot:
-                    readOnly: true
-                    allOf:
-                        - $ref: '#/components/schemas/DeploymentConfig'
-                    description: |-
-                        The deployment config snapshot taken at the time of plan creation.
-                         This is to ensure that we get consistent rollout for the plan.
+                deployment:
+                    $ref: '#/components/schemas/Plan_Deployment'
         PlanCheckRun:
             type: object
             properties:
@@ -11519,7 +10995,7 @@ components:
                 schemaVersion:
                     type: string
                     description: |-
-                        schema_version is parsed from VCS file name.
+                        schema_version is parsed from file name.
                          It is automatically generated in the UI workflow.
                 ghostFlags:
                     type: object
@@ -11565,11 +11041,19 @@ components:
                     description: |-
                         The environment resource.
                          Format: environments/prod where prod is the environment resource ID.
-                labels:
-                    type: object
-                    additionalProperties:
+        Plan_Deployment:
+            type: object
+            properties:
+                environments:
+                    type: array
+                    items:
                         type: string
-                    description: labels of the database.
+                    description: The environments deploy order.
+                databaseGroupMappings:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Deployment_DatabaseGroupMapping'
+                    description: The database group mapping.
         Plan_ExportDataConfig:
             type: object
             properties:
@@ -11616,13 +11100,6 @@ components:
                 id:
                     type: string
                     description: A UUID4 string that uniquely identifies the Spec.
-                dependsOnSpecs:
-                    type: array
-                    items:
-                        type: string
-                    description: |-
-                        IDs of the specs that this spec depends on.
-                         Must be a subset of the specs in the same step.
                 specReleaseSource:
                     $ref: '#/components/schemas/Plan_SpecReleaseSource'
                 createDatabaseConfig:
@@ -11648,26 +11125,6 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/Plan_Spec'
-        Plan_VCSSource:
-            type: object
-            properties:
-                vcsType:
-                    enum:
-                        - VCS_TYPE_UNSPECIFIED
-                        - GITHUB
-                        - GITLAB
-                        - BITBUCKET
-                        - AZURE_DEVOPS
-                    type: string
-                    format: enum
-                vcsConnector:
-                    type: string
-                    description: |-
-                        Optional.
-                         If present, we will update the pull request for rollout status.
-                         Format: projects/{project-ID}/vcsConnectors/{vcs-connector}
-                pullRequestUrl:
-                    type: string
         Policy:
             type: object
             properties:
@@ -11686,7 +11143,6 @@ components:
                     enum:
                         - POLICY_TYPE_UNSPECIFIED
                         - ROLLOUT_POLICY
-                        - SLOW_QUERY
                         - DISABLE_COPY_DATA
                         - MASKING_RULE
                         - MASKING_EXCEPTION
@@ -11694,12 +11150,11 @@ components:
                         - TAG
                         - DATA_SOURCE_QUERY
                         - DATA_EXPORT
+                        - DATA_QUERY
                     type: string
                     format: enum
                 rolloutPolicy:
                     $ref: '#/components/schemas/RolloutPolicy'
-                slowQueryPolicy:
-                    $ref: '#/components/schemas/SlowQueryPolicy'
                 disableCopyDataPolicy:
                     $ref: '#/components/schemas/DisableCopyDataPolicy'
                 maskingRulePolicy:
@@ -11714,6 +11169,8 @@ components:
                     $ref: '#/components/schemas/DataSourceQueryPolicy'
                 exportDataPolicy:
                     $ref: '#/components/schemas/ExportDataPolicy'
+                queryDataPolicy:
+                    $ref: '#/components/schemas/QueryDataPolicy'
                 enforce:
                     type: boolean
                 resourceType:
@@ -11962,6 +11419,14 @@ components:
                 allowSelfApproval:
                     type: boolean
                     description: Whether to allow the issue creator to self-approve the issue.
+        QueryDataPolicy:
+            type: object
+            properties:
+                timeout:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                    description: The query timeout duration.
+            description: QueryDataPolicy is the policy configuration for querying data.
         QueryHistory:
             type: object
             properties:
@@ -12028,10 +11493,6 @@ components:
                     type: integer
                     description: The maximum number of rows to return.
                     format: int32
-                timeout:
-                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
-                    type: string
-                    description: The timeout for the request.
                 dataSourceId:
                     type: string
                     description: |-
@@ -12547,11 +12008,7 @@ components:
             properties:
                 automatic:
                     type: boolean
-                workspaceRoles:
-                    type: array
-                    items:
-                        type: string
-                projectRoles:
+                roles:
                     type: array
                     items:
                         type: string
@@ -12762,24 +12219,6 @@ components:
                     format: enum
                 comment:
                     type: string
-        Schedule:
-            type: object
-            properties:
-                deployments:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/ScheduleDeployment'
-            description: Schedule is the message for deployment schedule.
-        ScheduleDeployment:
-            type: object
-            properties:
-                title:
-                    type: string
-                    description: The title of the deployment (stage) in a schedule.
-                id:
-                    type: string
-                spec:
-                    $ref: '#/components/schemas/DeploymentSpec'
         SchedulerInfo_WaitingCause:
             type: object
             properties:
@@ -13131,6 +12570,23 @@ components:
                 showDeleted:
                     type: boolean
                     description: Show deleted projects if specified.
+                filter:
+                    type: string
+                    description: |-
+                        Filter the project.
+                         Supported filters:
+                         - name
+                         - resource_id
+                         - exclude_default: if not include the default project.
+
+                         For example:
+                         name = "project name"
+                         name.matches("project name")
+                         resource_id = "project id"
+                         resource_id.matches("project id")
+                         name = "project name" && resource_id.matches("project id")
+                         name.matches("project name") || resource_id = "project id"
+                         exclude_default == true
         SearchProjectsResponse:
             type: object
             properties:
@@ -13165,7 +12621,7 @@ components:
                          - database, for example:
                             database = "instances/{instance}/databases/{database}"
                          - instance, for example:
-                            instance = "instance/{instance}"
+                            instance = "instances/{instance}"
                          - type, for example:
                             type = "QUERY"
         SearchQueryHistoriesResponse:
@@ -13183,24 +12639,6 @@ components:
                         A token to retrieve next page of history.
                          Pass this value in the page_token field in the subsequent call to
                          `ListQueryHistory` method to retrieve the next page of history.
-        SearchVCSProviderRepositoriesRequest:
-            required:
-                - name
-            type: object
-            properties:
-                name:
-                    type: string
-                    description: |-
-                        The name of the vcs provider to retrieve the vcs provider repositories.
-                         Format: vcsProviders/{vcsProvider}
-        SearchVCSProviderRepositoriesResponse:
-            type: object
-            properties:
-                repositories:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/VCSRepository'
-                    description: The list of repositories in vcs provider.
         SearchWorksheetsRequest:
             type: object
             properties:
@@ -13245,34 +12683,17 @@ components:
                         Not used. A token, which can be sent as `page_token` to retrieve the next page.
                          If this field is omitted, there are no subsequent pages.
         Secret:
-            required:
-                - name
             type: object
             properties:
                 name:
                     type: string
-                    description: |-
-                        name is the unique name of the secret, which is specified by the client.
-                         Format:
-                         instances/{instance}/databases/{database}/secrets/{secret}
-                createdTime:
-                    readOnly: true
-                    type: string
-                    description: Not used. The timestamp when the secret resource was created initially.
-                    format: date-time
-                updatedTime:
-                    readOnly: true
-                    type: string
-                    description: Not used. The timestamp when the secret resource was updated.
-                    format: date-time
+                    description: The name is the name of the secret.
                 value:
-                    writeOnly: true
                     type: string
-                    description: The value of the secret.
+                    description: The value is the value of the secret.
                 description:
                     type: string
-                    description: The description of the secret.
-            description: Secret is the secret of the database now.
+                    description: The description is the description of the secret.
         SemanticTypeSetting:
             type: object
             properties:
@@ -13422,105 +12843,6 @@ components:
                     items:
                         $ref: '#/components/schemas/SheetCommand'
                     description: The start and end position of each command in the sheet statement.
-        SlowQueryDetails:
-            type: object
-            properties:
-                startTime:
-                    type: string
-                    description: The start time of the slow query log.
-                    format: date-time
-                queryTime:
-                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
-                    type: string
-                    description: The query time of the slow query log.
-                lockTime:
-                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
-                    type: string
-                    description: The lock time of the slow query log.
-                rowsSent:
-                    type: string
-                    description: The rows sent of the slow query log.
-                rowsExamined:
-                    type: string
-                    description: The rows examined of the slow query log.
-                sqlText:
-                    type: string
-                    description: The sql text of the slow query log.
-            description: SlowQueryDetails is the details of the slow query log.
-        SlowQueryLog:
-            required:
-                - resource
-            type: object
-            properties:
-                resource:
-                    type: string
-                    description: |-
-                        The resource of the slow query log.
-                         The format is "instances/{instance}/databases/{database}".
-                project:
-                    type: string
-                    description: |-
-                        The project of the slow query log.
-                         The format is "projects/{project}".
-                statistics:
-                    allOf:
-                        - $ref: '#/components/schemas/SlowQueryStatistics'
-                    description: The statistics of the slow query log.
-            description: SlowQueryLog is the slow query log.
-        SlowQueryPolicy:
-            type: object
-            properties:
-                active:
-                    type: boolean
-        SlowQueryStatistics:
-            type: object
-            properties:
-                sqlFingerprint:
-                    type: string
-                    description: The fingerprint of the slow query log.
-                count:
-                    type: string
-                    description: The count of the slow query log.
-                latestLogTime:
-                    type: string
-                    description: The latest log time of the slow query log.
-                    format: date-time
-                averageQueryTime:
-                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
-                    type: string
-                    description: The average query time of the slow query log.
-                maximumQueryTime:
-                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
-                    type: string
-                    description: The maximum query time of the slow query log.
-                averageRowsSent:
-                    type: string
-                    description: The average rows sent of the slow query log.
-                maximumRowsSent:
-                    type: string
-                    description: The maximum rows sent of the slow query log.
-                averageRowsExamined:
-                    type: string
-                    description: The average rows examined of the slow query log.
-                maximumRowsExamined:
-                    type: string
-                    description: The maximum rows examined of the slow query log.
-                queryTimePercent:
-                    type: number
-                    description: The percentage of the query time.
-                    format: double
-                countPercent:
-                    type: number
-                    description: The percentage of the count.
-                    format: double
-                samples:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/SlowQueryDetails'
-                    description: |-
-                        Samples are details of the sample slow query logs with the same
-                         fingerprint.
-            description: SlowQueryStatistics is the statistics of the slow query log.
         Stage:
             type: object
             properties:
@@ -13534,12 +12856,43 @@ components:
                         The id comes from the deployment config.
                          Format: UUID
                          Empty for legacy stages.
-                title:
+                environment:
                     type: string
                 tasks:
                     type: array
                     items:
                         $ref: '#/components/schemas/Task'
+        StatUsersRequest:
+            type: object
+            properties: {}
+        StatUsersResponse:
+            type: object
+            properties:
+                stats:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/StatUsersResponse_StatUser'
+        StatUsersResponse_StatUser:
+            type: object
+            properties:
+                userType:
+                    enum:
+                        - USER_TYPE_UNSPECIFIED
+                        - USER
+                        - SYSTEM_BOT
+                        - SERVICE_ACCOUNT
+                    type: string
+                    format: enum
+                state:
+                    enum:
+                        - STATE_UNSPECIFIED
+                        - ACTIVE
+                        - DELETED
+                    type: string
+                    format: enum
+                count:
+                    type: integer
+                    format: int32
         Status:
             type: object
             properties:
@@ -13556,58 +12909,6 @@ components:
                         $ref: '#/components/schemas/GoogleProtobufAny'
                     description: A list of messages that carry the error details.  There is a common set of message types for APIs to use.
             description: 'The `Status` type defines a logical error model that is suitable for different programming environments, including REST APIs and RPC APIs. It is used by [gRPC](https://github.com/grpc). Each `Status` message contains three pieces of data: error code, error message, and error details. You can find out more about this error model and how to work with it in the [API Design Guide](https://cloud.google.com/apis/design/errors).'
-        StringifyMetadataRequest:
-            required:
-                - metadata
-            type: object
-            properties:
-                metadata:
-                    $ref: '#/components/schemas/DatabaseMetadata'
-                engine:
-                    enum:
-                        - ENGINE_UNSPECIFIED
-                        - CLICKHOUSE
-                        - MYSQL
-                        - POSTGRES
-                        - SNOWFLAKE
-                        - SQLITE
-                        - TIDB
-                        - MONGODB
-                        - REDIS
-                        - ORACLE
-                        - SPANNER
-                        - MSSQL
-                        - REDSHIFT
-                        - MARIADB
-                        - OCEANBASE
-                        - DM
-                        - RISINGWAVE
-                        - OCEANBASE_ORACLE
-                        - STARROCKS
-                        - DORIS
-                        - HIVE
-                        - ELASTICSEARCH
-                        - BIGQUERY
-                        - DYNAMODB
-                        - DATABRICKS
-                        - COCKROACHDB
-                        - COSMOSDB
-                    type: string
-                    description: The database engine of the schema string.
-                    format: enum
-                classificationFromConfig:
-                    type: boolean
-                    description: If false, we will build the raw common by classification in database catalog.
-                catalog:
-                    allOf:
-                        - $ref: '#/components/schemas/DatabaseCatalog'
-                    description: Database catlog is required if classification_from_config is false.
-        StringifyMetadataResponse:
-            type: object
-            properties:
-                schema:
-                    readOnly: true
-                    type: string
         Subscription:
             type: object
             properties:
@@ -13681,17 +12982,6 @@ components:
                     items:
                         type: string
                     description: All database name list in the instance.
-        SyncSlowQueriesRequest:
-            required:
-                - parent
-            type: object
-            properties:
-                parent:
-                    type: string
-                    description: |-
-                        The name of the instance to sync slow queries.
-                         Format: instances/{instance} for one instance
-                              or projects/{project} for one project.
         TableCatalog:
             type: object
             properties:
@@ -13786,6 +13076,8 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/TriggerMetadata'
+                skipDump:
+                    type: boolean
             description: TableMetadata is the metadata for tables.
         TablePartitionMetadata:
             type: object
@@ -13864,8 +13156,6 @@ components:
                 name:
                     type: string
                     description: 'Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task}'
-                title:
-                    type: string
                 specId:
                     type: string
                     description: |-
@@ -13894,17 +13184,11 @@ components:
                         - DATABASE_SCHEMA_BASELINE
                         - DATABASE_SCHEMA_UPDATE
                         - DATABASE_SCHEMA_UPDATE_SDL
-                        - DATABASE_SCHEMA_UPDATE_GHOST_SYNC
-                        - DATABASE_SCHEMA_UPDATE_GHOST_CUTOVER
+                        - DATABASE_SCHEMA_UPDATE_GHOST
                         - DATABASE_DATA_UPDATE
                         - DATABASE_DATA_EXPORT
                     type: string
                     format: enum
-                dependsOnTasks:
-                    type: array
-                    items:
-                        type: string
-                    description: 'Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task}'
                 target:
                     type: string
                     description: |-
@@ -13944,8 +13228,6 @@ components:
                     readOnly: true
                     type: string
                     format: date-time
-                title:
-                    type: string
                 status:
                     enum:
                         - STATUS_UNSPECIFIED
@@ -14173,10 +13455,6 @@ components:
                     type: string
                 environment:
                     type: string
-                labels:
-                    type: object
-                    additionalProperties:
-                        type: string
         Task_DatabaseDataExport:
             type: object
             properties:
@@ -14284,6 +13562,8 @@ components:
                     type: string
                 comment:
                     type: string
+                skipDump:
+                    type: boolean
         UndeleteEnvironmentRequest:
             required:
                 - name
@@ -14450,103 +13730,6 @@ components:
                 source:
                     type: string
                     description: source means where the user comes from. For now we support Entra ID SCIM sync, so the source could be Entra ID.
-        VCSConnector:
-            type: object
-            properties:
-                title:
-                    type: string
-                    description: The title or display name of the VCS connector.
-                fullPath:
-                    type: string
-                    description: |-
-                        Full path from the corresponding VCS provider.
-                         For GitLab, this is the project full path. e.g. group1/project-1
-                webUrl:
-                    type: string
-                    description: |-
-                        Web url from the corresponding VCS provider.
-                         For GitLab, this is the project web url. e.g. https://gitlab.example.com/group1/project-1
-                branch:
-                    type: string
-                    description: Branch to listen to.
-                baseDirectory:
-                    type: string
-                    description: Base working directory we are interested.
-                externalId:
-                    type: string
-                    description: |-
-                        Repository id from the corresponding VCS provider.
-                         For GitLab, this is the project id. e.g. 123
-                externalWebhookId:
-                    type: string
-                    description: |-
-                        Push webhook id from the corresponding VCS provider.
-                         For GitLab, this is the project webhook id. e.g. 123
-                webhookSecretToken:
-                    type: string
-                    description: For GitLab, webhook request contains this in the 'X-Gitlab-Token" header and we compare it with the one stored in db to validate it sends to the expected endpoint.
-                databaseGroup:
-                    type: string
-                    description: |-
-                        Apply changes to the database group. Optional, if not set, will apply changes to all databases in the project.
-                         Format: projects/{project}/databaseGroups/{databaseGroup}
-        VCSProvider:
-            required:
-                - title
-                - type
-                - url
-            type: object
-            properties:
-                name:
-                    readOnly: true
-                    type: string
-                    description: |-
-                        The name of the vcs provider.
-                         Format: vcsProviders/{vcsProvider}
-                title:
-                    type: string
-                    description: The title of the vcs provider. It is used to display in the UI. Specified by the client.
-                type:
-                    enum:
-                        - VCS_TYPE_UNSPECIFIED
-                        - GITHUB
-                        - GITLAB
-                        - BITBUCKET
-                        - AZURE_DEVOPS
-                    type: string
-                    format: enum
-                url:
-                    type: string
-                    description: |-
-                        The url of the vcs provider. Specified by the client.
-                         For example: github.com, gitlab.com, gitlab.bytebase.com.
-                accessToken:
-                    writeOnly: true
-                    type: string
-                    description: The access token of the vcs provider.
-        VCSRepository:
-            type: object
-            properties:
-                id:
-                    type: string
-                    description: |-
-                        The id of the repository in vcs provider.
-                         e.g. In GitLab, this is the corresponding project id. e.g. 123
-                title:
-                    type: string
-                    description: |-
-                        The title of the repository in vcs provider.
-                         e.g. sample-project
-                fullPath:
-                    type: string
-                    description: |-
-                        The full_path of the repository in vcs provider.
-                         e.g. bytebase/sample-project
-                webUrl:
-                    type: string
-                    description: |-
-                        Web url of the repository in vcs provider.
-                         e.g. http://gitlab.bytebase.com/bytebase/sample-project
         Value:
             type: object
             properties:
@@ -14565,8 +13748,6 @@ components:
                     $ref: '#/components/schemas/WorkspaceApprovalSetting'
                 workspaceTrialSettingValue:
                     $ref: '#/components/schemas/WorkspaceTrialSetting'
-                externalApprovalSettingValue:
-                    $ref: '#/components/schemas/ExternalApprovalSetting'
                 schemaTemplateSettingValue:
                     $ref: '#/components/schemas/SchemaTemplateSetting'
                 dataClassificationSettingValue:
@@ -14595,14 +13776,13 @@ components:
                 type:
                     enum:
                         - TYPE_UNSPECIFIED
-                        - TYPE_SLACK
-                        - TYPE_DISCORD
-                        - TYPE_TEAMS
-                        - TYPE_DINGTALK
-                        - TYPE_FEISHU
-                        - TYPE_WECOM
-                        - TYPE_CUSTOM
-                        - TYPE_LARK
+                        - SLACK
+                        - DISCORD
+                        - TEAMS
+                        - DINGTALK
+                        - FEISHU
+                        - WECOM
+                        - LARK
                     type: string
                     description: type is the type of the webhook.
                     format: enum
@@ -14758,12 +13938,7 @@ components:
             properties:
                 externalUrl:
                     type: string
-                    description: |-
-                        The URL user visits Bytebase.
-
-                         The external URL is used for:
-                         1. Constructing the correct callback URL when configuring the VCS provider. The callback URL points to the frontend.
-                         2. Creating the correct webhook endpoint when configuring the project GitOps workflow. The webhook endpoint points to the backend.
+                    description: The external URL is used for sso authentication callback.
                 disallowSignup:
                     type: boolean
                     description: Disallow self-service signup, users can only be invited by the owner.
@@ -14775,9 +13950,6 @@ components:
                     items:
                         type: string
                     description: outbound_ip_list is the outbound IP for Bytebase instance in SaaS mode.
-                gitopsWebhookUrl:
-                    type: string
-                    description: The webhook URL for the GitOps workflow.
                 tokenDuration:
                     pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
                     type: string
@@ -14862,7 +14034,5 @@ tags:
     - name: SheetService
     - name: SubscriptionService
     - name: UserService
-    - name: VCSConnectorService
-    - name: VCSProviderService
     - name: WorksheetService
     - name: WorkspaceService

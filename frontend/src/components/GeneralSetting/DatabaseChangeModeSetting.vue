@@ -3,7 +3,7 @@
     <div class="text-left lg:w-1/4">
       <div class="flex items-center space-x-2">
         <h1 class="text-2xl font-bold">
-          {{ $t("settings.general.workspace.database-change-mode.self") }}
+          {{ title }}
         </h1>
       </div>
     </div>
@@ -61,17 +61,6 @@
           </NSpace>
         </NRadioGroup>
       </div>
-      <div class="mt-4">
-        <div class="flex justify-end">
-          <NButton
-            type="primary"
-            :disabled="!allowEdit || !allowSave"
-            @click.prevent="save"
-          >
-            {{ $t("common.update") }}
-          </NButton>
-        </div>
-      </div>
     </div>
 
     <BBModal
@@ -103,16 +92,13 @@
 </template>
 
 <script lang="ts" setup>
-import { isEqual } from "lodash-es";
 import { NRadioGroup, NSpace, NRadio, NButton } from "naive-ui";
 import { computed, reactive, ref } from "vue";
-import { useI18n } from "vue-i18n";
 import { BBModal } from "@/bbkit";
 import LearnMoreLink from "@/components/LearnMoreLink.vue";
 import { router } from "@/router";
-import { WORKSPACE_ROOT_MODULE } from "@/router/dashboard/workspaceRoutes";
+import { WORKSPACE_ROUTE_LANDING } from "@/router/dashboard/workspaceRoutes";
 import { SQL_EDITOR_HOME_MODULE } from "@/router/sqlEditor";
-import { pushNotification } from "@/store";
 import { useSettingV1Store } from "@/store/modules/v1/setting";
 import { DatabaseChangeMode } from "@/types/proto/v1/setting_service";
 import { isSQLEditorRoute } from "@/utils";
@@ -138,31 +124,27 @@ const getInitialState = (): LocalState => {
   }
   return defaultState;
 };
-defineProps<{
+
+const props = defineProps<{
+  title: string;
   allowEdit: boolean;
 }>();
 
-const { t } = useI18n();
 const settingV1Store = useSettingV1Store();
 const containerRef = ref<HTMLDivElement>();
 
 const state = reactive<LocalState>(getInitialState());
 
 const allowSave = computed((): boolean => {
-  return !isEqual(state, getInitialState());
+  return state.databaseChangeMode !== getInitialState().databaseChangeMode;
 });
 
-const save = async () => {
+const onUpdate = async () => {
   await settingV1Store.updateWorkspaceProfile({
     payload: {
       databaseChangeMode: state.databaseChangeMode,
     },
     updateMask: ["value.workspace_profile_setting_value.database_change_mode"],
-  });
-  pushNotification({
-    module: "bytebase",
-    style: "SUCCESS",
-    title: t("settings.general.workspace.config-updated"),
   });
   if (
     state.databaseChangeMode === DatabaseChangeMode.EDITOR &&
@@ -174,13 +156,22 @@ const save = async () => {
     isSQLEditorRoute(router) &&
     state.databaseChangeMode === DatabaseChangeMode.PIPELINE
   ) {
-    router.push({ name: WORKSPACE_ROOT_MODULE });
+    router.replace({ name: WORKSPACE_ROUTE_LANDING });
   }
 };
 
 const goToSQLEditor = () => {
-  router.push({
+  router.replace({
     name: SQL_EDITOR_HOME_MODULE,
   });
 };
+
+defineExpose({
+  isDirty: allowSave,
+  update: onUpdate,
+  title: props.title,
+  revert: () => {
+    Object.assign(state, getInitialState());
+  },
+});
 </script>

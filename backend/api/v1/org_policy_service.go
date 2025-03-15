@@ -373,16 +373,6 @@ func (s *OrgPolicyService) convertPolicyPayloadToString(ctx context.Context, pol
 			return "", errors.Wrap(err, "failed to marshal tag policy")
 		}
 		return string(payloadBytes), nil
-	case v1pb.PolicyType_SLOW_QUERY:
-		payload, err := convertToSlowQueryPolicyPayload(policy.GetSlowQueryPolicy())
-		if err != nil {
-			return "", status.Error(codes.InvalidArgument, err.Error())
-		}
-		payloadBytes, err := protojson.Marshal(payload)
-		if err != nil {
-			return "", errors.Wrap(err, "failed to marshal masking policy")
-		}
-		return string(payloadBytes), nil
 	case v1pb.PolicyType_DISABLE_COPY_DATA:
 		if err := s.licenseService.IsFeatureEnabled(api.FeatureAccessControl); err != nil {
 			return "", status.Error(codes.PermissionDenied, err.Error())
@@ -401,6 +391,19 @@ func (s *OrgPolicyService) convertPolicyPayloadToString(ctx context.Context, pol
 			return "", status.Error(codes.PermissionDenied, err.Error())
 		}
 		payload, err := convertToExportDataPolicyPayload(policy.GetExportDataPolicy())
+		if err != nil {
+			return "", status.Error(codes.InvalidArgument, err.Error())
+		}
+		payloadBytes, err := protojson.Marshal(payload)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to marshal policy")
+		}
+		return string(payloadBytes), nil
+	case v1pb.PolicyType_DATA_QUERY:
+		if err := s.licenseService.IsFeatureEnabled(api.FeatureAccessControl); err != nil {
+			return "", status.Error(codes.PermissionDenied, err.Error())
+		}
+		payload, err := convertToQueryDataPolicyPayload(policy.GetQueryDataPolicy())
 		if err != nil {
 			return "", status.Error(codes.InvalidArgument, err.Error())
 		}
@@ -499,13 +502,6 @@ func (s *OrgPolicyService) convertToPolicy(ctx context.Context, policyMessage *s
 		policy.Policy = &v1pb.Policy_TagPolicy{
 			TagPolicy: p,
 		}
-	case api.PolicyTypeSlowQuery:
-		pType = v1pb.PolicyType_SLOW_QUERY
-		payload, err := convertToV1PBSlowQueryPolicy(policyMessage.Payload)
-		if err != nil {
-			return nil, err
-		}
-		policy.Policy = payload
 	case api.PolicyTypeDisableCopyData:
 		pType = v1pb.PolicyType_DISABLE_COPY_DATA
 		payload, err := convertToV1PBDisableCopyDataPolicy(policyMessage.Payload)
@@ -516,6 +512,13 @@ func (s *OrgPolicyService) convertToPolicy(ctx context.Context, policyMessage *s
 	case api.PolicyTypeExportData:
 		pType = v1pb.PolicyType_DATA_EXPORT
 		payload, err := convertToV1PBExportDataPolicy(policyMessage.Payload)
+		if err != nil {
+			return nil, err
+		}
+		policy.Policy = payload
+	case api.PolicyTypeQueryData:
+		pType = v1pb.PolicyType_DATA_QUERY
+		payload, err := convertToV1PBQueryDataPolicy(policyMessage.Payload)
 		if err != nil {
 			return nil, err
 		}
@@ -657,29 +660,10 @@ func convertToV1RolloutPolicyPayload(payloadStr string) (*v1pb.Policy_RolloutPol
 
 func convertToStorePBRolloutPolicy(policy *v1pb.RolloutPolicy) *storepb.RolloutPolicy {
 	return &storepb.RolloutPolicy{
-		Automatic:      policy.Automatic,
-		WorkspaceRoles: policy.WorkspaceRoles,
-		ProjectRoles:   policy.ProjectRoles,
-		IssueRoles:     policy.IssueRoles,
+		Automatic:  policy.Automatic,
+		Roles:      policy.Roles,
+		IssueRoles: policy.IssueRoles,
 	}
-}
-
-func convertToV1PBSlowQueryPolicy(payloadStr string) (*v1pb.Policy_SlowQueryPolicy, error) {
-	payload := &storepb.SlowQueryPolicy{}
-	if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(payloadStr), payload); err != nil {
-		return nil, errors.Wrapf(err, "failed to unmarshal slow query policy payload")
-	}
-	return &v1pb.Policy_SlowQueryPolicy{
-		SlowQueryPolicy: &v1pb.SlowQueryPolicy{
-			Active: payload.Active,
-		},
-	}, nil
-}
-
-func convertToSlowQueryPolicyPayload(policy *v1pb.SlowQueryPolicy) (*storepb.SlowQueryPolicy, error) {
-	return &storepb.SlowQueryPolicy{
-		Active: policy.Active,
-	}, nil
 }
 
 func convertToV1PBDisableCopyDataPolicy(payloadStr string) (*v1pb.Policy_DisableCopyDataPolicy, error) {
@@ -697,11 +681,23 @@ func convertToV1PBDisableCopyDataPolicy(payloadStr string) (*v1pb.Policy_Disable
 func convertToV1PBExportDataPolicy(payloadStr string) (*v1pb.Policy_ExportDataPolicy, error) {
 	payload := &storepb.ExportDataPolicy{}
 	if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(payloadStr), payload); err != nil {
-		return nil, errors.Wrapf(err, "failed to unmarshal disable copy policy payload")
+		return nil, errors.Wrapf(err, "failed to unmarshal export data policy payload")
 	}
 	return &v1pb.Policy_ExportDataPolicy{
 		ExportDataPolicy: &v1pb.ExportDataPolicy{
 			Disable: payload.Disable,
+		},
+	}, nil
+}
+
+func convertToV1PBQueryDataPolicy(payloadStr string) (*v1pb.Policy_QueryDataPolicy, error) {
+	payload := &storepb.QueryDataPolicy{}
+	if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(payloadStr), payload); err != nil {
+		return nil, errors.Wrapf(err, "failed to unmarshal query data policy payload")
+	}
+	return &v1pb.Policy_QueryDataPolicy{
+		QueryDataPolicy: &v1pb.QueryDataPolicy{
+			Timeout: payload.Timeout,
 		},
 	}, nil
 }
@@ -715,6 +711,12 @@ func convertToDisableCopyDataPolicyPayload(policy *v1pb.DisableCopyDataPolicy) (
 func convertToExportDataPolicyPayload(policy *v1pb.ExportDataPolicy) (*storepb.ExportDataPolicy, error) {
 	return &storepb.ExportDataPolicy{
 		Disable: policy.Disable,
+	}, nil
+}
+
+func convertToQueryDataPolicyPayload(policy *v1pb.QueryDataPolicy) (*storepb.QueryDataPolicy, error) {
+	return &storepb.QueryDataPolicy{
+		Timeout: policy.Timeout,
 	}, nil
 }
 
@@ -859,12 +861,12 @@ func convertPolicyType(pType string) (api.PolicyType, error) {
 		return api.PolicyTypeMaskingRule, nil
 	case v1pb.PolicyType_MASKING_EXCEPTION.String():
 		return api.PolicyTypeMaskingException, nil
-	case v1pb.PolicyType_SLOW_QUERY.String():
-		return api.PolicyTypeSlowQuery, nil
 	case v1pb.PolicyType_DISABLE_COPY_DATA.String():
 		return api.PolicyTypeDisableCopyData, nil
 	case v1pb.PolicyType_DATA_EXPORT.String():
 		return api.PolicyTypeExportData, nil
+	case v1pb.PolicyType_DATA_QUERY.String():
+		return api.PolicyTypeQueryData, nil
 	case v1pb.PolicyType_RESTRICT_ISSUE_CREATION_FOR_SQL_REVIEW.String():
 		return api.PolicyTypeRestrictIssueCreationForSQLReview, nil
 	case v1pb.PolicyType_DATA_SOURCE_QUERY.String():

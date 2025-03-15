@@ -17,19 +17,15 @@
   </div>
 
   <div
-    v-if="!create && allowEdit"
-    class="flex items-center justify-end gap-x-3"
+    v-if="!create && allowEdit && valueChanged()"
+    class="flex items-center justify-between gap-x-3"
     v-bind="$attrs"
   >
-    <NButton v-if="valueChanged()" @click.prevent="revertEnvironment">
-      {{ $t("common.revert") }}
+    <NButton @click.prevent="revertEnvironment">
+      {{ $t("common.cancel") }}
     </NButton>
-    <NButton
-      type="primary"
-      :disabled="!valueChanged()"
-      @click.prevent="updateEnvironment"
-    >
-      {{ $t("common.update") }}
+    <NButton type="primary" @click.prevent="updateEnvironment">
+      {{ $t("common.confirm-and-update") }}
     </NButton>
   </div>
 </template>
@@ -37,9 +33,12 @@
 <script setup lang="ts">
 import { cloneDeep, isEqual } from "lodash-es";
 import { NButton } from "naive-ui";
+import { useI18n } from "vue-i18n";
+import { pushNotification } from "@/store";
 import { PolicyType } from "@/types/proto/v1/org_policy_service";
 import { useEnvironmentFormContext } from "./context";
 
+const { t } = useI18n();
 const {
   state,
   environment,
@@ -57,6 +56,8 @@ const revertEnvironment = () => {
   state.value.environment = cloneDeep(environment.value);
   state.value.rolloutPolicy = cloneDeep(rolloutPolicy.value);
   state.value.environmentTier = cloneDeep(environmentTier.value);
+  events.emit("revert-access-control");
+  events.emit("revert-sql-review");
 };
 
 const createEnvironment = () => {
@@ -72,6 +73,17 @@ const createEnvironment = () => {
 };
 
 const updateEnvironment = () => {
+  if (!isEqual(rolloutPolicy.value, state.value.rolloutPolicy)) {
+    events.emit("update-policy", {
+      environment: state.value.environment,
+      policyType: PolicyType.ROLLOUT_POLICY,
+      policy: state.value.rolloutPolicy,
+    });
+  }
+
+  events.emit("update-access-control");
+  events.emit("update-sql-review");
+
   const env = cloneDeep(environment.value);
   if (
     state.value.environment.title !== env.title ||
@@ -87,12 +99,12 @@ const updateEnvironment = () => {
     events.emit("update", environmentPatch);
   }
 
-  if (!isEqual(rolloutPolicy.value, state.value.rolloutPolicy)) {
-    events.emit("update-policy", {
-      environment: state.value.environment,
-      policyType: PolicyType.ROLLOUT_POLICY,
-      policy: state.value.rolloutPolicy,
-    });
-  }
+  pushNotification({
+    module: "bytebase",
+    style: "SUCCESS",
+    title: t("environment.successfully-updated-environment", {
+      name: state.value.environment.title,
+    }),
+  });
 };
 </script>

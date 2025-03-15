@@ -65,6 +65,7 @@
       "self": "Vai trò"
     },
     "revert": "Hoàn tác",
+    "confirm-to-revert": "Xác nhận hoàn tác chỉnh sửa của bạn?",
     "apply": "Áp dụng",
     "reorder": "Sắp xếp lại",
     "id": "ID",
@@ -78,7 +79,6 @@
     "updated-at": "Thời gian cập nhật",
     "statement": "Câu lệnh",
     "statement-size": "Kích thước câu lệnh",
-    "sql-statement": "Câu lệnh SQL",
     "snapshot": "Ảnh chụp nhanh",
     "status": "Trạng thái",
     "stage": "Giai đoạn",
@@ -98,16 +98,12 @@
     "detail": "Chi tiết",
     "type": "Loại",
     "language": "Ngôn ngữ",
-    "repository": "Kho lưu trữ",
     "change": "Thay đổi",
-    "branch": "Nhánh",
     "sensitive-placeholder": "Nhạy cảm - Chỉ ghi",
     "enabled": "Đã kích hoạt",
     "default": "Mặc định",
-    "gitops": "GitOps",
     "restore": "Khôi phục",
     "detailed-guide": "Hướng dẫn chi tiết",
-    "workspace": "Không gian làm việc",
     "confirm": "Xác nhận",
     "learn-more": "Tìm hiểu thêm",
     "troubleshoot": "Khắc phục sự cố",
@@ -128,7 +124,6 @@
     "read-only": "Chỉ đọc",
     "all": "Tất cả",
     "recent": "Gần đây",
-    "deployment-config": "Cấu hình triển khai",
     "ok": "OK",
     "share": "Chia sẻ",
     "or": "hoặc",
@@ -157,7 +152,6 @@
     "view-doc": "Xem tài liệu",
     "write-only": "chỉ ghi",
     "sync": "Đồng bộ hóa",
-    "sync-now": "Đồng bộ hóa ngay",
     "success": "Thành công",
     "failed": "Thất bại",
     "load-more": "Tải thêm",
@@ -200,13 +194,13 @@
     "search-user": "Tìm người dùng",
     "info": "Thông tin",
     "minutes": "Phút",
-    "go-to-configure": "Đi tới cấu hình",
     "filter-by-name": "Lọc theo tên",
     "license": "Giấy phép",
     "view-details": "Xem chi tiết",
     "force-verb": "Buộc {verb}",
     "untitled": "Không tiêu đề",
-    "missing-permission": "Thiếu quyền cần thiết",
+    "missing-required-permission": "Thiếu quyền cần thiết",
+    "resource-not-found": "Không tìm thấy tài nguyên",
     "continue-anyway": "Tiếp tục",
     "permissions": "Quyền",
     "baseline": "Đường cơ sở",
@@ -217,7 +211,6 @@
     "resources": "Tài nguyên",
     "closed": "Đã đóng",
     "options": "Tùy chọn",
-    "reset": "Đặt lại",
     "refresh": "Làm mới",
     "rollback": "Hoàn tác",
     "rows": {
@@ -268,10 +261,6 @@
       "pending": "Đang chờ",
       "not-started": "Chưa bắt đầu"
     },
-    "type": {
-      "bb-task-database-schema-update-ghost-sync": "Đồng bộ dữ liệu",
-      "bb-task-database-schema-update-ghost-cutover": "Chuyển bảng"
-    },
     "skip": "Bỏ qua",
     "task-checks": "Kiểm tra tác vụ",
     "prior-backup": "Sao lưu trước",
@@ -290,11 +279,10 @@
         "x-status-task-is-not-editable": "Tác vụ trạng thái {status} không thể chỉnh sửa",
         "nothing-changed": "Không có gì thay đổi",
         "not-applicable": {
-          "some-tasks-dont-meet-ghost-requirement": "Một số tác vụ không đáp ứng yêu cầu gh-ost"
+          "task-doesnt-meet-ghost-requirement": "Nhiệm vụ không đáp ứng được yêu cầu của gh-ost",
+          "needs-database-for-saving-temp-data": "Cần có cơ sở dữ liệu ({database}) để lưu dữ liệu tạm thời."
         }
       },
-      "enable": "Bật di chuyển trực tuyến",
-      "disable": "Tắt di chuyển trực tuyến",
       "advice-split-statement-to-single-online-migration-issue": "Đề nghị chia câu lệnh này thành một vấn đề di chuyển trực tuyến."
     },
     "prior-backup-tips": "Sao lưu dữ liệu bị ảnh hưởng trước"
@@ -315,7 +303,6 @@
     "deploy": "Tự lưu trữ",
     "cloud": "Đám mây",
     "request-demo": "Đặt lịch giới thiệu sản phẩm 30 phút.",
-    "readonly": "Bytebase đang ở chế độ chỉ đọc. Bạn vẫn có thể xem bảng điều khiển, nhưng mọi nỗ lực thay đổi sẽ không thành công.",
     "external-url": "Bytebase chưa được cấu hình --external-url"
   },
   "bbkit": {
@@ -344,7 +331,6 @@
       "iam-and-admin": "IAM & Quản trị",
       "im-integration": "Tích hợp",
       "sso": "SSO",
-      "gitops": "GitOps",
       "subscription": "Gói đăng ký",
       "global-masking": "Che giấu toàn cục",
       "data-classification": "Phân loại dữ liệu",
@@ -494,11 +480,9 @@
         "select-logo": "Tải lên một tệp",
         "drag-logo": "hoặc kéo vào đây",
         "logo-upload-tip": "{extension} tối đa {size} MiB",
-        "logo-upload-succeed": "Đã cập nhật logo thành công",
         "security": "Bảo mật",
         "account": "Tài khoản",
         "watermark": {
-          "update-success": "Đã cập nhật cài đặt hình mờ",
           "description": "Hiển thị hình mờ trên các trang, bao gồm tên người dùng, ID và email.",
           "enable": "Bật hình mờ"
         },
@@ -524,11 +508,6 @@
           "self": "URL bên ngoài",
           "description": "URL bên ngoài mà người dùng truy cập Bytebase, phải bắt đầu bằng http:// hoặc https://."
         },
-        "gitops-webhook-url": {
-          "self": "URL Webhook GitOps",
-          "description": "URL được sử dụng để gửi webhook GitOps đến phiên bản Bytebase.",
-          "default-to-external-url": "Mặc định là URL bên ngoài"
-        },
         "sign-in-frequency": {
           "self": "Tần suất đăng nhập",
           "description": "Tần suất đăng nhập xác định tần suất người dùng phải xác thực lại. Cập nhật cấu hình yêu cầu người dùng đăng nhập lại để thay đổi có hiệu lực.",
@@ -544,6 +523,13 @@
         "maximum-sql-result": {
           "self": "Kích thước kết quả SQL tối đa",
           "description": "Giới hạn kích thước kết quả truy vấn SQL đầu ra."
+        },
+        "query-data-policy": {
+          "timeout": {
+            "self": "Thời gian truy vấn tối đa",
+            "description": "Thời gian tối đa được phép chạy truy vấn trong SQL Editor.",
+            "no-time-limit": "Không giới hạn thời gian cho truy vấn khi đặt thành 0."
+          }
         },
         "domain-restriction": {
           "self": "Tên miền không gian làm việc",
@@ -565,6 +551,8 @@
           "password-rotation": "Yêu cầu người dùng đặt lại mật khẩu của họ sau mỗi {day} ngày"
         },
         "config-updated": "Cấu hình được cập nhật.",
+        "config-partly-updated": "Cấu hình đã được cập nhật một phần.",
+        "failed-to-update-setting": "Không cập nhật được cài đặt \"{title}\"",
         "ai-assistant": {
           "self": "Trợ lý AI",
           "description": "Sử dụng OpenAPI để hỗ trợ các tác vụ phát triển cơ sở dữ liệu.",
@@ -585,7 +573,6 @@
         },
         "announcement": {
           "self": "Thông báo",
-          "update-success": "Cài đặt thông báo được cập nhật thành công.",
           "admin-or-dba-can-edit": "Chỉ quản trị viên không gian làm việc hoặc DBA mới có thể cập nhật cài đặt thông báo."
         },
         "announcement-alert-level": {
@@ -600,7 +587,6 @@
           "self": "Liên kết",
           "placeholder": "Nhập liên kết thông báo"
         },
-        "confirm-delete-custom-logo": "Xóa logo thương hiệu tùy chỉnh?",
         "restrict-issue-creation-for-sql-review": {
           "title": "Không cho phép tạo vấn đề khi đánh giá SQL có lỗi",
           "description": "Khi được bật, người dùng chỉ được phép tạo vấn đề nếu đánh giá SQL không chứa bất kỳ lỗi nào."
@@ -741,7 +727,6 @@
       "reopened-issue": "đã mở lại vấn đề",
       "resolved-issue": "đã giải quyết vấn đề",
       "canceled-issue": "đã hủy vấn đề",
-      "empty": "",
       "changed": "đã thay đổi",
       "canceled": "đã hủy",
       "started": "đã bắt đầu",
@@ -837,6 +822,14 @@
         "label": {
           "title": "Nhãn",
           "description": "Lọc theo nhãn vấn đề"
+        },
+        "database-label": {
+          "title": "Nhãn",
+          "description": "Nhập \"key\":\"value\" rồi nhấn Enter"
+        },
+        "engine": {
+          "title": "Động cơ",
+          "description": "Lọc theo động cơ"
         }
       },
       "hide": "Ẩn tìm kiếm nâng cao"
@@ -928,6 +921,7 @@
     "sql-check": {
       "sql-checks": "Kiểm tra SQL",
       "not-executed-yet": "Chưa được thực hiện",
+      "statement-is-required": "Câu lệnh SQL là bắt buộc",
       "statement-is-too-large": "Vì kích thước câu lệnh hiện tại vượt quá 2MB, việc kiểm tra SQL sẽ bị bỏ qua.",
       "back-to-edit": "Quay lại chỉnh sửa",
       "sql-review-violations": "Vi phạm đánh giá SQL"
@@ -994,10 +988,6 @@
       "request-exporter-role": "Yêu cầu vai trò người xuất"
     }
   },
-  "alter-schema": {
-    "vcs-info": "VCS đã được bật. Chọn tùy chọn này sẽ điều hướng bạn đến kho lưu trữ Git tương ứng để bắt đầu quá trình thay đổi.",
-    "no-databases-in-project": "Không có cơ sở dữ liệu nào trong dự án này. Nhấp vào Cơ sở dữ liệu mới hoặc Chuyển vào Cơ sở dữ liệu để thêm cơ sở dữ liệu."
-  },
   "quick-action": {
     "create-db": "Tạo cơ sở dữ liệu",
     "new-db": "Cơ sở dữ liệu mới",
@@ -1022,7 +1012,6 @@
     "encoding": "Mã hóa",
     "character-set": "Bộ ký tự",
     "collation": "Đối chiếu",
-    "select": "Chọn cơ sở dữ liệu",
     "tables": "Bảng",
     "collections": "Bộ sưu tập",
     "views": "Khung nhìn",
@@ -1032,7 +1021,6 @@
     "streams": "Luồng",
     "tasks": "Tác vụ",
     "labels-for-resource": "Nhãn cho {resource}",
-    "last-successful-sync": "Đồng bộ thành công lần cuối",
     "failed-to-sync-schema-for-database-database-value-name": "Không đồng bộ hóa được lược đồ cho cơ sở dữ liệu '{0}'.",
     "successfully-synced-schema-for-database-database-value-name": "Đã đồng bộ hóa thành công lược đồ cho cơ sở dữ liệu '{0}'.",
     "start-to-sync-schema": "Bắt đầu đồng bộ hóa lược đồ",
@@ -1161,9 +1149,16 @@
       "password-tip": "Bạn cũng có thể chỉ định điểm cuối quản lý bí mật bên ngoài",
       "google-iam": "Google Cloud SQL IAM",
       "aws-iam": "AWS RDS IAM",
+      "azure-iam": "Azure IAM",
       "external-secret-vault": "Vault (KV v2)",
       "external-secret-aws": "AWS Secrets Manager",
       "external-secret-gcp": "GCP Secret Manager"
+    },
+    "iam-extension": {
+      "credential-source": "Credential Source",
+      "tenant-id": "Tenant ID",
+      "client-id": "Client ID",
+      "client-secret": "Client Secret"
     },
     "database-region": "Khu vực cơ sở dữ liệu",
     "external-secret-gcp": {
@@ -1319,12 +1314,10 @@
     "rollout": {
       "name": "Chính sách triển khai",
       "tip": "Chính sách được áp dụng cho các vấn đề hồi tố.",
-      "info": "Để triển khai thay đổi cơ sở dữ liệu, cài đặt này kiểm soát việc triển khai có yêu cầu phê duyệt thủ công hay không.",
+      "info": "Các tác vụ có thể được thực hiện bởi người dùng có quyền 'taskRuns.Create' hoặc các vai trò sau",
       "auto": "Triển khai tự động",
       "auto-info": "Nếu tất cả kiểm tra vượt qua, thay đổi sẽ được triển khai và thực hiện tự động.",
-      "manual-by-last-approver": "Triển khai thủ công bởi người phê duyệt cuối cùng từ phê duyệt tùy chỉnh",
-      "manual-by-dedicated-roles": "Triển khai thủ công bởi các vai trò chuyên dụng",
-      "manual-by-dedicated-roles-info": "Cho phép bất kỳ vai trò nào được chọn sau đây nhấp vào nút \"Triển khai\" và sau đó thay đổi sẽ được thực hiện."
+      "last-issue-approver": "Người phê duyệt vấn đề cuối cùng"
     },
     "environment-tier": {
       "name": "Cấp môi trường",
@@ -1364,6 +1357,7 @@
     "unassign-alert-description": "Các cơ sở dữ liệu đã chọn sẽ bị xóa khỏi dự án",
     "edit-schema": "Chỉnh sửa lược đồ",
     "edit-labels": "Chỉnh sửa nhãn",
+    "edit-environment": "Chỉnh sửa Môi trường",
     "mixed-values-for-label": "Nhãn đã chọn này có các giá trị hỗn hợp",
     "mixed-label-values-warning": "Một số tài nguyên đã chọn có các giá trị hỗn hợp cho cùng một khóa",
     "change-data": "Thay đổi dữ liệu",
@@ -1374,7 +1368,6 @@
     "batch-action-disabled-for-unassigned": "Không thể {action} đối với cơ sở dữ liệu chưa được gán",
     "data-export-action-disabled": "Không thể xuất dữ liệu cho nhiều hơn một cơ sở dữ liệu",
     "successfully-transferred-databases": "Đã chuyển thành công cơ sở dữ liệu",
-    "gitops-enabled": "GitOps đã bật",
     "nullable": "Có thể null",
     "expression": "Biểu thức",
     "position": "Vị trí",
@@ -1430,7 +1423,6 @@
       "select": "Chọn bảng",
       "select-tip": "Vui lòng chọn một bảng để bắt đầu."
     },
-    "n-selected-m-in-total": "({selected} đã chọn, {total} tổng cộng)",
     "all": "Tất cả cơ sở dữ liệu",
     "show-schemaless-databases": "Hiển thị cơ sở dữ liệu không có lược đồ. (Chỉnh sửa lược đồ không áp dụng cho cơ sở dữ liệu không có lược đồ.)",
     "secret": {
@@ -1491,34 +1483,6 @@
     },
     "not-found": "Không tìm thấy cơ sở dữ liệu"
   },
-  "repository": {
-    "our-webhook-link": "Webhook được tạo bởi Bytebase có thể được tìm thấy tại {webhookLink}.",
-    "branch-observe-file-change": "Nhánh mà Bytebase quan sát sự thay đổi tệp.",
-    "database-group-description": "Theo mặc định, các thay đổi sẽ được áp dụng cho tất cả cơ sở dữ liệu trong dự án. Ngoài ra, chúng có thể được áp dụng cho nhóm cơ sở dữ liệu.",
-    "base-directory": "Thư mục cơ sở",
-    "base-directory-description": "Thư mục gốc nơi Bytebase quan sát sự thay đổi tệp. Sử dụng \"/\" nếu các tệp được lưu trữ trong thư mục gốc của kho lưu trữ.",
-    "git-provider": "Nhà cung cấp Git",
-    "gitops-naming-format": "định dạng đặt tên",
-    "gitops-description-file-path": "Tập lệnh di chuyển cơ sở dữ liệu được lưu trữ trong {fullPath}. Để thực hiện thay đổi cơ sở dữ liệu, nhà phát triển sẽ tạo một tập lệnh di chuyển tuân theo {naming}.",
-    "gitops-description-branch": "Sau khi tập lệnh được phê duyệt và hợp nhất vào nhánh {branch}, Bytebase sẽ tự động tạo vấn đề để áp dụng thay đổi cơ sở dữ liệu.",
-    "setup-wizard-guide": "Nếu bạn gặp lỗi trong quá trình này, vui lòng tham khảo {guide} của chúng tôi",
-    "add-git-provider": "Thêm nhà cung cấp Git",
-    "choose-git-provider": "Chọn nhà cung cấp Git",
-    "select-repository": "Chọn kho lưu trữ",
-    "configure-deploy": "Cấu hình triển khai",
-    "choose-git-provider-description": "Chọn nhà cung cấp Git nơi lưu trữ tập lệnh lược đồ cơ sở dữ liệu (.sql) của bạn. Khi bạn đẩy tập lệnh đã thay đổi vào kho lưu trữ Git, Bytebase sẽ tự động tạo một quy trình để áp dụng thay đổi lược đồ cho cơ sở dữ liệu.",
-    "choose-git-provider-visit-workspace": "Truy cập cài đặt {workspace} để thêm nhiều nhà cung cấp Git.",
-    "choose-git-provider-contact-workspace-admin": "Liên hệ với quản trị viên không gian làm việc Bytebase của bạn nếu bạn muốn các nhà cung cấp Git khác xuất hiện ở đây. Bytebase hiện hỗ trợ GitLab EE/CE tự lưu trữ và có kế hoạch thêm GitLab.com và GitHub Enterprise sau này.",
-    "select-repository-attention-gitlab": "Bytebase chỉ liệt kê các dự án GitLab cấp cho bạn ít nhất vai trò 'Maintainer', cho phép định cấu hình webhook dự án để quan sát sự kiện đẩy mã.",
-    "select-repository-attention-github": "Bytebase chỉ liệt kê các kho lưu trữ GitHub mà bạn có quyền quản trị, cho phép định cấu hình webhook kho lưu trữ để quan sát sự kiện đẩy mã.",
-    "select-repository-attention-bitbucket": "Bytebase chỉ liệt kê các kho lưu trữ Bitbucket mà bạn có quyền quản trị, cho phép định cấu hình webhook kho lưu trữ để quan sát sự kiện đẩy mã.",
-    "select-repository-attention-azure-devops": "Bytebase chỉ liệt kê các kho lưu trữ Azure DevOps thuộc tổ chức mà quyền truy cập ứng dụng của bên thứ ba thông qua OAuth được cấp. Nếu bạn không thấy kho lưu trữ bạn muốn, vui lòng truy cập Tổ chức -> Cài đặt tổ chức -> Chính sách để bật quyền truy cập ứng dụng của bên thứ ba.",
-    "select-repository-search": "Tìm kiếm kho lưu trữ",
-    "linked": "Kho lưu trữ được liên kết"
-  },
-  "workflow": {
-    "gitops-workflow-description": "Tập lệnh di chuyển cơ sở dữ liệu được lưu trữ trong kho lưu trữ git. Để thực hiện thay đổi cơ sở dữ liệu, nhà phát triển sẽ tạo một tập lệnh di chuyển và gửi để xem xét trong VCS tương ứng như GitLab. Sau khi tập lệnh được phê duyệt và hợp nhất vào nhánh đã định cấu hình, Bytebase sẽ tự động khởi động tác vụ để áp dụng thay đổi cơ sở dữ liệu."
-  },
   "anomaly": {
     "attention-desc": "Bytebase định kỳ phát hiện các bất thường dựa trên khoảng thời gian quét phiên bản và hiển thị các phát hiện ở đây.",
     "table-placeholder": "Hoan hô, không phát hiện thấy bất thường {type} nào!",
@@ -1542,8 +1506,7 @@
       "success-prompt": "Đã tạo thành công dự án {name}."
     },
     "overview": {
-      "info-slot-content": "Bytebase định kỳ đồng bộ hóa lược đồ phiên bản. Các cơ sở dữ liệu mới được đồng bộ hóa trước tiên được đặt ở đây. Người dùng nên chuyển chúng đến dự án ứng dụng thích hợp.",
-      "no-db-prompt": "Không có cơ sở dữ liệu nào thuộc dự án này. Bạn có thể thêm cơ sở dữ liệu bằng cách nhấp vào {newDb} hoặc {transferInDb} từ thanh tác vụ trên cùng."
+      "info-slot-content": "Bytebase định kỳ đồng bộ hóa lược đồ phiên bản. Các cơ sở dữ liệu mới được đồng bộ hóa trước tiên được đặt ở đây. Người dùng nên chuyển chúng đến dự án ứng dụng thích hợp."
     },
     "webhook": {
       "success-created-prompt": "Đã tạo thành công webhook {name}.",
@@ -1612,6 +1575,7 @@
     },
     "settings": {
       "success-updated": "Đã cập nhật thành công cài đặt dự án.",
+      "update-failed": "Không cập nhật được cài đặt dự án.",
       "success-member-added-prompt": "Đã thêm thành công vào dự án.",
       "archive": {
         "title": "Lưu trữ dự án",
@@ -1626,10 +1590,13 @@
         "self": "Liên quan đến vấn đề",
         "labels": {
           "self": "Nhãn",
+          "description": "Có thể gắn nhãn vào các vấn đề để quản lý",
           "configure-labels": "Cấu hình nhãn",
+          "placeholder": "Nhấn Enter để thêm thẻ",
           "force-issue-labels": {
             "self": "Yêu cầu nhãn cho tất cả các vấn đề",
-            "description": "Yêu cầu ít nhất một nhãn khi tạo vấn đề."
+            "description": "Yêu cầu ít nhất một nhãn khi tạo vấn đề.",
+            "warning": "Yêu cầu ít nhất một nhãn được cấu hình"
           }
         },
         "allow-modify-statement": {
@@ -1680,73 +1647,10 @@
     },
     "select": "Chọn Dự án",
     "all": "Tất cả dự án",
-    "gitops-connector": {
-      "add": "Thêm trình kết nối GitOps",
-      "delete": "Xóa trình kết nối GitOps",
-      "update-success": "Đã cập nhật thành công trình kết nối GitOps",
-      "create-success": "Đã tạo thành công trình kết nối GitOps",
-      "delete-success": "Trình kết nối GitOps bị xóa"
-    },
     "masking-exemption": {
       "self": "Miễn trừ Che giấu",
       "grant-exemption": "Cấp Miễn trừ",
       "revoke-exemption-title": "Xóa cả miễn trừ che giấu xuất và truy vấn cho {member}?"
-    }
-  },
-  "gitops": {
-    "setting": {
-      "description": "Trong quy trình GitOps của Bytebase, các nhà phát triển lưu trữ tập lệnh di chuyển trong VCS. Yêu cầu kéo nhắc đánh giá SQL và những yêu cầu được hợp nhất bắt đầu kế hoạch di chuyển. Quản trị viên định cấu hình nhà cung cấp VCS, trong khi chủ sở hữu dự án thiết lập kết nối VCS trong các dự án.",
-      "add-git-provider": {
-        "self": "Thêm nhà cung cấp Git",
-        "description": "Trước khi bất kỳ dự án nào có thể bật quy trình GitOps, trước tiên Bytebase cần tích hợp với hệ thống kiểm soát phiên bản (VCS) tương ứng bằng cách đăng ký làm ứng dụng OAuth trong VCS đó.",
-        "gitlab-self-host": "GitLab Tự lưu trữ",
-        "github-self-host": "GitHub Tự lưu trữ",
-        "azure-devops-service": "Dịch vụ Azure DevOps",
-        "add-success": "Đã thêm thành công nhà cung cấp Git {vcs}",
-        "choose": "Chọn nhà cung cấp Git",
-        "basic-info": {
-          "gitlab-instance-url": "URL phiên bản GitLab",
-          "gitlab-instance-url-label": "URL phiên bản VCS. Đảm bảo phiên bản này và Bytebase có thể truy cập mạng từ nhau.",
-          "github-instance-url": "URL phiên bản GitHub",
-          "bitbucket-instance-url": "URL phiên bản Bitbucket",
-          "azure-instance-url": "URL phiên bản Azure DevOps",
-          "instance-url-error": "URL phiên bản phải bắt đầu bằng https:// hoặc http://",
-          "display-name": "Tên hiển thị",
-          "display-name-label": "Tên hiển thị tùy chọn để giúp xác định trong số các cấu hình khác nhau sử dụng cùng một nhà cung cấp Git."
-        },
-        "access-token": {
-          "personal-access-token": "mã thông báo truy cập cá nhân",
-          "github-fine-grained-token": "mã thông báo truy cập cá nhân chi tiết",
-          "gitlab-personal-access-token": "Tạo một người dùng dịch vụ chuyên dụng và tạo một {token} với vai trò người bảo trì và ít nhất các quyền sau cho nhóm hoặc dự án sẽ được quản lý. Bạn có thể tạo mã thông báo truy cập dự án để quản lý một dự án duy nhất hoặc tạo mã thông báo truy cập nhóm để quản lý tất cả các dự án trong nhóm.",
-          "github-personal-access-token": "Tạo một tài khoản dịch vụ chuyên dụng và tạo một {token} với vai trò thành viên cho tổ chức hoặc tất cả các dự án cần quản lý.",
-          "bitbucket-app-access-token": "Tạo một người dùng dịch vụ cụ thể và tạo {app_password} với ít nhất các quyền sau cho các tổ chức, dự án hoặc kho lưu trữ có liên quan để quản lý.",
-          "bitbucket-app-access-token-tips": "Chèn '{secret}' bên dưới.",
-          "bitbucket-app-password": "mật khẩu ứng dụng",
-          "azure-devops-personal-access-token": "Tạo một người dùng dịch vụ chuyên dụng và tạo {token} với vai trò thành viên cho tất cả các tổ chức có thể truy cập với các phạm vi sau. Trường 'Tổ chức' phải được đặt thành 'Tất cả các tổ chức có thể truy cập'."
-        }
-      },
-      "git-provider": {
-        "delete-forbidden": "Để xóa nhà cung cấp này, hãy hủy liên kết tất cả các kho lưu trữ trước.",
-        "delete": "Xóa nhà cung cấp Git này",
-        "delete-confirm": "Xóa nhà cung cấp Git \"{name}\"?"
-      }
-    }
-  },
-  "deployment-config": {
-    "add-selector": "Thêm bộ chọn",
-    "update-success": "Đã cập nhật thành công cấu hình triển khai.",
-    "this-is-example-deployment-config": "Đây là ví dụ cấu hình triển khai. Bạn cần chỉnh sửa và lưu nó.",
-    "add-stage": "Thêm giai đoạn",
-    "confirm-to-revert": "Xác nhận hoàn tác chỉnh sửa của bạn?",
-    "confirm-to-reset": "Xác nhận đặt lại về mặc định?",
-    "name-placeholder": "Tên giai đoạn...",
-    "error": {
-      "env-in-selector-required": "\"Môi trường\" là bắt buộc trong mỗi giai đoạn"
-    },
-    "matched-databases": {
-      "all": "Tất cả cơ sở dữ liệu phù hợp",
-      "n": "{n} cơ sở dữ liệu phù hợp | {n} cơ sở dữ liệu phù hợp",
-      "show-more": "Hiển thị thêm"
     }
   },
   "data-source": {
@@ -1808,7 +1712,6 @@
     "to-enable-admin-mode": "để bật chế độ quản trị",
     "notify-empty-statement": "Vui lòng nhập câu lệnh SQL của bạn vào trình soạn thảo",
     "goto-edit-schema-hint": "Vui lòng chọn một kết nối cơ sở dữ liệu từ đầu trình soạn thảo",
-    "notify-invalid-sql-statement": "Câu lệnh SQL không hợp lệ.",
     "can-not-execute-query": "Không thể thực hiện truy vấn khi đang tải dữ liệu.",
     "rows": "dòng | dòng",
     "vertical-display": "Hiển thị dọc",
@@ -2035,14 +1938,9 @@
       "key-necessary": "Khóa là bắt buộc",
       "value-necessary": "Giá trị là bắt buộc",
       "key-duplicated": "Khóa trùng lặp",
-      "max-value-length-exceeded": "Độ dài giá trị không được vượt quá {length} ký tự",
-      "x-is-reserved-key": "\"{key}\" là một khóa hệ thống dành riêng"
+      "max-value-length-exceeded": "Độ dài giá trị không được vượt quá {length} ký tự"
     },
-    "placeholder": {
-      "select-values": "Chọn giá trị..."
-    },
-    "add-label": "Thêm nhãn",
-    "filter-by-label": "Lọc theo nhãn"
+    "add-label": "Thêm nhãn"
   },
   "oauth": {
     "unknown-event": "Loại sự kiện không mong đợi, OAuth không thành công."
@@ -2052,9 +1950,7 @@
     "inquire-enterprise-plan": "Yêu cầu gói Doanh nghiệp",
     "enterprise-free-trial": "Dùng thử Doanh nghiệp miễn phí {days} ngày",
     "button": {
-      "upgrade": "Nâng cấp",
-      "contact-us": "Liên hệ chúng tôi",
-      "view-subscription": "Xem gói đăng ký"
+      "upgrade": "Nâng cấp"
     },
     "trial-start-modal": {
       "title": "Bắt đầu dùng thử {plan} của bạn",
@@ -2083,6 +1979,7 @@
       "n-license-remain": "còn lại {n}",
       "manage-license": "Quản lý giấy phép phiên bản",
       "used-and-total-license": "Giấy phép phiên bản đã gán / Tổng số",
+      "used-and-total-user": "Giới hạn người dùng đang hoạt động / Tổng số",
       "success-notification": "Đã cập nhật thành công gán giấy phép",
       "missing-license-for-feature": "Thiếu giấy phép phiên bản để bật {feature}. Nhấp để gán ngay."
     },
@@ -2396,14 +2293,6 @@
       "skip": "Bỏ qua phê duyệt thủ công",
       "risk-not-configured-tips": "Đảm bảo bạn đã xác định {link}.",
       "the-related-risk-rules": "các quy tắc rủi ro liên quan",
-      "external-approval": {
-        "self": "Phê duyệt bên ngoài",
-        "delete": "Xóa nút phê duyệt bên ngoài?",
-        "endpoint": "Điểm cuối",
-        "view-node": "Xem nút phê duyệt bên ngoài",
-        "create-node": "Tạo nút phê duyệt bên ngoài",
-        "edit-node": "Chỉnh sửa nút phê duyệt bên ngoài"
-      },
       "issue-review": {
         "sent-back": "Đã gửi lại",
         "review-sent-back-by": "Đánh giá đã gửi lại bởi {user}"
@@ -2437,39 +2326,6 @@
       "any-n-role-can-approve": "Bất kỳ {role} nào cũng có thể phê duyệt",
       "approved-by-n": "Đã được phê duyệt bởi {approver}",
       "issue-creators-cannot-approve-their-own-issue": "Người tạo vấn đề không thể phê duyệt vấn đề của chính họ"
-    }
-  },
-  "slow-query": {
-    "slow-queries": "Truy vấn chậm",
-    "report": "Báo cáo",
-    "last-query-time": "Thời gian truy vấn cuối cùng",
-    "sql-statement": "Câu lệnh SQL",
-    "total-query-count": "Tổng số truy vấn",
-    "query-count-percent": "Phần trăm số truy vấn",
-    "max-query-time": "Thời gian truy vấn tối đa",
-    "avg-query-time": "Thời gian truy vấn trung bình",
-    "query-time-percent": "Phần trăm thời gian truy vấn",
-    "max-rows-examined": "Số dòng được kiểm tra tối đa",
-    "avg-rows-examined": "Số dòng được kiểm tra trung bình",
-    "max-rows-sent": "Số dòng được gửi tối đa",
-    "avg-rows-sent": "Số dòng được gửi trung bình",
-    "query-start-time": "Thời gian bắt đầu truy vấn",
-    "rows-examined": "Số dòng đã kiểm tra",
-    "rows-sent": "Số dòng đã gửi",
-    "lock-time": "Thời gian khóa",
-    "query-time": "Thời gian truy vấn",
-    "attention-description": "Bytebase định kỳ đồng bộ nhật ký truy vấn chậm từ các phiên bản. Đối với phiên bản MySQL, slow_query phải được bật trước. Đối với phiên bản PostgreSQL, chỉ những cơ sở dữ liệu đã bật pg_stat_statements mới thu thập các truy vấn chậm.",
-    "sync-job-started": "Đã bắt đầu công việc đồng bộ. Vui lòng đợi công việc hoàn thành.",
-    "detail": "Chi tiết truy vấn chậm",
-    "advise-index": {
-      "current-index": "Chỉ mục hiện tại",
-      "suggestion": "Đề xuất",
-      "create-index": "Tạo chỉ mục",
-      "setup-openai-key-to-enable": "Thiết lập khóa OpenAI để bật cố vấn chỉ mục"
-    },
-    "no-log-placeholder": {
-      "admin": "Nhấp vào nút \"Định cấu hình\" để tìm nạp các truy vấn chậm từ các phiên bản cơ sở dữ liệu hoặc nhấp vào nút \"Đồng bộ hóa ngay\" để đồng bộ nhật ký truy vấn chậm ngay lập tức",
-      "developer": "Nhấp vào nút \"Đồng bộ hóa ngay\" để đồng bộ nhật ký truy vấn chậm ngay lập tức hoặc liên hệ với quản trị viên/DBA Bytebase để định cấu hình các truy vấn chậm"
     }
   },
   "schema-template": {
@@ -2582,7 +2438,6 @@
     }
   },
   "database-group": {
-    "self": "Nhóm cơ sở dữ liệu",
     "create": "Nhóm cơ sở dữ liệu mới",
     "edit": "Chỉnh sửa nhóm cơ sở dữ liệu",
     "matched-database": "Cơ sở dữ liệu phù hợp",
@@ -2593,7 +2448,8 @@
     },
     "condition": {
       "self": "Điều kiện"
-    }
+    },
+    "select": "Chọn nhóm cơ sở dữ liệu"
   },
   "export-center": {
     "self": "Trung tâm xuất",

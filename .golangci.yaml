@@ -18,10 +18,10 @@ linters:
     - mirror
     - bodyclose
     - exhaustive
+    - tparallel
 
 # golangci-lint run --exclude="Rollback,logger.Sync,pgInstance.Stop"
 issues:
-  include:
     # https://golangci-lint.run/usage/configuration/#command-line-options
   exclude:
     - Rollback
@@ -30,14 +30,12 @@ issues:
     - fmt.Printf
     - Enter(.*)_(.*)
     - Exit(.*)_(.*)
-  skip-dirs:
+  exclude-dirs:
     - proto/generated-go
     - frontend
 
 run:
   timeout: 30m
-  build-tags:
-    - mysql
 
 linters-settings:
   goimports:

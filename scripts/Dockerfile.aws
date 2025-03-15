@@ -1,13 +1,4 @@
-# DO NOT run docker build against this file directly. Instead using ./build_bytebase_docker.sh as that
-# one sets the various ARG used in the Dockerfile
-
-# After build
-
-# $ docker run --init --rm --name bytebase --publish 8080:8080 --volume ~/.bytebase/data:/var/opt/bytebase bytebase/bytebase
-
-FROM node:22.12.0 as frontend
-
-ARG RELEASE="release"
+FROM node:22.14.0 as frontend
 
 RUN npm i -g pnpm
 
@@ -15,30 +6,22 @@ WORKDIR /frontend-build
 
 COPY . .
 
-RUN pnpm --dir frontend install --frozen-lockfile
-RUN pnpm --dir frontend release-aws
+RUN pnpm --dir ./frontend i
+RUN pnpm --dir ./frontend release-aws
 
-FROM golang:1.23.4 as backend
+FROM golang:1.24.1 as backend
 ADD go.mod go.sum /
 RUN go mod download
 
 ARG TARGETARCH
-ARG VERSION="development"
-ARG VERSION_SUFFIX=""
-ARG GO_VERSION="1.23.4"
-ARG GIT_COMMIT="unknown"
-ARG BUILD_TIME="unknown"
-ARG BUILD_USER="unknown"
-ARG PRODUCT_ID="prod-n4dmmye4e6hjo"
+ARG VERSION
+ARG GIT_COMMIT
 
-ARG RELEASE="release"
-
-# Need gcc for CGO_ENABLED=1
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
     apt-get install -y gcc-aarch64-linux-gnu; \
-    else \
+  else \
     apt-get install -y gcc ;\
-    fi
+  fi
 RUN apt-get update && apt-get install -y libkrb5-dev
 
 WORKDIR /backend-build
@@ -51,15 +34,12 @@ COPY --from=frontend /frontend-build/frontend/dist ./backend/server/dist
 COPY ./scripts/VERSION .
 
 # -ldflags="-w -s" means omit DWARF symbol table and the symbol table and debug information
-# go-sqlite3 requires CGO_ENABLED
-RUN if [ "$TARGETARCH" = "arm64" ]; then \
-    CC=aarch64-linux-gnu-gcc && CC_FOR_TARGET=gcc-aarch64-linux-gnu; \
-    fi && \
-    VERSION=`cat ./scripts/VERSION`${VERSION_SUFFIX} && CGO_ENABLED=1 GOOS=linux GOARCH=$TARGETARCH CC=$CC CC_FOR_TARGET=$CC_FOR_TARGET go build \
-    --tags "${RELEASE},embed_frontend,aws" \
-    -ldflags="-w -s -X 'github.com/bytebase/bytebase/backend/bin/server/cmd.version=${VERSION}' -X 'github.com/bytebase/bytebase/backend/bin/server/cmd.goversion=${GO_VERSION}' -X 'github.com/bytebase/bytebase/backend/bin/server/cmd.gitcommit=${GIT_COMMIT}' -X 'github.com/bytebase/bytebase/backend/bin/server/cmd.buildtime=${BUILD_TIME}' -X 'github.com/bytebase/bytebase/backend/bin/server/cmd.builduser=${BUILD_USER}'" \
-    -o bytebase \
-    ./backend/bin/server/main.go
+RUN if [ "$TARGETARCH" = "arm64" ]; then CC=aarch64-linux-gnu-gcc && CC_FOR_TARGET=gcc-aarch64-linux-gnu; fi && \
+  GOARCH=$TARGETARCH CC=$CC CC_FOR_TARGET=$CC_FOR_TARGET go build \
+  --tags "release,embed_frontend,aws" \
+  -ldflags="-w -s -X 'github.com/bytebase/bytebase/backend/bin/server/cmd.version=${VERSION}' -X 'github.com/bytebase/bytebase/backend/bin/server/cmd.gitcommit=${GIT_COMMIT}'" \
+  -o bytebase \
+  ./backend/bin/server/main.go
 
 # Use debian to decompress tar files.
 FROM debian:bookworm-slim as decompressor
@@ -73,8 +53,6 @@ COPY ./backend/resources /tmp/bytebase/resources/
 # we extract resources to a specific dir here and the backend will create symlinks at runtime.
 RUN mkdir -p /var/opt/bytebase/resources/mongoutil-1.6.1-linux-${TARGETARCH}/
 RUN tar -Jxf /tmp/bytebase/resources/mongoutil/mongoutil-1.6.1-linux-${TARGETARCH}.txz -C /var/opt/bytebase/resources/mongoutil-1.6.1-linux-${TARGETARCH}/
-RUN mkdir -p /var/opt/bytebase/resources/mysqlutil-8.0.33-linux-${TARGETARCH}/
-RUN tar -zxf /tmp/bytebase/resources/mysqlutil/mysqlutil-8.0.33-linux-${TARGETARCH}.tar.gz -C /var/opt/bytebase/resources/mysqlutil-8.0.33-linux-${TARGETARCH}/
 RUN mkdir -p /var/opt/bytebase/resources/postgres-linux-${TARGETARCH}-16
 RUN tar -Jxf /tmp/bytebase/resources/postgres/postgres-linux-${TARGETARCH}.txz -C /var/opt/bytebase/resources/postgres-linux-${TARGETARCH}-16/
 
@@ -82,16 +60,12 @@ RUN tar -Jxf /tmp/bytebase/resources/postgres/postgres-linux-${TARGETARCH}.txz -
 FROM debian:bookworm-slim as monolithic
 
 ARG TARGETARCH
-ARG VERSION="development"
-ARG GIT_COMMIT="unknown"
-ARG BUILD_TIME="unknown"
-ARG BUILD_USER="unknown"
+ARG VERSION
+ARG GIT_COMMI
 
 # See https://github.com/opencontainers/image-spec/blob/master/annotations.md
 LABEL org.opencontainers.image.version=${VERSION}
 LABEL org.opencontainers.image.revision=${GIT_COMMIT}
-LABEL org.opencontainers.image.created=${BUILD_TIME}
-LABEL org.opencontainers.image.authors=${BUILD_USER}
 
 # Create user "bytebase" for running Postgres database and server.
 RUN addgroup --gid 113 --system bytebase && adduser --uid 113 --system bytebase && adduser bytebase bytebase
@@ -118,7 +92,7 @@ COPY --from=backend /etc/ssl/certs /etc/ssl/certs
 COPY --from=decompressor /var/opt/bytebase/resources /bytebase/resources
 
 ENV OPENSSL_CONF /etc/ssl/
-ENV AWS_PRODUCT_ID=$PRODUCT_ID
+ENV AWS_PRODUCT_ID="prod-n4dmmye4e6hjo"
 
 CMD ["--port", "8080", "--data", "/var/opt/bytebase"]
 

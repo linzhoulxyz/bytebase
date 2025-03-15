@@ -196,11 +196,11 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, acti
 		if u.RolloutPolicy.GetAutomatic() {
 			usersGetters = append(usersGetters, getUsersFromUsers(e.Issue.Creator))
 		} else {
-			for _, workspaceRole := range u.RolloutPolicy.GetWorkspaceRoles() {
+			for _, workspaceRole := range u.RolloutPolicy.GetRoles() {
 				role := api.Role(strings.TrimPrefix(workspaceRole, "roles/"))
 				usersGetters = append(usersGetters, m.getUsersFromWorkspaceRole(role))
 			}
-			for _, projectRole := range u.RolloutPolicy.GetProjectRoles() {
+			for _, projectRole := range u.RolloutPolicy.GetRoles() {
 				role := api.Role(strings.TrimPrefix(projectRole, "roles/"))
 				usersGetters = append(usersGetters, getUsersFromProjectRole(m.store, role, e.Project.ResourceID))
 			}
@@ -278,10 +278,6 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, acti
 		case *storepb.ApprovalNode_Role:
 			role := api.Role(strings.TrimPrefix(val.Role, "roles/"))
 			usersGetter = getUsersFromProjectRole(m.store, role, e.Project.ResourceID)
-		case *storepb.ApprovalNode_ExternalNodeId:
-			usersGetter = func(_ context.Context) ([]*store.UserMessage, error) {
-				return nil, nil
-			}
 		default:
 			return nil, errors.Errorf("invalid node payload type")
 		}

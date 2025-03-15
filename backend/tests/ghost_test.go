@@ -1,21 +1,13 @@
-//go:build mysql
-
 package tests
 
 import (
 	"context"
 	_ "embed"
 	"fmt"
-	"regexp"
-	"strconv"
-	"strings"
 	"testing"
 
-	"github.com/bytebase/bytebase/backend/resources/mysql"
-	"github.com/bytebase/bytebase/backend/tests/fake"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 
-	ghostsql "github.com/github/gh-ost/go/sql"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
 )
@@ -38,32 +30,7 @@ var (
 
 	//go:embed test-data/ghost_test_schema2.result
 	wantDBSchema2 string
-
-	deletedRegex = regexp.MustCompile("~book_[0-9]+_del")
 )
-
-func TestGhostParser(t *testing.T) {
-	t.Parallel()
-	a := require.New(t)
-	const statement = `
-	ALTER TABLE
-  		test
-	ADD
-		COLUMN ghost_play_2 int;
-	`
-	t.Run("fail to parse", func(t *testing.T) {
-		t.Parallel()
-		parser := ghostsql.NewParserFromAlterStatement(statement)
-		a.Equal(false, parser.HasExplicitTable())
-	})
-	t.Run("succeed to parse", func(t *testing.T) {
-		t.Parallel()
-		s := strings.Join(strings.Fields(statement), " ")
-		parser := ghostsql.NewParserFromAlterStatement(s)
-		a.Equal(true, parser.HasExplicitTable())
-		a.Equal("test", parser.GetExplicitTable())
-	})
-}
 
 func TestGhostSchemaUpdate(t *testing.T) {
 	const databaseName = "testGhostSchemaUpdate"
@@ -72,21 +39,17 @@ func TestGhostSchemaUpdate(t *testing.T) {
 	a := require.New(t)
 	ctx := context.Background()
 	ctl := &controller{}
-	dataDir := t.TempDir()
-	ctx, err := ctl.StartServerWithExternalPg(ctx, &config{
-		dataDir:            dataDir,
-		vcsProviderCreator: fake.NewGitLab,
-	})
+	ctx, err := ctl.StartServerWithExternalPg(ctx)
 	a.NoError(err)
 	defer ctl.Close(ctx)
 
-	mysqlPort := getTestPort()
-	stopInstance := mysql.SetupTestInstance(t, mysqlPort, mysqlBinDir)
-	defer stopInstance()
-
-	mysqlDB, err := connectTestMySQL(mysqlPort, "")
+	mysqlContainer, err := getMySQLContainer(ctx)
+	defer func() {
+		mysqlContainer.Close(ctx)
+	}()
 	a.NoError(err)
-	defer mysqlDB.Close()
+
+	mysqlDB := mysqlContainer.db
 
 	_, err = mysqlDB.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %v", databaseName))
 	a.NoError(err)
@@ -106,12 +69,15 @@ func TestGhostSchemaUpdate(t *testing.T) {
 			Engine:      v1pb.Engine_MYSQL,
 			Environment: "environments/prod",
 			Activation:  true,
-			DataSources: []*v1pb.DataSource{{Type: v1pb.DataSourceType_ADMIN, Host: "127.0.0.1", Port: strconv.Itoa(mysqlPort), Username: "bytebase", Password: "bytebase", Id: "admin"}},
+			DataSources: []*v1pb.DataSource{{Type: v1pb.DataSourceType_ADMIN, Host: mysqlContainer.host, Port: mysqlContainer.port, Username: "bytebase", Password: "bytebase", Id: "admin"}},
 		},
 	})
 	a.NoError(err)
 
-	err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil /* environment */, databaseName, "", nil)
+	err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil /* environment */, "bbdataarchive", "")
+	a.NoError(err)
+
+	err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil /* environment */, databaseName, "")
 	a.NoError(err)
 
 	database, err := ctl.databaseServiceClient.GetDatabase(ctx, &v1pb.GetDatabaseRequest{
@@ -149,5 +115,5 @@ func TestGhostSchemaUpdate(t *testing.T) {
 	dbMetadata, err = ctl.databaseServiceClient.GetDatabaseSchema(ctx, &v1pb.GetDatabaseSchemaRequest{Name: fmt.Sprintf("%s/schema", database.Name)})
 	a.NoError(err)
 
-	a.Equal(wantDBSchema2, deletedRegex.ReplaceAllString(dbMetadata.Schema, "xxx"))
+	a.Equal(wantDBSchema2, dbMetadata.Schema)
 }

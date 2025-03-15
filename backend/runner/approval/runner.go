@@ -25,7 +25,6 @@ import (
 	"github.com/bytebase/bytebase/backend/component/webhook"
 	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
 	api "github.com/bytebase/bytebase/backend/legacyapi"
-	"github.com/bytebase/bytebase/backend/runner/relay"
 	"github.com/bytebase/bytebase/backend/store"
 	"github.com/bytebase/bytebase/backend/utils"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
@@ -39,19 +38,17 @@ type Runner struct {
 	dbFactory      *dbfactory.DBFactory
 	stateCfg       *state.State
 	webhookManager *webhook.Manager
-	relayRunner    *relay.Runner
 	licenseService enterprise.LicenseService
 }
 
 // NewRunner creates a new runner.
-func NewRunner(store *store.Store, sheetManager *sheet.Manager, dbFactory *dbfactory.DBFactory, stateCfg *state.State, webhookManager *webhook.Manager, relayRunner *relay.Runner, licenseService enterprise.LicenseService) *Runner {
+func NewRunner(store *store.Store, sheetManager *sheet.Manager, dbFactory *dbfactory.DBFactory, stateCfg *state.State, webhookManager *webhook.Manager, licenseService enterprise.LicenseService) *Runner {
 	return &Runner{
 		store:          store,
 		sheetManager:   sheetManager,
 		dbFactory:      dbFactory,
 		stateCfg:       stateCfg,
 		webhookManager: webhookManager,
-		relayRunner:    relayRunner,
 		licenseService: licenseService,
 	}
 }
@@ -198,7 +195,7 @@ func (r *Runner) findApprovalTemplateForIssue(ctx context.Context, issue *store.
 		payload.Approval.ApprovalTemplates = []*storepb.ApprovalTemplate{approvalTemplate}
 	}
 
-	newApprovers, issueComments, err := utils.HandleIncomingApprovalSteps(ctx, r.store, r.relayRunner.Client, issue, payload.Approval)
+	newApprovers, err := utils.HandleIncomingApprovalSteps(payload.Approval)
 	if err != nil {
 		err = errors.Wrapf(err, "failed to handle incoming approval steps")
 		if updateErr := updateIssueApprovalPayload(ctx, r.store, issue, &storepb.IssuePayloadApproval{
@@ -216,17 +213,6 @@ func (r *Runner) findApprovalTemplateForIssue(ctx context.Context, issue *store.
 	}
 
 	if err := func() error {
-		for _, ic := range issueComments {
-			if _, err := r.store.CreateIssueComment(ctx, ic, api.SystemBotID); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		slog.Warn("failed to create issue comment", log.BBError(err))
-	}
-
-	if err := func() error {
 		if len(payload.Approval.ApprovalTemplates) != 0 {
 			return nil
 		}
@@ -240,7 +226,7 @@ func (r *Runner) findApprovalTemplateForIssue(ctx context.Context, issue *store.
 		if len(stages) == 0 {
 			return nil
 		}
-		policy, err := apiv1.GetValidRolloutPolicyForStage(ctx, r.store, r.licenseService, stages[0])
+		policy, err := apiv1.GetValidRolloutPolicyForStage(ctx, r.store, stages[0])
 		if err != nil {
 			return err
 		}
@@ -252,7 +238,7 @@ func (r *Runner) findApprovalTemplateForIssue(ctx context.Context, issue *store.
 			Project: webhook.NewProject(issue.Project),
 			IssueRolloutReady: &webhook.EventIssueRolloutReady{
 				RolloutPolicy: policy,
-				StageName:     stages[0].Name,
+				StageName:     stages[0].Environment,
 			},
 		})
 		return nil
@@ -365,13 +351,13 @@ func (r *Runner) getDatabaseGeneralIssueRisk(ctx context.Context, issue *store.I
 		return 0, store.RiskSourceUnknown, false, errors.Wrapf(err, "failed to list plan check runs for plan %v", plan.UID)
 	}
 	type Key struct {
-		InstanceUID  int
+		InstanceID   string
 		DatabaseName string
 	}
 	latestPlanCheckRun := map[Key]*store.PlanCheckRunMessage{}
 	for _, run := range planCheckRuns {
 		key := Key{
-			InstanceUID:  int(run.Config.InstanceUid),
+			InstanceID:   run.Config.InstanceId,
 			DatabaseName: run.Config.DatabaseName,
 		}
 		latestPlanCheckRun[key] = run
@@ -420,7 +406,7 @@ func (r *Runner) getDatabaseGeneralIssueRisk(ctx context.Context, issue *store.I
 		return 0, store.RiskSourceUnknown, false, nil
 	}
 
-	pipelineCreate, err := apiv1.GetPipelineCreate(ctx, r.store, r.sheetManager, r.licenseService, r.dbFactory, plan.Config.GetSteps(), plan.Config.GetDeploymentSnapshot(), issue.Project, false)
+	pipelineCreate, err := apiv1.GetPipelineCreate(ctx, r.store, r.sheetManager, r.licenseService, r.dbFactory, plan.Name, plan.Config.GetSteps(), plan.Config.GetDeployment(), issue.Project)
 	if err != nil {
 		return 0, store.RiskSourceUnknown, false, errors.Wrap(err, "failed to get pipeline create")
 	}
@@ -447,17 +433,21 @@ func (r *Runner) getDatabaseGeneralIssueRisk(ctx context.Context, issue *store.I
 				return 0, store.RiskSourceUnknown, true, nil
 			}
 
+			taskStatement := ""
+			sheetUID := int(task.Payload.GetSheetId())
+			if sheetUID != 0 {
+				statement, err := r.store.GetSheetStatementByID(ctx, sheetUID)
+				if err != nil {
+					return 0, store.RiskSourceUnknown, true, errors.Wrapf(err, "failed to get statement in sheet %v", sheetUID)
+				}
+				taskStatement = statement
+			}
+
 			environmentID := instance.EnvironmentID
 			var databaseName string
 			if task.Type == api.TaskDatabaseCreate {
-				payload := &storepb.TaskDatabaseCreatePayload{}
-				if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(task.Payload), payload); err != nil {
-					return 0, store.RiskSourceUnknown, false, err
-				}
-				databaseName = payload.DatabaseName
-				if payload.EnvironmentId != "" {
-					environmentID = payload.EnvironmentId
-				}
+				databaseName = task.Payload.GetDatabaseName()
+				environmentID = task.Payload.GetEnvironmentId()
 			} else {
 				database, err := r.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{
 					InstanceID:   &task.InstanceID,
@@ -494,7 +484,8 @@ func (r *Runner) getDatabaseGeneralIssueRisk(ctx context.Context, issue *store.I
 						"project_id":     issue.Project.ResourceID,
 						"database_name":  databaseName,
 						// convert to string type otherwise cel-go will complain that storepb.Engine is not string type.
-						"db_engine": instance.Engine.String(),
+						"db_engine":     instance.Metadata.GetEngine().String(),
+						"sql_statement": taskStatement,
 					}
 
 					vars, err := e.PartialVars(args)
@@ -510,7 +501,7 @@ func (r *Runner) getDatabaseGeneralIssueRisk(ctx context.Context, issue *store.I
 					}
 
 					if run, ok := latestPlanCheckRun[Key{
-						InstanceUID:  instance.UID,
+						InstanceID:   instance.ResourceID,
 						DatabaseName: databaseName,
 					}]; ok {
 						for _, result := range run.Result.Results {
@@ -583,7 +574,7 @@ func (r *Runner) getDatabaseDataExportIssueRisk(ctx context.Context, issue *stor
 		return 0, store.RiskSourceUnknown, false, errors.Errorf("plan %v not found", *issue.PlanUID)
 	}
 
-	pipelineCreate, err := apiv1.GetPipelineCreate(ctx, r.store, r.sheetManager, r.licenseService, r.dbFactory, plan.Config.GetSteps(), plan.Config.GetDeploymentSnapshot(), issue.Project, false)
+	pipelineCreate, err := apiv1.GetPipelineCreate(ctx, r.store, r.sheetManager, r.licenseService, r.dbFactory, plan.Name, plan.Config.GetSteps(), plan.Config.GetDeployment(), issue.Project)
 	if err != nil {
 		return 0, store.RiskSourceUnknown, false, errors.Wrap(err, "failed to get pipeline create")
 	}
@@ -613,11 +604,6 @@ func (r *Runner) getDatabaseDataExportIssueRisk(ctx context.Context, issue *stor
 			if r.licenseService.IsFeatureEnabledForInstance(api.FeatureCustomApproval, instance) != nil {
 				// nolint:nilerr
 				return 0, store.RiskSourceUnknown, true, nil
-			}
-
-			payload := &storepb.TaskDatabaseDataExportPayload{}
-			if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(task.Payload), payload); err != nil {
-				return 0, store.RiskSourceUnknown, false, err
 			}
 
 			database, err := r.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{
@@ -653,7 +639,7 @@ func (r *Runner) getDatabaseDataExportIssueRisk(ctx context.Context, issue *stor
 						"environment_id": environmentID,
 						"project_id":     issue.Project.ResourceID,
 						"database_name":  databaseName,
-						"db_engine":      instance.Engine.String(),
+						"db_engine":      instance.Metadata.GetEngine().String(),
 					}
 
 					vars, err := e.PartialVars(args)
@@ -745,10 +731,10 @@ func (r *Runner) getGrantRequestIssueRisk(ctx context.Context, issue *store.Issu
 				continue
 			}
 			database, err := r.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{
-				ProjectID:           &issue.Project.ResourceID,
-				InstanceID:          &instanceID,
-				DatabaseName:        &databaseName,
-				IgnoreCaseSensitive: store.IgnoreDatabaseAndTableCaseSensitive(instance),
+				ProjectID:       &issue.Project.ResourceID,
+				InstanceID:      &instanceID,
+				DatabaseName:    &databaseName,
+				IsCaseSensitive: store.IsObjectCaseSensitive(instance),
 			})
 			if err != nil {
 				return 0, store.RiskSourceUnknown, false, errors.Wrap(err, "failed to get database")
@@ -801,7 +787,7 @@ func (r *Runner) getGrantRequestIssueRisk(ctx context.Context, issue *store.Issu
 				"project_id":     issue.Project.ResourceID,
 				"database_name":  database.DatabaseName,
 				// convert to string type otherwise cel-go will complain that storepb.Engine is not string type.
-				"db_engine":       instance.Engine.String(),
+				"db_engine":       instance.Metadata.GetEngine().String(),
 				"expiration_days": expirationDays,
 			}
 			if riskSource == store.RiskRequestExport {

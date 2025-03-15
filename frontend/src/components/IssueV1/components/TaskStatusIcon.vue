@@ -1,15 +1,15 @@
 <template>
   <div
-    class="relative flex flex-shrink-0 items-center justify-center rounded-full select-none w-6 h-6 overflow-hidden"
+    class="relative flex flex-shrink-0 items-center justify-center select-none w-6 h-6 overflow-hidden"
     :class="classes"
   >
     <template v-if="planCheckStatus === PlanCheckRun_Result_Status.ERROR">
-      <heroicons:exclamation-circle class="w-7 h-7 text-error" />
+      <CircleAlertIcon class="text-error" />
     </template>
     <template
       v-else-if="planCheckStatus === PlanCheckRun_Result_Status.WARNING"
     >
-      <heroicons:exclamation-triangle class="w-7 h-7 text-warning" />
+      <TriangleAlertIcon class="text-warning" />
     </template>
     <template
       v-else-if="
@@ -57,6 +57,7 @@
 </template>
 
 <script lang="ts" setup>
+import { CircleAlertIcon, TriangleAlertIcon } from "lucide-vue-next";
 import { computed } from "vue";
 import { SkipIcon } from "@/components/Icon";
 import { PlanCheckRun_Result_Status } from "@/types/proto/v1/plan_service";
@@ -81,33 +82,30 @@ const planCheckStatus = computed(() => {
 });
 
 const classes = computed((): string => {
-  if (planCheckStatus.value === PlanCheckRun_Result_Status.ERROR) {
-    return "bg-white text-error !w-7";
-  }
-  if (planCheckStatus.value === PlanCheckRun_Result_Status.WARNING) {
-    return "bg-white text-warning !w-7";
+  if (Boolean(planCheckStatus.value)) {
+    return "";
   }
 
   switch (props.status) {
     case Task_Status.NOT_STARTED:
     case Task_Status.STATUS_UNSPECIFIED:
       if (!isCreating.value) {
-        return "bg-white border-2 border-info text-info";
+        return "bg-white border-2 border-info text-info rounded-full";
       }
-      return "bg-white border-2 border-control";
+      return "bg-white border-2 border-control rounded-full";
     case Task_Status.PENDING:
       if (!isCreating.value) {
-        return "bg-white border-2 border-info text-info ";
+        return "bg-white border-2 border-info text-info rounded-full";
       }
-      return "bg-white border-2 border-control";
+      return "bg-white border-2 border-control rounded-full";
     case Task_Status.RUNNING:
-      return "bg-white border-2 border-info text-info";
+      return "bg-white border-2 border-info text-info rounded-full";
     case Task_Status.SKIPPED:
-      return "bg-gray-200 text-gray-500";
+      return "bg-gray-200 text-gray-500 rounded-full";
     case Task_Status.DONE:
-      return "bg-success text-white";
+      return "bg-success text-white rounded-full";
     case Task_Status.FAILED:
-      return "bg-error text-white";
+      return "bg-error text-white rounded-full";
     default:
       return "";
   }

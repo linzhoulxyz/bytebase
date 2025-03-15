@@ -17,7 +17,10 @@ import {
 } from "@/utils";
 import { useCurrentUserV1 } from "../auth";
 import { useSQLEditorTabStore } from "../sqlEditor";
-import { getUserEmailFromIdentifier } from "./common";
+import { useUserStore, batchGetOrFetchUsers } from "../user";
+import { extractUserId } from "./common";
+import { useDatabaseV1Store, batchGetOrFetchDatabases } from "./database";
+import { useProjectV1Store, batchGetOrFetchProjects } from "./project";
 
 type WorksheetView = "FULL" | "BASIC";
 type WorksheetCacheKey = [string /* uid */, WorksheetView];
@@ -26,6 +29,9 @@ export const useWorkSheetStore = defineStore("worksheet_v1", () => {
   const cacheByUID = useCache<WorksheetCacheKey, Worksheet | undefined>(
     "bb.worksheet.by-uid"
   );
+  const projectStore = useProjectV1Store();
+  const databaseStore = useDatabaseV1Store();
+  const userStore = useUserStore();
 
   // Getters
   const worksheetList = computed(() => {
@@ -53,17 +59,32 @@ export const useWorkSheetStore = defineStore("worksheet_v1", () => {
   });
 
   // Utilities
-  const setCache = (worksheet: Worksheet, view: WorksheetView) => {
+  const setCache = async (worksheet: Worksheet, view: WorksheetView) => {
     const uid = extractWorksheetUID(worksheet.name);
     if (uid === String(UNKNOWN_ID)) return;
     if (view === "FULL") {
       // A FULL version should override BASIC version
       cacheByUID.invalidateEntity([uid, "BASIC"]);
     }
+
+    await Promise.all([
+      projectStore.getOrFetchProjectByName(worksheet.project),
+      databaseStore.getOrFetchDatabaseByName(worksheet.database),
+      userStore.getOrFetchUserByIdentifier(worksheet.creator),
+    ]);
     cacheByUID.setEntity([uid, view], worksheet);
   };
-  const setListCache = (worksheets: Worksheet[]) => {
-    worksheets.forEach((worksheet) => setCache(worksheet, "BASIC"));
+  const setListCache = async (worksheets: Worksheet[]) => {
+    await Promise.all([
+      batchGetOrFetchProjects(worksheets.map((worksheet) => worksheet.project)),
+      batchGetOrFetchDatabases(
+        worksheets.map((worksheet) => worksheet.database)
+      ),
+      batchGetOrFetchUsers(worksheets.map((worksheet) => worksheet.creator)),
+    ]);
+    for (const worksheet of worksheets) {
+      await setCache(worksheet, "BASIC");
+    }
   };
 
   // CRUD
@@ -71,7 +92,7 @@ export const useWorkSheetStore = defineStore("worksheet_v1", () => {
     const created = await worksheetServiceClient.createWorksheet({
       worksheet,
     });
-    setCache(created, "FULL");
+    await setCache(created, "FULL");
     return created;
   };
 
@@ -132,6 +153,8 @@ export const useWorkSheetStore = defineStore("worksheet_v1", () => {
         // If the request failed
         // remove the request cache entry so we can retry when needed.
         cacheByUID.invalidateRequest([uid, "FULL"]);
+      } else {
+        return setCache(worksheet, "FULL");
       }
     });
     return promise;
@@ -142,7 +165,7 @@ export const useWorkSheetStore = defineStore("worksheet_v1", () => {
     const { worksheets } = await worksheetServiceClient.searchWorksheets({
       filter: `creator = users/${me.value.email}`,
     });
-    setListCache(worksheets);
+    await setListCache(worksheets);
     return worksheets;
   };
   const fetchSharedWorksheetList = async () => {
@@ -150,7 +173,7 @@ export const useWorkSheetStore = defineStore("worksheet_v1", () => {
     const { worksheets } = await worksheetServiceClient.searchWorksheets({
       filter: `creator != "users/${me.value.email}" && visibility = "${Worksheet_Visibility.VISIBILITY_PROJECT_READ} | ${Worksheet_Visibility.VISIBILITY_PROJECT_WRITE}"`,
     });
-    setListCache(worksheets);
+    await setListCache(worksheets);
     return worksheets;
   };
 
@@ -158,7 +181,7 @@ export const useWorkSheetStore = defineStore("worksheet_v1", () => {
     const { worksheets } = await worksheetServiceClient.searchWorksheets({
       filter: `starred = true`,
     });
-    setListCache(worksheets);
+    await setListCache(worksheets);
     return worksheets;
   };
 
@@ -171,7 +194,7 @@ export const useWorkSheetStore = defineStore("worksheet_v1", () => {
       worksheet,
       updateMask,
     });
-    setCache(updated, "FULL");
+    await setCache(updated, "FULL");
     return updated;
   };
 
@@ -195,12 +218,12 @@ export const useWorkSheetStore = defineStore("worksheet_v1", () => {
     const fullViewWorksheet = getWorksheetByName(organizer.worksheet, "FULL");
     if (fullViewWorksheet) {
       fullViewWorksheet.starred = organizer.starred;
-      setCache(fullViewWorksheet, "FULL");
+      await setCache(fullViewWorksheet, "FULL");
     }
     const basicViewWorksheet = getWorksheetByName(organizer.worksheet, "BASIC");
     if (basicViewWorksheet) {
       basicViewWorksheet.starred = organizer.starred;
-      setCache(basicViewWorksheet, "BASIC");
+      await setCache(basicViewWorksheet, "BASIC");
     }
   };
 
@@ -240,7 +263,7 @@ export const useWorkSheetAndTabStore = defineStore("worksheet_and_tab", () => {
   const isCreator = computed(() => {
     const worksheet = currentWorksheet.value;
     if (!worksheet) return false;
-    return getUserEmailFromIdentifier(worksheet.creator) === me.value.email;
+    return extractUserId(worksheet.creator) === me.value.email;
   });
 
   const isReadOnly = computed(() => {

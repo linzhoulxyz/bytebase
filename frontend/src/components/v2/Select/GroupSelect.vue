@@ -1,22 +1,19 @@
 <template>
-  <NSelect
-    :filterable="true"
-    :value="validValue"
-    :options="options"
+  <ResourceSelect
+    :value="validSelectedGroup"
+    :values="validSelectedGroups"
     :disabled="disabled"
-    :clearable="clearable"
     :multiple="multiple"
-    :filter="filterByTitle"
-    :render-label="renderLabel"
-    :render-tag="renderTag"
+    :options="options"
+    :custom-label="renderLabel"
     :placeholder="$t('settings.members.select-group', multiple ? 2 : 1)"
-    @update:value="$emit('update:value', $event)"
+    @update:value="(val) => $emit('update:group', val)"
+    @update:values="(val) => $emit('update:groups', val)"
   />
 </template>
 
 <script lang="tsx" setup>
-import { NCheckbox, NSelect, NTag, type SelectOption } from "naive-ui";
-import type { SelectBaseOption } from "naive-ui/lib/select/src/interface";
+import { computedAsync } from "@vueuse/core";
 import { computed } from "vue";
 import {
   getMemberBindingsByRole,
@@ -26,25 +23,21 @@ import GroupNameCell from "@/components/User/Settings/UserDataTableByGroup/cells
 import { useGroupStore, useProjectV1Store, useWorkspaceV1Store } from "@/store";
 import { PRESET_WORKSPACE_ROLES } from "@/types";
 import type { Group } from "@/types/proto/v1/group_service";
-
-export interface GroupSelectOption extends SelectOption {
-  value: string;
-  group: Group;
-}
+import ResourceSelect from "./ResourceSelect.vue";
 
 const props = withDefaults(
   defineProps<{
-    value?: string[] | string | undefined;
+    group?: string | undefined;
+    groups?: string[] | undefined;
     disabled?: boolean;
-    clearable?: boolean;
     multiple?: boolean;
     projectName?: string;
     selectFirstAsDefault?: boolean;
     size?: "tiny" | "small" | "medium" | "large";
   }>(),
   {
-    clearable: false,
-    value: undefined,
+    group: undefined,
+    groups: undefined,
     multiple: false,
     projectName: undefined,
     selectFirstAsDefault: true,
@@ -53,16 +46,22 @@ const props = withDefaults(
 );
 
 defineEmits<{
-  (event: "update:value", val: string | string[]): void;
+  (event: "update:group", val: string | undefined): void;
+  (event: "update:groups", val: string[]): void;
 }>();
 
 const groupStore = useGroupStore();
 const projectV1Store = useProjectV1Store();
 const workspaceStore = useWorkspaceV1Store();
 
-const getGroupListFromProject = (projectName: string) => {
-  const project = projectV1Store.getProjectByName(projectName);
-  const memberMap = getMemberBindingsByRole({
+const groupList = computedAsync(async () => {
+  if (!props.projectName) {
+    return groupStore.groupList;
+  }
+  const project = await projectV1Store.getOrFetchProjectByName(
+    props.projectName
+  );
+  const memberMap = await getMemberBindingsByRole({
     policies: [
       {
         level: "WORKSPACE",
@@ -80,75 +79,44 @@ const getGroupListFromProject = (projectName: string) => {
   return getMemberBindings(memberMap)
     .map((binding) => binding.group)
     .filter((g) => g) as Group[];
-};
-
-const groupList = computed(() =>
-  props.projectName
-    ? getGroupListFromProject(props.projectName)
-    : groupStore.groupList
-);
+}, []);
 
 const options = computed(() => {
-  return groupList.value.map<GroupSelectOption>((group) => ({
+  return groupList.value.map((group) => ({
     value: group.name,
     label: group.title,
-    group,
+    resource: group,
   }));
 });
 
-const validValue = computed(() => {
-  if (!props.value) {
-    return props.value;
-  }
+const validSelectedGroup = computed(() => {
   if (props.multiple) {
-    return (props.value as string[]).filter((v) => {
-      return options.value.findIndex((o) => o.value === v) >= 0;
-    });
+    return undefined;
   }
-
-  if (options.value.findIndex((o) => o.value === props.value) >= 0) {
-    return props.value;
+  if (options.value.findIndex((o) => o.value === props.group) >= 0) {
+    return props.group;
   }
   return undefined;
 });
 
-const filterByTitle = (pattern: string, option: SelectOption) => {
-  const { group } = option as GroupSelectOption;
-  pattern = pattern.toLowerCase();
-  return (
-    group.title.toLowerCase().includes(pattern) ||
-    group.name.includes(pattern.toLowerCase())
-  );
-};
+const validSelectedGroups = computed(() => {
+  if (!props.multiple) {
+    return undefined;
+  }
 
-const renderLabel = (option: SelectOption, selected: boolean) => {
-  const { group } = option as GroupSelectOption;
+  return props.groups?.filter((v) => {
+    return options.value.findIndex((o) => o.value === v) >= 0;
+  });
+});
 
+const renderLabel = (group: Group) => {
   return (
-    <div class="flex items-start space-x-2 py-2">
-      <NCheckbox checked={selected} size="small" class="mt-1" />
-      <GroupNameCell group={group} showIcon={false} link={false} />
-    </div>
-  );
-};
-
-const renderTag = ({
-  option,
-  handleClose,
-}: {
-  option: SelectBaseOption;
-  handleClose: () => void;
-}) => {
-  const { group } = option as GroupSelectOption;
-  return (
-    <NTag size={props.size} closable={!props.disabled} onClose={handleClose}>
-      <GroupNameCell
-        group={group}
-        showIcon={false}
-        link={false}
-        showEmail={false}
-      />
-    </NTag>
+    <GroupNameCell
+      showEmail={false}
+      group={group}
+      showIcon={false}
+      link={false}
+    />
   );
 };
 </script>

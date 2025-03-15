@@ -3,7 +3,7 @@
     <div class="text-left lg:w-1/4">
       <div class="flex items-center space-x-2">
         <h1 class="text-2xl font-bold">
-          {{ $t("settings.general.workspace.ai-assistant.self") }}
+          {{ title }}
         </h1>
         <FeatureBadge feature="bb.feature.ai-assistant" />
       </div>
@@ -49,7 +49,7 @@
             <NInput
               v-model:value="state.openAIKey"
               class="mb-4 w-full"
-              :disabled="!allowEdit"
+              :disabled="!allowEdit || !hasAIFeature"
               :placeholder="
                 $t(
                   'settings.general.workspace.ai-assistant.openai-key.placeholder'
@@ -62,102 +62,83 @@
           </span>
         </NTooltip>
 
-        <label class="flex items-center gap-x-2">
-          <span class="font-medium">{{
-            $t("settings.general.workspace.ai-assistant.openai-endpoint.self")
-          }}</span>
-        </label>
-        <div class="mb-3 text-sm text-gray-400">
-          {{
-            $t(
-              "settings.general.workspace.ai-assistant.openai-endpoint.description"
-            )
-          }}
-        </div>
-        <NTooltip placement="top-start" :disabled="allowEdit">
-          <template #trigger>
-            <NInput
-              v-model:value="state.openAIEndpoint"
-              class="mb-4 w-full"
-              :disabled="!allowEdit"
-            />
-          </template>
-          <span class="text-sm text-gray-400 -translate-y-2">
-            {{ $t("settings.general.workspace.only-admin-can-edit") }}
-          </span>
-        </NTooltip>
+        <template v-if="isDev()">
+          <label class="flex items-center gap-x-2">
+            <span class="font-medium">{{
+              $t("settings.general.workspace.ai-assistant.openai-endpoint.self")
+            }}</span>
+          </label>
+          <div class="mb-3 text-sm text-gray-400">
+            {{
+              $t(
+                "settings.general.workspace.ai-assistant.openai-endpoint.description"
+              )
+            }}
+          </div>
+          <NTooltip placement="top-start" :disabled="allowEdit">
+            <template #trigger>
+              <NInput
+                v-model:value="state.openAIEndpoint"
+                class="mb-4 w-full"
+                :disabled="!allowEdit || !hasAIFeature"
+              />
+            </template>
+            <span class="text-sm text-gray-400 -translate-y-2">
+              {{ $t("settings.general.workspace.only-admin-can-edit") }}
+            </span>
+          </NTooltip>
 
-        <label class="flex items-center gap-x-2">
-          <span class="font-medium">{{
-            $t("settings.general.workspace.ai-assistant.openai-model.self")
-          }}</span>
-        </label>
-        <div class="mb-3 text-sm text-gray-400">
-          {{
-            $t(
-              "settings.general.workspace.ai-assistant.openai-model.description"
-            )
-          }}
-        </div>
-        <NTooltip placement="top-start" :disabled="allowEdit">
-          <template #trigger>
-            <NInput
-              v-model:value="state.openAIModel"
-              class="mb-4 w-full"
-              :disabled="!allowEdit"
-            />
-          </template>
-          <span class="text-sm text-gray-400 -translate-y-2">
-            {{ $t("settings.general.workspace.only-admin-can-edit") }}
-          </span>
-        </NTooltip>
-
-        <div class="flex justify-end">
-          <NButton
-            type="primary"
-            :disabled="!allowEdit || !allowSave"
-            @click.prevent="updateOpenAIKeyEndpoint"
-          >
-            <FeatureBadge
-              feature="bb.feature.ai-assistant"
-              custom-class="mr-1 text-white pointer-events-none"
-            />
-            {{ $t("common.update") }}
-          </NButton>
-        </div>
+          <label class="flex items-center gap-x-2">
+            <span class="font-medium">{{
+              $t("settings.general.workspace.ai-assistant.openai-model.self")
+            }}</span>
+          </label>
+          <div class="mb-3 text-sm text-gray-400">
+            {{
+              $t(
+                "settings.general.workspace.ai-assistant.openai-model.description"
+              )
+            }}
+          </div>
+          <NTooltip placement="top-start" :disabled="allowEdit">
+            <template #trigger>
+              <NInput
+                v-model:value="state.openAIModel"
+                class="mb-4 w-full"
+                :disabled="!allowEdit || !hasAIFeature"
+              />
+            </template>
+            <span class="text-sm text-gray-400 -translate-y-2">
+              {{ $t("settings.general.workspace.only-admin-can-edit") }}
+            </span>
+          </NTooltip>
+        </template>
       </div>
     </div>
-
-    <FeatureModal
-      feature="bb.feature.ai-assistant"
-      :open="state.showFeatureModal"
-      @cancel="state.showFeatureModal = false"
-    />
   </div>
 </template>
 
 <script lang="ts" setup>
-import { NButton, NInput, NTooltip } from "naive-ui";
+import { NInput, NTooltip } from "naive-ui";
 import scrollIntoView from "scroll-into-view-if-needed";
 import { computed, onMounted, reactive, ref, watchEffect } from "vue";
-import { useI18n } from "vue-i18n";
 import LearnMoreLink from "@/components/LearnMoreLink.vue";
-import { hasFeature, pushNotification } from "@/store";
+import { hasFeature } from "@/store";
 import { useSettingV1Store } from "@/store/modules/v1/setting";
-import { FeatureBadge, FeatureModal } from "../FeatureGuard";
+import { isDev } from "@/utils";
+import { FeatureBadge } from "../FeatureGuard";
 
 interface LocalState {
   openAIKey: string;
   openAIEndpoint: string;
   openAIModel: string;
-  showFeatureModal: boolean;
 }
 
-defineProps<{
+const props = defineProps<{
+  title: string;
   allowEdit: boolean;
 }>();
 
-const { t } = useI18n();
 const settingV1Store = useSettingV1Store();
 const containerRef = ref<HTMLDivElement>();
 
@@ -165,33 +146,40 @@ const state = reactive<LocalState>({
   openAIKey: "",
   openAIEndpoint: "",
   openAIModel: "",
-  showFeatureModal: false,
 });
 
-const openAIKeySetting = settingV1Store.getSettingByName(
-  "bb.plugin.openai.key"
+const openAIKeySetting = computed(() =>
+  settingV1Store.getSettingByName("bb.plugin.openai.key")
 );
-const openAIEndpointSetting = settingV1Store.getSettingByName(
-  "bb.plugin.openai.endpoint"
+const openAIEndpointSetting = computed(() =>
+  settingV1Store.getSettingByName("bb.plugin.openai.endpoint")
 );
-const openAIModelSetting = settingV1Store.getSettingByName(
-  "bb.plugin.openai.model"
+const openAIModelSetting = computed(() =>
+  settingV1Store.getSettingByName("bb.plugin.openai.model")
 );
 
+const hasAIFeature = computed(() => hasFeature("bb.feature.ai-assistant"));
+
+const getInitialState = (): LocalState => {
+  return {
+    openAIKey: maskKey(openAIKeySetting.value?.value?.stringValue),
+    openAIEndpoint: openAIEndpointSetting.value?.value?.stringValue ?? "",
+    openAIModel: openAIModelSetting.value?.value?.stringValue ?? "",
+  };
+};
+
 watchEffect(() => {
-  state.openAIKey = maskKey(openAIKeySetting?.value?.stringValue);
-  state.openAIEndpoint = openAIEndpointSetting?.value?.stringValue ?? "";
-  state.openAIModel = openAIModelSetting?.value?.stringValue ?? "";
+  Object.assign(state, getInitialState());
 });
 
 const allowSave = computed((): boolean => {
   const openAIKeyUpdated =
-    state.openAIKey !== maskKey(openAIKeySetting?.value?.stringValue) ||
+    state.openAIKey !== maskKey(openAIKeySetting.value?.value?.stringValue) ||
     (state.openAIKey && !state.openAIKey.includes("***"));
   const openAIEndpointUpdated =
-    state.openAIEndpoint !== openAIEndpointSetting?.value?.stringValue;
+    state.openAIEndpoint !== openAIEndpointSetting.value?.value?.stringValue;
   const openAIModelUpdated =
-    state.openAIModel !== openAIModelSetting?.value?.stringValue;
+    state.openAIModel !== openAIModelSetting.value?.value?.stringValue;
   return openAIKeyUpdated || openAIEndpointUpdated || openAIModelUpdated;
 });
 
@@ -200,15 +188,8 @@ function maskKey(key: string | undefined): string {
 }
 
 const updateOpenAIKeyEndpoint = async () => {
-  // Always allow to unset the key.
-  const isUnset = state.openAIKey === "" && state.openAIEndpoint === "";
-  if (!isUnset && !hasFeature("bb.feature.ai-assistant")) {
-    state.showFeatureModal = true;
-    return;
-  }
-
   if (
-    state.openAIKey !== maskKey(openAIKeySetting?.value?.stringValue) ||
+    state.openAIKey !== maskKey(openAIKeySetting.value?.value?.stringValue) ||
     !state.openAIKey.includes("***")
   ) {
     await settingV1Store.upsertSetting({
@@ -218,7 +199,9 @@ const updateOpenAIKeyEndpoint = async () => {
       },
     });
   }
-  if (state.openAIEndpoint !== openAIEndpointSetting?.value?.stringValue) {
+  if (
+    state.openAIEndpoint !== openAIEndpointSetting.value?.value?.stringValue
+  ) {
     await settingV1Store.upsertSetting({
       name: "bb.plugin.openai.endpoint",
       value: {
@@ -226,7 +209,7 @@ const updateOpenAIKeyEndpoint = async () => {
       },
     });
   }
-  if (state.openAIEndpoint !== openAIModelSetting?.value?.stringValue) {
+  if (state.openAIEndpoint !== openAIModelSetting.value?.value?.stringValue) {
     await settingV1Store.upsertSetting({
       name: "bb.plugin.openai.model",
       value: {
@@ -234,11 +217,8 @@ const updateOpenAIKeyEndpoint = async () => {
       },
     });
   }
-  pushNotification({
-    module: "bytebase",
-    style: "SUCCESS",
-    title: t("settings.general.workspace.config-updated"),
-  });
+
+  Object.assign(state, getInitialState());
 };
 
 onMounted(() => {
@@ -249,5 +229,14 @@ onMounted(() => {
       scrollMode: "if-needed",
     });
   }
+});
+
+defineExpose({
+  isDirty: allowSave,
+  title: props.title,
+  update: updateOpenAIKeyEndpoint,
+  revert: () => {
+    Object.assign(state, getInitialState());
+  },
 });
 </script>

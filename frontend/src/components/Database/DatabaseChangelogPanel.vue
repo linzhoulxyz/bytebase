@@ -75,9 +75,8 @@
     </div>
 
     <PagedTable
-      ref="issuePagedTable"
+      ref="changedlogPagedTable"
       :session-key="`bb.paged-changelog-table.${database.name}`"
-      :page-size="50"
       :fetch-list="fetchChangelogList"
     >
       <template #table="{ list, loading }">

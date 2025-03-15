@@ -1,6 +1,6 @@
 <template>
-  <div class="w-full flex flex-col gap-4 py-4 px-4 overflow-y-auto">
-    <div class="flex items-center space-x-2">
+  <div class="w-full flex flex-col gap-4 py-4 overflow-y-auto">
+    <div class="flex items-center space-x-2 px-4">
       <SearchBox
         v-model:value="state.keyword"
         style="max-width: 100%"
@@ -17,8 +17,12 @@
       </NButton>
     </div>
 
-    <ProjectV1Table
-      :project-list="filteredProjectList"
+    <PagedProjectTable
+      session-key="bb.sql-editor.project-table"
+      :search="state.keyword"
+      :footer-class="'mx-4'"
+      :bordered="false"
+      :include-default="false"
       :prevent-default="true"
       @row-click="showProjectDetail"
     />
@@ -51,19 +55,16 @@
 <script setup lang="ts">
 import { PlusIcon } from "lucide-vue-next";
 import { NButton, NEllipsis } from "naive-ui";
-import { computed, onMounted, reactive, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { reactive, watch } from "vue";
+import { useRouter } from "vue-router";
 import ProjectCreatePanel from "@/components/Project/ProjectCreatePanel.vue";
 import {
   Drawer,
   DrawerContent,
-  ProjectV1Table,
+  PagedProjectTable,
   SearchBox,
 } from "@/components/v2";
-import { useProjectV1List, useProjectV1Store } from "@/store";
 import type { ComposedProject } from "@/types";
-import type { Project } from "@/types/proto/v1/project_service";
-import { filterProjectV1ListByKeyword, wrapRefAsPromise } from "@/utils";
 import Detail from "./Detail.vue";
 
 interface LocalState {
@@ -74,20 +75,13 @@ interface LocalState {
   };
 }
 
-const route = useRoute();
 const router = useRouter();
-
 const state = reactive<LocalState>({
   keyword: "",
   detail: {
     show: false,
     project: undefined,
   },
-});
-const { projectList, ready } = useProjectV1List();
-
-const filteredProjectList = computed(() => {
-  return filterProjectV1ListByKeyword(projectList.value, state.keyword);
 });
 
 const handleClickNewProject = () => {
@@ -104,42 +98,20 @@ const hideDrawer = () => {
   state.detail.show = false;
 };
 
-const handleCreated = async (project: Project) => {
-  const composed = await useProjectV1Store().getOrFetchProjectByName(
-    project.name
-  );
-  state.detail.project = composed;
+const handleCreated = async (project: ComposedProject) => {
+  state.detail.project = project;
 };
 
-onMounted(() => {
-  if (route.hash === "#add") {
-    state.detail.show = true;
-    state.detail.project = undefined;
-  }
-  wrapRefAsPromise(ready, true).then(() => {
-    const maybeProjectName = route.hash.replace(/^#*/g, "");
-    if (maybeProjectName) {
-      const project = projectList.value.find(
-        (proj) => proj.name === maybeProjectName
-      );
-      if (project) {
-        state.detail.show = true;
-        state.detail.project = project;
-      }
+watch(
+  [() => state.detail.show, () => state.detail.project?.name],
+  ([show, projectName]) => {
+    if (show) {
+      router.replace({ hash: projectName ? `#${projectName}` : "#add" });
+    } else {
+      router.replace({ hash: "" });
     }
-
-    watch(
-      [() => state.detail.show, () => state.detail.project?.name],
-      ([show, projectName]) => {
-        if (show) {
-          router.replace({ hash: projectName ? `#${projectName}` : "#add" });
-        } else {
-          router.replace({ hash: "" });
-        }
-      }
-    );
-  });
-});
+  }
+);
 </script>
 
 <style scoped lang="postcss">

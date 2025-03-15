@@ -1,21 +1,84 @@
 <template>
-  <div class="mx-auto">
-    <div v-if="subscriptionStore.isSelfHostLicense" class="textinfolabel mb-4">
-      {{ $t("subscription.description") }}
-      <a
-        class="text-accent"
-        :href="subscriptionStore.purchaseLicenseUrl"
-        target="__blank"
+  <div class="w-full mx-auto">
+    <div
+      class="w-full grid grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 my-4"
+    >
+      <div class="flex flex-col text-left">
+        <div class="flex text-main">
+          {{ $t("subscription.current") }}
+          <span
+            v-if="isExpired"
+            class="ml-2 inline-flex items-center px-3 py-0.5 rounded-full text-base font-sm bg-red-100 text-red-800 h-6"
+          >
+            {{ $t("subscription.expired") }}
+          </span>
+          <span
+            v-else-if="isTrialing"
+            class="ml-2 inline-flex items-center px-3 py-0.5 rounded-full text-base font-sm bg-indigo-100 text-indigo-800 h-6"
+          >
+            {{ $t("subscription.trialing") }}
+          </span>
+        </div>
+        <div class="text-indigo-600 mt-1 text-3xl lg:text-4xl">
+          {{ currentPlan }}
+        </div>
+      </div>
+      <div v-if="!subscriptionStore.isFreePlan" class="flex flex-col text-left">
+        <div class="text-main">
+          {{ $t("subscription.expires-at") }}
+        </div>
+        <dd class="mt-1 text-3xl lg:text-4xl">{{ expireAt || "N/A" }}</dd>
+      </div>
+      <div
+        v-if="subscriptionStore.canTrial && allowEdit"
+        class="flex flex-col text-left"
       >
-        {{ $t("subscription.purchase-license") }}
-      </a>
-      <span v-if="subscriptionStore.canTrial" class="ml-1">
-        {{ $t("common.or") }}
-        <span class="text-accent cursor-pointer" @click="openTrialModal">
-          {{ $t("subscription.plan.try") }}
-        </span>
-      </span>
+        <div class="text-main">
+          {{ $t("subscription.try-for-free") }}
+        </div>
+        <div class="mt-1">
+          <NButton
+            type="primary"
+            size="large"
+            @click="state.showTrialModal = true"
+          >
+            {{
+              $t("subscription.enterprise-free-trial", {
+                days: subscriptionStore.trialingDays,
+              })
+            }}
+          </NButton>
+        </div>
+      </div>
+      <div
+        v-if="
+          subscriptionStore.isTrialing &&
+          subscriptionStore.currentPlan == PlanType.ENTERPRISE
+        "
+        class="flex flex-col text-left"
+      >
+        <div class="text-main">
+          {{ $t("subscription.inquire-enterprise-plan") }}
+        </div>
+        <div class="mt-1 ml-auto">
+          <NButton type="primary" size="large" @click="inquireEnterprise">
+            {{ $t("subscription.contact-us") }}
+          </NButton>
+        </div>
+      </div>
+      <WorkspaceInstanceLicenseStats v-if="allowManageInstanceLicenses" />
+      <div class="flex flex-col text-left">
+        <div class="text-main">
+          {{ $t("subscription.instance-assignment.used-and-total-user") }}
+        </div>
+        <div class="mt-1 text-4xl flex items-center gap-2">
+          {{ userStore.activeUserCountWithoutBot }}
+          <span class="font-mono text-gray-500">/</span>
+          {{ userLimit }}
+        </div>
+      </div>
     </div>
+    <NDivider />
     <div>
       <label class="flex items-center gap-x-2">
         <span class="text-main">
@@ -42,74 +105,26 @@
         </NButton>
       </div>
     </div>
-    <NDivider />
-    <dl class="text-left grid grid-cols-2 gap-x-6 my-4 xl:grid-cols-4">
-      <div class="my-3">
-        <dt class="flex text-main">
-          {{ $t("subscription.current") }}
-          <span
-            v-if="isExpired"
-            class="ml-2 inline-flex items-center px-3 py-0.5 rounded-full text-base font-sm bg-red-100 text-red-800 h-6"
-          >
-            {{ $t("subscription.expired") }}
-          </span>
-          <span
-            v-else-if="isTrialing"
-            class="ml-2 inline-flex items-center px-3 py-0.5 rounded-full text-base font-sm bg-indigo-100 text-indigo-800 h-6"
-          >
-            {{ $t("subscription.trialing") }}
-          </span>
-        </dt>
-        <dd class="text-indigo-600 mt-1 text-4xl">
-          <div>
-            {{ currentPlan }}
-          </div>
-        </dd>
-      </div>
-      <WorkspaceInstanceLicenseStats v-if="allowManageInstanceLicenses" />
-      <div v-if="!subscriptionStore.isFreePlan" class="my-3">
-        <dt class="text-main">
-          {{ $t("subscription.expires-at") }}
-        </dt>
-        <dd class="mt-1 text-4xl">{{ expireAt || "n/a" }}</dd>
-      </div>
-      <div v-if="subscriptionStore.canTrial && allowEdit" class="my-3">
-        <dt class="text-main">
-          {{ $t("subscription.try-for-free") }}
-        </dt>
-
-        <dd class="mt-1">
-          <NButton type="primary" @click="state.showTrialModal = true">
-            {{
-              $t("subscription.enterprise-free-trial", {
-                days: subscriptionStore.trialingDays,
-              })
-            }}
-          </NButton>
-        </dd>
-      </div>
-      <div
-        v-if="
-          subscriptionStore.isTrialing &&
-          subscriptionStore.currentPlan == PlanType.ENTERPRISE
-        "
-        class="my-3"
-      >
-        <dt class="text-main">
-          {{ $t("subscription.inquire-enterprise-plan") }}
-        </dt>
-
-        <dd class="mt-1 ml-auto">
-          <NButton type="primary" @click="inquireEnterprise">
-            {{ $t("subscription.contact-us") }}
-          </NButton>
-        </dd>
-      </div>
-    </dl>
     <div
       v-if="allowEdit && subscriptionStore.isSelfHostLicense"
       class="w-full mt-4 flex flex-col"
     >
+      <label class="flex items-center gap-x-2">
+        <span class="text-main">
+          {{ $t("subscription.upload-license") }}
+        </span>
+      </label>
+      <div class="mb-3 text-sm text-gray-400">
+        {{ $t("subscription.description") }}
+        {{ $t("subscription.plan-compare") }}
+        <LearnMoreLink url="https://www.bytebase.com/pricing?source=console" />
+        <span v-if="subscriptionStore.canTrial" class="ml-1">
+          <span class="text-accent cursor-pointer" @click="openTrialModal">
+            {{ $t("subscription.plan.try") }}
+          </span>
+        </span>
+      </div>
+
       <NInput
         v-model:value="state.license"
         type="textarea"
@@ -125,13 +140,6 @@
           {{ $t("subscription.upload-license") }}
         </NButton>
       </div>
-    </div>
-    <NDivider />
-    <div class="sm:flex sm:flex-col sm:align-center">
-      <div class="textinfolabel">
-        {{ $t("subscription.plan-compare") }}
-      </div>
-      <PricingTable @on-trial="openTrialModal" />
     </div>
     <TrialModal
       v-if="state.showTrialModal"
@@ -152,6 +160,7 @@ import { NButton, NDivider, NInput } from "naive-ui";
 import { storeToRefs } from "pinia";
 import { computed, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import LearnMoreLink from "@/components/LearnMoreLink.vue";
 import TrialModal from "@/components/TrialModal.vue";
 import WeChatQRModal from "@/components/WeChatQRModal.vue";
 import WorkspaceInstanceLicenseStats from "@/components/WorkspaceInstanceLicenseStats.vue";
@@ -160,11 +169,11 @@ import {
   pushNotification,
   useSubscriptionV1Store,
   useSettingV1Store,
+  useUserStore,
 } from "@/store";
 import { ENTERPRISE_INQUIRE_LINK } from "@/types";
 import { PlanType } from "@/types/proto/v1/subscription_service";
 import { hasWorkspacePermissionV2 } from "@/utils";
-import PricingTable from "../components/PricingTable/";
 
 interface LocalState {
   loading: boolean;
@@ -181,6 +190,7 @@ const { t } = useI18n();
 const { locale } = useLanguage();
 const subscriptionStore = useSubscriptionV1Store();
 const settingV1Store = useSettingV1Store();
+const userStore = useUserStore();
 
 const state = reactive<LocalState>({
   loading: false,
@@ -191,6 +201,13 @@ const state = reactive<LocalState>({
 
 const disabled = computed((): boolean => {
   return state.loading || !state.license;
+});
+
+const userLimit = computed((): string => {
+  if (subscriptionStore.userCountLimit === Number.MAX_VALUE) {
+    return t("subscription.unlimited");
+  }
+  return `${subscriptionStore.userCountLimit}`;
 });
 
 const workspaceIdField = ref<HTMLInputElement | null>(null);

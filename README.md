@@ -13,8 +13,8 @@
 </h1>
 
 <p align="center">
-  <a href="https://bytebase.com/docs/get-started/install/overview" target="_blank"><b>⚙️ Install</b></a> •
-  <a href="https://bytebase.com/docs"><b>📚 Docs</b></a> •
+  <a href="https://bytebase.com/docs/get-started/self-host" target="_blank"><b>⚙️ Install</b></a> •
+  <a href="https://bytebase.com/docs/introduction/what-is-bytebase"><b>📚 Docs</b></a> •
   <a href="https://discord.gg/huyw7gRsyA"><b>💬 Discord</b></a> •
   <a href="https://www.bytebase.com/request-demo/"><b>🙋‍♀️ Book Demo</b></a>
 </p>
@@ -147,7 +147,7 @@ Bytebase is a Database CI/CD solution for the Developers and DBAs. It's the **on
 
 # 🔧 Installation
 
-- [Docker](https://www.bytebase.com/docs/get-started/install/deploy-with-docker)
+- [Docker](https://www.bytebase.com/docs/get-started/self-host/)
 - [Kubernetes](https://www.bytebase.com/docs/get-started/install/deploy-to-kubernetes)
 - [Build from source](https://www.bytebase.com/docs/get-started/install/build-from-source-code)
 
@@ -282,7 +282,7 @@ Below diagram describes a typical mapping between an engineering org and the cor
 1. Start frontend (with live reload).
 
    ```bash
-   cd frontend && pnpm i && pnpm dev
+   pnpm --dir frontend i && pnpm --dir frontend dev
    ```
 
    Bytebase should now be running at http://localhost:3000 and change either frontend or backend code would trigger live reload.

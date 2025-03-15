@@ -5,34 +5,31 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/bytebase/bytebase/backend/common"
-	api "github.com/bytebase/bytebase/backend/legacyapi"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 // DatabaseMessage is the message for database.
 type DatabaseMessage struct {
-	UID                    int
-	ProjectID              string
-	InstanceID             string
+	ProjectID    string
+	InstanceID   string
+	DatabaseName string
+
 	EnvironmentID          string
 	EffectiveEnvironmentID string
 
-	DatabaseName string
-	SyncState    api.SyncStatus
-	SyncAt       time.Time
-	Secrets      *storepb.Secrets
-	DataShare    bool
-	// ServiceName is the Oracle specific field.
-	ServiceName string
-	Metadata    *storepb.DatabaseMetadata
+	Deleted  bool
+	Metadata *storepb.DatabaseMetadata
 	// Output only
 	SchemaVersion string
+}
+
+func (d *DatabaseMessage) String() string {
+	return common.FormatDatabase(d.InstanceID, d.DatabaseName)
 }
 
 // UpdateDatabaseMessage is the mssage for updating a database.
@@ -40,18 +37,18 @@ type UpdateDatabaseMessage struct {
 	InstanceID   string
 	DatabaseName string
 
-	ProjectID           *string
-	SyncState           *api.SyncStatus
-	SyncAt              *time.Time
-	SourceBackupID      *int
-	Secrets             *storepb.Secrets
-	DataShare           *bool
-	ServiceName         *string
-	UpdateEnvironmentID bool
-	EnvironmentID       string
+	ProjectID *string
+	Deleted   *bool
+	// Empty string will unset the environment.
+	EnvironmentID *string
+	Metadata      *storepb.DatabaseMetadata
+}
 
-	// MetadataUpsert upserts the top-level messages.
-	MetadataUpsert *storepb.DatabaseMetadata
+// BatchUpdateDatabases is the message for batch updating databases.
+type BatchUpdateDatabases struct {
+	ProjectID *string
+	// Empty string will unset the environment.
+	EnvironmentID *string
 }
 
 // FindDatabaseMessage is the message for finding databases.
@@ -60,15 +57,15 @@ type FindDatabaseMessage struct {
 	EffectiveEnvironmentID *string
 	InstanceID             *string
 	DatabaseName           *string
-	UID                    *int
 	Engine                 *storepb.Engine
 	// When this is used, we will return databases from archived instances or environments.
 	// This is used for existing tasks with archived databases.
 	ShowDeleted bool
 
-	// IgnoreCaseSensitive is used to ignore case sensitive when finding database.
-	IgnoreCaseSensitive bool
+	// IsCaseSensitive is used to ignore case sensitive when finding database.
+	IsCaseSensitive bool
 
+	Filter *ListResourceFilter
 	Limit  *int
 	Offset *int
 }
@@ -77,11 +74,6 @@ type FindDatabaseMessage struct {
 func (s *Store) GetDatabaseV2(ctx context.Context, find *FindDatabaseMessage) (*DatabaseMessage, error) {
 	if find.InstanceID != nil && find.DatabaseName != nil {
 		if v, ok := s.databaseCache.Get(getDatabaseCacheKey(*find.InstanceID, *find.DatabaseName)); ok {
-			return v, nil
-		}
-	}
-	if find.UID != nil {
-		if v, ok := s.databaseIDCache.Get(*find.UID); ok {
 			return v, nil
 		}
 	}
@@ -109,7 +101,6 @@ func (s *Store) GetDatabaseV2(ctx context.Context, find *FindDatabaseMessage) (*
 	}
 
 	s.databaseCache.Add(getDatabaseCacheKey(database.InstanceID, database.DatabaseName), database)
-	s.databaseIDCache.Add(database.UID, database)
 	return database, nil
 }
 
@@ -132,7 +123,6 @@ func (s *Store) ListDatabases(ctx context.Context, find *FindDatabaseMessage) ([
 
 	for _, database := range databases {
 		s.databaseCache.Add(getDatabaseCacheKey(database.InstanceID, database.DatabaseName), database)
-		s.databaseIDCache.Add(database.UID, database)
 	}
 	return databases, nil
 }
@@ -145,8 +135,7 @@ func (s *Store) CreateDatabaseDefault(ctx context.Context, create *DatabaseMessa
 	}
 	defer tx.Rollback()
 
-	databaseUID, err := s.createDatabaseDefaultImpl(ctx, tx, create.ProjectID, create.InstanceID, create)
-	if err != nil {
+	if _, err := s.createDatabaseDefaultImpl(ctx, tx, create.ProjectID, create.InstanceID, create); err != nil {
 		return nil, err
 	}
 
@@ -156,45 +145,28 @@ func (s *Store) CreateDatabaseDefault(ctx context.Context, create *DatabaseMessa
 
 	// Invalidate an update the cache.
 	s.databaseCache.Remove(getDatabaseCacheKey(create.InstanceID, create.DatabaseName))
-	s.databaseIDCache.Remove(databaseUID)
-	return s.GetDatabaseV2(ctx, &FindDatabaseMessage{UID: &databaseUID})
+	return s.GetDatabaseV2(ctx, &FindDatabaseMessage{InstanceID: &create.InstanceID, DatabaseName: &create.DatabaseName, ShowDeleted: true})
 }
 
 // createDatabaseDefault only creates a default database with charset, collation only in the default project.
-func (*Store) createDatabaseDefaultImpl(ctx context.Context, tx *Tx, projectID, instanceID string, create *DatabaseMessage) (int, error) {
-	secretsString, err := protojson.Marshal(&storepb.Secrets{})
-	if err != nil {
-		return 0, err
-	}
-
+func (*Store) createDatabaseDefaultImpl(ctx context.Context, txn *sql.Tx, projectID, instanceID string, create *DatabaseMessage) (int, error) {
 	query := `
 		INSERT INTO db (
 			instance,
 			project,
 			name,
-			sync_status,
-			schema_version,
-			secrets,
-			datashare,
-			service_name
+			deleted
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (instance, name) DO UPDATE SET
-			project = EXCLUDED.project,
-			sync_status = EXCLUDED.sync_status,
-			datashare = EXCLUDED.datashare,
-			service_name = EXCLUDED.service_name
+			deleted = EXCLUDED.deleted
 		RETURNING id`
 	var databaseUID int
-	if err := tx.QueryRowContext(ctx, query,
+	if err := txn.QueryRowContext(ctx, query,
 		instanceID,
 		projectID,
 		create.DatabaseName,
-		api.OK,
-		"",            /* schema_version */
-		secretsString, /* secrets */
-		create.DataShare,
-		create.ServiceName,
+		false,
 	).Scan(
 		&databaseUID,
 	); err != nil {
@@ -205,10 +177,6 @@ func (*Store) createDatabaseDefaultImpl(ctx context.Context, tx *Tx, projectID, 
 
 // UpsertDatabase upserts a database.
 func (s *Store) UpsertDatabase(ctx context.Context, create *DatabaseMessage) (*DatabaseMessage, error) {
-	secretsString, err := protojson.Marshal(create.Secrets)
-	if err != nil {
-		return nil, err
-	}
 	metadataString, err := protojson.Marshal(create.Metadata)
 	if err != nil {
 		return nil, err
@@ -230,20 +198,14 @@ func (s *Store) UpsertDatabase(ctx context.Context, create *DatabaseMessage) (*D
 			project,
 			environment,
 			name,
-			sync_status,
-			sync_at,
-			schema_version,
-			secrets,
-			datashare,
-			service_name,
+			deleted,
 			metadata
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, '', $7, $8, $9, $10)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (instance, name) DO UPDATE SET
 			project = EXCLUDED.project,
 			environment = EXCLUDED.environment,
 			name = EXCLUDED.name,
-			schema_version = EXCLUDED.schema_version,
 			metadata = EXCLUDED.metadata
 		RETURNING id`
 	var databaseUID int
@@ -252,11 +214,7 @@ func (s *Store) UpsertDatabase(ctx context.Context, create *DatabaseMessage) (*D
 		create.ProjectID,
 		environment,
 		create.DatabaseName,
-		create.SyncState,
-		create.SyncAt,
-		secretsString,
-		create.DataShare,
-		create.ServiceName,
+		create.Deleted,
 		metadataString,
 	).Scan(
 		&databaseUID,
@@ -269,8 +227,7 @@ func (s *Store) UpsertDatabase(ctx context.Context, create *DatabaseMessage) (*D
 
 	// Invalidate and update the cache.
 	s.databaseCache.Remove(getDatabaseCacheKey(create.InstanceID, create.DatabaseName))
-	s.databaseIDCache.Remove(databaseUID)
-	return s.GetDatabaseV2(ctx, &FindDatabaseMessage{UID: &databaseUID, ShowDeleted: true})
+	return s.GetDatabaseV2(ctx, &FindDatabaseMessage{InstanceID: &create.InstanceID, DatabaseName: &create.DatabaseName, ShowDeleted: true})
 }
 
 // UpdateDatabase updates a database.
@@ -279,42 +236,22 @@ func (s *Store) UpdateDatabase(ctx context.Context, patch *UpdateDatabaseMessage
 	if v := patch.ProjectID; v != nil {
 		set, args = append(set, fmt.Sprintf("project = $%d", len(args)+1)), append(args, *v)
 	}
-	if patch.UpdateEnvironmentID {
-		var environment *string
-		if patch.EnvironmentID != "" {
-			environment = &patch.EnvironmentID
+	if v := patch.EnvironmentID; v != nil {
+		if *v == "" {
+			set = append(set, "environment = NULL")
+		} else {
+			set, args = append(set, fmt.Sprintf("environment = $%d", len(args)+1)), append(args, *v)
 		}
-		set, args = append(set, fmt.Sprintf("environment = $%d", len(args)+1)), append(args, environment)
 	}
-	if v := patch.SyncState; v != nil {
-		set, args = append(set, fmt.Sprintf("sync_status = $%d", len(args)+1)), append(args, *v)
+	if v := patch.Deleted; v != nil {
+		set, args = append(set, fmt.Sprintf("deleted = $%d", len(args)+1)), append(args, *v)
 	}
-	if v := patch.SyncAt; v != nil {
-		set, args = append(set, fmt.Sprintf("sync_at = $%d", len(args)+1)), append(args, *v)
-	}
-	if v := patch.Secrets; v != nil {
-		secretsString, err := protojson.Marshal(v)
-		if err != nil {
-			return nil, err
-		}
-		set, args = append(set, fmt.Sprintf("secrets = $%d", len(args)+1)), append(args, secretsString)
-	}
-	if v := patch.DataShare; v != nil {
-		set, args = append(set, fmt.Sprintf("datashare = $%d", len(args)+1)), append(args, *v)
-	}
-	if v := patch.ServiceName; v != nil {
-		set, args = append(set, fmt.Sprintf("service_name = $%d", len(args)+1)), append(args, *v)
-	}
-	if v := patch.MetadataUpsert; v != nil {
+	if v := patch.Metadata; v != nil {
 		metadataBytes, err := protojson.Marshal(v)
 		if err != nil {
 			return nil, err
 		}
-		if v.Labels != nil && len(v.Labels) == 0 {
-			set, args = append(set, fmt.Sprintf("metadata = metadata || $%d || $%d", len(args)+1, len(args)+2)), append(args, metadataBytes, `{"labels": {}}`)
-		} else {
-			set, args = append(set, fmt.Sprintf("metadata = metadata || $%d", len(args)+1)), append(args, metadataBytes)
-		}
+		set, args = append(set, fmt.Sprintf("metadata = $%d", len(args)+1)), append(args, metadataBytes)
 	}
 	args = append(args, patch.InstanceID, patch.DatabaseName)
 
@@ -342,14 +279,23 @@ func (s *Store) UpdateDatabase(ctx context.Context, patch *UpdateDatabaseMessage
 
 	// Invalidate and update database cache.
 	s.databaseCache.Remove(getDatabaseCacheKey(patch.InstanceID, patch.DatabaseName))
-	s.databaseIDCache.Remove(databaseUID)
-	return s.GetDatabaseV2(ctx, &FindDatabaseMessage{UID: &databaseUID, ShowDeleted: true})
+	return s.GetDatabaseV2(ctx, &FindDatabaseMessage{InstanceID: &patch.InstanceID, DatabaseName: &patch.DatabaseName, ShowDeleted: true})
 }
 
-// BatchUpdateDatabaseProject updates the project for databases in batch.
-func (s *Store) BatchUpdateDatabaseProject(ctx context.Context, databases []*DatabaseMessage, projectID string) ([]*DatabaseMessage, error) {
+// BatchUpdateDatabases update databases in batch.
+func (s *Store) BatchUpdateDatabases(ctx context.Context, databases []*DatabaseMessage, update *BatchUpdateDatabases) ([]*DatabaseMessage, error) {
 	if len(databases) == 0 {
 		return nil, errors.Errorf("there is no database in the project")
+	}
+	set, args, wheres := []string{}, []any{}, []string{}
+	if update.ProjectID != nil {
+		set, args = append(set, fmt.Sprintf("project = $%d", len(args)+1)), append(args, *update.ProjectID)
+	}
+	if update.EnvironmentID != nil {
+		set, args = append(set, fmt.Sprintf("environment = $%d", len(args)+1)), append(args, *update.EnvironmentID)
+	}
+	if len(set) == 0 {
+		return nil, errors.New("no update field specified")
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -357,16 +303,13 @@ func (s *Store) BatchUpdateDatabaseProject(ctx context.Context, databases []*Dat
 		return nil, err
 	}
 	defer tx.Rollback()
-
-	var wheres []string
-	args := []any{projectID}
-	for i, database := range databases {
-		wheres = append(wheres, fmt.Sprintf("(db.instance = $%d AND db.name = $%d)", 2*i+2, 2*i+3))
+	for _, database := range databases {
+		wheres = append(wheres, fmt.Sprintf("(db.instance = $%d AND db.name = $%d)", len(args)+1, len(args)+2))
 		args = append(args, database.InstanceID, database.DatabaseName)
 	}
 	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
 			UPDATE db
-			SET project = $1
+			SET `+strings.Join(set, ", ")+`
 			WHERE %s;`, strings.Join(wheres, " OR ")),
 		args...,
 	); err != nil {
@@ -380,16 +323,36 @@ func (s *Store) BatchUpdateDatabaseProject(ctx context.Context, databases []*Dat
 	var updatedDatabases []*DatabaseMessage
 	for _, database := range databases {
 		updatedDatabase := *database
-		updatedDatabase.ProjectID = projectID
+		// Update cache for project field.
+		if update.ProjectID != nil {
+			updatedDatabase.ProjectID = *update.ProjectID
+		}
+		// Update cache for environment field and effective environment field.
+		if update.EnvironmentID != nil {
+			updatedDatabase.EnvironmentID = *update.EnvironmentID
+			if *update.EnvironmentID == "" {
+				instance, err := s.GetInstanceV2(ctx, &FindInstanceMessage{ResourceID: &database.InstanceID})
+				if err != nil {
+					// Should not reach here.
+					return nil, err
+				}
+				updatedDatabase.EffectiveEnvironmentID = instance.EnvironmentID
+			} else {
+				updatedDatabase.EffectiveEnvironmentID = *update.EnvironmentID
+			}
+		}
 		s.databaseCache.Add(getDatabaseCacheKey(database.InstanceID, database.DatabaseName), &updatedDatabase)
-		s.databaseIDCache.Add(database.UID, &updatedDatabase)
 		updatedDatabases = append(updatedDatabases, &updatedDatabase)
 	}
 	return updatedDatabases, nil
 }
 
-func (*Store) listDatabaseImplV2(ctx context.Context, tx *Tx, find *FindDatabaseMessage) ([]*DatabaseMessage, error) {
+func (*Store) listDatabaseImplV2(ctx context.Context, txn *sql.Tx, find *FindDatabaseMessage) ([]*DatabaseMessage, error) {
 	where, args := []string{"TRUE"}, []any{}
+	if filter := find.Filter; filter != nil {
+		where = append(where, filter.Where)
+		args = append(args, filter.Args...)
+	}
 	if v := find.ProjectID; v != nil {
 		where, args = append(where, fmt.Sprintf("db.project = $%d", len(args)+1)), append(args, *v)
 	}
@@ -404,17 +367,14 @@ func (*Store) listDatabaseImplV2(ctx context.Context, tx *Tx, find *FindDatabase
 		where, args = append(where, fmt.Sprintf("db.instance = $%d", len(args)+1)), append(args, *v)
 	}
 	if v := find.DatabaseName; v != nil {
-		if find.IgnoreCaseSensitive {
-			where, args = append(where, fmt.Sprintf("LOWER(db.name) = LOWER($%d)", len(args)+1)), append(args, *v)
-		} else {
+		if find.IsCaseSensitive {
 			where, args = append(where, fmt.Sprintf("db.name = $%d", len(args)+1)), append(args, *v)
+		} else {
+			where, args = append(where, fmt.Sprintf("LOWER(db.name) = LOWER($%d)", len(args)+1)), append(args, *v)
 		}
 	}
-	if v := find.UID; v != nil {
-		where, args = append(where, fmt.Sprintf("db.id = $%d", len(args)+1)), append(args, *v)
-	}
 	if v := find.Engine; v != nil {
-		where, args = append(where, fmt.Sprintf("instance.engine = $%d", len(args)+1)), append(args, *v)
+		where, args = append(where, fmt.Sprintf("instance.metadata->>'engine' = $%d", len(args)+1)), append(args, *v)
 	}
 	if !find.ShowDeleted {
 		where, args = append(where, fmt.Sprintf(`
@@ -430,12 +390,11 @@ func (*Store) listDatabaseImplV2(ctx context.Context, tx *Tx, find *FindDatabase
 
 		where, args = append(where, fmt.Sprintf("instance.deleted = $%d", len(args)+1)), append(args, false)
 		// We don't show databases that are deleted by users already.
-		where, args = append(where, fmt.Sprintf("db.sync_status = $%d", len(args)+1)), append(args, api.OK)
+		where, args = append(where, fmt.Sprintf("db.deleted = $%d", len(args)+1)), append(args, false)
 	}
 
 	query := fmt.Sprintf(`
 		SELECT
-			db.id,
 			db.project,
 			COALESCE(
 				(SELECT environment.resource_id FROM environment WHERE environment.resource_id = db.environment),
@@ -444,8 +403,7 @@ func (*Store) listDatabaseImplV2(ctx context.Context, tx *Tx, find *FindDatabase
 			(SELECT environment.resource_id FROM environment WHERE environment.resource_id = db.environment),
 			db.instance,
 			db.name,
-			db.sync_status,
-			db.sync_at,
+			db.deleted,
 			COALESCE(
 				(
 					SELECT revision.version
@@ -456,9 +414,6 @@ func (*Store) listDatabaseImplV2(ctx context.Context, tx *Tx, find *FindDatabase
 				),
 				''
 			),
-			db.secrets,
-			db.datashare,
-			db.service_name,
 			db.metadata
 		FROM db
 		LEFT JOIN instance ON db.instance = instance.resource_id
@@ -472,7 +427,7 @@ func (*Store) listDatabaseImplV2(ctx context.Context, tx *Tx, find *FindDatabase
 	}
 
 	var databaseMessages []*DatabaseMessage
-	rows, err := tx.QueryContext(ctx, query,
+	rows, err := txn.QueryContext(ctx, query,
 		args...,
 	)
 	if err != nil {
@@ -481,21 +436,16 @@ func (*Store) listDatabaseImplV2(ctx context.Context, tx *Tx, find *FindDatabase
 	defer rows.Close()
 	for rows.Next() {
 		databaseMessage := &DatabaseMessage{}
-		var secretsString, metadataString string
+		var metadataString string
 		var effectiveEnvironment, environment sql.NullString
 		if err := rows.Scan(
-			&databaseMessage.UID,
 			&databaseMessage.ProjectID,
 			&effectiveEnvironment,
 			&environment,
 			&databaseMessage.InstanceID,
 			&databaseMessage.DatabaseName,
-			&databaseMessage.SyncState,
-			&databaseMessage.SyncAt,
+			&databaseMessage.Deleted,
 			&databaseMessage.SchemaVersion,
-			&secretsString,
-			&databaseMessage.DataShare,
-			&databaseMessage.ServiceName,
 			&metadataString,
 		); err != nil {
 			return nil, err
@@ -507,11 +457,6 @@ func (*Store) listDatabaseImplV2(ctx context.Context, tx *Tx, find *FindDatabase
 			databaseMessage.EnvironmentID = environment.String
 		}
 
-		var secret storepb.Secrets
-		if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(secretsString), &secret); err != nil {
-			return nil, err
-		}
-		databaseMessage.Secrets = &secret
 		var metadata storepb.DatabaseMetadata
 		if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(metadataString), &metadata); err != nil {
 			return nil, err

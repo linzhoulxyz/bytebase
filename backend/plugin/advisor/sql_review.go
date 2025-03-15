@@ -503,11 +503,11 @@ type SQLReviewCheckContext struct {
 	DbType                storepb.Engine
 	Catalog               catalogInterface
 	Driver                *sql.DB
-	Context               context.Context
 	PreUpdateBackupDetail *storepb.PreUpdateBackupDetail
 	ClassificationConfig  *storepb.DataClassificationSetting_DataClassificationConfig
 	ListDatabaseNamesFunc base.ListDatabaseNamesFunc
 	InstanceID            string
+	IsObjectCaseSensitive bool
 
 	// Snowflake specific fields
 	CurrentDatabase string
@@ -521,6 +521,7 @@ type SQLReviewCheckContext struct {
 
 // SQLReviewCheck checks the statements with sql review rules.
 func SQLReviewCheck(
+	ctx context.Context,
 	sm *sheet.Manager,
 	statements string,
 	ruleList []*storepb.SQLReviewRule,
@@ -544,7 +545,7 @@ func SQLReviewCheck(
 		switch checkContext.DbType {
 		case storepb.Engine_TIDB, storepb.Engine_MYSQL, storepb.Engine_MARIADB, storepb.Engine_POSTGRES, storepb.Engine_OCEANBASE:
 			if err := finder.WalkThrough(asts); err != nil {
-				return convertWalkThroughErrorToAdvice(checkContext, err)
+				return convertWalkThroughErrorToAdvice(ctx, checkContext, err)
 			}
 		}
 	}
@@ -572,11 +573,10 @@ func SQLReviewCheck(
 		}
 
 		adviceList, err := Check(
+			ctx,
 			checkContext.DbType,
 			advisorType,
 			Context{
-				Charset:                  checkContext.Charset,
-				Collation:                checkContext.Collation,
 				DBSchema:                 checkContext.DBSchema,
 				ChangeType:               checkContext.ChangeType,
 				PreUpdateBackupDetail:    checkContext.PreUpdateBackupDetail,
@@ -585,14 +585,13 @@ func SQLReviewCheck(
 				Rule:                     rule,
 				Catalog:                  finder,
 				Driver:                   checkContext.Driver,
-				Context:                  checkContext.Context,
 				CurrentDatabase:          checkContext.CurrentDatabase,
 				ClassificationConfig:     checkContext.ClassificationConfig,
 				UsePostgresDatabaseOwner: checkContext.UsePostgresDatabaseOwner,
 				ListDatabaseNamesFunc:    checkContext.ListDatabaseNamesFunc,
 				InstanceID:               checkContext.InstanceID,
+				IsObjectCaseSensitive:    checkContext.IsObjectCaseSensitive,
 			},
-			statements,
 		)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to check statement")
@@ -623,7 +622,7 @@ func SQLReviewCheck(
 	return advices, nil
 }
 
-func convertWalkThroughErrorToAdvice(checkContext SQLReviewCheckContext, err error) ([]*storepb.Advice, error) {
+func convertWalkThroughErrorToAdvice(ctx context.Context, checkContext SQLReviewCheckContext, err error) ([]*storepb.Advice, error) {
 	walkThroughError, ok := err.(*catalog.WalkThroughError)
 	if !ok {
 		return nil, err
@@ -805,7 +804,7 @@ func convertWalkThroughErrorToAdvice(checkContext SQLReviewCheckContext, err err
 			if !yes {
 				return nil, errors.Errorf("invalid payload for ColumnIsReferencedByView, expect []string but found %T", walkThroughError.Payload)
 			}
-			if definition, err := getViewDefinition(checkContext, list); err != nil {
+			if definition, err := getViewDefinition(ctx, checkContext, list); err != nil {
 				slog.Warn("failed to get view definition", log.BBError(err))
 			} else {
 				details = definition
@@ -828,7 +827,7 @@ func convertWalkThroughErrorToAdvice(checkContext SQLReviewCheckContext, err err
 			if !yes {
 				return nil, errors.Errorf("invalid payload for TableIsReferencedByView, expect []string but found %T", walkThroughError.Payload)
 			}
-			if definition, err := getViewDefinition(checkContext, list); err != nil {
+			if definition, err := getViewDefinition(ctx, checkContext, list); err != nil {
 				slog.Warn("failed to get view definition", log.BBError(err))
 			} else {
 				details = definition
@@ -869,7 +868,7 @@ func convertWalkThroughErrorToAdvice(checkContext SQLReviewCheckContext, err err
 	return res, nil
 }
 
-func getViewDefinition(checkContext SQLReviewCheckContext, viewList []string) (string, error) {
+func getViewDefinition(ctx context.Context, checkContext SQLReviewCheckContext, viewList []string) (string, error) {
 	var buf bytes.Buffer
 	sql := fmt.Sprintf(`
 		WITH view_list(view_name) AS (
@@ -879,7 +878,7 @@ func getViewDefinition(checkContext SQLReviewCheckContext, viewList []string) (s
 		FROM view_list;
 	`, strings.Join(viewList, "'),('"))
 
-	rows, err := checkContext.Driver.QueryContext(checkContext.Context, sql)
+	rows, err := checkContext.Driver.QueryContext(ctx, sql)
 	if err != nil {
 		return "", err
 	}

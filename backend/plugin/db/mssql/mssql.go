@@ -12,8 +12,10 @@ import (
 	"strings"
 
 	// Import MSSQL driver.
+
 	"github.com/golang-sql/sqlexp"
 	gomssqldb "github.com/microsoft/go-mssqldb"
+	"github.com/microsoft/go-mssqldb/azuread"
 
 	// Kerberos Active Directory authentication outside Windows.
 	_ "github.com/microsoft/go-mssqldb/integratedauth/krb5"
@@ -55,24 +57,19 @@ func newDriver(db.DriverConfig) db.Driver {
 func (driver *Driver) Open(_ context.Context, _ storepb.Engine, config db.ConnectionConfig) (db.Driver, error) {
 	query := url.Values{}
 	query.Add("app name", "bytebase")
-	if config.Database != "" {
-		query.Add("database", config.Database)
+	if config.ConnectionContext.DatabaseName != "" {
+		query.Add("database", config.ConnectionContext.DatabaseName)
+	} else if config.DataSource.Database != "" {
+		query.Add("database", config.DataSource.Database)
 	}
 
 	// In order to be compatible with db servers that only support old versions of tls.
 	// See: https://github.com/microsoft/go-mssqldb/issues/33
 	query.Add("tlsmin", "1.0")
 
-	trustServerCertificate := "true"
-
 	var err error
-	if config.TLSConfig.UseSSL && config.TLSConfig.SslCA != "" {
-		// We should not TrustServerCertificate in production environment, otherwise, TLS is susceptible
-		// to man-in-the middle attacks. TrustServerCertificate makes driver accepts any certificate presented by the server
-		// and any host name in that certificate.
-		// Due to Golang runtime limitation, x509 package will throw the error of 'certificate relies on legacy Common Name field, use SANs instead if
-		// TrustServerCertificate is false.
-		trustServerCertificate = "false"
+	if config.DataSource.GetUseSsl() && config.DataSource.GetSslCa() != "" {
+		// Due to Golang runtime limitation, x509 package will throw the error of 'certificate relies on legacy Common Name field, use SANs instead.
 		// Driver reads the certificate from file instead of regarding it as certificate content.
 		// https://github.com/microsoft/go-mssqldb/blob/main/msdsn/conn_str.go#L159
 		// TODO(zp): Driver supports .der format also.
@@ -82,14 +79,14 @@ func (driver *Driver) Open(_ context.Context, _ storepb.Engine, config db.Connec
 			return nil, errors.Wrapf(err, "failed to create temporary file with pattern %s", pattern)
 		}
 		fName := file.Name()
-		defer func() {
+		defer func(err error) {
 			if err != nil {
 				_ = os.Remove(fName)
 			} else {
 				driver.certFilePath = fName
 			}
-		}()
-		_, err = file.WriteString(config.TLSConfig.SslCA)
+		}(err)
+		_, err = file.WriteString(config.DataSource.GetSslCa())
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to write certificate to file %s", fName)
 		}
@@ -98,20 +95,34 @@ func (driver *Driver) Open(_ context.Context, _ storepb.Engine, config db.Connec
 		}
 		query.Add("certificate", fName)
 	}
-	query.Add("TrustServerCertificate", trustServerCertificate)
+	query.Add("TrustServerCertificate", "true")
+
+	driverName := "sqlserver"
+	password := config.Password
+	if config.DataSource.GetAuthenticationType() == storepb.DataSource_AZURE_IAM {
+		driverName = azuread.DriverName
+		if config.DataSource.GetClientSecretCredential() != nil {
+			query.Add("fedauth", azuread.ActiveDirectoryServicePrincipal)
+			query.Add("user id", fmt.Sprintf("%s@%s", config.DataSource.GetClientSecretCredential().ClientId, config.DataSource.GetClientSecretCredential().TenantId))
+			query.Add("password", config.DataSource.GetClientSecretCredential().ClientSecret)
+			password = ""
+		} else {
+			query.Add("fedauth", azuread.ActiveDirectoryDefault)
+		}
+	}
 	u := &url.URL{
 		Scheme:   "sqlserver",
-		User:     url.UserPassword(config.Username, config.Password),
-		Host:     fmt.Sprintf("%s:%s", config.Host, config.Port),
+		User:     url.UserPassword(config.DataSource.Username, password),
+		Host:     fmt.Sprintf("%s:%s", config.DataSource.Host, config.DataSource.Port),
 		RawQuery: query.Encode(),
 	}
 	var db *sql.DB
-	db, err = sql.Open("sqlserver", u.String())
+	db, err = sql.Open(driverName, u.String())
 	if err != nil {
 		return nil, err
 	}
 	driver.db = db
-	driver.databaseName = config.Database
+	driver.databaseName = config.ConnectionContext.DatabaseName
 	driver.maximumSQLResultSize = config.MaximumSQLResultSize
 	return driver, nil
 }
@@ -226,8 +237,8 @@ func (driver *Driver) Execute(ctx context.Context, statement string, opts db.Exe
 	return totalAffectRows, nil
 }
 
-func execute(ctx context.Context, tx *sql.Tx, statement string) (int64, error) {
-	sqlResult, err := tx.ExecContext(ctx, statement)
+func execute(ctx context.Context, txn *sql.Tx, statement string) (int64, error) {
+	sqlResult, err := txn.ExecContext(ctx, statement)
 	var e gomssqldb.Error
 	if errors.As(err, &e) {
 		err = unpackGoMSSQLDBError(e)

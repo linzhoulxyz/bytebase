@@ -3,7 +3,9 @@ package plancheck
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/github/gh-ost/go/logic"
@@ -11,25 +13,27 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/bytebase/bytebase/backend/common"
+	"github.com/bytebase/bytebase/backend/common/log"
+	"github.com/bytebase/bytebase/backend/component/dbfactory"
 	"github.com/bytebase/bytebase/backend/component/ghost"
-	api "github.com/bytebase/bytebase/backend/legacyapi"
+	"github.com/bytebase/bytebase/backend/plugin/db"
 	"github.com/bytebase/bytebase/backend/store"
 	"github.com/bytebase/bytebase/backend/utils"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 // NewGhostSyncExecutor creates a gh-ost sync check executor.
-func NewGhostSyncExecutor(store *store.Store, secret string) Executor {
+func NewGhostSyncExecutor(store *store.Store, dbFactory *dbfactory.DBFactory) Executor {
 	return &GhostSyncExecutor{
-		store:  store,
-		secret: secret,
+		store:     store,
+		dbFactory: dbFactory,
 	}
 }
 
 // GhostSyncExecutor is the gh-ost sync check executor.
 type GhostSyncExecutor struct {
-	store  *store.Store
-	secret string
+	store     *store.Store
+	dbFactory *dbfactory.DBFactory
 }
 
 // Run runs the gh-ost sync check executor.
@@ -57,13 +61,12 @@ func (e *GhostSyncExecutor) Run(ctx context.Context, config *storepb.PlanCheckRu
 		}
 	}()
 
-	instanceUID := int(config.InstanceUid)
-	instance, err := e.store.GetInstanceV2(ctx, &store.FindInstanceMessage{UID: &instanceUID})
+	instance, err := e.store.GetInstanceV2(ctx, &store.FindInstanceMessage{ResourceID: &config.InstanceId})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get instance UID %v", instanceUID)
+		return nil, errors.Wrapf(err, "failed to get instance %s", config.InstanceId)
 	}
 	if instance == nil {
-		return nil, errors.Errorf("instance not found UID %v", instanceUID)
+		return nil, errors.Errorf("instance %s not found", config.InstanceId)
 	}
 
 	database, err := e.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{InstanceID: &instance.ResourceID, DatabaseName: &config.DatabaseName})
@@ -74,7 +77,7 @@ func (e *GhostSyncExecutor) Run(ctx context.Context, config *storepb.PlanCheckRu
 		return nil, errors.Errorf("database not found %q", config.DatabaseName)
 	}
 
-	adminDataSource := utils.DataSourceFromInstanceWithType(instance, api.Admin)
+	adminDataSource := utils.DataSourceFromInstanceWithType(instance, storepb.DataSourceType_ADMIN)
 	if adminDataSource == nil {
 		return nil, common.Errorf(common.Internal, "admin data source not found for instance %s", instance.ResourceID)
 	}
@@ -95,13 +98,15 @@ func (e *GhostSyncExecutor) Run(ctx context.Context, config *storepb.PlanCheckRu
 	materials := utils.GetSecretMapFromDatabaseMessage(database)
 	// To avoid leaking the rendered statement, the error message should use the original statement and not the rendered statement.
 	renderedStatement := utils.RenderStatement(statement, materials)
+	// Trim trailing semicolons.
+	renderedStatement = strings.TrimRight(renderedStatement, ";")
 
 	tableName, err := ghost.GetTableNameFromStatement(renderedStatement)
 	if err != nil {
 		return nil, common.Wrapf(err, common.Internal, "failed to parse table name from statement, statement: %v", statement)
 	}
 
-	migrationContext, err := ghost.NewMigrationContext(ctx, rand.Intn(10000000), database, adminDataSource, e.secret, tableName, fmt.Sprintf("_dryrun_%d", time.Now().Unix()), renderedStatement, true, config.GhostFlags, 20000000)
+	migrationContext, err := ghost.NewMigrationContext(ctx, rand.Intn(10000000), database, adminDataSource, tableName, fmt.Sprintf("_dryrun_%d", time.Now().Unix()), renderedStatement, true, config.GhostFlags, 20000000)
 	if err != nil {
 		return nil, common.Wrapf(err, common.Internal, "failed to create migration context")
 	}
@@ -113,6 +118,31 @@ func (e *GhostSyncExecutor) Run(ctx context.Context, config *storepb.PlanCheckRu
 	}()
 
 	migrator := logic.NewMigrator(migrationContext, "bb")
+
+	defer func() {
+		if err := func() error {
+			ctx := context.Background()
+			driver, err := e.dbFactory.GetAdminDatabaseDriver(ctx, instance, database, db.ConnectionContext{})
+			if err != nil {
+				return errors.Wrapf(err, "failed to get driver")
+			}
+			defer driver.Close(ctx)
+
+			sql := fmt.Sprintf("DROP TABLE IF EXISTS `%s`.`%s`; DROP TABLE IF EXISTS `%s`.`%s`;",
+				"bbdataarchive",
+				migrationContext.GetGhostTableName(),
+				"bbdataarchive",
+				migrationContext.GetChangelogTableName(),
+			)
+
+			if _, err := driver.GetDB().ExecContext(ctx, sql); err != nil {
+				return errors.Wrapf(err, "failed to drop gh-ost temp tables")
+			}
+			return nil
+		}(); err != nil {
+			slog.Warn("failed to cleanup gh-ost temp tables", log.BBError(err))
+		}
+	}()
 
 	if err := migrator.Migrate(); err != nil {
 		return []*storepb.PlanCheckRunResult_Result{

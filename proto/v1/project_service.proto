@@ -98,21 +98,6 @@ service ProjectService {
     option (bytebase.v1.audit) = true;
   }
 
-  rpc GetDeploymentConfig(GetDeploymentConfigRequest) returns (DeploymentConfig) {
-    option (google.api.http) = {get: "/v1/{name=projects/*/deploymentConfigs/*}"};
-    option (bytebase.v1.permission) = "bb.projects.get";
-    option (bytebase.v1.auth_method) = IAM;
-  }
-
-  rpc UpdateDeploymentConfig(UpdateDeploymentConfigRequest) returns (DeploymentConfig) {
-    option (google.api.http) = {
-      patch: "/v1/{deployment_config.name=projects/*/deploymentConfigs/*}"
-      body: "deployment_config"
-    };
-    option (bytebase.v1.permission) = "bb.projects.update";
-    option (bytebase.v1.auth_method) = IAM;
-  }
-
   rpc AddWebhook(AddWebhookRequest) returns (Project) {
     option (google.api.http) = {
       post: "/v1/{project=projects/*}:addWebhook"
@@ -161,14 +146,12 @@ message GetProjectRequest {
 }
 
 message ListProjectsRequest {
-  // Not used.
   // The maximum number of projects to return. The service may return fewer than
   // this value.
   // If unspecified, at most 10 projects will be returned.
   // The maximum value is 1000; values above 1000 will be coerced to 1000.
   int32 page_size = 1;
 
-  // Not used.
   // A page token, received from a previous `ListProjects` call.
   // Provide this to retrieve the subsequent page.
   //
@@ -178,6 +161,10 @@ message ListProjectsRequest {
 
   // Show deleted projects if specified.
   bool show_deleted = 3;
+
+  // Filter the project.
+  // Check filter for SearchProjectsRequest for details.
+  string filter = 4;
 }
 
 message ListProjectsResponse {
@@ -192,6 +179,22 @@ message ListProjectsResponse {
 message SearchProjectsRequest {
   // Show deleted projects if specified.
   bool show_deleted = 1;
+
+  // Filter the project.
+  // Supported filters:
+  // - name
+  // - resource_id
+  // - exclude_default: if not include the default project.
+  //
+  // For example:
+  // name = "project name"
+  // name.matches("project name")
+  // resource_id = "project id"
+  // resource_id.matches("project id")
+  // name = "project name" && resource_id.matches("project id")
+  // name.matches("project name") || resource_id = "project id"
+  // exclude_default == true
+  string filter = 2;
 }
 
 message SearchProjectsResponse {
@@ -259,19 +262,6 @@ message BatchGetIamPolicyResponse {
   repeated PolicyResult policy_results = 1;
 }
 
-message GetDeploymentConfigRequest {
-  // The name of the resource.
-  // Format: projects/{project}/deploymentConfigs/default.
-  string name = 1 [
-    (google.api.field_behavior) = REQUIRED,
-    (google.api.resource_reference) = {type: "bytebase.com/DeploymentConfig"}
-  ];
-}
-
-message UpdateDeploymentConfigRequest {
-  DeploymentConfig deployment_config = 1 [(google.api.field_behavior) = REQUIRED];
-}
-
 message Label {
   string value = 1;
   string color = 2;
@@ -293,8 +283,6 @@ message Project {
 
   // The title or name of a project. It's not unique within the workspace.
   string title = 4;
-
-  Workflow workflow = 6;
 
   repeated Webhook webhooks = 11;
 
@@ -323,12 +311,6 @@ message Project {
 
   // Whether to allow the issue creator to self-approve the issue.
   bool allow_self_approval = 21;
-}
-
-enum Workflow {
-  WORKFLOW_UNSPECIFIED = 0;
-  UI = 1;
-  VCS = 2;
 }
 
 message AddWebhookRequest {
@@ -385,14 +367,13 @@ message Webhook {
 
   enum Type {
     TYPE_UNSPECIFIED = 0;
-    TYPE_SLACK = 1;
-    TYPE_DISCORD = 2;
-    TYPE_TEAMS = 3;
-    TYPE_DINGTALK = 4;
-    TYPE_FEISHU = 5;
-    TYPE_WECOM = 6;
-    TYPE_CUSTOM = 7;
-    TYPE_LARK = 8;
+    SLACK = 1;
+    DISCORD = 2;
+    TEAMS = 3;
+    DINGTALK = 4;
+    FEISHU = 5;
+    WECOM = 6;
+    LARK = 8;
   }
   // type is the type of the webhook.
   Type type = 2 [(google.api.field_behavior) = REQUIRED];
@@ -418,58 +399,6 @@ message Webhook {
   // - TYPE_ISSUE_FIELD_UPDATE
   // - TYPE_ISSUE_COMMENT_CREATE
   repeated Activity.Type notification_types = 5 [(google.api.field_behavior) = UNORDERED_LIST];
-}
-
-message DeploymentConfig {
-  option (google.api.resource) = {
-    type: "bytebase.com/DeploymentConfig"
-    pattern: "projects/{project}/deploymentConfigs/default"
-  };
-
-  // The name of the resource.
-  // Format: projects/{project}/deploymentConfigs/default.
-  string name = 1;
-
-  // The title of the deployment config.
-  string title = 2;
-
-  Schedule schedule = 3;
-}
-
-message Schedule {
-  repeated ScheduleDeployment deployments = 1;
-}
-
-message ScheduleDeployment {
-  // The title of the deployment (stage) in a schedule.
-  string title = 1;
-  string id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
-  DeploymentSpec spec = 2;
-}
-
-message DeploymentSpec {
-  LabelSelector label_selector = 1;
-}
-
-message LabelSelector {
-  repeated LabelSelectorRequirement match_expressions = 1;
-}
-
-message LabelSelectorRequirement {
-  string key = 1;
-  OperatorType operator = 2;
-  repeated string values = 3;
-}
-
-enum OperatorType {
-  // The operator is not specified.
-  OPERATOR_TYPE_UNSPECIFIED = 0;
-  // The operator is "In".
-  OPERATOR_TYPE_IN = 1;
-  // The operator is "Exists".
-  OPERATOR_TYPE_EXISTS = 2;
-  // The operator is "Not In".
-  OPERATOR_TYPE_NOT_IN = 3;
 }
 
 // TODO(zp): move to activity later.

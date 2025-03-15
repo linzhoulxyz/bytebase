@@ -92,14 +92,6 @@ service SQLService {
     option (bytebase.v1.allow_without_credential) = true;
   }
 
-  rpc StringifyMetadata(StringifyMetadataRequest) returns (StringifyMetadataResponse) {
-    option (google.api.http) = {
-      post: "/v1/schemaDesign:stringifyMetadata"
-      body: "*"
-    };
-    option (bytebase.v1.allow_without_credential) = true;
-  }
-
   rpc DiffMetadata(DiffMetadataRequest) returns (DiffMetadataResponse) {
     option (google.api.http) = {
       post: "/v1/schemaDesign:diffMetadata"
@@ -125,9 +117,6 @@ message AdminExecuteRequest {
 
   // The maximum number of rows to return.
   int32 limit = 4;
-
-  // The timeout for the request.
-  google.protobuf.Duration timeout = 5;
 
   // The default schema to execute the statement. Equals to the current schema
   // in Oracle and search path in Postgres.
@@ -158,9 +147,6 @@ message QueryRequest {
 
   // The maximum number of rows to return.
   int32 limit = 4;
-
-  // The timeout for the request.
-  optional google.protobuf.Duration timeout = 5;
 
   // The id of data source.
   // It is used for querying admin data source even if the instance has
@@ -411,11 +397,6 @@ message CheckRequest {
 
   string statement = 1;
 
-  // The database metadata to check against. It can be used to check against an
-  // uncommitted metadata. If not provided, the database metadata will be
-  // fetched from the database.
-  DatabaseMetadata metadata = 3 [(google.api.field_behavior) = OPTIONAL];
-
   enum ChangeType {
     CHANGE_TYPE_UNSPECIFIED = 0;
     DDL = 1;
@@ -428,6 +409,9 @@ message CheckRequest {
 
 message CheckResponse {
   repeated Advice advices = 1;
+
+  // The count of affected rows of the statement on the target database.
+  int32 affected_rows = 2;
 }
 
 message ParseMyBatisMapperRequest {
@@ -436,20 +420,6 @@ message ParseMyBatisMapperRequest {
 
 message ParseMyBatisMapperResponse {
   repeated string statements = 1;
-}
-
-message StringifyMetadataRequest {
-  DatabaseMetadata metadata = 1 [(google.api.field_behavior) = REQUIRED];
-  // The database engine of the schema string.
-  Engine engine = 2;
-  // If false, we will build the raw common by classification in database catalog.
-  bool classification_from_config = 3;
-  // Database catlog is required if classification_from_config is false.
-  optional DatabaseCatalog catalog = 4;
-}
-
-message StringifyMetadataResponse {
-  string schema = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message DiffMetadataRequest {
@@ -493,7 +463,7 @@ message SearchQueryHistoriesRequest {
   // - database, for example:
   //    database = "instances/{instance}/databases/{database}"
   // - instance, for example:
-  //    instance = "instance/{instance}"
+  //    instance = "instances/{instance}"
   // - type, for example:
   //    type = "QUERY"
   string filter = 3;

@@ -1,29 +1,26 @@
 <template>
-  <NSelect
-    :value="combinedValue"
-    :options="options"
-    :placeholder="placeholder ?? $t('database.select')"
-    :virtual-scroll="true"
-    :multiple="multiple"
-    :filter="filterByDatabaseName"
-    :filterable="true"
-    :clearable="clearable"
-    class="bb-database-select"
-    style="width: 12rem"
+  <ResourceSelect
     v-bind="$attrs"
-    :render-label="renderLabel"
-    @update:value="handleValueUpdated"
+    class="bb-database-select"
+    :remote="true"
+    :loading="state.loading"
+    :placeholder="$t('database.select')"
+    :multiple="multiple"
+    :value="databaseName"
+    :values="databaseNames"
+    :options="options"
+    :custom-label="renderLabel"
+    @search="handleSearch"
+    @update:value="(val) => $emit('update:database-name', val)"
+    @update:values="(val) => $emit('update:database-names', val)"
   />
 </template>
 
 <script lang="ts" setup>
-import type { SelectOption, SelectRenderLabel } from "naive-ui";
-import { NSelect } from "naive-ui";
-import { computed, h, watch } from "vue";
-import { useSlots } from "vue";
+import { useDebounceFn } from "@vueuse/core";
+import { computed, h, watch, reactive, watchEffect } from "vue";
 import { useI18n } from "vue-i18n";
 import { useDatabaseV1Store } from "@/store";
-import { useDatabaseV1List } from "@/store/modules/v1/databaseList";
 import type { ComposedDatabase } from "@/types";
 import {
   isValidDatabaseName,
@@ -32,16 +29,20 @@ import {
   isValidProjectName,
   unknownDatabase,
 } from "@/types";
-import type { Engine } from "@/types/proto/v1/common";
-import { instanceV1Name, supportedEngineV1List } from "@/utils";
+import { type Engine, engineToJSON } from "@/types/proto/v1/common";
+import {
+  instanceV1Name,
+  supportedEngineV1List,
+  getDefaultPagination,
+} from "@/utils";
 import { InstanceV1EngineIcon } from "../Model";
+import ResourceSelect from "./ResourceSelect.vue";
 
-interface DatabaseSelectOption extends SelectOption {
-  value: string;
-  database: ComposedDatabase;
+interface LocalState {
+  loading: boolean;
+  rawDatabaseList: ComposedDatabase[];
 }
 
-const slots = useSlots();
 const props = withDefaults(
   defineProps<{
     databaseName?: string; // UNKNOWN_DATABASE_NAME stands for "ALL"
@@ -52,10 +53,10 @@ const props = withDefaults(
     allowedEngineTypeList?: readonly Engine[];
     includeAll?: boolean;
     autoReset?: boolean;
-    placeholder?: string;
     filter?: (database: ComposedDatabase, index: number) => boolean;
     multiple?: boolean;
     clearable?: boolean;
+    defaultSelectFirst?: boolean;
   }>(),
   {
     databaseName: undefined,
@@ -66,10 +67,10 @@ const props = withDefaults(
     allowedEngineTypeList: () => supportedEngineV1List(),
     includeAll: false,
     autoReset: true,
-    placeholder: undefined,
     filter: undefined,
     multiple: false,
     clearable: false,
+    defaultSelectFirst: false,
   }
 );
 
@@ -79,100 +80,103 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const { ready } = useDatabaseV1List(props.projectName || props.instanceName);
+const databaseStore = useDatabaseV1Store();
 
-const combinedValue = computed(() => {
-  if (props.multiple) {
-    return props.databaseNames || [];
-  } else {
-    return props.databaseName;
-  }
+const state = reactive<LocalState>({
+  loading: true,
+  rawDatabaseList: [],
 });
 
-const handleValueUpdated = (value: string | string[]) => {
-  if (props.multiple) {
-    if (!value) {
-      // normalize value
-      value = [];
-    }
-    emit("update:database-names", value as string[]);
-  } else {
-    if (value === null) {
-      // normalize value
-      value = "";
-    }
-    emit("update:database-name", value as string);
+const filterParams = computed(() => {
+  const list = [];
+  if (isValidEnvironmentName(props.environmentName)) {
+    list.push(`environment == "${props.environmentName}"`);
   }
-};
-
-const rawDatabaseList = computed(() => {
-  const list = useDatabaseV1Store().databaseListByUser;
-
-  return list.filter((db) => {
-    if (
-      isValidEnvironmentName(props.environmentName) &&
-      db.effectiveEnvironment !== props.environmentName
-    ) {
-      return false;
-    }
-    if (
-      isValidInstanceName(props.instanceName) &&
-      props.instanceName !== db.instance
-    ) {
-      return false;
-    }
-    if (
-      isValidProjectName(props.projectName) &&
-      db.project !== props.projectName
-    ) {
-      return false;
-    }
-    if (!props.allowedEngineTypeList.includes(db.instanceResource.engine)) {
-      return false;
-    }
-
-    return true;
-  });
-});
-
-const combinedDatabaseList = computed(() => {
-  let list = [...rawDatabaseList.value];
-
-  if (props.filter) {
-    list = list.filter(props.filter);
+  if (isValidInstanceName(props.instanceName)) {
+    list.push(`instance == "${props.instanceName}"`);
   }
-
-  if (props.includeAll) {
-    const dummyAll = {
-      ...unknownDatabase(),
-      databaseName: t("database.all"),
-    };
-    list.unshift(dummyAll);
+  if (isValidProjectName(props.projectName)) {
+    list.push(`project == "${props.projectName}"`);
+  }
+  if (props.allowedEngineTypeList.length > 0) {
+    list.push(
+      `engine in [${props.allowedEngineTypeList.map((e) => `"${engineToJSON(e)}"`).join(", ")}]`
+    );
   }
 
   return list;
 });
 
+const searchDatabases = async (name: string) => {
+  const dbFilter = [...filterParams.value];
+  if (name) {
+    dbFilter.push(`name.matches("${name}")`);
+  }
+  const { databases } = await databaseStore.fetchDatabases({
+    parent: "workspaces/-",
+    filter: dbFilter.join(" && "),
+    pageSize: getDefaultPagination(),
+  });
+  return databases;
+};
+
+const handleSearch = useDebounceFn(async (search: string) => {
+  state.loading = true;
+  try {
+    const databases = await searchDatabases(search);
+    state.rawDatabaseList = databases;
+    if (!search && props.includeAll) {
+      const dummyAll = {
+        ...unknownDatabase(),
+        databaseName: t("database.all"),
+      };
+      state.rawDatabaseList.unshift(dummyAll);
+    }
+  } finally {
+    state.loading = false;
+  }
+}, 500);
+
+watch(
+  () => filterParams.value,
+  () => {
+    handleSearch("");
+  },
+  {
+    immediate: true,
+  }
+);
+
+const combinedDatabaseList = computed(() => {
+  if (props.filter) {
+    return state.rawDatabaseList.filter(props.filter);
+  }
+
+  return state.rawDatabaseList;
+});
+
 const options = computed(() => {
-  return combinedDatabaseList.value.map<DatabaseSelectOption>((database) => {
+  return combinedDatabaseList.value.map((database) => {
     return {
-      database,
+      resource: database,
       value: database.name,
       label: database.databaseName,
     };
   });
 });
 
-const renderLabel: SelectRenderLabel = (option) => {
-  const { database } = option as DatabaseSelectOption;
-  if (!database) {
+watchEffect(() => {
+  if (!props.defaultSelectFirst || props.multiple) {
+    return;
+  }
+  if (options.value.length === 0) {
     return;
   }
 
-  if (slots.default) {
-    return slots.default({ database });
-  }
+  emit("update:database-name", options.value[0].value);
+});
 
+const renderLabel = (database: ComposedDatabase) => {
   const children = [h("div", {}, [database.databaseName])];
   if (isValidDatabaseName(database.name)) {
     // prefix engine icon
@@ -202,18 +206,13 @@ const renderLabel: SelectRenderLabel = (option) => {
   );
 };
 
-const filterByDatabaseName = (pattern: string, option: SelectOption) => {
-  const { database } = option as DatabaseSelectOption;
-  return database.databaseName.toLowerCase().includes(pattern.toLowerCase());
-};
-
 // The database list might change if environment changes, and the previous selected id
 // might not exist in the new list. In such case, we need to invalidate the selection
 // and emit the event.
 const resetInvalidSelection = () => {
   if (!props.autoReset) return;
   if (
-    ready.value &&
+    !state.loading &&
     props.databaseName &&
     !combinedDatabaseList.value.find((item) => item.name === props.databaseName)
   ) {
@@ -221,14 +220,8 @@ const resetInvalidSelection = () => {
   }
 };
 
-watch(
-  [
-    () => [props.projectName, props.environmentName, props.databaseName],
-    combinedDatabaseList,
-  ],
-  resetInvalidSelection,
-  {
-    immediate: true,
-  }
-);
+watch(() => combinedDatabaseList.value, resetInvalidSelection, {
+  immediate: true,
+  deep: true,
+});
 </script>

@@ -90,13 +90,21 @@ import {
   DEFAULT_PROJECT_NAME,
   isValidProjectName,
 } from "@/types";
+import { UpdateDatabaseRequest } from "@/types/proto/v1/database_service";
 import { autoProjectRoute } from "@/utils";
 import DatabaseV1Table from "../v2/Model/DatabaseV1Table/DatabaseV1Table.vue";
 
-const props = defineProps<{
-  databaseList: ComposedDatabase[];
-  selectedDatabaseNames?: string[];
-}>();
+const props = withDefaults(
+  defineProps<{
+    databaseList: ComposedDatabase[];
+    selectedDatabaseNames?: string[];
+    onSuccess?: (databases: ComposedDatabase[]) => void;
+  }>(),
+  {
+    selectedDatabaseNames: () => [],
+    onSuccess: (_: ComposedDatabase[]) => {},
+  }
+);
 
 const emit = defineEmits<{
   (e: "dismiss"): void;
@@ -148,15 +156,9 @@ watch(
   }
 );
 
-const targetProject = computed(() => {
-  const name = targetProjectName.value;
-  if (!name || !isValidProjectName(name)) return undefined;
-  return projectStore.getProjectByName(name);
-});
-
 const validationErrors = computed(() => {
   const errors: string[] = [];
-  if (!targetProject.value) {
+  if (!targetProjectName.value) {
     errors.push(t("database.transfer.errors.select-target-project"));
   }
   if (selectedDatabaseNameList.value.length === 0) {
@@ -170,8 +172,15 @@ const allowTransfer = computed(() => {
 });
 
 const doTransfer = async () => {
-  const target = targetProject.value!;
-  if (!target) return;
+  const name = targetProjectName.value;
+  if (!name || !isValidProjectName(name)) {
+    return;
+  }
+
+  const target = await projectStore.getOrFetchProjectByName(name);
+  if (!target) {
+    return;
+  }
 
   const databaseList = selectedDatabaseList.value.filter(
     (db) => db.project !== target.name
@@ -181,10 +190,19 @@ const doTransfer = async () => {
     loading.value = true;
 
     if (databaseList.length > 0) {
-      await useDatabaseV1Store().transferDatabases(
-        selectedDatabaseList.value,
-        target.name
-      );
+      await useDatabaseV1Store().batchUpdateDatabases({
+        parent: "-",
+        requests: databaseList.map((database) => {
+          return UpdateDatabaseRequest.fromPartial({
+            database: {
+              name: database.name,
+              project: target.name,
+            },
+            updateMask: ["project"],
+          });
+        }),
+      });
+
       const displayDatabaseName =
         databaseList.length > 1
           ? `${databaseList.length} databases`
@@ -203,6 +221,7 @@ const doTransfer = async () => {
       }
     }
 
+    props.onSuccess(databaseList);
     emit("dismiss");
   } finally {
     loading.value = false;

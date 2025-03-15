@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/genproto/googleapis/type/expr"
 
-	"github.com/bytebase/bytebase/backend/tests/fake"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
@@ -19,6 +18,7 @@ import (
 // 2. The database group is then created with the specified expr.
 // 3. The results obtained are compared with the results given in prepareInstance and they should be consistent.
 func TestCreateDatabaseGroup(t *testing.T) {
+	t.Parallel()
 	type testCasePrepareInstance struct {
 		instanceTitle         string
 		matchedDatabasesName  map[string]any
@@ -127,10 +127,7 @@ func TestCreateDatabaseGroup(t *testing.T) {
 			t.Parallel()
 			ctl := &controller{}
 			ctx := context.Background()
-			ctx, err := ctl.StartServerWithExternalPg(ctx, &config{
-				dataDir:            t.TempDir(),
-				vcsProviderCreator: fake.NewGitLab,
-			})
+			ctx, err := ctl.StartServerWithExternalPg(ctx)
 			a.NoError(err)
 			defer func() {
 				_ = ctl.Close(ctx)
@@ -154,11 +151,11 @@ func TestCreateDatabaseGroup(t *testing.T) {
 				a.NoError(err)
 				instanceResourceID2InstanceTitle[instanceResourceID] = instance.Title
 				for preCreateDatabase := range prepareInstance.matchedDatabasesName {
-					err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil, preCreateDatabase, "", nil /* labelMap */)
+					err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil, preCreateDatabase, "")
 					a.NoError(err)
 				}
 				for preCreateDatabase := range prepareInstance.unmatchedDatabaseName {
-					err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil, preCreateDatabase, "", nil /* labelMap */)
+					err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil, preCreateDatabase, "")
 					a.NoError(err)
 				}
 			}

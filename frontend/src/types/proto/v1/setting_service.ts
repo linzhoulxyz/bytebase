@@ -156,7 +156,6 @@ export interface Value {
   workspaceProfileSettingValue?: WorkspaceProfileSetting | undefined;
   workspaceApprovalSettingValue?: WorkspaceApprovalSetting | undefined;
   workspaceTrialSettingValue?: WorkspaceTrialSetting | undefined;
-  externalApprovalSettingValue?: ExternalApprovalSetting | undefined;
   schemaTemplateSettingValue?: SchemaTemplateSetting | undefined;
   dataClassificationSettingValue?: DataClassificationSetting | undefined;
   semanticTypeSettingValue?: SemanticTypeSetting | undefined;
@@ -336,6 +335,7 @@ export interface AppIMSetting {
   feishu: AppIMSetting_Feishu | undefined;
   wecom: AppIMSetting_Wecom | undefined;
   lark: AppIMSetting_Lark | undefined;
+  dingtalk: AppIMSetting_DingTalk | undefined;
 }
 
 export interface AppIMSetting_Slack {
@@ -362,6 +362,13 @@ export interface AppIMSetting_Lark {
   appSecret: string;
 }
 
+export interface AppIMSetting_DingTalk {
+  enabled: boolean;
+  clientId: string;
+  clientSecret: string;
+  robotCode: string;
+}
+
 export interface AgentPluginSetting {
   /** The URL for the agent API. */
   url: string;
@@ -370,13 +377,7 @@ export interface AgentPluginSetting {
 }
 
 export interface WorkspaceProfileSetting {
-  /**
-   * The URL user visits Bytebase.
-   *
-   * The external URL is used for:
-   * 1. Constructing the correct callback URL when configuring the VCS provider. The callback URL points to the frontend.
-   * 2. Creating the correct webhook endpoint when configuring the project GitOps workflow. The webhook endpoint points to the backend.
-   */
+  /** The external URL is used for sso authentication callback. */
   externalUrl: string;
   /** Disallow self-service signup, users can only be invited by the owner. */
   disallowSignup: boolean;
@@ -384,8 +385,6 @@ export interface WorkspaceProfileSetting {
   require2fa: boolean;
   /** outbound_ip_list is the outbound IP for Bytebase instance in SaaS mode. */
   outboundIpList: string[];
-  /** The webhook URL for the GitOps workflow. */
-  gitopsWebhookUrl: string;
   /** The duration for token. */
   tokenDuration:
     | Duration
@@ -486,22 +485,6 @@ export interface WorkspaceApprovalSetting {
 export interface WorkspaceApprovalSetting_Rule {
   template: ApprovalTemplate | undefined;
   condition: Expr | undefined;
-}
-
-export interface ExternalApprovalSetting {
-  nodes: ExternalApprovalSetting_Node[];
-}
-
-export interface ExternalApprovalSetting_Node {
-  /**
-   * A unique identifier for a node in UUID format.
-   * We will also include the id in the message sending to the external relay service to identify the node.
-   */
-  id: string;
-  /** The title of the node. */
-  title: string;
-  /** The external endpoint for the relay service, e.g. "http://hello:1234". */
-  endpoint: string;
 }
 
 export interface SchemaTemplateSetting {
@@ -1191,7 +1174,6 @@ function createBaseValue(): Value {
     workspaceProfileSettingValue: undefined,
     workspaceApprovalSettingValue: undefined,
     workspaceTrialSettingValue: undefined,
-    externalApprovalSettingValue: undefined,
     schemaTemplateSettingValue: undefined,
     dataClassificationSettingValue: undefined,
     semanticTypeSettingValue: undefined,
@@ -1223,9 +1205,6 @@ export const Value: MessageFns<Value> = {
     }
     if (message.workspaceTrialSettingValue !== undefined) {
       WorkspaceTrialSetting.encode(message.workspaceTrialSettingValue, writer.uint32(58).fork()).join();
-    }
-    if (message.externalApprovalSettingValue !== undefined) {
-      ExternalApprovalSetting.encode(message.externalApprovalSettingValue, writer.uint32(66).fork()).join();
     }
     if (message.schemaTemplateSettingValue !== undefined) {
       SchemaTemplateSetting.encode(message.schemaTemplateSettingValue, writer.uint32(74).fork()).join();
@@ -1311,14 +1290,6 @@ export const Value: MessageFns<Value> = {
           message.workspaceTrialSettingValue = WorkspaceTrialSetting.decode(reader, reader.uint32());
           continue;
         }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          message.externalApprovalSettingValue = ExternalApprovalSetting.decode(reader, reader.uint32());
-          continue;
-        }
         case 9: {
           if (tag !== 74) {
             break;
@@ -1395,9 +1366,6 @@ export const Value: MessageFns<Value> = {
       workspaceTrialSettingValue: isSet(object.workspaceTrialSettingValue)
         ? WorkspaceTrialSetting.fromJSON(object.workspaceTrialSettingValue)
         : undefined,
-      externalApprovalSettingValue: isSet(object.externalApprovalSettingValue)
-        ? ExternalApprovalSetting.fromJSON(object.externalApprovalSettingValue)
-        : undefined,
       schemaTemplateSettingValue: isSet(object.schemaTemplateSettingValue)
         ? SchemaTemplateSetting.fromJSON(object.schemaTemplateSettingValue)
         : undefined,
@@ -1439,9 +1407,6 @@ export const Value: MessageFns<Value> = {
     }
     if (message.workspaceTrialSettingValue !== undefined) {
       obj.workspaceTrialSettingValue = WorkspaceTrialSetting.toJSON(message.workspaceTrialSettingValue);
-    }
-    if (message.externalApprovalSettingValue !== undefined) {
-      obj.externalApprovalSettingValue = ExternalApprovalSetting.toJSON(message.externalApprovalSettingValue);
     }
     if (message.schemaTemplateSettingValue !== undefined) {
       obj.schemaTemplateSettingValue = SchemaTemplateSetting.toJSON(message.schemaTemplateSettingValue);
@@ -1492,10 +1457,6 @@ export const Value: MessageFns<Value> = {
     message.workspaceTrialSettingValue =
       (object.workspaceTrialSettingValue !== undefined && object.workspaceTrialSettingValue !== null)
         ? WorkspaceTrialSetting.fromPartial(object.workspaceTrialSettingValue)
-        : undefined;
-    message.externalApprovalSettingValue =
-      (object.externalApprovalSettingValue !== undefined && object.externalApprovalSettingValue !== null)
-        ? ExternalApprovalSetting.fromPartial(object.externalApprovalSettingValue)
         : undefined;
     message.schemaTemplateSettingValue =
       (object.schemaTemplateSettingValue !== undefined && object.schemaTemplateSettingValue !== null)
@@ -1762,7 +1723,7 @@ export const SMTPMailDeliverySettingValue: MessageFns<SMTPMailDeliverySettingVal
 };
 
 function createBaseAppIMSetting(): AppIMSetting {
-  return { slack: undefined, feishu: undefined, wecom: undefined, lark: undefined };
+  return { slack: undefined, feishu: undefined, wecom: undefined, lark: undefined, dingtalk: undefined };
 }
 
 export const AppIMSetting: MessageFns<AppIMSetting> = {
@@ -1778,6 +1739,9 @@ export const AppIMSetting: MessageFns<AppIMSetting> = {
     }
     if (message.lark !== undefined) {
       AppIMSetting_Lark.encode(message.lark, writer.uint32(34).fork()).join();
+    }
+    if (message.dingtalk !== undefined) {
+      AppIMSetting_DingTalk.encode(message.dingtalk, writer.uint32(42).fork()).join();
     }
     return writer;
   },
@@ -1821,6 +1785,14 @@ export const AppIMSetting: MessageFns<AppIMSetting> = {
           message.lark = AppIMSetting_Lark.decode(reader, reader.uint32());
           continue;
         }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.dingtalk = AppIMSetting_DingTalk.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1836,6 +1808,7 @@ export const AppIMSetting: MessageFns<AppIMSetting> = {
       feishu: isSet(object.feishu) ? AppIMSetting_Feishu.fromJSON(object.feishu) : undefined,
       wecom: isSet(object.wecom) ? AppIMSetting_Wecom.fromJSON(object.wecom) : undefined,
       lark: isSet(object.lark) ? AppIMSetting_Lark.fromJSON(object.lark) : undefined,
+      dingtalk: isSet(object.dingtalk) ? AppIMSetting_DingTalk.fromJSON(object.dingtalk) : undefined,
     };
   },
 
@@ -1852,6 +1825,9 @@ export const AppIMSetting: MessageFns<AppIMSetting> = {
     }
     if (message.lark !== undefined) {
       obj.lark = AppIMSetting_Lark.toJSON(message.lark);
+    }
+    if (message.dingtalk !== undefined) {
+      obj.dingtalk = AppIMSetting_DingTalk.toJSON(message.dingtalk);
     }
     return obj;
   },
@@ -1872,6 +1848,9 @@ export const AppIMSetting: MessageFns<AppIMSetting> = {
       : undefined;
     message.lark = (object.lark !== undefined && object.lark !== null)
       ? AppIMSetting_Lark.fromPartial(object.lark)
+      : undefined;
+    message.dingtalk = (object.dingtalk !== undefined && object.dingtalk !== null)
+      ? AppIMSetting_DingTalk.fromPartial(object.dingtalk)
       : undefined;
     return message;
   },
@@ -2245,6 +2224,114 @@ export const AppIMSetting_Lark: MessageFns<AppIMSetting_Lark> = {
   },
 };
 
+function createBaseAppIMSetting_DingTalk(): AppIMSetting_DingTalk {
+  return { enabled: false, clientId: "", clientSecret: "", robotCode: "" };
+}
+
+export const AppIMSetting_DingTalk: MessageFns<AppIMSetting_DingTalk> = {
+  encode(message: AppIMSetting_DingTalk, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.enabled !== false) {
+      writer.uint32(8).bool(message.enabled);
+    }
+    if (message.clientId !== "") {
+      writer.uint32(18).string(message.clientId);
+    }
+    if (message.clientSecret !== "") {
+      writer.uint32(26).string(message.clientSecret);
+    }
+    if (message.robotCode !== "") {
+      writer.uint32(34).string(message.robotCode);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AppIMSetting_DingTalk {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseAppIMSetting_DingTalk();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.enabled = reader.bool();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.clientId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.clientSecret = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.robotCode = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): AppIMSetting_DingTalk {
+    return {
+      enabled: isSet(object.enabled) ? globalThis.Boolean(object.enabled) : false,
+      clientId: isSet(object.clientId) ? globalThis.String(object.clientId) : "",
+      clientSecret: isSet(object.clientSecret) ? globalThis.String(object.clientSecret) : "",
+      robotCode: isSet(object.robotCode) ? globalThis.String(object.robotCode) : "",
+    };
+  },
+
+  toJSON(message: AppIMSetting_DingTalk): unknown {
+    const obj: any = {};
+    if (message.enabled !== false) {
+      obj.enabled = message.enabled;
+    }
+    if (message.clientId !== "") {
+      obj.clientId = message.clientId;
+    }
+    if (message.clientSecret !== "") {
+      obj.clientSecret = message.clientSecret;
+    }
+    if (message.robotCode !== "") {
+      obj.robotCode = message.robotCode;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<AppIMSetting_DingTalk>): AppIMSetting_DingTalk {
+    return AppIMSetting_DingTalk.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<AppIMSetting_DingTalk>): AppIMSetting_DingTalk {
+    const message = createBaseAppIMSetting_DingTalk();
+    message.enabled = object.enabled ?? false;
+    message.clientId = object.clientId ?? "";
+    message.clientSecret = object.clientSecret ?? "";
+    message.robotCode = object.robotCode ?? "";
+    return message;
+  },
+};
+
 function createBaseAgentPluginSetting(): AgentPluginSetting {
   return { url: "", token: "" };
 }
@@ -2327,7 +2414,6 @@ function createBaseWorkspaceProfileSetting(): WorkspaceProfileSetting {
     disallowSignup: false,
     require2fa: false,
     outboundIpList: [],
-    gitopsWebhookUrl: "",
     tokenDuration: undefined,
     announcement: undefined,
     maximumRoleExpiration: undefined,
@@ -2351,9 +2437,6 @@ export const WorkspaceProfileSetting: MessageFns<WorkspaceProfileSetting> = {
     }
     for (const v of message.outboundIpList) {
       writer.uint32(34).string(v!);
-    }
-    if (message.gitopsWebhookUrl !== "") {
-      writer.uint32(42).string(message.gitopsWebhookUrl);
     }
     if (message.tokenDuration !== undefined) {
       Duration.encode(message.tokenDuration, writer.uint32(50).fork()).join();
@@ -2416,14 +2499,6 @@ export const WorkspaceProfileSetting: MessageFns<WorkspaceProfileSetting> = {
           }
 
           message.outboundIpList.push(reader.string());
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.gitopsWebhookUrl = reader.string();
           continue;
         }
         case 6: {
@@ -2499,7 +2574,6 @@ export const WorkspaceProfileSetting: MessageFns<WorkspaceProfileSetting> = {
       outboundIpList: globalThis.Array.isArray(object?.outboundIpList)
         ? object.outboundIpList.map((e: any) => globalThis.String(e))
         : [],
-      gitopsWebhookUrl: isSet(object.gitopsWebhookUrl) ? globalThis.String(object.gitopsWebhookUrl) : "",
       tokenDuration: isSet(object.tokenDuration) ? Duration.fromJSON(object.tokenDuration) : undefined,
       announcement: isSet(object.announcement) ? Announcement.fromJSON(object.announcement) : undefined,
       maximumRoleExpiration: isSet(object.maximumRoleExpiration)
@@ -2531,9 +2605,6 @@ export const WorkspaceProfileSetting: MessageFns<WorkspaceProfileSetting> = {
     }
     if (message.outboundIpList?.length) {
       obj.outboundIpList = message.outboundIpList;
-    }
-    if (message.gitopsWebhookUrl !== "") {
-      obj.gitopsWebhookUrl = message.gitopsWebhookUrl;
     }
     if (message.tokenDuration !== undefined) {
       obj.tokenDuration = Duration.toJSON(message.tokenDuration);
@@ -2568,7 +2639,6 @@ export const WorkspaceProfileSetting: MessageFns<WorkspaceProfileSetting> = {
     message.disallowSignup = object.disallowSignup ?? false;
     message.require2fa = object.require2fa ?? false;
     message.outboundIpList = object.outboundIpList?.map((e) => e) || [];
-    message.gitopsWebhookUrl = object.gitopsWebhookUrl ?? "";
     message.tokenDuration = (object.tokenDuration !== undefined && object.tokenDuration !== null)
       ? Duration.fromPartial(object.tokenDuration)
       : undefined;
@@ -2819,160 +2889,6 @@ export const WorkspaceApprovalSetting_Rule: MessageFns<WorkspaceApprovalSetting_
     message.condition = (object.condition !== undefined && object.condition !== null)
       ? Expr.fromPartial(object.condition)
       : undefined;
-    return message;
-  },
-};
-
-function createBaseExternalApprovalSetting(): ExternalApprovalSetting {
-  return { nodes: [] };
-}
-
-export const ExternalApprovalSetting: MessageFns<ExternalApprovalSetting> = {
-  encode(message: ExternalApprovalSetting, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.nodes) {
-      ExternalApprovalSetting_Node.encode(v!, writer.uint32(10).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ExternalApprovalSetting {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseExternalApprovalSetting();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.nodes.push(ExternalApprovalSetting_Node.decode(reader, reader.uint32()));
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ExternalApprovalSetting {
-    return {
-      nodes: globalThis.Array.isArray(object?.nodes)
-        ? object.nodes.map((e: any) => ExternalApprovalSetting_Node.fromJSON(e))
-        : [],
-    };
-  },
-
-  toJSON(message: ExternalApprovalSetting): unknown {
-    const obj: any = {};
-    if (message.nodes?.length) {
-      obj.nodes = message.nodes.map((e) => ExternalApprovalSetting_Node.toJSON(e));
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<ExternalApprovalSetting>): ExternalApprovalSetting {
-    return ExternalApprovalSetting.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<ExternalApprovalSetting>): ExternalApprovalSetting {
-    const message = createBaseExternalApprovalSetting();
-    message.nodes = object.nodes?.map((e) => ExternalApprovalSetting_Node.fromPartial(e)) || [];
-    return message;
-  },
-};
-
-function createBaseExternalApprovalSetting_Node(): ExternalApprovalSetting_Node {
-  return { id: "", title: "", endpoint: "" };
-}
-
-export const ExternalApprovalSetting_Node: MessageFns<ExternalApprovalSetting_Node> = {
-  encode(message: ExternalApprovalSetting_Node, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.id !== "") {
-      writer.uint32(10).string(message.id);
-    }
-    if (message.title !== "") {
-      writer.uint32(18).string(message.title);
-    }
-    if (message.endpoint !== "") {
-      writer.uint32(26).string(message.endpoint);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ExternalApprovalSetting_Node {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseExternalApprovalSetting_Node();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.id = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.title = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.endpoint = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ExternalApprovalSetting_Node {
-    return {
-      id: isSet(object.id) ? globalThis.String(object.id) : "",
-      title: isSet(object.title) ? globalThis.String(object.title) : "",
-      endpoint: isSet(object.endpoint) ? globalThis.String(object.endpoint) : "",
-    };
-  },
-
-  toJSON(message: ExternalApprovalSetting_Node): unknown {
-    const obj: any = {};
-    if (message.id !== "") {
-      obj.id = message.id;
-    }
-    if (message.title !== "") {
-      obj.title = message.title;
-    }
-    if (message.endpoint !== "") {
-      obj.endpoint = message.endpoint;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<ExternalApprovalSetting_Node>): ExternalApprovalSetting_Node {
-    return ExternalApprovalSetting_Node.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<ExternalApprovalSetting_Node>): ExternalApprovalSetting_Node {
-    const message = createBaseExternalApprovalSetting_Node();
-    message.id = object.id ?? "";
-    message.title = object.title ?? "";
-    message.endpoint = object.endpoint ?? "";
     return message;
   },
 };

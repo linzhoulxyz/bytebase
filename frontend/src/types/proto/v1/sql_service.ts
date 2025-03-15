@@ -36,10 +36,6 @@ export interface AdminExecuteRequest {
   statement: string;
   /** The maximum number of rows to return. */
   limit: number;
-  /** The timeout for the request. */
-  timeout:
-    | Duration
-    | undefined;
   /**
    * The default schema to execute the statement. Equals to the current schema
    * in Oracle and search path in Postgres.
@@ -69,10 +65,6 @@ export interface QueryRequest {
   statement: string;
   /** The maximum number of rows to return. */
   limit: number;
-  /** The timeout for the request. */
-  timeout?:
-    | Duration
-    | undefined;
   /**
    * The id of data source.
    * It is used for querying admin data source even if the instance has
@@ -422,12 +414,6 @@ export interface CheckRequest {
    */
   name: string;
   statement: string;
-  /**
-   * The database metadata to check against. It can be used to check against an
-   * uncommitted metadata. If not provided, the database metadata will be
-   * fetched from the database.
-   */
-  metadata: DatabaseMetadata | undefined;
   changeType: CheckRequest_ChangeType;
 }
 
@@ -502,6 +488,8 @@ export function checkRequest_ChangeTypeToNumber(object: CheckRequest_ChangeType)
 
 export interface CheckResponse {
   advices: Advice[];
+  /** The count of affected rows of the statement on the target database. */
+  affectedRows: number;
 }
 
 export interface ParseMyBatisMapperRequest {
@@ -510,22 +498,6 @@ export interface ParseMyBatisMapperRequest {
 
 export interface ParseMyBatisMapperResponse {
   statements: string[];
-}
-
-export interface StringifyMetadataRequest {
-  metadata:
-    | DatabaseMetadata
-    | undefined;
-  /** The database engine of the schema string. */
-  engine: Engine;
-  /** If false, we will build the raw common by classification in database catalog. */
-  classificationFromConfig: boolean;
-  /** Database catlog is required if classification_from_config is false. */
-  catalog?: DatabaseCatalog | undefined;
-}
-
-export interface StringifyMetadataResponse {
-  schema: string;
 }
 
 export interface DiffMetadataRequest {
@@ -571,7 +543,7 @@ export interface SearchQueryHistoriesRequest {
    * - database, for example:
    *    database = "instances/{instance}/databases/{database}"
    * - instance, for example:
-   *    instance = "instance/{instance}"
+   *    instance = "instances/{instance}"
    * - type, for example:
    *    type = "QUERY"
    */
@@ -662,7 +634,7 @@ export function queryHistory_TypeToNumber(object: QueryHistory_Type): number {
 }
 
 function createBaseAdminExecuteRequest(): AdminExecuteRequest {
-  return { name: "", statement: "", limit: 0, timeout: undefined, schema: undefined, container: undefined };
+  return { name: "", statement: "", limit: 0, schema: undefined, container: undefined };
 }
 
 export const AdminExecuteRequest: MessageFns<AdminExecuteRequest> = {
@@ -675,9 +647,6 @@ export const AdminExecuteRequest: MessageFns<AdminExecuteRequest> = {
     }
     if (message.limit !== 0) {
       writer.uint32(32).int32(message.limit);
-    }
-    if (message.timeout !== undefined) {
-      Duration.encode(message.timeout, writer.uint32(42).fork()).join();
     }
     if (message.schema !== undefined) {
       writer.uint32(50).string(message.schema);
@@ -719,14 +688,6 @@ export const AdminExecuteRequest: MessageFns<AdminExecuteRequest> = {
           message.limit = reader.int32();
           continue;
         }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.timeout = Duration.decode(reader, reader.uint32());
-          continue;
-        }
         case 6: {
           if (tag !== 50) {
             break;
@@ -757,7 +718,6 @@ export const AdminExecuteRequest: MessageFns<AdminExecuteRequest> = {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
       statement: isSet(object.statement) ? globalThis.String(object.statement) : "",
       limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
-      timeout: isSet(object.timeout) ? Duration.fromJSON(object.timeout) : undefined,
       schema: isSet(object.schema) ? globalThis.String(object.schema) : undefined,
       container: isSet(object.container) ? globalThis.String(object.container) : undefined,
     };
@@ -773,9 +733,6 @@ export const AdminExecuteRequest: MessageFns<AdminExecuteRequest> = {
     }
     if (message.limit !== 0) {
       obj.limit = Math.round(message.limit);
-    }
-    if (message.timeout !== undefined) {
-      obj.timeout = Duration.toJSON(message.timeout);
     }
     if (message.schema !== undefined) {
       obj.schema = message.schema;
@@ -794,9 +751,6 @@ export const AdminExecuteRequest: MessageFns<AdminExecuteRequest> = {
     message.name = object.name ?? "";
     message.statement = object.statement ?? "";
     message.limit = object.limit ?? 0;
-    message.timeout = (object.timeout !== undefined && object.timeout !== null)
-      ? Duration.fromPartial(object.timeout)
-      : undefined;
     message.schema = object.schema ?? undefined;
     message.container = object.container ?? undefined;
     return message;
@@ -868,7 +822,6 @@ function createBaseQueryRequest(): QueryRequest {
     name: "",
     statement: "",
     limit: 0,
-    timeout: undefined,
     dataSourceId: "",
     explain: false,
     schema: undefined,
@@ -887,9 +840,6 @@ export const QueryRequest: MessageFns<QueryRequest> = {
     }
     if (message.limit !== 0) {
       writer.uint32(32).int32(message.limit);
-    }
-    if (message.timeout !== undefined) {
-      Duration.encode(message.timeout, writer.uint32(42).fork()).join();
     }
     if (message.dataSourceId !== "") {
       writer.uint32(50).string(message.dataSourceId);
@@ -938,14 +888,6 @@ export const QueryRequest: MessageFns<QueryRequest> = {
           }
 
           message.limit = reader.int32();
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.timeout = Duration.decode(reader, reader.uint32());
           continue;
         }
         case 6: {
@@ -1002,7 +944,6 @@ export const QueryRequest: MessageFns<QueryRequest> = {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
       statement: isSet(object.statement) ? globalThis.String(object.statement) : "",
       limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
-      timeout: isSet(object.timeout) ? Duration.fromJSON(object.timeout) : undefined,
       dataSourceId: isSet(object.dataSourceId) ? globalThis.String(object.dataSourceId) : "",
       explain: isSet(object.explain) ? globalThis.Boolean(object.explain) : false,
       schema: isSet(object.schema) ? globalThis.String(object.schema) : undefined,
@@ -1021,9 +962,6 @@ export const QueryRequest: MessageFns<QueryRequest> = {
     }
     if (message.limit !== 0) {
       obj.limit = Math.round(message.limit);
-    }
-    if (message.timeout !== undefined) {
-      obj.timeout = Duration.toJSON(message.timeout);
     }
     if (message.dataSourceId !== "") {
       obj.dataSourceId = message.dataSourceId;
@@ -1051,9 +989,6 @@ export const QueryRequest: MessageFns<QueryRequest> = {
     message.name = object.name ?? "";
     message.statement = object.statement ?? "";
     message.limit = object.limit ?? 0;
-    message.timeout = (object.timeout !== undefined && object.timeout !== null)
-      ? Duration.fromPartial(object.timeout)
-      : undefined;
     message.dataSourceId = object.dataSourceId ?? "";
     message.explain = object.explain ?? false;
     message.schema = object.schema ?? undefined;
@@ -2889,7 +2824,7 @@ export const PrettyResponse: MessageFns<PrettyResponse> = {
 };
 
 function createBaseCheckRequest(): CheckRequest {
-  return { name: "", statement: "", metadata: undefined, changeType: CheckRequest_ChangeType.CHANGE_TYPE_UNSPECIFIED };
+  return { name: "", statement: "", changeType: CheckRequest_ChangeType.CHANGE_TYPE_UNSPECIFIED };
 }
 
 export const CheckRequest: MessageFns<CheckRequest> = {
@@ -2899,9 +2834,6 @@ export const CheckRequest: MessageFns<CheckRequest> = {
     }
     if (message.statement !== "") {
       writer.uint32(10).string(message.statement);
-    }
-    if (message.metadata !== undefined) {
-      DatabaseMetadata.encode(message.metadata, writer.uint32(26).fork()).join();
     }
     if (message.changeType !== CheckRequest_ChangeType.CHANGE_TYPE_UNSPECIFIED) {
       writer.uint32(32).int32(checkRequest_ChangeTypeToNumber(message.changeType));
@@ -2932,14 +2864,6 @@ export const CheckRequest: MessageFns<CheckRequest> = {
           message.statement = reader.string();
           continue;
         }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.metadata = DatabaseMetadata.decode(reader, reader.uint32());
-          continue;
-        }
         case 4: {
           if (tag !== 32) {
             break;
@@ -2961,7 +2885,6 @@ export const CheckRequest: MessageFns<CheckRequest> = {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
       statement: isSet(object.statement) ? globalThis.String(object.statement) : "",
-      metadata: isSet(object.metadata) ? DatabaseMetadata.fromJSON(object.metadata) : undefined,
       changeType: isSet(object.changeType)
         ? checkRequest_ChangeTypeFromJSON(object.changeType)
         : CheckRequest_ChangeType.CHANGE_TYPE_UNSPECIFIED,
@@ -2976,9 +2899,6 @@ export const CheckRequest: MessageFns<CheckRequest> = {
     if (message.statement !== "") {
       obj.statement = message.statement;
     }
-    if (message.metadata !== undefined) {
-      obj.metadata = DatabaseMetadata.toJSON(message.metadata);
-    }
     if (message.changeType !== CheckRequest_ChangeType.CHANGE_TYPE_UNSPECIFIED) {
       obj.changeType = checkRequest_ChangeTypeToJSON(message.changeType);
     }
@@ -2992,22 +2912,22 @@ export const CheckRequest: MessageFns<CheckRequest> = {
     const message = createBaseCheckRequest();
     message.name = object.name ?? "";
     message.statement = object.statement ?? "";
-    message.metadata = (object.metadata !== undefined && object.metadata !== null)
-      ? DatabaseMetadata.fromPartial(object.metadata)
-      : undefined;
     message.changeType = object.changeType ?? CheckRequest_ChangeType.CHANGE_TYPE_UNSPECIFIED;
     return message;
   },
 };
 
 function createBaseCheckResponse(): CheckResponse {
-  return { advices: [] };
+  return { advices: [], affectedRows: 0 };
 }
 
 export const CheckResponse: MessageFns<CheckResponse> = {
   encode(message: CheckResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     for (const v of message.advices) {
       Advice.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.affectedRows !== 0) {
+      writer.uint32(16).int32(message.affectedRows);
     }
     return writer;
   },
@@ -3027,6 +2947,14 @@ export const CheckResponse: MessageFns<CheckResponse> = {
           message.advices.push(Advice.decode(reader, reader.uint32()));
           continue;
         }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.affectedRows = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3039,6 +2967,7 @@ export const CheckResponse: MessageFns<CheckResponse> = {
   fromJSON(object: any): CheckResponse {
     return {
       advices: globalThis.Array.isArray(object?.advices) ? object.advices.map((e: any) => Advice.fromJSON(e)) : [],
+      affectedRows: isSet(object.affectedRows) ? globalThis.Number(object.affectedRows) : 0,
     };
   },
 
@@ -3046,6 +2975,9 @@ export const CheckResponse: MessageFns<CheckResponse> = {
     const obj: any = {};
     if (message.advices?.length) {
       obj.advices = message.advices.map((e) => Advice.toJSON(e));
+    }
+    if (message.affectedRows !== 0) {
+      obj.affectedRows = Math.round(message.affectedRows);
     }
     return obj;
   },
@@ -3056,6 +2988,7 @@ export const CheckResponse: MessageFns<CheckResponse> = {
   fromPartial(object: DeepPartial<CheckResponse>): CheckResponse {
     const message = createBaseCheckResponse();
     message.advices = object.advices?.map((e) => Advice.fromPartial(e)) || [];
+    message.affectedRows = object.affectedRows ?? 0;
     return message;
   },
 };
@@ -3176,183 +3109,6 @@ export const ParseMyBatisMapperResponse: MessageFns<ParseMyBatisMapperResponse> 
   fromPartial(object: DeepPartial<ParseMyBatisMapperResponse>): ParseMyBatisMapperResponse {
     const message = createBaseParseMyBatisMapperResponse();
     message.statements = object.statements?.map((e) => e) || [];
-    return message;
-  },
-};
-
-function createBaseStringifyMetadataRequest(): StringifyMetadataRequest {
-  return {
-    metadata: undefined,
-    engine: Engine.ENGINE_UNSPECIFIED,
-    classificationFromConfig: false,
-    catalog: undefined,
-  };
-}
-
-export const StringifyMetadataRequest: MessageFns<StringifyMetadataRequest> = {
-  encode(message: StringifyMetadataRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.metadata !== undefined) {
-      DatabaseMetadata.encode(message.metadata, writer.uint32(10).fork()).join();
-    }
-    if (message.engine !== Engine.ENGINE_UNSPECIFIED) {
-      writer.uint32(16).int32(engineToNumber(message.engine));
-    }
-    if (message.classificationFromConfig !== false) {
-      writer.uint32(24).bool(message.classificationFromConfig);
-    }
-    if (message.catalog !== undefined) {
-      DatabaseCatalog.encode(message.catalog, writer.uint32(34).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): StringifyMetadataRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStringifyMetadataRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.metadata = DatabaseMetadata.decode(reader, reader.uint32());
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.engine = engineFromJSON(reader.int32());
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.classificationFromConfig = reader.bool();
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.catalog = DatabaseCatalog.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): StringifyMetadataRequest {
-    return {
-      metadata: isSet(object.metadata) ? DatabaseMetadata.fromJSON(object.metadata) : undefined,
-      engine: isSet(object.engine) ? engineFromJSON(object.engine) : Engine.ENGINE_UNSPECIFIED,
-      classificationFromConfig: isSet(object.classificationFromConfig)
-        ? globalThis.Boolean(object.classificationFromConfig)
-        : false,
-      catalog: isSet(object.catalog) ? DatabaseCatalog.fromJSON(object.catalog) : undefined,
-    };
-  },
-
-  toJSON(message: StringifyMetadataRequest): unknown {
-    const obj: any = {};
-    if (message.metadata !== undefined) {
-      obj.metadata = DatabaseMetadata.toJSON(message.metadata);
-    }
-    if (message.engine !== Engine.ENGINE_UNSPECIFIED) {
-      obj.engine = engineToJSON(message.engine);
-    }
-    if (message.classificationFromConfig !== false) {
-      obj.classificationFromConfig = message.classificationFromConfig;
-    }
-    if (message.catalog !== undefined) {
-      obj.catalog = DatabaseCatalog.toJSON(message.catalog);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<StringifyMetadataRequest>): StringifyMetadataRequest {
-    return StringifyMetadataRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<StringifyMetadataRequest>): StringifyMetadataRequest {
-    const message = createBaseStringifyMetadataRequest();
-    message.metadata = (object.metadata !== undefined && object.metadata !== null)
-      ? DatabaseMetadata.fromPartial(object.metadata)
-      : undefined;
-    message.engine = object.engine ?? Engine.ENGINE_UNSPECIFIED;
-    message.classificationFromConfig = object.classificationFromConfig ?? false;
-    message.catalog = (object.catalog !== undefined && object.catalog !== null)
-      ? DatabaseCatalog.fromPartial(object.catalog)
-      : undefined;
-    return message;
-  },
-};
-
-function createBaseStringifyMetadataResponse(): StringifyMetadataResponse {
-  return { schema: "" };
-}
-
-export const StringifyMetadataResponse: MessageFns<StringifyMetadataResponse> = {
-  encode(message: StringifyMetadataResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.schema !== "") {
-      writer.uint32(10).string(message.schema);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): StringifyMetadataResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStringifyMetadataResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.schema = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): StringifyMetadataResponse {
-    return { schema: isSet(object.schema) ? globalThis.String(object.schema) : "" };
-  },
-
-  toJSON(message: StringifyMetadataResponse): unknown {
-    const obj: any = {};
-    if (message.schema !== "") {
-      obj.schema = message.schema;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<StringifyMetadataResponse>): StringifyMetadataResponse {
-    return StringifyMetadataResponse.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<StringifyMetadataResponse>): StringifyMetadataResponse {
-    const message = createBaseStringifyMetadataResponse();
-    message.schema = object.schema ?? "";
     return message;
   },
 };
@@ -4318,62 +4074,6 @@ export const SQLServiceDefinition = {
           800000: [new Uint8Array([1])],
           578365826: [
             new Uint8Array([19, 58, 1, 42, 34, 14, 47, 118, 49, 47, 115, 113, 108, 47, 112, 114, 101, 116, 116, 121]),
-          ],
-        },
-      },
-    },
-    stringifyMetadata: {
-      name: "StringifyMetadata",
-      requestType: StringifyMetadataRequest,
-      requestStream: false,
-      responseType: StringifyMetadataResponse,
-      responseStream: false,
-      options: {
-        _unknownFields: {
-          800000: [new Uint8Array([1])],
-          578365826: [
-            new Uint8Array([
-              39,
-              58,
-              1,
-              42,
-              34,
-              34,
-              47,
-              118,
-              49,
-              47,
-              115,
-              99,
-              104,
-              101,
-              109,
-              97,
-              68,
-              101,
-              115,
-              105,
-              103,
-              110,
-              58,
-              115,
-              116,
-              114,
-              105,
-              110,
-              103,
-              105,
-              102,
-              121,
-              77,
-              101,
-              116,
-              97,
-              100,
-              97,
-              116,
-              97,
-            ]),
           ],
         },
       },

@@ -55,20 +55,19 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import {
+  useDatabaseV1Store,
   useInstanceV1Store,
   useSubscriptionV1Store,
   useGracefulRequest,
   pushNotification,
-  useDBSchemaV1Store,
 } from "@/store";
-import { useDatabaseV1List } from "@/store/modules/v1/databaseList";
 import { Engine } from "@/types/proto/v1/common";
 import {
   DataSource,
   DataSourceType,
   Instance,
 } from "@/types/proto/v1/instance_service";
-import { isValidSpannerHost, defer, wrapRefAsPromise } from "@/utils";
+import { isValidSpannerHost, defer } from "@/utils";
 import ScanIntervalInput from "./ScanIntervalInput.vue";
 import {
   calcDataSourceUpdateMask,
@@ -110,11 +109,13 @@ const {
   checkDataSource,
   extractDataSourceFromEdit,
   pendingCreateInstance,
+  valueChanged,
 } = context;
 
 const router = useRouter();
 const { t } = useI18n();
 const instanceV1Store = useInstanceV1Store();
+const databaseStore = useDatabaseV1Store();
 const subscriptionStore = useSubscriptionV1Store();
 const scanIntervalInputRef = ref<InstanceType<typeof ScanIntervalInput>>();
 
@@ -123,15 +124,6 @@ const resetChanges = () => {
   basicInfo.value = cloneDeep(original.basicInfo);
   dataSourceEditState.value.dataSources = cloneDeep(original.dataSources);
 };
-
-const valueChanged = computed(() => {
-  const original = getOriginalEditState();
-  const editing = {
-    basicInfo: basicInfo.value,
-    dataSources: dataSourceEditState.value.dataSources,
-  };
-  return !isEqual(editing, original);
-});
 
 const allowUpdate = computed((): boolean => {
   if (!valueChanged.value) {
@@ -274,8 +266,6 @@ const doCreate = async () => {
       const createdInstance = await instanceV1Store.createInstance(
         pendingCreateInstance.value
       );
-      // Sync the database list after instance is created.
-      useDatabaseV1List(createdInstance.name);
       if (props.onCreated) {
         props.onCreated(createdInstance);
       } else {
@@ -363,31 +353,31 @@ const doUpdate = async () => {
       updateMask.push("environment");
     }
     if (
-      instancePatch.options?.syncInterval?.seconds?.toNumber() !==
-      inst.options?.syncInterval?.seconds?.toNumber()
+      instancePatch.syncInterval?.seconds?.toNumber() !==
+      inst.syncInterval?.seconds?.toNumber()
     ) {
-      updateMask.push("options.sync_interval");
+      updateMask.push("sync_interval");
     }
     if (
-      instancePatch.options?.maximumConnections !==
-      inst.options?.maximumConnections
+      instancePatch.maximumConnections !==
+      inst.maximumConnections
     ) {
-      updateMask.push("options.maximum_connections");
+      updateMask.push("maximum_connections");
     }
     if (
       !isEqual(
-        instancePatch.options?.syncDatabases,
-        inst.options?.syncDatabases
+        instancePatch.syncDatabases,
+        inst.syncDatabases
       )
     ) {
-      updateMask.push("options.sync_databases");
+      updateMask.push("sync_databases");
     }
     if (updateMask.length === 0) {
       return;
     }
     pendingRequestRunners.push(() =>
       instanceV1Store.updateInstance(instancePatch, updateMask).then(() => {
-        if (updateMask.includes("options.sync_databases")) {
+        if (updateMask.includes("sync_databases")) {
           return refreshInstanceDatabases(instancePatch.name);
         }
       })
@@ -395,13 +385,7 @@ const doUpdate = async () => {
   };
   const refreshInstanceDatabases = async (instance: string) => {
     await instanceV1Store.syncInstance(instance, true);
-    const { listCache, databaseList, ready } = useDatabaseV1List(instance);
-    listCache.deleteCache(instance);
-    await wrapRefAsPromise(ready, true);
-    const dbSchemaStore = useDBSchemaV1Store();
-    databaseList.value.forEach((database) =>
-      dbSchemaStore.removeCache(database.name)
-    );
+    databaseStore.removeCacheByInstance(instance);
   };
   /**
    * @returns true if blocked by connection testing failure

@@ -30,7 +30,6 @@ import {
   WORKSPACE_ROUTE_SEMANTIC_TYPES,
   WORKSPACE_ROUTE_DATA_CLASSIFICATION,
   WORKSPACE_ROUTE_AUDIT_LOG,
-  WORKSPACE_ROUTE_GITOPS,
   WORKSPACE_ROUTE_SSO,
   WORKSPACE_ROUTE_MAIL_DELIVERY,
   WORKSPACE_ROUTE_USERS,
@@ -251,12 +250,6 @@ export const useDashboardSidebar = () => {
             name: WORKSPACE_ROUTE_SCHEMA_TEMPLATE,
             type: "route",
           },
-          {
-            title: t("settings.sidebar.gitops"),
-            name: WORKSPACE_ROUTE_GITOPS,
-            type: "route",
-            hide: databaseChangeMode.value === DatabaseChangeMode.EDITOR,
-          },
         ],
       },
       {
@@ -296,6 +289,7 @@ export const useDashboardSidebar = () => {
             title: t("settings.sidebar.mail-delivery"),
             name: WORKSPACE_ROUTE_MAIL_DELIVERY,
             type: "route",
+            hide: true, // TODO: show it until we have a mail delivery requirement.
           },
         ],
       },

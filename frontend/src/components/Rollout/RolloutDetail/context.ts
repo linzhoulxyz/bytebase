@@ -1,3 +1,4 @@
+import { computedAsync } from "@vueuse/core";
 import Emittery from "emittery";
 import type { ComputedRef, InjectionKey, Ref } from "vue";
 import { computed, inject, provide, ref } from "vue";
@@ -8,7 +9,11 @@ import { useIssueV1Store, useProjectV1Store, useRolloutStore } from "@/store";
 import { projectNamePrefix } from "@/store/modules/v1/common";
 import type { ComposedIssue, ComposedProject, ComposedRollout } from "@/types";
 import { unknownProject, unknownRollout } from "@/types";
-import { Rollout, type Task } from "@/types/proto/v1/rollout_service";
+import {
+  Rollout,
+  type Task,
+  type Stage,
+} from "@/types/proto/v1/rollout_service";
 import { flattenTaskV1List } from "@/utils";
 
 type Events = {
@@ -22,8 +27,9 @@ export type RolloutDetailContext = {
   rolloutPreview: Ref<Rollout>;
   issue: Ref<ComposedIssue | undefined>;
 
-  project: ComputedRef<ComposedProject>;
+  project: Ref<ComposedProject>;
   tasks: ComputedRef<Task[]>;
+  mergedStages: ComputedRef<Stage[]>;
 
   // The events emmiter.
   emmiter: EventsEmmiter;
@@ -47,13 +53,15 @@ export const provideRolloutDetailContext = (rolloutName: string) => {
   const rolloutPreview = ref<Rollout>(Rollout.fromPartial({}));
   const issue = ref<ComposedIssue | undefined>(undefined);
 
-  const project = computed(() => {
+  const project = computedAsync(async () => {
     const projectId = route.params.projectId as string;
     if (!projectId) {
       return unknownProject();
     }
-    return projectV1Store.getProjectByName(`${projectNamePrefix}${projectId}`);
-  });
+    return await projectV1Store.getOrFetchProjectByName(
+      `${projectNamePrefix}${projectId}`
+    );
+  }, unknownProject());
 
   const tasks = computed(() => flattenTaskV1List(rollout.value));
 
@@ -64,6 +72,14 @@ export const provideRolloutDetailContext = (rolloutName: string) => {
     poller.restart();
   });
 
+  const mergedStages = computed(() => {
+    // Merge preview stages with created rollout stages.
+    return rolloutPreview.value.stages.map((sp) => {
+      const createdStage = rollout.value.stages.find((s) => s.environment === sp.environment);
+      return createdStage || sp;
+    });
+  });
+
   const context: RolloutDetailContext = {
     project,
     rollout,
@@ -71,6 +87,7 @@ export const provideRolloutDetailContext = (rolloutName: string) => {
     issue,
     tasks,
     emmiter,
+    mergedStages,
   };
 
   provide(KEY, context);

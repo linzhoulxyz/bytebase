@@ -37,7 +37,7 @@
               :enable-raw-expression="true"
               :factor-list="FactorList"
               :factor-support-dropdown="factorSupportDropdown"
-              :factor-options-map="DatabaseGroupFactorOptionsMap(project)"
+              :option-config-map="getDatabaseGroupOptionConfigMap()"
             />
             <p
               v-if="matchingError"
@@ -129,7 +129,6 @@ import {
   databaseGroupNamePrefix,
   getProjectNameAndDatabaseGroupName,
 } from "@/store/modules/v1/common";
-import { useDatabaseV1List } from "@/store/modules/v1/databaseList";
 import type {
   ComposedDatabase,
   ComposedProject,
@@ -144,7 +143,10 @@ import { getErrorCode } from "@/utils/grpcweb";
 import { FeatureAttentionForInstanceLicense } from "../FeatureGuard";
 import { ResourceIdField } from "../v2";
 import MatchedDatabaseView from "./MatchedDatabaseView.vue";
-import { factorSupportDropdown, DatabaseGroupFactorOptionsMap } from "./utils";
+import {
+  factorSupportDropdown,
+  getDatabaseGroupOptionConfigMap,
+} from "./utils";
 import { FactorList } from "./utils";
 
 const props = defineProps<{
@@ -177,7 +179,6 @@ const state = reactive<LocalState>({
   expr: wrapAsGroup(emptySimpleExpr()),
   multitenancy: false,
 });
-const { databaseList } = useDatabaseV1List(props.project.name);
 const resourceIdField = ref<InstanceType<typeof ResourceIdField>>();
 const router = useRouter();
 const dialog = useDialog();
@@ -250,7 +251,7 @@ const updateDatabaseMatchingState = useDebounceFn(async () => {
   if (!validateSimpleExpr(state.expr)) {
     matchingError.value = undefined;
     matchedDatabaseList.value = [];
-    unmatchedDatabaseList.value = databaseList.value;
+    unmatchedDatabaseList.value = [];
     return;
   }
 
@@ -267,7 +268,7 @@ const updateDatabaseMatchingState = useDebounceFn(async () => {
   } catch (error) {
     matchingError.value = (error as ClientError).details;
     matchedDatabaseList.value = [];
-    unmatchedDatabaseList.value = databaseList.value;
+    unmatchedDatabaseList.value = [];
   }
   state.isRequesting = false;
 }, 500);

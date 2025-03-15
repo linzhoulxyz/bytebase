@@ -251,8 +251,8 @@ func (s *Store) UpdateEnvironmentV2(ctx context.Context, patch *UpdateEnvironmen
 	})
 }
 
-func (*Store) getEnvironmentImplV2(ctx context.Context, tx *Tx, find *FindEnvironmentMessage) (*EnvironmentMessage, error) {
-	environments, err := listEnvironmentImplV2(ctx, tx, find)
+func (*Store) getEnvironmentImplV2(ctx context.Context, txn *sql.Tx, find *FindEnvironmentMessage) (*EnvironmentMessage, error) {
+	environments, err := listEnvironmentImplV2(ctx, txn, find)
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +265,7 @@ func (*Store) getEnvironmentImplV2(ctx context.Context, tx *Tx, find *FindEnviro
 	return environments[0], nil
 }
 
-func listEnvironmentImplV2(ctx context.Context, tx *Tx, find *FindEnvironmentMessage) ([]*EnvironmentMessage, error) {
+func listEnvironmentImplV2(ctx context.Context, txn *sql.Tx, find *FindEnvironmentMessage) ([]*EnvironmentMessage, error) {
 	where, args := []string{"TRUE"}, []any{}
 	if v := find.ResourceID; v != nil {
 		where, args = append(where, fmt.Sprintf("environment.resource_id = $%d", len(args)+1)), append(args, *v)
@@ -275,7 +275,8 @@ func listEnvironmentImplV2(ctx context.Context, tx *Tx, find *FindEnvironmentMes
 	}
 
 	var environments []*EnvironmentMessage
-	rows, err := tx.QueryContext(ctx, fmt.Sprintf(`
+	environmentResource := `format('environments/%s', environment.resource_id)`
+	rows, err := txn.QueryContext(ctx, fmt.Sprintf(`
 		SELECT
 			environment.resource_id,
 			environment.name,
@@ -283,9 +284,9 @@ func listEnvironmentImplV2(ctx context.Context, tx *Tx, find *FindEnvironmentMes
 			environment.deleted,
 			policy.payload
 		FROM environment
-		LEFT JOIN policy ON environment.resource_id = policy.resource AND policy.resource_type = 'ENVIRONMENT' AND policy.type = 'bb.policy.environment-tier'
+		LEFT JOIN policy ON %s = policy.resource AND policy.resource_type = 'ENVIRONMENT' AND policy.type = 'bb.policy.environment-tier'
 		WHERE %s
-		ORDER BY environment.order ASC`, strings.Join(where, " AND ")),
+		ORDER BY environment.order ASC`, environmentResource, strings.Join(where, " AND ")),
 		args...,
 	)
 	if err != nil {

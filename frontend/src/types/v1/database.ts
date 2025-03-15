@@ -35,7 +35,7 @@ export const emptyDatabase = (): ComposedDatabase => {
   const database = Database.fromJSON({
     name: `${instanceResource.name}/databases/${EMPTY_ID}`,
     uid: String(EMPTY_ID),
-    syncState: State.ACTIVE,
+    state: State.ACTIVE,
     project: projectEntity.name,
     effectiveEnvironment: effectiveEnvironmentEntity.name,
   });
@@ -56,7 +56,7 @@ export const unknownDatabase = (): ComposedDatabase => {
   const database = Database.fromJSON({
     name: `${instanceResource.name}/databases/${UNKNOWN_ID}`,
     uid: String(UNKNOWN_ID),
-    syncState: State.ACTIVE,
+    state: State.ACTIVE,
     project: projectEntity.name,
     effectiveEnvironment: effectiveEnvironmentEntity.name,
   });
@@ -76,7 +76,9 @@ export const isValidDatabaseName = (name: any): name is string => {
   return Boolean(
     instanceName &&
       instanceName !== String(UNKNOWN_ID) &&
+      instanceName !== String(EMPTY_ID) &&
       databaseName &&
-      databaseName !== String(UNKNOWN_ID)
+      databaseName !== String(UNKNOWN_ID) &&
+      databaseName !== String(EMPTY_ID)
   );
 };

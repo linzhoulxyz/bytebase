@@ -6,6 +6,7 @@ import "google/api/annotations.proto";
 import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 import "google/type/expr.proto";
@@ -237,7 +238,6 @@ message Policy {
 
   oneof policy {
     RolloutPolicy rollout_policy = 19;
-    SlowQueryPolicy slow_query_policy = 12;
     DisableCopyDataPolicy disable_copy_data_policy = 16;
     MaskingRulePolicy masking_rule_policy = 17;
     MaskingExceptionPolicy masking_exception_policy = 18;
@@ -245,6 +245,7 @@ message Policy {
     TagPolicy tag_policy = 21;
     DataSourceQueryPolicy data_source_query_policy = 22;
     ExportDataPolicy export_data_policy = 23;
+    QueryDataPolicy query_data_policy = 24;
   }
 
   bool enforce = 13;
@@ -254,11 +255,10 @@ message Policy {
 }
 
 enum PolicyType {
-  reserved 2, 4, 6, 5;
+  reserved 2, 4, 6, 5, 7;
 
   POLICY_TYPE_UNSPECIFIED = 0;
   ROLLOUT_POLICY = 11;
-  SLOW_QUERY = 7;
   DISABLE_COPY_DATA = 8;
   MASKING_RULE = 9;
   MASKING_EXCEPTION = 10;
@@ -266,6 +266,7 @@ enum PolicyType {
   TAG = 13;
   DATA_SOURCE_QUERY = 14;
   DATA_EXPORT = 15;
+  DATA_QUERY = 16;
 }
 
 enum PolicyResourceType {
@@ -279,15 +280,10 @@ enum PolicyResourceType {
 
 message RolloutPolicy {
   bool automatic = 1;
-  repeated string workspace_roles = 2;
-  repeated string project_roles = 3;
+  repeated string roles = 2;
   // roles/LAST_APPROVER
   // roles/CREATOR
-  repeated string issue_roles = 4;
-}
-
-message SlowQueryPolicy {
-  bool active = 1;
+  repeated string issue_roles = 3;
 }
 
 message DisableCopyDataPolicy {
@@ -296,6 +292,12 @@ message DisableCopyDataPolicy {
 
 message ExportDataPolicy {
   bool disable = 1;
+}
+
+// QueryDataPolicy is the policy configuration for querying data.
+message QueryDataPolicy {
+  // The query timeout duration.
+  google.protobuf.Duration timeout = 1;
 }
 
 message SQLReviewRule {

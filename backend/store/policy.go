@@ -11,6 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
@@ -141,9 +142,7 @@ func (s *Store) GetRolloutPolicy(ctx context.Context, environment string) (*stor
 		return nil, errors.Wrapf(err, "failed to get policy")
 	}
 	if policy == nil {
-		return &storepb.RolloutPolicy{
-			Automatic: true,
-		}, nil
+		return &storepb.RolloutPolicy{}, nil
 	}
 
 	p := &storepb.RolloutPolicy{}
@@ -154,7 +153,7 @@ func (s *Store) GetRolloutPolicy(ctx context.Context, environment string) (*stor
 	return p, nil
 }
 
-func (s *Store) GetDataExportPolicy(ctx context.Context) (*storepb.ExportDataPolicy, error) {
+func (s *Store) GetExportDataPolicy(ctx context.Context) (*storepb.ExportDataPolicy, error) {
 	resourceType := api.PolicyResourceTypeWorkspace
 	resource := ""
 	pType := api.PolicyTypeExportData
@@ -174,9 +173,34 @@ func (s *Store) GetDataExportPolicy(ctx context.Context) (*storepb.ExportDataPol
 
 	p := &storepb.ExportDataPolicy{}
 	if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(policy.Payload), p); err != nil {
-		return nil, errors.Wrapf(err, "failed to unmarshal data export policy")
+		return nil, errors.Wrapf(err, "failed to unmarshal export data policy")
 	}
 
+	return p, nil
+}
+
+func (s *Store) GetQueryDataPolicy(ctx context.Context) (*storepb.QueryDataPolicy, error) {
+	resourceType := api.PolicyResourceTypeWorkspace
+	resource := ""
+	pType := api.PolicyTypeQueryData
+	policy, err := s.GetPolicyV2(ctx, &FindPolicyMessage{
+		ResourceType: &resourceType,
+		Resource:     &resource,
+		Type:         &pType,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get policy")
+	}
+	if policy == nil {
+		return &storepb.QueryDataPolicy{
+			Timeout: &durationpb.Duration{},
+		}, nil
+	}
+
+	p := &storepb.QueryDataPolicy{}
+	if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(policy.Payload), p); err != nil {
+		return nil, errors.Wrapf(err, "failed to unmarshal query data policy")
+	}
 	return p, nil
 }
 
@@ -254,32 +278,6 @@ func (s *Store) getReviewConfigByResource(ctx context.Context, resourceType api.
 	}
 
 	return reviewConfig.Payload, nil
-}
-
-// GetSlowQueryPolicy will get the slow query policy for instance ID.
-func (s *Store) GetSlowQueryPolicy(ctx context.Context, instanceID string) (*storepb.SlowQueryPolicy, error) {
-	resourceType := api.PolicyResourceTypeInstance
-	resource := common.FormatInstance(instanceID)
-	pType := api.PolicyTypeSlowQuery
-	policy, err := s.GetPolicyV2(ctx, &FindPolicyMessage{
-		ResourceType: &resourceType,
-		Resource:     &resource,
-		Type:         &pType,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if policy == nil {
-		return &storepb.SlowQueryPolicy{Active: false}, nil
-	}
-
-	payload := &storepb.SlowQueryPolicy{}
-	if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(policy.Payload), payload); err != nil {
-		return nil, errors.Wrapf(err, "failed to unmarshal slow query policy payload")
-	}
-
-	return payload, nil
 }
 
 // GetMaskingRulePolicy will get the masking rule policy.
@@ -531,22 +529,24 @@ func (s *Store) DeletePolicyV2(ctx context.Context, policy *PolicyMessage) error
 	return nil
 }
 
-func upsertPolicyV2Impl(ctx context.Context, tx *Tx, create *PolicyMessage) (*PolicyMessage, error) {
-	if err := tx.QueryRowContext(ctx, `
-			INSERT INTO policy (
-				resource_type,
-				resource,
-				inherit_from_parent,
-				type,
-				payload,
-				enforce
-			)
-			VALUES ($1, $2, $3, $4, $5, $6)
-			ON CONFLICT(resource_type, resource, type) DO UPDATE SET
-				inherit_from_parent = EXCLUDED.inherit_from_parent,
-				payload = EXCLUDED.payload,
-				enforce = EXCLUDED.enforce
-			RETURNING updated_at
+func upsertPolicyV2Impl(ctx context.Context, txn *sql.Tx, create *PolicyMessage) (*PolicyMessage, error) {
+	create.UpdatedAt = time.Now()
+	if _, err := txn.ExecContext(ctx, `
+		INSERT INTO policy (
+			resource_type,
+			resource,
+			inherit_from_parent,
+			type,
+			payload,
+			enforce,
+			updated_at
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT(resource_type, resource, type) DO UPDATE SET
+			inherit_from_parent = EXCLUDED.inherit_from_parent,
+			payload = EXCLUDED.payload,
+			enforce = EXCLUDED.enforce,
+			updated_at = EXCLUDED.updated_at
 		`,
 		create.ResourceType,
 		create.Resource,
@@ -554,15 +554,14 @@ func upsertPolicyV2Impl(ctx context.Context, tx *Tx, create *PolicyMessage) (*Po
 		create.Type,
 		create.Payload,
 		create.Enforce,
-	).Scan(
-		&create.UpdatedAt,
+		create.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
 	return create, nil
 }
 
-func (*Store) listPolicyImplV2(ctx context.Context, tx *Tx, find *FindPolicyMessage) ([]*PolicyMessage, error) {
+func (*Store) listPolicyImplV2(ctx context.Context, txn *sql.Tx, find *FindPolicyMessage) ([]*PolicyMessage, error) {
 	where, args := []string{"TRUE"}, []any{}
 	if v := find.ResourceType; v != nil {
 		where, args = append(where, fmt.Sprintf("resource_type = $%d", len(args)+1)), append(args, *v)
@@ -577,7 +576,7 @@ func (*Store) listPolicyImplV2(ctx context.Context, tx *Tx, find *FindPolicyMess
 		where, args = append(where, fmt.Sprintf("enforce = $%d", len(args)+1)), append(args, true)
 	}
 
-	rows, err := tx.QueryContext(ctx, `
+	rows, err := txn.QueryContext(ctx, `
 		SELECT
 			updated_at,
 			resource_type,

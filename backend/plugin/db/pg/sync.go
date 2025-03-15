@@ -8,12 +8,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/blang/semver/v4"
 	"github.com/pkg/errors"
-	"google.golang.org/protobuf/types/known/durationpb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
@@ -55,7 +52,7 @@ func (driver *Driver) SyncInstance(ctx context.Context) (*db.InstanceMetadata, e
 	return &db.InstanceMetadata{
 		Version:   version,
 		Databases: filteredDatabases,
-		Metadata: &storepb.InstanceMetadata{
+		Metadata: &storepb.Instance{
 			Roles: instanceRoles,
 		},
 	}, nil
@@ -89,23 +86,17 @@ func (driver *Driver) SyncDBSchema(ctx context.Context) (*storepb.DatabaseSchema
 
 	// We set the search path to empty before the column sync.
 	// The reason is that we can get the expression with default schema name.
-	originSearchPath, err := setSearchPath(txn, "")
-	if err != nil {
+	if err := setTxSearchPath(txn, ""); err != nil {
 		return nil, errors.Wrapf(err, "failed to set search path")
 	}
-	defer func() {
-		if _, err := setSearchPath(txn, originSearchPath); err != nil {
-			slog.Error("failed to restore search path", log.BBError(err))
-		}
-	}()
 
-	schemas, schemaOwners, err := getSchemas(txn)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get schemas from database %q", driver.databaseName)
-	}
 	extensionDepend, err := getExtensionDepend(txn)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get extension dependencies from database %q", driver.databaseName)
+	}
+	schemas, schemaOwners, skipDumps, err := getSchemas(txn, extensionDepend)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get schemas from database %q", driver.databaseName)
 	}
 	columnMap, err := getTableColumns(txn)
 	if err != nil {
@@ -153,7 +144,7 @@ func (driver *Driver) SyncDBSchema(ctx context.Context) (*storepb.DatabaseSchema
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get functions from database %q", driver.databaseName)
 	}
-	sequenceMap, err := getSequences(txn, extensionDepend)
+	sequenceMap, err := getSequences(txn, tableOidMap, extensionDepend)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get sequences from database %q", driver.databaseName)
 	}
@@ -189,6 +180,7 @@ func (driver *Driver) SyncDBSchema(ctx context.Context) (*storepb.DatabaseSchema
 			MaterializedViews: materializedViewMap[schemaName],
 			Owner:             schemaOwners[i],
 			EnumTypes:         enumTypes[schemaName],
+			SkipDump:          skipDumps[i],
 		})
 	}
 	databaseMetadata.Extensions = extensions
@@ -377,35 +369,38 @@ func formatTableNameFromRegclass(name string) string {
 }
 
 var listSchemaQuery = fmt.Sprintf(`
-SELECT nspname, pg_catalog.pg_get_userbyid(nspowner) as schema_owner
+SELECT oid, nspname, pg_catalog.pg_get_userbyid(nspowner) as schema_owner
 FROM pg_catalog.pg_namespace
 WHERE nspname NOT IN (%s)
 ORDER BY nspname;
 `, pgparser.SystemSchemaWhereClause)
 
-func getSchemas(txn *sql.Tx) ([]string, []string, error) {
+func getSchemas(txn *sql.Tx, extensionDepend map[int]bool) ([]string, []string, []bool, error) {
 	rows, err := txn.Query(listSchemaQuery)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	defer rows.Close()
 
 	var schemaNames, schemaOwners []string
+	var skipDump []bool
 	for rows.Next() {
+		var oid int
 		var schemaName, schemaOwner string
-		if err := rows.Scan(&schemaName, &schemaOwner); err != nil {
-			return nil, nil, err
+		if err := rows.Scan(&oid, &schemaName, &schemaOwner); err != nil {
+			return nil, nil, nil, err
 		}
 		if pgparser.IsSystemSchema(schemaName) {
 			continue
 		}
+		skipDump = append(skipDump, extensionDepend[oid])
 		schemaNames = append(schemaNames, schemaName)
 		schemaOwners = append(schemaOwners, schemaOwner)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return schemaNames, schemaOwners, nil
+	return schemaNames, schemaOwners, skipDump, nil
 }
 
 func getListForeignTableQuery() string {
@@ -442,7 +437,7 @@ func getTables(
 	indexMap map[db.TableKey][]*storepb.IndexMetadata,
 	triggerMap map[db.TableKey][]*storepb.TriggerMetadata,
 	extensionDepend map[int]bool,
-) (map[string][]*storepb.TableMetadata, map[string][]*storepb.ExternalTableMetadata, map[int]*db.TableKey, error) {
+) (map[string][]*storepb.TableMetadata, map[string][]*storepb.ExternalTableMetadata, map[int]*db.TableKeyWithColumns, error) {
 	foreignKeysMap, err := getForeignKeys(txn)
 	if err != nil {
 		return nil, nil, nil, errors.Wrapf(err, "failed to get foreign keys")
@@ -453,7 +448,7 @@ func getTables(
 	}
 
 	tableMap := make(map[string][]*storepb.TableMetadata)
-	tableOidMap := make(map[int]*db.TableKey)
+	tableOidMap := make(map[int]*db.TableKeyWithColumns)
 	query := getListTableQuery(isAtLeastPG10)
 	rows, err := txn.Query(query)
 	if err != nil {
@@ -473,8 +468,7 @@ func getTables(
 			continue
 		}
 		if extensionDepend[oid] {
-			// Skip extension table.
-			continue
+			table.SkipDump = true
 		}
 		if comment.Valid {
 			table.Comment = comment.String
@@ -486,7 +480,7 @@ func getTables(
 		table.Triggers = triggerMap[key]
 
 		tableMap[schemaName] = append(tableMap[schemaName], table)
-		tableOidMap[oid] = &db.TableKey{Schema: schemaName, Table: table.Name}
+		tableOidMap[oid] = &db.TableKeyWithColumns{Schema: schemaName, Table: table.Name, Columns: table.Columns}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, nil, nil, err
@@ -638,19 +632,13 @@ func getIndexInheritance(txn *sql.Tx) (map[db.IndexKey]*db.IndexKey, error) {
 	return result, nil
 }
 
-var showSearchPathQuery = `SELECT pg_catalog.current_setting('search_path');`
-
-var setSearchPathQuery = `SELECT pg_catalog.set_config('search_path', $1, false);`
-
-func setSearchPath(txn *sql.Tx, searchPath string) (string, error) {
-	var originSearchPath string
-	if err := txn.QueryRow(showSearchPathQuery).Scan(&originSearchPath); err != nil {
-		return "", err
-	}
+func setTxSearchPath(txn *sql.Tx, searchPath string) error {
+	// The new value of the search_path will only apply during the current transaction.
+	const setSearchPathQuery = `SELECT pg_catalog.set_config('search_path', $1, true);`
 	if _, err := txn.Exec(setSearchPathQuery, searchPath); err != nil {
-		return "", err
+		return err
 	}
-	return originSearchPath, nil
+	return nil
 }
 
 var listColumnQuery = `
@@ -761,8 +749,7 @@ func getMaterializedViews(txn *sql.Tx, indexMap map[db.TableKey][]*storepb.Index
 			continue
 		}
 		if extensionDepend[oid] {
-			// Skip extension view.
-			continue
+			matview.SkipDump = true
 		}
 
 		// Return error on NULL view definition.
@@ -827,8 +814,7 @@ func getViews(txn *sql.Tx, columnMap map[db.TableKey][]*storepb.ColumnMetadata, 
 			continue
 		}
 		if extensionDepend[oid] {
-			// Skip extension view.
-			continue
+			view.SkipDump = true
 		}
 
 		// Return error on NULL view definition.
@@ -963,6 +949,7 @@ func getEnumTypes(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*stor
 	currentEnumSchema := ""
 	currentEnumNmae := ""
 	currentEnumComment := ""
+	currentSkipDump := false
 	var currentEnumValues []string
 	for rows.Next() {
 		var oid int
@@ -972,27 +959,24 @@ func getEnumTypes(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*stor
 			return nil, err
 		}
 
-		if extensionDepend[oid] {
-			// Skip extension enum.
-			continue
-		}
-
-		if comment.Valid {
-			currentEnumComment = comment.String
-		}
-
 		if currentEnumSchema != schemaName || currentEnumNmae != enumName {
 			if currentEnumSchema != "" {
 				enumTypes[currentEnumSchema] = append(enumTypes[currentEnumSchema], &storepb.EnumTypeMetadata{
-					Name:    currentEnumNmae,
-					Values:  currentEnumValues,
-					Comment: currentEnumComment,
+					Name:     currentEnumNmae,
+					Values:   currentEnumValues,
+					Comment:  currentEnumComment,
+					SkipDump: currentSkipDump,
 				})
 			}
 			currentEnumSchema = schemaName
 			currentEnumNmae = enumName
 			currentEnumValues = []string{}
-			currentEnumComment = ""
+			if comment.Valid {
+				currentEnumComment = comment.String
+			} else {
+				currentEnumComment = ""
+			}
+			currentSkipDump = extensionDepend[oid]
 		}
 		currentEnumValues = append(currentEnumValues, enumValue)
 	}
@@ -1002,9 +986,10 @@ func getEnumTypes(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*stor
 
 	if currentEnumSchema != "" {
 		enumTypes[currentEnumSchema] = append(enumTypes[currentEnumSchema], &storepb.EnumTypeMetadata{
-			Name:    currentEnumNmae,
-			Values:  currentEnumValues,
-			Comment: currentEnumComment,
+			Name:     currentEnumNmae,
+			Values:   currentEnumValues,
+			Comment:  currentEnumComment,
+			SkipDump: currentSkipDump,
 		})
 	}
 
@@ -1012,7 +997,12 @@ func getEnumTypes(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*stor
 }
 
 // getSequences gets all sequences of a database.
-func getSequences(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*storepb.SequenceMetadata, error) {
+func getSequences(txn *sql.Tx, tableOidMap map[int]*db.TableKeyWithColumns, extensionDepend map[int]bool) (map[string][]*storepb.SequenceMetadata, error) {
+	sequenceOwnerMap, err := getSequenceOwners(txn)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get sequence owners")
+	}
+
 	query := `
 	SELECT
 		pc.oid,
@@ -1046,9 +1036,9 @@ func getSequences(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*stor
 		if err := rows.Scan(&oid, &schemaName, &sequenceName, &dataType, &startValue, &minValue, &maxValue, &incrementBy, &cycle, &cacheSize, &lastValue, &comment); err != nil {
 			return nil, err
 		}
+		skipDump := false
 		if extensionDepend[oid] {
-			// Skip extension sequence.
-			continue
+			skipDump = true
 		}
 		lastValueStr := ""
 		if lastValue.Valid {
@@ -1069,56 +1059,58 @@ func getSequences(txn *sql.Tx, extensionDepend map[int]bool) (map[string][]*stor
 			CacheSize: strconv.FormatInt(cacheSize, 10),
 			LastValue: lastValueStr,
 			Comment:   sequenceComment,
+			SkipDump:  skipDump,
 		}
+		if columnOidKey, ok := sequenceOwnerMap[oid]; ok {
+			if tableKey, ok := tableOidMap[columnOidKey.TableOid]; ok {
+				sequence.OwnerTable = tableKey.Table
+				// PostgreSQL column ID is 1-based.
+				if len(tableKey.Columns) > columnOidKey.ColumnID-1 {
+					sequence.OwnerColumn = tableKey.Columns[columnOidKey.ColumnID-1].Name
+				}
+			}
+		}
+
 		sequenceMap[schemaName] = append(sequenceMap[schemaName], sequence)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	sequenceOwnerMap, err := getSequenceOwners(txn)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get sequence owners")
-	}
-
-	for schemaName, list := range sequenceMap {
-		for _, sequence := range list {
-			if ownerColumn, ok := sequenceOwnerMap[db.SequenceKey{Schema: schemaName, Sequence: sequence.Name}]; ok {
-				sequence.OwnerTable = ownerColumn.Table
-				sequence.OwnerColumn = ownerColumn.Column
-			}
-		}
-	}
-
 	return sequenceMap, nil
 }
 
-func getSequenceOwners(txn *sql.Tx) (map[db.SequenceKey]db.ColumnKey, error) {
-	query := fmt.Sprintf(`
+type ColumnOidKey struct {
+	TableOid int
+	ColumnID int
+}
+
+func getSequenceOwners(txn *sql.Tx) (map[int]ColumnOidKey, error) {
+	query := `
 	SELECT
-		ns.nspname as schema_name,
-		seq.relname as sequence_name,
-		tab.relname as table_name,
-		attr.attname as column_name
-	FROM pg_class as seq
-		JOIN pg_depend as dep ON (seq.relfilenode = dep.objid)
-		JOIN pg_class as tab ON (dep.refobjid = tab.relfilenode)
-		JOIN pg_attribute as attr ON (attr.attnum = dep.refobjsubid AND attr.attrelid = dep.refobjid)
-		JOIN pg_namespace as ns ON (tab.relnamespace = ns.oid)
-	WHERE ns.nspname NOT IN (%s) AND seq.relkind = 'S';
-	`, pgparser.SystemSchemaWhereClause)
+		c.oid,
+		refobjid AS owning_tab,
+		refobjsubid AS owning_col
+	FROM pg_class c
+  		LEFT JOIN pg_depend d ON
+  			(c.relkind =  'S' AND
+                d.classid = 'pg_class'::regclass AND d.objid = c.oid AND
+                d.objsubid = 0 AND
+                d.refclassid = 'pg_class'::regclass AND d.deptype IN ('a', 'i'))
+	WHERE refobjid is NOT NULL and refobjsubid is NOT NULL;`
+
 	rows, err := txn.Query(query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	sequenceOwnerMap := make(map[db.SequenceKey]db.ColumnKey)
+	sequenceOwnerMap := make(map[int]ColumnOidKey)
 	for rows.Next() {
-		var schemaName, sequenceName, tableName, columnName string
-		if err := rows.Scan(&schemaName, &sequenceName, &tableName, &columnName); err != nil {
+		var oid, tableOid, columnID int
+		if err := rows.Scan(&oid, &tableOid, &columnID); err != nil {
 			return nil, err
 		}
-		sequenceOwnerMap[db.SequenceKey{Schema: schemaName, Sequence: sequenceName}] = db.ColumnKey{Schema: schemaName, Table: tableName, Column: columnName}
+		sequenceOwnerMap[oid] = ColumnOidKey{TableOid: tableOid, ColumnID: columnID}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -1155,8 +1147,7 @@ func getTriggers(txn *sql.Tx, extensionDepend map[int]bool) (map[db.TableKey][]*
 			return nil, err
 		}
 		if extensionDepend[oid] {
-			// Skip extension trigger.
-			continue
+			trigger.SkipDump = true
 		}
 		if comment.Valid {
 			trigger.Comment = comment.String
@@ -1343,7 +1334,8 @@ order by function_schema, function_name;`, pgparser.SystemSchemaWhereClause)
 func getFunctions(
 	txn *sql.Tx,
 	functionDependencyTables map[int][]int,
-	tableOidMap, viewOidMap, materializedViewOidMap map[int]*db.TableKey,
+	tableOidMap map[int]*db.TableKeyWithColumns,
+	viewOidMap, materializedViewOidMap map[int]*db.TableKey,
 	extensionDepend map[int]bool,
 ) (map[string][]*storepb.FunctionMetadata, error) {
 	functionMap := make(map[string][]*storepb.FunctionMetadata)
@@ -1366,8 +1358,7 @@ func getFunctions(
 			continue
 		}
 		if extensionDepend[oid] {
-			// Skip extension function.
-			continue
+			function.SkipDump = true
 		}
 		if comment.Valid {
 			function.Comment = comment.String
@@ -1400,154 +1391,6 @@ func getFunctions(
 	}
 
 	return functionMap, nil
-}
-
-var statPluginVersion = semver.MustParse("1.8.0")
-
-// SyncSlowQuery syncs the slow query.
-func (driver *Driver) SyncSlowQuery(ctx context.Context, _ time.Time) (map[string]*storepb.SlowQueryStatistics, error) {
-	var now time.Time
-	getNow := `SELECT NOW();`
-	nowRows, err := driver.db.QueryContext(ctx, getNow)
-	if err != nil {
-		return nil, util.FormatErrorWithQuery(err, getNow)
-	}
-	defer nowRows.Close()
-	for nowRows.Next() {
-		if err := nowRows.Scan(&now); err != nil {
-			return nil, util.FormatErrorWithQuery(err, getNow)
-		}
-	}
-	if err := nowRows.Err(); err != nil {
-		return nil, util.FormatErrorWithQuery(err, getNow)
-	}
-
-	result := make(map[string]*storepb.SlowQueryStatistics)
-	version, err := driver.getPGStatStatementsVersion(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var query string
-	// pg_stat_statements version 1.8 changed the column names of pg_stat_statements.
-	// version is a string in the form of "major.minor".
-	// We need to check if the major version is greater than or equal to 1 and the minor version is greater than or equal to 8.
-	sv, err := semver.ParseTolerant(version)
-	if err != nil {
-		return nil, err
-	}
-	if sv.GTE(statPluginVersion) {
-		query = `
-		SELECT
-			pg_database.datname,
-			query,
-			calls,
-			total_exec_time,
-			max_exec_time,
-			rows
-		FROM
-			pg_stat_statements
-			JOIN pg_database ON pg_database.oid = pg_stat_statements.dbid
-		WHERE max_exec_time >= 1000;
-	`
-	} else {
-		query = `
-		SELECT
-			pg_database.datname,
-			query,
-			calls,
-			total_time,
-			max_time,
-			rows
-		FROM
-			pg_stat_statements
-			JOIN pg_database ON pg_database.oid = pg_stat_statements.dbid
-		WHERE max_time >= 1000;
-		`
-	}
-
-	slowQueryStatisticsRows, err := driver.db.QueryContext(ctx, query)
-	if err != nil {
-		return nil, util.FormatErrorWithQuery(err, query)
-	}
-	defer slowQueryStatisticsRows.Close()
-	for slowQueryStatisticsRows.Next() {
-		var database string
-		var fingerprint string
-		var calls int64
-		var totalExecTime float64
-		var maxExecTime float64
-		var rows int64
-		if err := slowQueryStatisticsRows.Scan(&database, &fingerprint, &calls, &totalExecTime, &maxExecTime, &rows); err != nil {
-			return nil, err
-		}
-		if len(fingerprint) > db.SlowQueryMaxLen {
-			fingerprint, _ = common.TruncateString(fingerprint, db.SlowQueryMaxLen)
-		}
-		item := storepb.SlowQueryStatisticsItem{
-			SqlFingerprint:   fingerprint,
-			Count:            calls,
-			LatestLogTime:    timestamppb.New(now.UTC()),
-			TotalQueryTime:   durationpb.New(time.Duration(totalExecTime * float64(time.Millisecond))),
-			MaximumQueryTime: durationpb.New(time.Duration(maxExecTime * float64(time.Millisecond))),
-			TotalRowsSent:    rows,
-		}
-		if statistics, exists := result[database]; exists {
-			statistics.Items = append(statistics.Items, &item)
-		} else {
-			result[database] = &storepb.SlowQueryStatistics{
-				Items: []*storepb.SlowQueryStatisticsItem{&item},
-			}
-		}
-	}
-	if err := slowQueryStatisticsRows.Err(); err != nil {
-		return nil, err
-	}
-
-	reset := `SELECT pg_stat_statements_reset();`
-	if _, err := driver.db.ExecContext(ctx, reset); err != nil {
-		return nil, util.FormatErrorWithQuery(err, reset)
-	}
-	return result, nil
-}
-
-// CheckSlowQueryLogEnabled checks if slow query log is enabled.
-func (driver *Driver) CheckSlowQueryLogEnabled(ctx context.Context) error {
-	showSharedPreloadLibraries := `SELECT setting FROM pg_settings WHERE name = 'shared_preload_libraries';`
-
-	sharedPreloadLibrariesRows, err := driver.db.QueryContext(ctx, showSharedPreloadLibraries)
-	if err != nil {
-		return util.FormatErrorWithQuery(err, showSharedPreloadLibraries)
-	}
-	defer sharedPreloadLibrariesRows.Close()
-	for sharedPreloadLibrariesRows.Next() {
-		var sharedPreloadLibraries string
-		if err := sharedPreloadLibrariesRows.Scan(&sharedPreloadLibraries); err != nil {
-			return err
-		}
-		if !strings.Contains(sharedPreloadLibraries, "pg_stat_statements") {
-			return errors.New("pg_stat_statements is not loaded")
-		}
-	}
-	if err := sharedPreloadLibrariesRows.Err(); err != nil {
-		return util.FormatErrorWithQuery(err, showSharedPreloadLibraries)
-	}
-
-	checkPGStatStatements := `SELECT count(*) FROM pg_stat_statements limit 10;`
-
-	pgStatStatementsInfoRows, err := driver.db.QueryContext(ctx, checkPGStatStatements)
-	if err != nil {
-		return util.FormatErrorWithQuery(err, checkPGStatStatements)
-	}
-	defer pgStatStatementsInfoRows.Close()
-	// no need to scan rows, just check if there is any row
-	if !pgStatStatementsInfoRows.Next() {
-		return errors.New("pg_stat_statements is empty")
-	}
-	if err := pgStatStatementsInfoRows.Err(); err != nil {
-		return util.FormatErrorWithQuery(err, checkPGStatStatements)
-	}
-
-	return nil
 }
 
 func isAtLeastPG10(version string) bool {

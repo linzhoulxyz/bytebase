@@ -1,14 +1,22 @@
 <template>
   <div class="w-full flex flex-col justify-start items-start pt-6 space-y-4">
     <div class="space-y-2 mb-4">
-      <span class="text-lg font-medium text-main">
+      <div class="text-lg font-medium text-main">
         {{ $t("project.settings.issue-related.labels.self") }}
-      </span>
+        <div class="textinfolabel">
+          {{ $t("project.settings.issue-related.labels.description") }}
+        </div>
+      </div>
       <NDynamicTags
         :size="'large'"
-        :disabled="!allowEdit"
+        :disabled="!allowEdit || loading"
         :value="labelValues"
         :render-tag="renderLabel"
+        :input-props="{
+          placeholder: $t('project.settings.issue-related.labels.placeholder'),
+          clearable: true,
+        }"
+        :input-style="'min-width: 12rem;'"
         @update:value="onLabelsUpdate"
       />
     </div>
@@ -23,7 +31,7 @@
         <NCheckbox
           v-model:checked="state.allowModifyStatement"
           size="large"
-          :disabled="!allowUpdateIssueProjectSetting"
+          :disabled="!allowUpdateIssueProjectSetting || loading"
           :label="
             $t('project.settings.issue-related.allow-modify-statement.self')
           "
@@ -40,7 +48,7 @@
         <NCheckbox
           v-model:checked="state.autoResolveIssue"
           size="large"
-          :disabled="!allowUpdateIssueProjectSetting"
+          :disabled="!allowUpdateIssueProjectSetting || loading"
           :label="$t('project.settings.issue-related.auto-resolve-issue.self')"
         />
         <p class="text-sm text-gray-400 pl-6 ml-0.5">
@@ -54,12 +62,31 @@
           v-model:checked="state.forceIssueLabels"
           size="large"
           :disabled="
-            !allowUpdateIssueProjectSetting || state.issueLabels.length === 0
+            !allowUpdateIssueProjectSetting ||
+            state.issueLabels.length === 0 ||
+            loading
           "
-          :label="
-            $t('project.settings.issue-related.labels.force-issue-labels.self')
-          "
-        />
+        >
+          <template #default>
+            <div class="flex items-center gap-x-2">
+              {{
+                $t(
+                  "project.settings.issue-related.labels.force-issue-labels.self"
+                )
+              }}
+              <NTooltip v-if="allowEdit && state.issueLabels.length === 0">
+                <template #trigger>
+                  <TriangleAlertIcon class="w-4 text-warning" />
+                </template>
+                {{
+                  $t(
+                    "project.settings.issue-related.labels.force-issue-labels.warning"
+                  )
+                }}
+              </NTooltip>
+            </div>
+          </template>
+        </NCheckbox>
         <p class="text-sm text-gray-400 pl-6 ml-0.5">
           {{
             $t(
@@ -72,7 +99,7 @@
         <NCheckbox
           v-model:checked="state.enforceIssueTitle"
           size="large"
-          :disabled="!allowUpdateIssueProjectSetting"
+          :disabled="!allowUpdateIssueProjectSetting || loading"
           :label="$t('project.settings.issue-related.enforce-issue-title.self')"
         />
         <p class="text-sm text-gray-400 pl-6 ml-0.5">
@@ -85,7 +112,7 @@
         <NCheckbox
           v-model:checked="state.allowSelfApproval"
           size="large"
-          :disabled="!allowUpdateIssueProjectSetting"
+          :disabled="!allowUpdateIssueProjectSetting || loading"
           :label="$t('project.settings.issue-related.allow-self-approval.self')"
         />
         <p class="text-sm text-gray-400 pl-6 ml-0.5">
@@ -98,7 +125,7 @@
         <NCheckbox
           v-model:checked="state.autoEnableBackup"
           size="large"
-          :disabled="!allowUpdateIssueProjectSetting"
+          :disabled="!allowUpdateIssueProjectSetting || loading"
           :label="$t('project.settings.issue-related.auto-enable-backup.self')"
         />
         <p class="text-sm text-gray-400 pl-6 ml-0.5">
@@ -111,7 +138,7 @@
         <NCheckbox
           v-model:checked="state.skipBackupErrors"
           size="large"
-          :disabled="!allowUpdateIssueProjectSetting"
+          :disabled="!allowUpdateIssueProjectSetting || loading"
           :label="$t('project.settings.issue-related.skip-backup-errors.self')"
         />
         <p class="text-sm text-gray-400 pl-6 ml-0.5">
@@ -124,7 +151,7 @@
         <NCheckbox
           v-model:checked="state.postgresDatabaseTenantMode"
           size="large"
-          :disabled="!allowUpdateIssueProjectSetting"
+          :disabled="!allowUpdateIssueProjectSetting || loading"
           :label="
             $t(
               'project.settings.issue-related.postgres-database-tenant-mode.self'
@@ -140,25 +167,22 @@
         </p>
       </div>
     </div>
-    <div class="w-full flex justify-end gap-x-3">
-      <NButton
-        type="primary"
-        :disabled="!valueChanged || !allowEdit"
-        @click.prevent="doUpdate"
-      >
-        {{ $t("common.update") }}
-      </NButton>
-    </div>
   </div>
 </template>
 
 <script setup lang="tsx">
 import { isEqual, cloneDeep } from "lodash-es";
-import { NButton, NDynamicTags, NTag, NColorPicker, NCheckbox } from "naive-ui";
-import { computed, reactive } from "vue";
-import { useI18n } from "vue-i18n";
+import { TriangleAlertIcon } from "lucide-vue-next";
+import {
+  NDynamicTags,
+  NTag,
+  NColorPicker,
+  NCheckbox,
+  NTooltip,
+} from "naive-ui";
+import { computed, reactive, ref } from "vue";
 import { FeatureBadge } from "@/components/FeatureGuard";
-import { hasFeature, pushNotification, useProjectV1Store } from "@/store";
+import { hasFeature, useProjectV1Store } from "@/store";
 import type { ComposedProject } from "@/types";
 import { Label } from "@/types/proto/v1/project_service";
 
@@ -196,9 +220,9 @@ const props = defineProps<{
   allowEdit: boolean;
 }>();
 
-const { t } = useI18n();
 const projectStore = useProjectV1Store();
 const state = reactive<LocalState>(getInitialLocalState());
+const loading = ref<boolean>(false);
 
 const labelValues = computed(() => state.issueLabels.map((l) => l.value));
 
@@ -264,19 +288,25 @@ const renderLabel = (value: string, index: number) => {
 };
 
 const doUpdate = async () => {
+  if (loading.value) {
+    return;
+  }
+  if (updateMask.value.length === 0) {
+    return;
+  }
+  loading.value = true;
   const projectPatch = {
     ...cloneDeep(props.project),
     ...state,
   };
-  await projectStore.updateProject(projectPatch, getUpdateMask());
-  pushNotification({
-    module: "bytebase",
-    style: "SUCCESS",
-    title: t("common.updated"),
-  });
+  try {
+    await projectStore.updateProject(projectPatch, updateMask.value);
+  } finally {
+    loading.value = false;
+  }
 };
 
-const getUpdateMask = () => {
+const updateMask = computed(() => {
   const mask: string[] = [];
   if (!isEqual(state.issueLabels, props.project.issueLabels)) {
     mask.push("issue_labels");
@@ -311,5 +341,13 @@ const getUpdateMask = () => {
     mask.push("postgres_database_tenant_mode");
   }
   return mask;
-};
+});
+
+defineExpose({
+  isDirty: valueChanged,
+  update: doUpdate,
+  revert: () => {
+    Object.assign(state, getInitialLocalState());
+  },
+});
 </script>

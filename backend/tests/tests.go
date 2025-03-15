@@ -31,9 +31,7 @@ import (
 	"github.com/bytebase/bytebase/backend/common"
 	component "github.com/bytebase/bytebase/backend/component/config"
 	api "github.com/bytebase/bytebase/backend/legacyapi"
-	"github.com/bytebase/bytebase/backend/resources/postgres"
 	"github.com/bytebase/bytebase/backend/server"
-	"github.com/bytebase/bytebase/backend/tests/fake"
 )
 
 var (
@@ -42,17 +40,9 @@ var (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT NULL
 	);`
-	migrationStatement2 = `
-	CREATE TABLE book2 (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT NULL
-	);`
 
 	//go:embed test-data/book_schema.result
 	wantBookSchema string
-
-	//go:embed test-data/book_2_schema.result
-	want2BookSchema string
 
 	dataUpdateStatement = `
 	INSERT INTO book(name) VALUES
@@ -64,56 +54,6 @@ var (
 		name TEXT NULL
 	);
 `
-	dumpedSchema2 = `CREATE TABLE book (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT NULL
-	);
-CREATE TABLE book2 (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT NULL
-	);
-`
-
-	deploySchedule = &v1pb.Schedule{
-		Deployments: []*v1pb.ScheduleDeployment{
-			{
-				Title: "Test stage",
-				Spec: &v1pb.DeploymentSpec{
-					LabelSelector: &v1pb.LabelSelector{
-						MatchExpressions: []*v1pb.LabelSelectorRequirement{
-							{
-								Key:      api.EnvironmentLabelKey,
-								Operator: v1pb.OperatorType_OPERATOR_TYPE_IN,
-								Values:   []string{"test"},
-							},
-							{
-								Key:      api.TenantLabelKey,
-								Operator: v1pb.OperatorType_OPERATOR_TYPE_EXISTS,
-							},
-						},
-					},
-				},
-			},
-			{
-				Title: "Prod stage",
-				Spec: &v1pb.DeploymentSpec{
-					LabelSelector: &v1pb.LabelSelector{
-						MatchExpressions: []*v1pb.LabelSelectorRequirement{
-							{
-								Key:      api.EnvironmentLabelKey,
-								Operator: v1pb.OperatorType_OPERATOR_TYPE_IN,
-								Values:   []string{"prod"},
-							},
-							{
-								Key:      api.TenantLabelKey,
-								Operator: v1pb.OperatorType_OPERATOR_TYPE_EXISTS,
-							},
-						},
-					},
-				},
-			},
-		},
-	}
 )
 
 type controller struct {
@@ -128,7 +68,6 @@ type controller struct {
 	reviewConfigServiceClient    v1pb.ReviewConfigServiceClient
 	projectServiceClient         v1pb.ProjectServiceClient
 	databaseGroupServiceClient   v1pb.DatabaseGroupServiceClient
-	vcsConnectorServiceClient    v1pb.VCSConnectorServiceClient
 	authServiceClient            v1pb.AuthServiceClient
 	userServiceClient            v1pb.UserServiceClient
 	settingServiceClient         v1pb.SettingServiceClient
@@ -137,7 +76,6 @@ type controller struct {
 	databaseServiceClient        v1pb.DatabaseServiceClient
 	databaseCatalogServiceClient v1pb.DatabaseCatalogServiceClient
 	sheetServiceClient           v1pb.SheetServiceClient
-	evcsClient                   v1pb.VCSProviderServiceClient
 	sqlServiceClient             v1pb.SQLServiceClient
 	subscriptionServiceClient    v1pb.SubscriptionServiceClient
 	actuatorServiceClient        v1pb.ActuatorServiceClient
@@ -145,33 +83,22 @@ type controller struct {
 	cookie  string
 	project *v1pb.Project
 
-	vcsProvider fake.VCSProvider
-
 	rootURL  string
 	apiURL   string
-	vcsURL   string
 	v1APIURL string
-}
-
-type config struct {
-	dataDir            string
-	vcsProviderCreator fake.VCSProviderCreator
-	readOnly           bool
-	skipOnboardingData bool
 }
 
 var (
 	mu       sync.Mutex
 	nextPort = time.Now().Second()*200 + 5010
 
-	externalPgPort = time.Now().Second()*200 + 5000
+	externalPgHost string
+	externalPgPort string
 
 	nextDatabaseNumber = 20210113
 
 	// resourceDir is the shared resource directory.
 	resourceDir string
-	pgBinDir    string
-	mysqlBinDir string
 )
 
 func getTestPort() int {
@@ -179,14 +106,6 @@ func getTestPort() int {
 	defer mu.Unlock()
 	p := nextPort
 	nextPort += 2
-	return p
-}
-
-func getTestPortForEmbeddedPg() int {
-	mu.Lock()
-	defer mu.Unlock()
-	p := nextPort
-	nextPort += 3
 	return p
 }
 
@@ -200,12 +119,8 @@ func getTestDatabaseString() string {
 }
 
 // StartServerWithExternalPg starts the main server with external Postgres.
-func (ctl *controller) StartServerWithExternalPg(ctx context.Context, config *config) (context.Context, error) {
-	if err := ctl.startMockServers(config.vcsProviderCreator); err != nil {
-		return nil, err
-	}
-
-	pgMainURL := fmt.Sprintf("postgresql://%s@:%d/%s?host=%s", postgres.TestPgUser, externalPgPort, "postgres", common.GetPostgresSocketDir())
+func (ctl *controller) StartServerWithExternalPg(ctx context.Context) (context.Context, error) {
+	pgMainURL := fmt.Sprintf("postgresql://postgres:root-password@%s:%s/postgres", externalPgHost, externalPgPort)
 	db, err := sql.Open("pgx", pgMainURL)
 	if err != nil {
 		return nil, err
@@ -216,9 +131,9 @@ func (ctl *controller) StartServerWithExternalPg(ctx context.Context, config *co
 		return nil, err
 	}
 
-	pgURL := fmt.Sprintf("postgresql://%s@:%d/%s?host=%s", postgres.TestPgUser, externalPgPort, databaseName, common.GetPostgresSocketDir())
+	pgURL := fmt.Sprintf("postgresql://postgres:root-password@%s:%s/%s", externalPgHost, externalPgPort, databaseName)
 	serverPort := getTestPort()
-	profile := getTestProfileWithExternalPg(config.dataDir, resourceDir, serverPort, postgres.TestPgUser, pgURL, config.skipOnboardingData)
+	profile := getTestProfileWithExternalPg(resourceDir, serverPort, pgURL)
 	server, err := server.NewServer(ctx, profile)
 	if err != nil {
 		return nil, err
@@ -267,23 +182,6 @@ func (ctl *controller) StartServerWithExternalPg(ctx context.Context, config *co
 	return metaCtx, nil
 }
 
-// StartServer starts the main server with embed Postgres.
-func (ctl *controller) StartServer(ctx context.Context, config *config) (context.Context, error) {
-	if err := ctl.startMockServers(config.vcsProviderCreator); err != nil {
-		return nil, err
-	}
-	serverPort := getTestPortForEmbeddedPg()
-	profile := getTestProfile(config.dataDir, resourceDir, serverPort, config.readOnly)
-	server, err := server.NewServer(ctx, profile)
-	if err != nil {
-		return nil, err
-	}
-	ctl.server = server
-	ctl.profile = profile
-
-	return ctl.start(ctx, serverPort)
-}
-
 func (ctl *controller) initWorkspaceProfile(ctx context.Context) error {
 	_, err := ctl.settingServiceClient.UpdateSetting(ctx, &v1pb.UpdateSettingRequest{
 		AllowMissing: true,
@@ -308,62 +206,18 @@ func (ctl *controller) initWorkspaceProfile(ctx context.Context) error {
 	return err
 }
 
-// GetTestProfile will return a profile for testing.
-// We require port as an argument of GetTestProfile so that test can run in parallel in different ports.
-func getTestProfile(dataDir, resourceDir string, port int, readOnly bool) *component.Profile {
-	return &component.Profile{
-		Mode:                 common.ReleaseModeDev,
-		ExternalURL:          fmt.Sprintf("http://localhost:%d", port),
-		Port:                 port,
-		DatastorePort:        port + 2,
-		SampleDatabasePort:   0,
-		PgUser:               "bbtest",
-		Readonly:             readOnly,
-		DataDir:              dataDir,
-		ResourceDir:          resourceDir,
-		AppRunnerInterval:    1 * time.Second,
-		BackupRunnerInterval: 10 * time.Second,
-	}
-}
-
 // GetTestProfileWithExternalPg will return a profile for testing with external Postgres.
 // We require port as an argument of GetTestProfile so that test can run in parallel in different ports,
 // pgURL for connect to Postgres.
-func getTestProfileWithExternalPg(dataDir, resourceDir string, port int, pgUser string, pgURL string, skipOnboardingData bool) *component.Profile {
+func getTestProfileWithExternalPg(resourceDir string, port int, pgURL string) *component.Profile {
 	return &component.Profile{
-		Mode:                       common.ReleaseModeDev,
-		ExternalURL:                fmt.Sprintf("http://localhost:%d", port),
-		Port:                       port,
-		SampleDatabasePort:         0,
-		PgUser:                     pgUser,
-		DataDir:                    dataDir,
-		ResourceDir:                resourceDir,
-		AppRunnerInterval:          1 * time.Second,
-		BackupRunnerInterval:       10 * time.Second,
-		PgURL:                      pgURL,
-		TestOnlySkipOnboardingData: skipOnboardingData,
+		Mode:               common.ReleaseModeDev,
+		ExternalURL:        fmt.Sprintf("http://localhost:%d", port),
+		Port:               port,
+		SampleDatabasePort: 0,
+		ResourceDir:        resourceDir,
+		PgURL:              pgURL,
 	}
-}
-
-func (ctl *controller) startMockServers(vcsProviderCreator fake.VCSProviderCreator) error {
-	// Set up VCS provider.
-	vcsPort := getTestPort()
-	ctl.vcsProvider = vcsProviderCreator(vcsPort)
-	ctl.vcsURL = fmt.Sprintf("http://localhost:%d", vcsPort)
-
-	errChan := make(chan error, 1)
-
-	go func() {
-		if err := ctl.vcsProvider.Run(); err != nil {
-			errChan <- errors.Wrap(err, "failed to run vcsProvider server")
-		}
-	}()
-
-	if err := waitForVCSStart(ctl.vcsProvider, errChan); err != nil {
-		return errors.Wrap(err, "failed to wait for vcsProvider to start")
-	}
-
-	return nil
 }
 
 // start only called by StartServer() and StartServerWithExternalPg().
@@ -384,7 +238,7 @@ func (ctl *controller) start(ctx context.Context, port int) (context.Context, er
 	ctl.client = &http.Client{}
 
 	// initialize grpc connection.
-	grpcConn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", port), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	grpcConn, err := grpc.NewClient(fmt.Sprintf("127.0.0.1:%d", port), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to dial grpc")
 	}
@@ -396,7 +250,6 @@ func (ctl *controller) start(ctx context.Context, port int) (context.Context, er
 	ctl.reviewConfigServiceClient = v1pb.NewReviewConfigServiceClient(ctl.grpcConn)
 	ctl.projectServiceClient = v1pb.NewProjectServiceClient(ctl.grpcConn)
 	ctl.databaseGroupServiceClient = v1pb.NewDatabaseGroupServiceClient(ctl.grpcConn)
-	ctl.vcsConnectorServiceClient = v1pb.NewVCSConnectorServiceClient(ctl.grpcConn)
 	ctl.authServiceClient = v1pb.NewAuthServiceClient(ctl.grpcConn)
 	ctl.userServiceClient = v1pb.NewUserServiceClient(ctl.grpcConn)
 	ctl.settingServiceClient = v1pb.NewSettingServiceClient(ctl.grpcConn)
@@ -405,7 +258,6 @@ func (ctl *controller) start(ctx context.Context, port int) (context.Context, er
 	ctl.databaseServiceClient = v1pb.NewDatabaseServiceClient(ctl.grpcConn)
 	ctl.databaseCatalogServiceClient = v1pb.NewDatabaseCatalogServiceClient(ctl.grpcConn)
 	ctl.sheetServiceClient = v1pb.NewSheetServiceClient(ctl.grpcConn)
-	ctl.evcsClient = v1pb.NewVCSProviderServiceClient(ctl.grpcConn)
 	ctl.sqlServiceClient = v1pb.NewSQLServiceClient(ctl.grpcConn)
 	ctl.subscriptionServiceClient = v1pb.NewSubscriptionServiceClient(ctl.grpcConn)
 	ctl.actuatorServiceClient = v1pb.NewActuatorServiceClient(ctl.grpcConn)
@@ -422,26 +274,6 @@ func (ctl *controller) start(ctx context.Context, port int) (context.Context, er
 		"Authorization",
 		fmt.Sprintf("Bearer %s", authToken),
 	)), nil
-}
-
-func waitForVCSStart(p fake.VCSProvider, errChan <-chan error) error {
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			addr := p.ListenerAddr()
-			if addr != nil && strings.Contains(addr.String(), ":") {
-				return nil // was started
-			}
-		case err := <-errChan:
-			if err == http.ErrServerClosed {
-				return nil
-			}
-			return err
-		}
-	}
 }
 
 func (ctl *controller) waitForHealthz(ctx context.Context) error {
@@ -472,11 +304,6 @@ func (ctl *controller) Close(ctx context.Context) error {
 	var e error
 	if ctl.server != nil {
 		if err := ctl.server.Shutdown(ctx); err != nil {
-			e = multierr.Append(e, err)
-		}
-	}
-	if ctl.vcsProvider != nil {
-		if err := ctl.vcsProvider.Close(); err != nil {
 			e = multierr.Append(e, err)
 		}
 	}

@@ -22,7 +22,6 @@ type ProjectMessage struct {
 	Webhooks                   []*ProjectWebhookMessage
 	DataClassificationConfigID string
 	Setting                    *storepb.Project
-	VCSConnectorsCount         int
 	Deleted                    bool
 }
 
@@ -34,6 +33,9 @@ func (p *ProjectMessage) GetName() string {
 type FindProjectMessage struct {
 	ResourceID  *string
 	ShowDeleted bool
+	Limit       *int
+	Offset      *int
+	Filter      *ListResourceFilter
 }
 
 // UpdateProjectMessage is the message for updating a project.
@@ -205,7 +207,7 @@ func (s *Store) UpdateProjectV2(ctx context.Context, patch *UpdateProjectMessage
 	return s.GetProjectV2(ctx, &FindProjectMessage{ResourceID: &patch.ResourceID})
 }
 
-func updateProjectImplV2(ctx context.Context, tx *Tx, patch *UpdateProjectMessage) error {
+func updateProjectImplV2(ctx context.Context, txn *sql.Tx, patch *UpdateProjectMessage) error {
 	set, args := []string{}, []any{}
 	if v := patch.Title; v != nil {
 		set, args = append(set, fmt.Sprintf("name = $%d", len(args)+1)), append(args, *v)
@@ -225,7 +227,7 @@ func updateProjectImplV2(ctx context.Context, tx *Tx, patch *UpdateProjectMessag
 	}
 
 	args = append(args, patch.ResourceID)
-	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
+	if _, err := txn.ExecContext(ctx, fmt.Sprintf(`
 		UPDATE project
 		SET `+strings.Join(set, ", ")+`
 		WHERE resource_id = $%d`, len(args)),
@@ -236,8 +238,12 @@ func updateProjectImplV2(ctx context.Context, tx *Tx, patch *UpdateProjectMessag
 	return nil
 }
 
-func (s *Store) listProjectImplV2(ctx context.Context, tx *Tx, find *FindProjectMessage) ([]*ProjectMessage, error) {
+func (s *Store) listProjectImplV2(ctx context.Context, txn *sql.Tx, find *FindProjectMessage) ([]*ProjectMessage, error) {
 	where, args := []string{"TRUE"}, []any{}
+	if filter := find.Filter; filter != nil {
+		where = append(where, filter.Where)
+		args = append(args, filter.Args...)
+	}
 	if v := find.ResourceID; v != nil {
 		where, args = append(where, fmt.Sprintf("resource_id = $%d", len(args)+1)), append(args, *v)
 	}
@@ -245,20 +251,25 @@ func (s *Store) listProjectImplV2(ctx context.Context, tx *Tx, find *FindProject
 		where, args = append(where, fmt.Sprintf("deleted = $%d", len(args)+1)), append(args, false)
 	}
 
-	var projectMessages []*ProjectMessage
-	rows, err := tx.QueryContext(ctx, fmt.Sprintf(`
+	query := fmt.Sprintf(`
 		SELECT
 			resource_id,
 			name,
 			data_classification_config_id,
-			(SELECT COUNT(1) FROM vcs_connector WHERE project.resource_id = vcs_connector.project) AS connectors,
 			setting,
 			deleted
 		FROM project
 		WHERE %s
-		ORDER BY project.resource_id`, strings.Join(where, " AND ")),
-		args...,
-	)
+		ORDER BY project.resource_id`, strings.Join(where, " AND "))
+	if v := find.Limit; v != nil {
+		query += fmt.Sprintf(" LIMIT %d", *v)
+	}
+	if v := find.Offset; v != nil {
+		query += fmt.Sprintf(" OFFSET %d", *v)
+	}
+
+	var projectMessages []*ProjectMessage
+	rows, err := txn.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +282,6 @@ func (s *Store) listProjectImplV2(ctx context.Context, tx *Tx, find *FindProject
 			&projectMessage.ResourceID,
 			&projectMessage.Title,
 			&projectMessage.DataClassificationConfigID,
-			&projectMessage.VCSConnectorsCount,
 			&payload,
 			&projectMessage.Deleted,
 		); err != nil {
@@ -289,7 +299,7 @@ func (s *Store) listProjectImplV2(ctx context.Context, tx *Tx, find *FindProject
 	}
 
 	for _, project := range projectMessages {
-		projectWebhooks, err := s.findProjectWebhookImplV2(ctx, tx, &FindProjectWebhookMessage{ProjectID: &project.ResourceID})
+		projectWebhooks, err := s.findProjectWebhookImplV2(ctx, txn, &FindProjectWebhookMessage{ProjectID: &project.ResourceID})
 		if err != nil {
 			return nil, err
 		}

@@ -18,12 +18,9 @@
                   {{ approvalNodeText(step.step.nodes[0]) }}
                 </NPerformantEllipsis>
               </div>
-              <div v-if="isExternalApprovalStep(step.step)" class="shrink-0">
-                <ExternalApprovalSyncButton />
-              </div>
             </div>
           </template>
-          <template v-if="!isExternalApprovalStep(step.step)" #footer>
+          <template #footer>
             <i18n-t
               keypath="custom-approval.issue-review.approved-by-n"
               tag="div"
@@ -74,12 +71,24 @@
             </li>
           </ul>
           <hr />
-          <template v-if="!isExternalApprovalStep(step.step)">
-            <Candidates :step="step" />
-          </template>
-          <template v-else>
-            <ExternalApprovalSyncButton />
-          </template>
+          <div
+            v-if="step.candidates.length === 0"
+            class="w-[14rem] text-wrap text-warning italic"
+          >
+            {{ $t("custom-approval.issue-review.no-one-matched") }}
+          </div>
+          <div
+            v-else
+            class="min-w-[8rem] max-w-[12rem] max-h-[18rem] flex flex-col text-control-light overflow-y-hidden"
+          >
+            <div class="flex-1 overflow-auto text-sm">
+              <Candidate
+                v-for="candidate in step.candidates"
+                :key="candidate"
+                :candidate="candidate"
+              />
+            </div>
+          </div>
         </div>
       </template>
     </NPopover>
@@ -96,11 +105,9 @@ import {
 import { useIssueContext } from "@/components/IssueV1/logic";
 import type { WrappedReviewStep } from "@/types";
 import { type User } from "@/types/proto/v1/user_service";
-import type { ApprovalStep } from "@/types/proto/v1/issue_service";
 import { approvalNodeText } from "@/utils";
 import Approver from "./Approver.vue";
-import Candidates from "./Candidates.vue";
-import ExternalApprovalSyncButton from "./ExternalApprovalNodeSyncButton.vue";
+import Candidate from "./Candidate.vue";
 import TimelineIcon from "./TimelineIcon.vue";
 
 defineProps<{
@@ -108,8 +115,4 @@ defineProps<{
 }>();
 
 const { issue } = useIssueContext();
-
-const isExternalApprovalStep = (step: ApprovalStep) => {
-  return !!step.nodes[0]?.externalNodeId;
-};
 </script>

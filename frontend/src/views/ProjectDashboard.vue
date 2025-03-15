@@ -5,7 +5,6 @@
         v-model:value="state.searchText"
         style="max-width: 100%"
         :placeholder="$t('common.filter-by-name')"
-        :autofocus="true"
       />
       <NButton
         v-if="hasWorkspacePermissionV2('bb.projects.create')"
@@ -18,7 +17,13 @@
         {{ $t("quick-action.new-project") }}
       </NButton>
     </div>
-    <ProjectV1Table :bordered="false" :project-list="filteredProjectList" />
+    <PagedProjectTable
+      session-key="bb.project-table"
+      :search="state.searchText"
+      :footer-class="'mx-4'"
+      :bordered="false"
+      :include-default="false"
+    />
   </div>
   <Drawer
     :auto-focus="true"
@@ -33,16 +38,12 @@
 <script lang="ts" setup>
 import { PlusIcon } from "lucide-vue-next";
 import { NButton } from "naive-ui";
-import { computed, onMounted, reactive } from "vue";
+import { onMounted, reactive } from "vue";
 import ProjectCreatePanel from "@/components/Project/ProjectCreatePanel.vue";
-import { SearchBox, ProjectV1Table } from "@/components/v2";
+import { SearchBox, PagedProjectTable } from "@/components/v2";
 import { Drawer } from "@/components/v2";
-import { useUIStateStore, useProjectV1List } from "@/store";
-import { DEFAULT_PROJECT_NAME } from "@/types";
-import {
-  filterProjectV1ListByKeyword,
-  hasWorkspacePermissionV2,
-} from "@/utils";
+import { useUIStateStore } from "@/store";
+import { hasWorkspacePermissionV2 } from "@/utils";
 
 interface LocalState {
   searchText: string;
@@ -52,14 +53,6 @@ interface LocalState {
 const state = reactive<LocalState>({
   searchText: "",
   showCreateDrawer: false,
-});
-const { projectList } = useProjectV1List();
-
-const filteredProjectList = computed(() => {
-  const list = projectList.value.filter(
-    (project) => project.name !== DEFAULT_PROJECT_NAME
-  );
-  return filterProjectV1ListByKeyword(list, state.searchText);
 });
 
 onMounted(() => {

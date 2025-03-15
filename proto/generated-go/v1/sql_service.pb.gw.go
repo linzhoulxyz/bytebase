@@ -119,14 +119,12 @@ func local_request_SQLService_Query_1(ctx context.Context, marshaler runtime.Mar
 	return msg, metadata, err
 }
 
-func request_SQLService_AdminExecute_0(ctx context.Context, marshaler runtime.Marshaler, client SQLServiceClient, req *http.Request, pathParams map[string]string) (SQLService_AdminExecuteClient, runtime.ServerMetadata, chan error, error) {
+func request_SQLService_AdminExecute_0(ctx context.Context, marshaler runtime.Marshaler, client SQLServiceClient, req *http.Request, pathParams map[string]string) (SQLService_AdminExecuteClient, runtime.ServerMetadata, error) {
 	var metadata runtime.ServerMetadata
-	errChan := make(chan error, 1)
 	stream, err := client.AdminExecute(ctx)
 	if err != nil {
 		grpclog.Errorf("Failed to start streaming: %v", err)
-		close(errChan)
-		return nil, metadata, errChan, err
+		return nil, metadata, err
 	}
 	dec := marshaler.NewDecoder(req.Body)
 	handleSend := func() error {
@@ -146,10 +144,8 @@ func request_SQLService_AdminExecute_0(ctx context.Context, marshaler runtime.Ma
 		return nil
 	}
 	go func() {
-		defer close(errChan)
 		for {
 			if err := handleSend(); err != nil {
-				errChan <- err
 				break
 			}
 		}
@@ -160,10 +156,10 @@ func request_SQLService_AdminExecute_0(ctx context.Context, marshaler runtime.Ma
 	header, err := stream.Header()
 	if err != nil {
 		grpclog.Errorf("Failed to get header from client: %v", err)
-		return nil, metadata, errChan, err
+		return nil, metadata, err
 	}
 	metadata.HeaderMD = header
-	return stream, metadata, errChan, nil
+	return stream, metadata, nil
 }
 
 func request_SQLService_SearchQueryHistories_0(ctx context.Context, marshaler runtime.Marshaler, client SQLServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
@@ -388,30 +384,6 @@ func local_request_SQLService_Pretty_0(ctx context.Context, marshaler runtime.Ma
 	return msg, metadata, err
 }
 
-func request_SQLService_StringifyMetadata_0(ctx context.Context, marshaler runtime.Marshaler, client SQLServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq StringifyMetadataRequest
-		metadata runtime.ServerMetadata
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	msg, err := client.StringifyMetadata(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return msg, metadata, err
-}
-
-func local_request_SQLService_StringifyMetadata_0(ctx context.Context, marshaler runtime.Marshaler, server SQLServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq StringifyMetadataRequest
-		metadata runtime.ServerMetadata
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	msg, err := server.StringifyMetadata(ctx, &protoReq)
-	return msg, metadata, err
-}
-
 func request_SQLService_DiffMetadata_0(ctx context.Context, marshaler runtime.Marshaler, client SQLServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq DiffMetadataRequest
@@ -629,26 +601,6 @@ func RegisterSQLServiceHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		}
 		forward_SQLService_Pretty_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodPost, pattern_SQLService_StringifyMetadata_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		var stream runtime.ServerTransportStream
-		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
-		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/bytebase.v1.SQLService/StringifyMetadata", runtime.WithHTTPPathPattern("/v1/schemaDesign:stringifyMetadata"))
-		if err != nil {
-			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		resp, md, err := local_request_SQLService_StringifyMetadata_0(annotatedContext, inboundMarshaler, server, req, pathParams)
-		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
-		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		forward_SQLService_StringifyMetadata_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-	})
 	mux.Handle(http.MethodPost, pattern_SQLService_DiffMetadata_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -752,20 +704,12 @@ func RegisterSQLServiceHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-
-		resp, md, reqErrChan, err := request_SQLService_AdminExecute_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		resp, md, err := request_SQLService_AdminExecute_0(annotatedContext, inboundMarshaler, client, req, pathParams)
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		go func() {
-			for err := range reqErrChan {
-				if err != nil && !errors.Is(err, io.EOF) {
-					runtime.HTTPStreamError(annotatedContext, mux, outboundMarshaler, w, req, err)
-				}
-			}
-		}()
 		forward_SQLService_AdminExecute_0(annotatedContext, mux, outboundMarshaler, w, req, func() (proto.Message, error) { return resp.Recv() }, mux.GetForwardResponseOptions()...)
 	})
 	mux.Handle(http.MethodPost, pattern_SQLService_SearchQueryHistories_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
@@ -887,23 +831,6 @@ func RegisterSQLServiceHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		}
 		forward_SQLService_Pretty_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodPost, pattern_SQLService_StringifyMetadata_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/bytebase.v1.SQLService/StringifyMetadata", runtime.WithHTTPPathPattern("/v1/schemaDesign:stringifyMetadata"))
-		if err != nil {
-			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		resp, md, err := request_SQLService_StringifyMetadata_0(annotatedContext, inboundMarshaler, client, req, pathParams)
-		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		forward_SQLService_StringifyMetadata_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-	})
 	mux.Handle(http.MethodPost, pattern_SQLService_DiffMetadata_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -935,7 +862,6 @@ var (
 	pattern_SQLService_Check_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "sql", "check"}, ""))
 	pattern_SQLService_ParseMyBatisMapper_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "sql", "parseMyBatisMapper"}, ""))
 	pattern_SQLService_Pretty_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "sql", "pretty"}, ""))
-	pattern_SQLService_StringifyMetadata_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "schemaDesign"}, "stringifyMetadata"))
 	pattern_SQLService_DiffMetadata_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "schemaDesign"}, "diffMetadata"))
 )
 
@@ -950,6 +876,5 @@ var (
 	forward_SQLService_Check_0                = runtime.ForwardResponseMessage
 	forward_SQLService_ParseMyBatisMapper_0   = runtime.ForwardResponseMessage
 	forward_SQLService_Pretty_0               = runtime.ForwardResponseMessage
-	forward_SQLService_StringifyMetadata_0    = runtime.ForwardResponseMessage
 	forward_SQLService_DiffMetadata_0         = runtime.ForwardResponseMessage
 )

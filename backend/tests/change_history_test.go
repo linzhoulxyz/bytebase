@@ -2,17 +2,13 @@ package tests
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"sort"
-	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/bytebase/bytebase/backend/common"
-	"github.com/bytebase/bytebase/backend/resources/postgres"
-	"github.com/bytebase/bytebase/backend/tests/fake"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
@@ -57,22 +53,17 @@ func TestFilterChangeHistoryByResources(t *testing.T) {
 	a := require.New(t)
 	ctx := context.Background()
 	ctl := &controller{}
-	dataDir := t.TempDir()
-	ctx, err := ctl.StartServerWithExternalPg(ctx, &config{
-		dataDir:            dataDir,
-		vcsProviderCreator: fake.NewGitLab,
-	})
+	ctx, err := ctl.StartServerWithExternalPg(ctx)
 	a.NoError(err)
 	defer ctl.Close(ctx)
 
-	// Create a PostgreSQL instance.
-	pgPort := getTestPort()
-	stopInstance := postgres.SetupTestInstance(pgBinDir, t.TempDir(), pgPort)
-	defer stopInstance()
-
-	pgDB, err := sql.Open("pgx", fmt.Sprintf("host=/tmp port=%d user=root database=postgres", pgPort))
+	pgContainer, err := getPgContainer(ctx)
+	defer func() {
+		pgContainer.Close(ctx)
+	}()
 	a.NoError(err)
-	defer pgDB.Close()
+
+	pgDB := pgContainer.db
 
 	err = pgDB.Ping()
 	a.NoError(err)
@@ -93,13 +84,13 @@ func TestFilterChangeHistoryByResources(t *testing.T) {
 			Engine:      v1pb.Engine_POSTGRES,
 			Environment: "environments/prod",
 			Activation:  true,
-			DataSources: []*v1pb.DataSource{{Type: v1pb.DataSourceType_ADMIN, Host: "/tmp", Port: strconv.Itoa(pgPort), Username: "bytebase", Password: "bytebase", Id: "admin"}},
+			DataSources: []*v1pb.DataSource{{Type: v1pb.DataSourceType_ADMIN, Host: pgContainer.host, Port: pgContainer.port, Username: "bytebase", Password: "bytebase", Id: "admin"}},
 		},
 	})
 	a.NoError(err)
 
 	// Create an issue that creates a database.
-	err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil /* environment */, databaseName, "bytebase", nil)
+	err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil /* environment */, databaseName, "bytebase")
 	a.NoError(err)
 
 	database, err := ctl.databaseServiceClient.GetDatabase(ctx, &v1pb.GetDatabaseRequest{

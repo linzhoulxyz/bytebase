@@ -52,8 +52,8 @@ export interface ActuatorInfo {
   readonly: boolean;
   /** saas flag means if the Bytebase is running in SaaS mode, some features are not allowed to edit by users. */
   saas: boolean;
-  /** demo_name specifies the demo name, empty string means no demo. */
-  demoName: string;
+  /** demo flag means if the Bytebase is running in demo mode. */
+  demo: boolean;
   /** host is the Bytebase instance host. */
   host: string;
   /** port is the Bytebase instance port. */
@@ -72,16 +72,8 @@ export interface ActuatorInfo {
   require2fa: boolean;
   /** workspace_id is the identifier for the workspace. */
   workspaceId: string;
-  /** gitops_webhook_url is the webhook URL for GitOps. */
-  gitopsWebhookUrl: string;
   /** debug flag means if the debug mode is enabled. */
   debug: boolean;
-  /** lsp is the enablement of lsp in SQL Editor. */
-  lsp: boolean;
-  /** pre_update_backup is the enablement of data backup prior to data update. */
-  preUpdateBackup: boolean;
-  /** iam_guard is the enablement of IAM checks. */
-  iamGuard: boolean;
   unlicensedFeatures: string[];
   /** disallow_password_signin is the flag to disallow user signin with email&password. (except workspace admins) */
   disallowPasswordSignin: boolean;
@@ -363,7 +355,7 @@ function createBaseActuatorInfo(): ActuatorInfo {
     gitCommit: "",
     readonly: false,
     saas: false,
-    demoName: "",
+    demo: false,
     host: "",
     port: "",
     externalUrl: "",
@@ -372,11 +364,7 @@ function createBaseActuatorInfo(): ActuatorInfo {
     lastActiveTime: undefined,
     require2fa: false,
     workspaceId: "",
-    gitopsWebhookUrl: "",
     debug: false,
-    lsp: false,
-    preUpdateBackup: false,
-    iamGuard: false,
     unlicensedFeatures: [],
     disallowPasswordSignin: false,
     passwordRestriction: undefined,
@@ -398,8 +386,8 @@ export const ActuatorInfo: MessageFns<ActuatorInfo> = {
     if (message.saas !== false) {
       writer.uint32(32).bool(message.saas);
     }
-    if (message.demoName !== "") {
-      writer.uint32(42).string(message.demoName);
+    if (message.demo !== false) {
+      writer.uint32(40).bool(message.demo);
     }
     if (message.host !== "") {
       writer.uint32(50).string(message.host);
@@ -425,20 +413,8 @@ export const ActuatorInfo: MessageFns<ActuatorInfo> = {
     if (message.workspaceId !== "") {
       writer.uint32(106).string(message.workspaceId);
     }
-    if (message.gitopsWebhookUrl !== "") {
-      writer.uint32(114).string(message.gitopsWebhookUrl);
-    }
     if (message.debug !== false) {
       writer.uint32(120).bool(message.debug);
-    }
-    if (message.lsp !== false) {
-      writer.uint32(128).bool(message.lsp);
-    }
-    if (message.preUpdateBackup !== false) {
-      writer.uint32(136).bool(message.preUpdateBackup);
-    }
-    if (message.iamGuard !== false) {
-      writer.uint32(144).bool(message.iamGuard);
     }
     for (const v of message.unlicensedFeatures) {
       writer.uint32(154).string(v!);
@@ -495,11 +471,11 @@ export const ActuatorInfo: MessageFns<ActuatorInfo> = {
           continue;
         }
         case 5: {
-          if (tag !== 42) {
+          if (tag !== 40) {
             break;
           }
 
-          message.demoName = reader.string();
+          message.demo = reader.bool();
           continue;
         }
         case 6: {
@@ -566,44 +542,12 @@ export const ActuatorInfo: MessageFns<ActuatorInfo> = {
           message.workspaceId = reader.string();
           continue;
         }
-        case 14: {
-          if (tag !== 114) {
-            break;
-          }
-
-          message.gitopsWebhookUrl = reader.string();
-          continue;
-        }
         case 15: {
           if (tag !== 120) {
             break;
           }
 
           message.debug = reader.bool();
-          continue;
-        }
-        case 16: {
-          if (tag !== 128) {
-            break;
-          }
-
-          message.lsp = reader.bool();
-          continue;
-        }
-        case 17: {
-          if (tag !== 136) {
-            break;
-          }
-
-          message.preUpdateBackup = reader.bool();
-          continue;
-        }
-        case 18: {
-          if (tag !== 144) {
-            break;
-          }
-
-          message.iamGuard = reader.bool();
           continue;
         }
         case 19: {
@@ -653,7 +597,7 @@ export const ActuatorInfo: MessageFns<ActuatorInfo> = {
       gitCommit: isSet(object.gitCommit) ? globalThis.String(object.gitCommit) : "",
       readonly: isSet(object.readonly) ? globalThis.Boolean(object.readonly) : false,
       saas: isSet(object.saas) ? globalThis.Boolean(object.saas) : false,
-      demoName: isSet(object.demoName) ? globalThis.String(object.demoName) : "",
+      demo: isSet(object.demo) ? globalThis.Boolean(object.demo) : false,
       host: isSet(object.host) ? globalThis.String(object.host) : "",
       port: isSet(object.port) ? globalThis.String(object.port) : "",
       externalUrl: isSet(object.externalUrl) ? globalThis.String(object.externalUrl) : "",
@@ -662,11 +606,7 @@ export const ActuatorInfo: MessageFns<ActuatorInfo> = {
       lastActiveTime: isSet(object.lastActiveTime) ? fromJsonTimestamp(object.lastActiveTime) : undefined,
       require2fa: isSet(object.require2fa) ? globalThis.Boolean(object.require2fa) : false,
       workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : "",
-      gitopsWebhookUrl: isSet(object.gitopsWebhookUrl) ? globalThis.String(object.gitopsWebhookUrl) : "",
       debug: isSet(object.debug) ? globalThis.Boolean(object.debug) : false,
-      lsp: isSet(object.lsp) ? globalThis.Boolean(object.lsp) : false,
-      preUpdateBackup: isSet(object.preUpdateBackup) ? globalThis.Boolean(object.preUpdateBackup) : false,
-      iamGuard: isSet(object.iamGuard) ? globalThis.Boolean(object.iamGuard) : false,
       unlicensedFeatures: globalThis.Array.isArray(object?.unlicensedFeatures)
         ? object.unlicensedFeatures.map((e: any) => globalThis.String(e))
         : [],
@@ -694,8 +634,8 @@ export const ActuatorInfo: MessageFns<ActuatorInfo> = {
     if (message.saas !== false) {
       obj.saas = message.saas;
     }
-    if (message.demoName !== "") {
-      obj.demoName = message.demoName;
+    if (message.demo !== false) {
+      obj.demo = message.demo;
     }
     if (message.host !== "") {
       obj.host = message.host;
@@ -721,20 +661,8 @@ export const ActuatorInfo: MessageFns<ActuatorInfo> = {
     if (message.workspaceId !== "") {
       obj.workspaceId = message.workspaceId;
     }
-    if (message.gitopsWebhookUrl !== "") {
-      obj.gitopsWebhookUrl = message.gitopsWebhookUrl;
-    }
     if (message.debug !== false) {
       obj.debug = message.debug;
-    }
-    if (message.lsp !== false) {
-      obj.lsp = message.lsp;
-    }
-    if (message.preUpdateBackup !== false) {
-      obj.preUpdateBackup = message.preUpdateBackup;
-    }
-    if (message.iamGuard !== false) {
-      obj.iamGuard = message.iamGuard;
     }
     if (message.unlicensedFeatures?.length) {
       obj.unlicensedFeatures = message.unlicensedFeatures;
@@ -760,7 +688,7 @@ export const ActuatorInfo: MessageFns<ActuatorInfo> = {
     message.gitCommit = object.gitCommit ?? "";
     message.readonly = object.readonly ?? false;
     message.saas = object.saas ?? false;
-    message.demoName = object.demoName ?? "";
+    message.demo = object.demo ?? false;
     message.host = object.host ?? "";
     message.port = object.port ?? "";
     message.externalUrl = object.externalUrl ?? "";
@@ -771,11 +699,7 @@ export const ActuatorInfo: MessageFns<ActuatorInfo> = {
       : undefined;
     message.require2fa = object.require2fa ?? false;
     message.workspaceId = object.workspaceId ?? "";
-    message.gitopsWebhookUrl = object.gitopsWebhookUrl ?? "";
     message.debug = object.debug ?? false;
-    message.lsp = object.lsp ?? false;
-    message.preUpdateBackup = object.preUpdateBackup ?? false;
-    message.iamGuard = object.iamGuard ?? false;
     message.unlicensedFeatures = object.unlicensedFeatures?.map((e) => e) || [];
     message.disallowPasswordSignin = object.disallowPasswordSignin ?? false;
     message.passwordRestriction = (object.passwordRestriction !== undefined && object.passwordRestriction !== null)

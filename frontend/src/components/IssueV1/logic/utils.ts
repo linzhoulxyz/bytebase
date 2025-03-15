@@ -40,7 +40,6 @@ export const databaseForTask = (issue: ComposedIssue, task: Task) => {
       task.databaseDataUpdate ||
       task.databaseSchemaUpdate ||
       task.databaseDataExport ||
-      task.type === Task_Type.DATABASE_SCHEMA_UPDATE_GHOST_CUTOVER ||
       task.type === Task_Type.DATABASE_SCHEMA_BASELINE
     ) {
       const db = useDatabaseV1Store().getDatabaseByName(task.target);
@@ -61,7 +60,7 @@ export const databaseForTask = (issue: ComposedIssue, task: Task) => {
         db.effectiveEnvironmentEntity =
           useEnvironmentV1Store().getEnvironmentByName(ir.environment) ??
           unknownEnvironment();
-        db.syncState = State.DELETED;
+        db.state = State.DELETED;
       }
       return db;
     }

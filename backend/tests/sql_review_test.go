@@ -1,15 +1,11 @@
-//go:build mysql
-
 package tests
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"testing"
 	"time"
 
@@ -27,9 +23,8 @@ import (
 
 	"github.com/bytebase/bytebase/backend/common"
 	api "github.com/bytebase/bytebase/backend/legacyapi"
-	"github.com/bytebase/bytebase/backend/resources/mysql"
-	"github.com/bytebase/bytebase/backend/resources/postgres"
-	"github.com/bytebase/bytebase/backend/tests/fake"
+	"github.com/bytebase/bytebase/backend/plugin/advisor"
+	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
@@ -83,25 +78,19 @@ func TestSQLReviewForPostgreSQL(t *testing.T) {
 	a := require.New(t)
 	ctx := context.Background()
 	ctl := &controller{}
-	dataDir := t.TempDir()
 	tests, err := readTestData(filepath)
 	a.NoError(err)
-	ctx, err = ctl.StartServerWithExternalPg(ctx, &config{
-		dataDir:            dataDir,
-		vcsProviderCreator: fake.NewGitLab,
-	})
+	ctx, err = ctl.StartServerWithExternalPg(ctx)
 	a.NoError(err)
 	defer ctl.Close(ctx)
 
-	// Create a PostgreSQL instance.
-	pgPort := getTestPort()
-	stopInstance := postgres.SetupTestInstance(pgBinDir, t.TempDir(), pgPort)
-	defer stopInstance()
-
-	pgDB, err := sql.Open("pgx", fmt.Sprintf("host=/tmp port=%d user=root database=postgres", pgPort))
+	pgContainer, err := getPgContainer(ctx)
+	defer func() {
+		pgContainer.Close(ctx)
+	}()
 	a.NoError(err)
-	defer pgDB.Close()
 
+	pgDB := pgContainer.db
 	err = pgDB.Ping()
 	a.NoError(err)
 
@@ -144,12 +133,12 @@ func TestSQLReviewForPostgreSQL(t *testing.T) {
 			Engine:      v1pb.Engine_POSTGRES,
 			Environment: "environments/prod",
 			Activation:  true,
-			DataSources: []*v1pb.DataSource{{Type: v1pb.DataSourceType_ADMIN, Host: "/tmp", Port: strconv.Itoa(pgPort), Username: "bytebase", Password: "bytebase", Id: "admin"}},
+			DataSources: []*v1pb.DataSource{{Type: v1pb.DataSourceType_ADMIN, Host: pgContainer.host, Port: pgContainer.port, Username: "bytebase", Password: "bytebase", Id: "admin"}},
 		},
 	})
 	a.NoError(err)
 
-	err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil /* environment */, databaseName, "bytebase", nil)
+	err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil /* environment */, databaseName, "bytebase")
 	a.NoError(err)
 
 	database, err := ctl.databaseServiceClient.GetDatabase(ctx, &v1pb.GetDatabaseRequest{
@@ -260,23 +249,17 @@ func TestSQLReviewForMySQL(t *testing.T) {
 	ctl := &controller{}
 	tests, err := readTestData(filepath)
 	a.NoError(err)
-	dataDir := t.TempDir()
-	ctx, err = ctl.StartServerWithExternalPg(ctx, &config{
-		dataDir:            dataDir,
-		vcsProviderCreator: fake.NewGitLab,
-	})
+	ctx, err = ctl.StartServerWithExternalPg(ctx)
 	a.NoError(err)
 	defer ctl.Close(ctx)
 
-	// Create a MySQL instance.
-	mysqlPort := getTestPort()
-	stopInstance := mysql.SetupTestInstance(t, mysqlPort, mysqlBinDir)
-	defer stopInstance()
-
-	mysqlDB, err := sql.Open("mysql", fmt.Sprintf("root@tcp(127.0.0.1:%d)/mysql", mysqlPort))
+	mysqlContainer, err := getMySQLContainer(ctx)
+	defer func() {
+		mysqlContainer.Close(ctx)
+	}()
 	a.NoError(err)
-	defer mysqlDB.Close()
 
+	mysqlDB := mysqlContainer.db
 	_, err = mysqlDB.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %v", databaseName))
 	a.NoError(err)
 
@@ -319,12 +302,12 @@ func TestSQLReviewForMySQL(t *testing.T) {
 			Engine:      v1pb.Engine_MYSQL,
 			Environment: "environments/prod",
 			Activation:  true,
-			DataSources: []*v1pb.DataSource{{Type: v1pb.DataSourceType_ADMIN, Host: "127.0.0.1", Port: strconv.Itoa(mysqlPort), Username: "bytebase", Password: "bytebase", Id: "admin"}},
+			DataSources: []*v1pb.DataSource{{Type: v1pb.DataSourceType_ADMIN, Host: mysqlContainer.host, Port: mysqlContainer.port, Username: "bytebase", Password: "bytebase", Id: "admin"}},
 		},
 	})
 	a.NoError(err)
 
-	err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil /* environment */, databaseName, "", nil)
+	err = ctl.createDatabaseV2(ctx, ctl.project, instance, nil /* environment */, databaseName, "")
 	a.NoError(err)
 
 	database, err := ctl.databaseServiceClient.GetDatabase(ctx, &v1pb.GetDatabaseRequest{
@@ -543,4 +526,514 @@ func equalReviewResultProtos(a *require.Assertions, want, got []*v1pb.PlanCheckR
 		diff := cmp.Diff(want[i], got[i], protocmp.Transform())
 		a.Empty(diff, message)
 	}
+}
+
+func prodTemplateReviewConfigForPostgreSQL() (*v1pb.ReviewConfig, error) {
+	config := &v1pb.ReviewConfig{
+		Name:    common.FormatReviewConfig(generateRandomString("review", 10)),
+		Title:   "Prod",
+		Enabled: true,
+		Rules: []*v1pb.SQLReviewRule{
+			// Naming
+			{
+				Type:   string(advisor.SchemaRuleTableNaming),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnNaming),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleIDXNaming),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRulePKNaming),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleUKNaming),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleFKNaming),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			// Statement
+			{
+				Type:   string(advisor.SchemaRuleStatementNoSelectAll),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleStatementRequireWhereForSelect),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleStatementRequireWhereForUpdateDelete),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleStatementNoLeadingWildcardLike),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleStatementDisallowCommit),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleStatementDisallowOrderBy),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleStatementMergeAlterTable),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleStatementInsertDisallowOrderByRand),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			// TABLE
+			{
+				Type:   string(advisor.SchemaRuleTableRequirePK),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleTableNoFK),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleTableDropNamingConvention),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleTableCommentConvention),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleTableDisallowPartition),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			// COLUMN
+			{
+				Type:   string(advisor.SchemaRuleRequiredColumn),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnNotNull),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnDisallowChangeType),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnDisallowChange),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnDisallowChangingOrder),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnAutoIncrementMustInteger),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnTypeDisallowList),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnDisallowSetCharset),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnMaximumCharacterLength),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnAutoIncrementInitialValue),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnAutoIncrementMustUnsigned),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleCurrentTimeColumnCountLimit),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			// SCHEMA
+			{
+				Type:   string(advisor.SchemaRuleSchemaBackwardCompatibility),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			// DATABASE
+			{
+				Type:   string(advisor.SchemaRuleDropEmptyDatabase),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			// INDEX
+			{
+				Type:   string(advisor.SchemaRuleIndexNoDuplicateColumn),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleIndexKeyNumberLimit),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleIndexPKTypeLimit),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleIndexTypeNoBlob),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleIndexTotalNumberLimit),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			// SYSTEM
+			{
+				Type:   string(advisor.SchemaRuleCharsetAllowlist),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+			{
+				Type:   string(advisor.SchemaRuleCollationAllowlist),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_POSTGRES,
+			},
+		},
+	}
+
+	for _, rule := range config.Rules {
+		payload, err := advisor.SetDefaultSQLReviewRulePayload(advisor.SQLReviewRuleType(rule.Type), storepb.Engine_POSTGRES)
+		if err != nil {
+			return nil, err
+		}
+		rule.Payload = payload
+	}
+	return config, nil
+}
+
+func prodTemplateReviewConfigForMySQL() (*v1pb.ReviewConfig, error) {
+	config := &v1pb.ReviewConfig{
+		Name:    common.FormatReviewConfig(generateRandomString("review", 10)),
+		Title:   "Prod",
+		Enabled: true,
+		Rules: []*v1pb.SQLReviewRule{
+			// Engine
+			{
+				Type:   string(advisor.SchemaRuleMySQLEngine),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			// Naming
+			{
+				Type:   string(advisor.SchemaRuleTableNaming),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnNaming),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleIDXNaming),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRulePKNaming),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleUKNaming),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleFKNaming),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleAutoIncrementColumnNaming),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			// Statement
+			{
+				Type:   string(advisor.SchemaRuleStatementNoSelectAll),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleStatementRequireWhereForSelect),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleStatementRequireWhereForUpdateDelete),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleStatementNoLeadingWildcardLike),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleStatementDisallowCommit),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleStatementDisallowLimit),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleStatementDisallowOrderBy),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleStatementMergeAlterTable),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleStatementInsertRowLimit),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleStatementInsertMustSpecifyColumn),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleStatementInsertDisallowOrderByRand),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleStatementAffectedRowLimit),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleStatementDMLDryRun),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			// TABLE
+			{
+				Type:   string(advisor.SchemaRuleTableRequirePK),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleTableNoFK),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleTableDropNamingConvention),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleTableCommentConvention),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleTableDisallowPartition),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			// COLUMN
+			{
+				Type:   string(advisor.SchemaRuleRequiredColumn),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnNotNull),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnDisallowDropInIndex),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnDisallowChangeType),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnSetDefaultForNotNull),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnDisallowChange),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnDisallowChangingOrder),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnCommentConvention),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnAutoIncrementMustInteger),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnTypeDisallowList),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnDisallowSetCharset),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnMaximumCharacterLength),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnAutoIncrementInitialValue),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnAutoIncrementMustUnsigned),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleCurrentTimeColumnCountLimit),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleColumnRequireDefault),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			// SCHEMA
+			{
+				Type:   string(advisor.SchemaRuleSchemaBackwardCompatibility),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			// DATABASE
+			{
+				Type:   string(advisor.SchemaRuleDropEmptyDatabase),
+				Level:  v1pb.SQLReviewRuleLevel_ERROR,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			// INDEX
+			{
+				Type:   string(advisor.SchemaRuleIndexNoDuplicateColumn),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleIndexKeyNumberLimit),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleIndexPKTypeLimit),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleIndexTypeNoBlob),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleIndexTotalNumberLimit),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			// SYSTEM
+			{
+				Type:   string(advisor.SchemaRuleCharsetAllowlist),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+			{
+				Type:   string(advisor.SchemaRuleCollationAllowlist),
+				Level:  v1pb.SQLReviewRuleLevel_WARNING,
+				Engine: v1pb.Engine_MYSQL,
+			},
+		},
+	}
+
+	for _, rule := range config.Rules {
+		payload, err := advisor.SetDefaultSQLReviewRulePayload(advisor.SQLReviewRuleType(rule.Type), storepb.Engine_POSTGRES)
+		if err != nil {
+			return nil, err
+		}
+		rule.Payload = payload
+	}
+	return config, nil
 }

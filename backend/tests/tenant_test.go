@@ -9,10 +9,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/genproto/googleapis/type/expr"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
-	"github.com/bytebase/bytebase/backend/common"
-	api "github.com/bytebase/bytebase/backend/legacyapi"
-	"github.com/bytebase/bytebase/backend/tests/fake"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
@@ -23,16 +21,12 @@ var (
 	prodInstanceName = "testInstanceProd"
 )
 
-func TestTenant(t *testing.T) {
+func TestDatabaseGroup(t *testing.T) {
 	t.Parallel()
 	a := require.New(t)
 	ctx := context.Background()
 	ctl := &controller{}
-	dataDir := t.TempDir()
-	ctx, err := ctl.StartServerWithExternalPg(ctx, &config{
-		dataDir:            dataDir,
-		vcsProviderCreator: fake.NewGitLab,
-	})
+	ctx, err := ctl.StartServerWithExternalPg(ctx)
 	a.NoError(err)
 	defer ctl.Close(ctx)
 
@@ -95,23 +89,14 @@ func TestTenant(t *testing.T) {
 		prodInstances = append(prodInstances, instance)
 	}
 
-	// Create deployment configuration.
-	_, err = ctl.projectServiceClient.UpdateDeploymentConfig(ctx, &v1pb.UpdateDeploymentConfigRequest{
-		DeploymentConfig: &v1pb.DeploymentConfig{
-			Name:     common.FormatDeploymentConfig(project.Name),
-			Schedule: deploySchedule,
-		},
-	})
-	a.NoError(err)
-
 	// Create issues that create databases.
 	databaseName := "testTenantSchemaUpdate"
-	for i, testInstance := range testInstances {
-		err := ctl.createDatabaseV2(ctx, project, testInstance, nil, databaseName, "", map[string]string{api.TenantLabelKey: fmt.Sprintf("tenant%d", i)})
+	for _, testInstance := range testInstances {
+		err := ctl.createDatabaseV2(ctx, project, testInstance, nil, databaseName, "")
 		a.NoError(err)
 	}
-	for i, prodInstance := range prodInstances {
-		err := ctl.createDatabaseV2(ctx, project, prodInstance, nil, databaseName, "", map[string]string{api.TenantLabelKey: fmt.Sprintf("tenant%d", i)})
+	for _, prodInstance := range prodInstances {
+		err := ctl.createDatabaseV2(ctx, project, prodInstance, nil, databaseName, "")
 		a.NoError(err)
 	}
 
@@ -176,8 +161,14 @@ func TestTenant(t *testing.T) {
 			},
 		},
 	}
-	_, _, _, err = ctl.changeDatabaseWithConfig(ctx, project, []*v1pb.Plan_Step{step})
+	plan, rollout, issue, err := ctl.changeDatabaseWithConfig(ctx, project, []*v1pb.Plan_Step{step})
 	a.NoError(err)
+
+	// Assert the plan deployment.
+	a.Len(plan.Deployment.DatabaseGroupMappings, 1)
+	a.Equal(databaseGroup.Name, plan.Deployment.DatabaseGroupMappings[0].DatabaseGroup)
+	a.Len(plan.Deployment.DatabaseGroupMappings[0].Databases, 2)
+	a.ElementsMatch([]string{testDatabases[0].Name, prodDatabases[0].Name}, plan.Deployment.DatabaseGroupMappings[0].Databases)
 
 	// Query schema.
 	for _, testInstance := range testInstances {
@@ -190,4 +181,70 @@ func TestTenant(t *testing.T) {
 		a.NoError(err)
 		a.Equal(wantBookSchema, dbMetadata.Schema)
 	}
+
+	// Create another database in the prod environment.
+	databaseName2 := "testTenantSchemaUpdate2"
+	err = ctl.createDatabaseV2(ctx, project, prodInstances[0], nil, databaseName2, "")
+	a.NoError(err)
+
+	resp, err = ctl.databaseServiceClient.ListDatabases(ctx, &v1pb.ListDatabasesRequest{
+		Parent: project.Name,
+	})
+	a.NoError(err)
+	databases = resp.Databases
+	prodDatabases = nil
+	for _, prodInstance := range prodInstances {
+		for _, database := range databases {
+			if strings.HasPrefix(database.Name, prodInstance.Name) {
+				prodDatabases = append(prodDatabases, database)
+			}
+		}
+	}
+	a.Len(prodDatabases, 2)
+
+	// Update the plan deployment.
+	plan, err = ctl.planServiceClient.UpdatePlan(ctx, &v1pb.UpdatePlanRequest{
+		Plan: &v1pb.Plan{
+			Name: plan.Name,
+			Deployment: &v1pb.Plan_Deployment{
+				Environments: plan.GetDeployment().GetEnvironments(), // Keep the existing environments.
+				DatabaseGroupMappings: []*v1pb.Plan_Deployment_DatabaseGroupMapping{
+					{
+						DatabaseGroup: databaseGroup.Name,
+						Databases:     []string{testDatabases[0].Name, prodDatabases[0].Name, prodDatabases[1].Name},
+					},
+				},
+			},
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{
+			Paths: []string{"deployment"},
+		},
+	})
+	a.NoError(err)
+
+	a.Len(plan.Deployment.DatabaseGroupMappings, 1)
+	a.Equal(databaseGroup.Name, plan.Deployment.DatabaseGroupMappings[0].DatabaseGroup)
+	a.Len(plan.Deployment.DatabaseGroupMappings[0].Databases, 3)
+	a.ElementsMatch([]string{testDatabases[0].Name, prodDatabases[0].Name, prodDatabases[1].Name}, plan.Deployment.DatabaseGroupMappings[0].Databases)
+
+	// Create the new task.
+	rollout2, err := ctl.rolloutServiceClient.CreateRollout(ctx, &v1pb.CreateRolloutRequest{
+		Parent: project.Name,
+		Rollout: &v1pb.Rollout{
+			Plan: plan.Name,
+		},
+		Target: nil, // set to nil to create all stages and tasks.
+	})
+	a.NoError(err)
+	a.Equal(rollout.Name, rollout2.Name)
+
+	a.Len(rollout.Stages, 2)
+	a.Len(rollout2.Stages, 2)
+	a.Len(rollout.Stages[1].Tasks, 1)
+	a.Len(rollout2.Stages[1].Tasks, 2)
+	// The task for databaseName2 should be created.
+	a.Equal(rollout2.Stages[1].Tasks[1].Target, fmt.Sprintf("%s/databases/%s", prodInstances[0].Name, databaseName2))
+
+	err = ctl.waitRollout(ctx, issue.Name, rollout.Name)
+	a.NoError(err)
 }

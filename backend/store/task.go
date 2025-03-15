@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgtype"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/bytebase/bytebase/backend/common"
 	api "github.com/bytebase/bytebase/backend/legacyapi"
@@ -26,15 +26,14 @@ type TaskMessage struct {
 	PipelineID     int
 	StageID        int
 	InstanceID     string
+	EnvironmentID  string // This is the stage.
 	DatabaseName   *string
 	TaskRunRawList []*TaskRunMessage
 
 	// Domain specific fields
-	Name              string
 	Type              api.TaskType
-	Payload           string
+	Payload           *storepb.TaskPayload
 	EarliestAllowedAt *time.Time
-	DependsOn         []int
 
 	LatestTaskRunStatus api.TaskRunStatus
 }
@@ -52,11 +51,6 @@ type TaskFind struct {
 
 	// Domain specific fields
 	TypeList *[]api.TaskType
-	// Payload contains JSONB expressions
-	// Ref: https://www.postgresql.org/docs/current/functions-json.html
-	Payload         string
-	NoBlockingStage bool
-	NonRollbackTask bool
 
 	LatestTaskRunStatusList *[]api.TaskRunStatus
 }
@@ -73,9 +67,7 @@ type TaskPatch struct {
 	DatabaseName            *string
 	EarliestAllowedTs       *time.Time
 	UpdateEarliestAllowedTs bool
-
-	// Payload and others cannot be set at the same time.
-	Payload *string
+	Type                    *api.TaskType
 
 	SheetID               *int
 	SchemaVersion         *string
@@ -128,7 +120,7 @@ func (s *Store) FindBlockingTasksByVersion(ctx context.Context, instanceID, data
 		ORDER BY task.id ASC
 	`
 
-	rows, err := s.db.db.QueryContext(ctx, query, instanceID, databaseName, version)
+	rows, err := s.db.QueryContext(ctx, query, instanceID, databaseName, version)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query rows")
 	}
@@ -150,47 +142,65 @@ func (s *Store) FindBlockingTasksByVersion(ctx context.Context, instanceID, data
 	return ids, nil
 }
 
-func (*Store) createTasks(ctx context.Context, tx *Tx, creates ...*TaskMessage) ([]*TaskMessage, error) {
-	var query strings.Builder
-	var values []any
-	var queryValues []string
-
-	_, _ = query.WriteString(
-		`INSERT INTO task (
+func (*Store) createTasks(ctx context.Context, txn *sql.Tx, creates ...*TaskMessage) ([]*TaskMessage, error) {
+	query := `INSERT INTO task (
 			pipeline_id,
 			stage_id,
 			instance,
 			db_name,
-			name,
-			status,
 			type,
 			payload,
 			earliest_allowed_at
-		)
-		VALUES
-    `)
-	for i, create := range creates {
-		if create.Payload == "" {
-			create.Payload = "{}"
+		) SELECT
+			unnest(CAST($1 AS INTEGER[])),
+			unnest(CAST($2 AS INTEGER[])),
+			unnest(CAST($3 AS TEXT[])),
+			unnest(CAST($4 AS TEXT[])),
+			unnest(CAST($5 AS TEXT[])),
+			unnest(CAST($6 AS JSONB[])),
+			unnest(CAST($7 AS TIMESTAMPTZ[]))
+		RETURNING id, pipeline_id, stage_id, instance, db_name, type, payload, earliest_allowed_at`
+
+	var (
+		pipelineIDs        []int
+		stageIDs           []int
+		instances          []string
+		databases          []*string
+		types              []string
+		payloads           [][]byte
+		earliestAllowedAts []time.Time
+	)
+	for _, create := range creates {
+		if create.Payload == nil {
+			create.Payload = &storepb.TaskPayload{}
 		}
-		values = append(values,
-			create.PipelineID,
-			create.StageID,
-			create.InstanceID,
-			create.DatabaseName,
-			create.Name,
-			create.Type,
-			create.Payload,
-			create.EarliestAllowedAt,
-		)
-		const count = 8
-		queryValues = append(queryValues, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, 'PENDING_APPROVAL', $%d, $%d, $%d)", i*count+1, i*count+2, i*count+3, i*count+4, i*count+5, i*count+6, i*count+7, i*count+8))
+		payload, err := protojson.Marshal(create.Payload)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to marshal payload")
+		}
+		pipelineIDs = append(pipelineIDs, create.PipelineID)
+		stageIDs = append(stageIDs, create.StageID)
+		instances = append(instances, create.InstanceID)
+		databases = append(databases, create.DatabaseName)
+		types = append(types, string(create.Type))
+		payloads = append(payloads, payload)
+		if create.EarliestAllowedAt == nil {
+			earliestAllowedAts = append(earliestAllowedAts, time.Time{})
+		} else {
+			earliestAllowedAts = append(earliestAllowedAts, *create.EarliestAllowedAt)
+		}
 	}
-	_, _ = query.WriteString(strings.Join(queryValues, ","))
-	_, _ = query.WriteString(` RETURNING id, pipeline_id, stage_id, instance, db_name, name, type, payload, earliest_allowed_at`)
 
 	var tasks []*TaskMessage
-	rows, err := tx.QueryContext(ctx, query.String(), values...)
+	rows, err := txn.QueryContext(ctx, query,
+		pipelineIDs,
+		stageIDs,
+		instances,
+		databases,
+		types,
+		payloads,
+		earliestAllowedAts,
+	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query")
 	}
@@ -198,15 +208,15 @@ func (*Store) createTasks(ctx context.Context, tx *Tx, creates ...*TaskMessage) 
 	for rows.Next() {
 		task := &TaskMessage{}
 		var earliestAllowedAt sql.NullTime
+		var payload []byte
 		if err := rows.Scan(
 			&task.ID,
 			&task.PipelineID,
 			&task.StageID,
 			&task.InstanceID,
 			&task.DatabaseName,
-			&task.Name,
 			&task.Type,
-			&task.Payload,
+			&payload,
 			&earliestAllowedAt,
 		); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan rows")
@@ -214,6 +224,11 @@ func (*Store) createTasks(ctx context.Context, tx *Tx, creates ...*TaskMessage) 
 		if earliestAllowedAt.Valid {
 			task.EarliestAllowedAt = &earliestAllowedAt.Time
 		}
+		taskPayload := &storepb.TaskPayload{}
+		if err := common.ProtojsonUnmarshaler.Unmarshal(payload, taskPayload); err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal plan config")
+		}
+		task.Payload = taskPayload
 		tasks = append(tasks, task)
 	}
 	if err := rows.Err(); err != nil {
@@ -223,27 +238,7 @@ func (*Store) createTasks(ctx context.Context, tx *Tx, creates ...*TaskMessage) 
 	return tasks, nil
 }
 
-// CreateTasksV2 creates a new task.
-func (s *Store) CreateTasksV2(ctx context.Context, creates ...*TaskMessage) ([]*TaskMessage, error) {
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to begin tx")
-	}
-	defer tx.Rollback()
-
-	tasks, err := s.createTasks(ctx, tx, creates...)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create tasks")
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, errors.Wrapf(err, "failed to commit tx")
-	}
-	return tasks, nil
-}
-
-// ListTasks retrieves a list of tasks based on find.
-func (s *Store) ListTasks(ctx context.Context, find *TaskFind) ([]*TaskMessage, error) {
+func (*Store) listTasksTx(ctx context.Context, txn *sql.Tx, find *TaskFind) ([]*TaskMessage, error) {
 	where, args := []string{"TRUE"}, []any{}
 	if v := find.ID; v != nil {
 		where, args = append(where, fmt.Sprintf("task.id = $%d", len(args)+1)), append(args, *v)
@@ -275,36 +270,19 @@ func (s *Store) ListTasks(ctx context.Context, find *TaskFind) ([]*TaskMessage, 
 		}
 		where = append(where, fmt.Sprintf("task.type in (%s)", strings.Join(list, ",")))
 	}
-	if v := find.Payload; v != "" {
-		where = append(where, v)
-	}
-	if find.NoBlockingStage {
-		where = append(where, "(SELECT NOT EXISTS (SELECT 1 FROM task as other_task WHERE other_task.pipeline_id = task.pipeline_id AND other_task.stage_id < task.stage_id AND other_task.status != 'DONE'))")
-	}
-	if find.NonRollbackTask {
-		where = append(where, "(NOT (task.type='bb.task.database.data.update' AND task.payload->>'rollbackFromTaskId' IS NOT NULL))")
-	}
-
-	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
 
 	args = append(args, api.TaskRunNotStarted)
-	rows, err := tx.QueryContext(ctx, fmt.Sprintf(`
+	rows, err := txn.QueryContext(ctx, fmt.Sprintf(`
 		SELECT
 			task.id,
 			task.pipeline_id,
 			task.stage_id,
 			task.instance,
 			task.db_name,
-			task.name,
 			latest_task_run.status AS latest_task_run_status,
 			task.type,
 			task.payload,
-			task.earliest_allowed_at,
-			(SELECT ARRAY_AGG (task_dag.from_task_id) FROM task_dag WHERE task_dag.to_task_id = task.id) blocked_by
+			task.earliest_allowed_at
 		FROM task
 		LEFT JOIN LATERAL (
 			SELECT COALESCE(
@@ -330,33 +308,49 @@ func (s *Store) ListTasks(ctx context.Context, find *TaskFind) ([]*TaskMessage, 
 	for rows.Next() {
 		task := &TaskMessage{}
 		var earliestAllowedAt sql.NullTime
-		var dependsOn pgtype.Int4Array
+		var payload []byte
 		if err := rows.Scan(
 			&task.ID,
 			&task.PipelineID,
 			&task.StageID,
 			&task.InstanceID,
 			&task.DatabaseName,
-			&task.Name,
 			&task.LatestTaskRunStatus,
 			&task.Type,
-			&task.Payload,
+			&payload,
 			&earliestAllowedAt,
-			&dependsOn,
 		); err != nil {
-			return nil, err
-		}
-		if err := dependsOn.AssignTo(&task.DependsOn); err != nil {
 			return nil, err
 		}
 		if earliestAllowedAt.Valid {
 			task.EarliestAllowedAt = &earliestAllowedAt.Time
 		}
+		taskPayload := &storepb.TaskPayload{}
+		if err := common.ProtojsonUnmarshaler.Unmarshal(payload, taskPayload); err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal plan config")
+		}
+		task.Payload = taskPayload
 		tasks = append(tasks, task)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	return tasks, nil
+}
+
+// ListTasks retrieves a list of tasks based on find.
+func (s *Store) ListTasks(ctx context.Context, find *TaskFind) ([]*TaskMessage, error) {
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	tasks, err := s.listTasksTx(ctx, tx, find)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list tasks")
+	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -370,8 +364,8 @@ func (s *Store) UpdateTaskV2(ctx context.Context, patch *TaskPatch) (*TaskMessag
 	if v := patch.DatabaseName; v != nil {
 		set, args = append(set, fmt.Sprintf("db_name = $%d", len(args)+1)), append(args, *v)
 	}
-	if (patch.SchemaVersion != nil || patch.SheetID != nil) && patch.Payload != nil {
-		return nil, errors.Errorf("cannot set both sheetID/schemaVersion and payload for TaskPatch")
+	if v := patch.Type; v != nil {
+		set, args = append(set, fmt.Sprintf("type = $%d", len(args)+1)), append(args, *v)
 	}
 	var payloadSet []string
 	if v := patch.SheetID; v != nil {
@@ -403,13 +397,6 @@ func (s *Store) UpdateTaskV2(ctx context.Context, patch *TaskPatch) (*TaskMessag
 	if len(payloadSet) != 0 {
 		set = append(set, fmt.Sprintf(`payload = payload || %s`, strings.Join(payloadSet, "||")))
 	}
-	if v := patch.Payload; v != nil {
-		payload := "{}"
-		if *v != "" {
-			payload = *v
-		}
-		set, args = append(set, fmt.Sprintf("payload = $%d", len(args)+1)), append(args, payload)
-	}
 	if patch.UpdateEarliestAllowedTs {
 		if patch.EarliestAllowedTs == nil {
 			set = append(set, "earliest_allowed_at = null")
@@ -427,11 +414,12 @@ func (s *Store) UpdateTaskV2(ctx context.Context, patch *TaskPatch) (*TaskMessag
 
 	task := &TaskMessage{}
 	var earliestAllowedAt sql.NullTime
+	var payload []byte
 	if err := tx.QueryRowContext(ctx, fmt.Sprintf(`
 		UPDATE task
 		SET `+strings.Join(set, ", ")+`
 		WHERE id = $%d
-		RETURNING id, pipeline_id, stage_id, instance, db_name, name, type, payload, earliest_allowed_at
+		RETURNING id, pipeline_id, stage_id, instance, db_name, type, payload, earliest_allowed_at
 	`, len(args)),
 		args...,
 	).Scan(
@@ -440,9 +428,8 @@ func (s *Store) UpdateTaskV2(ctx context.Context, patch *TaskPatch) (*TaskMessag
 		&task.StageID,
 		&task.InstanceID,
 		&task.DatabaseName,
-		&task.Name,
 		&task.Type,
-		&task.Payload,
+		&payload,
 		&earliestAllowedAt,
 	); err != nil {
 		if err == sql.ErrNoRows {
@@ -454,6 +441,11 @@ func (s *Store) UpdateTaskV2(ctx context.Context, patch *TaskPatch) (*TaskMessag
 	if earliestAllowedAt.Valid {
 		task.EarliestAllowedAt = &earliestAllowedAt.Time
 	}
+	taskPayload := &storepb.TaskPayload{}
+	if err := common.ProtojsonUnmarshaler.Unmarshal(payload, taskPayload); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal plan config")
+	}
+	task.Payload = taskPayload
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -469,7 +461,7 @@ func (s *Store) BatchSkipTasks(ctx context.Context, taskUIDs []int, comment stri
 	WHERE id = ANY($3)`
 	args := []any{true, comment, taskUIDs}
 
-	if _, err := s.db.db.ExecContext(ctx, query, args...); err != nil {
+	if _, err := s.db.ExecContext(ctx, query, args...); err != nil {
 		return errors.Wrapf(err, "failed to batch skip tasks")
 	}
 
@@ -484,7 +476,7 @@ func (s *Store) BatchSkipTasks(ctx context.Context, taskUIDs []int, comment stri
 // 5. are in the stage that is the first among the selected stages in the pipeline
 // 6. are not data export tasks.
 func (s *Store) ListTasksToAutoRollout(ctx context.Context, environments []string) ([]int, error) {
-	rows, err := s.db.db.QueryContext(ctx, `
+	rows, err := s.db.QueryContext(ctx, `
 	SELECT
 		task.pipeline_id,
 		task.stage_id,

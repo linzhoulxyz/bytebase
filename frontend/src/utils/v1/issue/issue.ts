@@ -41,8 +41,7 @@ export const isDatabaseChangeRelatedIssue = (issue: ComposedIssue): boolean => {
         Task_Type.DATABASE_CREATE,
         Task_Type.DATABASE_SCHEMA_BASELINE,
         Task_Type.DATABASE_SCHEMA_UPDATE,
-        Task_Type.DATABASE_SCHEMA_UPDATE_GHOST_SYNC,
-        Task_Type.DATABASE_SCHEMA_UPDATE_GHOST_CUTOVER,
+        Task_Type.DATABASE_SCHEMA_UPDATE_GHOST,
         Task_Type.DATABASE_SCHEMA_UPDATE_SDL,
         Task_Type.DATABASE_DATA_UPDATE,
       ];
@@ -66,8 +65,7 @@ export const generateIssueTitle = (
     | "bb.issue.database.data.export"
     | "bb.issue.grant.request.querier"
     | "bb.issue.grant.request.exporter",
-  databaseNameList: string[],
-  isOnlineMode = false
+  databaseNameList: string[]
 ) => {
   // Create a user friendly default issue name
   const parts: string[] = [];
@@ -79,17 +77,13 @@ export const generateIssueTitle = (
     parts.push(`[${databaseNameList.length} databases]`);
   }
   if (type.startsWith("bb.issue.database")) {
-    if (isOnlineMode) {
-      parts.push("Online schema change");
-    } else {
-      parts.push(
-        type === "bb.issue.database.schema.update"
-          ? t("issue.title.edit-schema")
-          : type === "bb.issue.database.data.update"
-            ? t("issue.title.change-data")
-            : t("issue.title.export-data")
-      );
-    }
+    parts.push(
+      type === "bb.issue.database.schema.update"
+        ? t("issue.title.edit-schema")
+        : type === "bb.issue.database.data.update"
+          ? t("issue.title.change-data")
+          : t("issue.title.export-data")
+    );
   } else {
     parts.push(
       type === "bb.issue.grant.request.querier"

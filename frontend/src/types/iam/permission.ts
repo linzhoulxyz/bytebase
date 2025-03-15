@@ -3,12 +3,6 @@ import type { PickLiteral } from "../utils";
 export type Permission =
   | "bb.auditLogs.export"
   | "bb.auditLogs.search"
-  | "bb.branches.admin"
-  | "bb.branches.create"
-  | "bb.branches.delete"
-  | "bb.branches.get"
-  | "bb.branches.list"
-  | "bb.branches.update"
   | "bb.changelists.create"
   | "bb.changelists.delete"
   | "bb.changelists.get"
@@ -129,20 +123,11 @@ export type Permission =
   | "bb.users.delete"
   | "bb.users.undelete"
   | "bb.users.update"
-  | "bb.vcsConnectors.create"
-  | "bb.vcsConnectors.delete"
-  | "bb.vcsConnectors.get"
-  | "bb.vcsConnectors.list"
-  | "bb.vcsConnectors.update"
-  | "bb.vcsProviders.create"
-  | "bb.vcsProviders.delete"
-  | "bb.vcsProviders.get"
-  | "bb.vcsProviders.list"
-  | "bb.vcsProviders.listProjects"
-  | "bb.vcsProviders.searchProjects"
-  | "bb.vcsProviders.update"
   | "bb.worksheets.get"
-  | "bb.worksheets.manage";
+  | "bb.worksheets.manage"
+  | "bb.workspaces.getIamPolicy"
+  | "bb.workspaces.setIamPolicy"
+  ;
 
 export type QueryPermission = PickLiteral<
   Permission,

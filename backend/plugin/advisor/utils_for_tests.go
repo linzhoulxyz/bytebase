@@ -11,7 +11,6 @@ import (
 	"sort"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
@@ -222,13 +221,12 @@ func RunSQLReviewRuleTest(t *testing.T, rule SQLReviewRuleType, dbType storepb.E
 			},
 		}
 
-		ctx := SQLReviewCheckContext{
+		checkCtx := SQLReviewCheckContext{
 			Charset:         "",
 			Collation:       "",
 			DbType:          dbType,
 			Catalog:         &testCatalog{finder: finder},
 			Driver:          nil,
-			Context:         context.Background(),
 			CurrentDatabase: curDB,
 			DBSchema:        schemaMetadata,
 			ChangeType:      tc.ChangeType,
@@ -239,7 +237,7 @@ func RunSQLReviewRuleTest(t *testing.T, rule SQLReviewRuleType, dbType storepb.E
 			UsePostgresDatabaseOwner: true,
 		}
 
-		adviceList, err := SQLReviewCheck(sm, tc.Statement, ruleList, ctx)
+		adviceList, err := SQLReviewCheck(t.Context(), sm, tc.Statement, ruleList, checkCtx)
 		// Sort adviceList by (line, content)
 		sort.Slice(adviceList, func(i, j int) bool {
 			if adviceList[i].GetStartPosition() == nil || adviceList[j].GetStartPosition() == nil {
@@ -315,16 +313,6 @@ func (*MockDriver) SyncDBSchema(_ context.Context) (*storepb.DatabaseSchemaMetad
 
 // Dump implements the Driver interface.
 func (*MockDriver) Dump(_ context.Context, _ io.Writer, _ *storepb.DatabaseSchemaMetadata) error {
-	return nil
-}
-
-// SyncSlowQuery implements the Driver interface.
-func (*MockDriver) SyncSlowQuery(_ context.Context, _ time.Time) (map[string]*storepb.SlowQueryStatistics, error) {
-	return nil, nil
-}
-
-// CheckSlowQueryLogEnabled checks if slow query log is enabled.
-func (*MockDriver) CheckSlowQueryLogEnabled(_ context.Context) error {
 	return nil
 }
 

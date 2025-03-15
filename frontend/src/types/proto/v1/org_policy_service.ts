@@ -7,6 +7,7 @@
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import Long from "long";
+import { Duration } from "../google/protobuf/duration";
 import { Empty } from "../google/protobuf/empty";
 import { FieldMask } from "../google/protobuf/field_mask";
 import { Expr } from "../google/type/expr";
@@ -17,7 +18,6 @@ export const protobufPackage = "bytebase.v1";
 export enum PolicyType {
   POLICY_TYPE_UNSPECIFIED = "POLICY_TYPE_UNSPECIFIED",
   ROLLOUT_POLICY = "ROLLOUT_POLICY",
-  SLOW_QUERY = "SLOW_QUERY",
   DISABLE_COPY_DATA = "DISABLE_COPY_DATA",
   MASKING_RULE = "MASKING_RULE",
   MASKING_EXCEPTION = "MASKING_EXCEPTION",
@@ -25,6 +25,7 @@ export enum PolicyType {
   TAG = "TAG",
   DATA_SOURCE_QUERY = "DATA_SOURCE_QUERY",
   DATA_EXPORT = "DATA_EXPORT",
+  DATA_QUERY = "DATA_QUERY",
   UNRECOGNIZED = "UNRECOGNIZED",
 }
 
@@ -36,9 +37,6 @@ export function policyTypeFromJSON(object: any): PolicyType {
     case 11:
     case "ROLLOUT_POLICY":
       return PolicyType.ROLLOUT_POLICY;
-    case 7:
-    case "SLOW_QUERY":
-      return PolicyType.SLOW_QUERY;
     case 8:
     case "DISABLE_COPY_DATA":
       return PolicyType.DISABLE_COPY_DATA;
@@ -60,6 +58,9 @@ export function policyTypeFromJSON(object: any): PolicyType {
     case 15:
     case "DATA_EXPORT":
       return PolicyType.DATA_EXPORT;
+    case 16:
+    case "DATA_QUERY":
+      return PolicyType.DATA_QUERY;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -73,8 +74,6 @@ export function policyTypeToJSON(object: PolicyType): string {
       return "POLICY_TYPE_UNSPECIFIED";
     case PolicyType.ROLLOUT_POLICY:
       return "ROLLOUT_POLICY";
-    case PolicyType.SLOW_QUERY:
-      return "SLOW_QUERY";
     case PolicyType.DISABLE_COPY_DATA:
       return "DISABLE_COPY_DATA";
     case PolicyType.MASKING_RULE:
@@ -89,6 +88,8 @@ export function policyTypeToJSON(object: PolicyType): string {
       return "DATA_SOURCE_QUERY";
     case PolicyType.DATA_EXPORT:
       return "DATA_EXPORT";
+    case PolicyType.DATA_QUERY:
+      return "DATA_QUERY";
     case PolicyType.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -101,8 +102,6 @@ export function policyTypeToNumber(object: PolicyType): number {
       return 0;
     case PolicyType.ROLLOUT_POLICY:
       return 11;
-    case PolicyType.SLOW_QUERY:
-      return 7;
     case PolicyType.DISABLE_COPY_DATA:
       return 8;
     case PolicyType.MASKING_RULE:
@@ -117,6 +116,8 @@ export function policyTypeToNumber(object: PolicyType): number {
       return 14;
     case PolicyType.DATA_EXPORT:
       return 15;
+    case PolicyType.DATA_QUERY:
+      return 16;
     case PolicyType.UNRECOGNIZED:
     default:
       return -1;
@@ -373,7 +374,6 @@ export interface Policy {
   inheritFromParent: boolean;
   type: PolicyType;
   rolloutPolicy?: RolloutPolicy | undefined;
-  slowQueryPolicy?: SlowQueryPolicy | undefined;
   disableCopyDataPolicy?: DisableCopyDataPolicy | undefined;
   maskingRulePolicy?: MaskingRulePolicy | undefined;
   maskingExceptionPolicy?: MaskingExceptionPolicy | undefined;
@@ -381,6 +381,7 @@ export interface Policy {
   tagPolicy?: TagPolicy | undefined;
   dataSourceQueryPolicy?: DataSourceQueryPolicy | undefined;
   exportDataPolicy?: ExportDataPolicy | undefined;
+  queryDataPolicy?: QueryDataPolicy | undefined;
   enforce: boolean;
   /** The resource type for the policy. */
   resourceType: PolicyResourceType;
@@ -388,17 +389,12 @@ export interface Policy {
 
 export interface RolloutPolicy {
   automatic: boolean;
-  workspaceRoles: string[];
-  projectRoles: string[];
+  roles: string[];
   /**
    * roles/LAST_APPROVER
    * roles/CREATOR
    */
   issueRoles: string[];
-}
-
-export interface SlowQueryPolicy {
-  active: boolean;
 }
 
 export interface DisableCopyDataPolicy {
@@ -407,6 +403,12 @@ export interface DisableCopyDataPolicy {
 
 export interface ExportDataPolicy {
   disable: boolean;
+}
+
+/** QueryDataPolicy is the policy configuration for querying data. */
+export interface QueryDataPolicy {
+  /** The query timeout duration. */
+  timeout: Duration | undefined;
 }
 
 export interface SQLReviewRule {
@@ -1097,7 +1099,6 @@ function createBasePolicy(): Policy {
     inheritFromParent: false,
     type: PolicyType.POLICY_TYPE_UNSPECIFIED,
     rolloutPolicy: undefined,
-    slowQueryPolicy: undefined,
     disableCopyDataPolicy: undefined,
     maskingRulePolicy: undefined,
     maskingExceptionPolicy: undefined,
@@ -1105,6 +1106,7 @@ function createBasePolicy(): Policy {
     tagPolicy: undefined,
     dataSourceQueryPolicy: undefined,
     exportDataPolicy: undefined,
+    queryDataPolicy: undefined,
     enforce: false,
     resourceType: PolicyResourceType.RESOURCE_TYPE_UNSPECIFIED,
   };
@@ -1123,9 +1125,6 @@ export const Policy: MessageFns<Policy> = {
     }
     if (message.rolloutPolicy !== undefined) {
       RolloutPolicy.encode(message.rolloutPolicy, writer.uint32(154).fork()).join();
-    }
-    if (message.slowQueryPolicy !== undefined) {
-      SlowQueryPolicy.encode(message.slowQueryPolicy, writer.uint32(98).fork()).join();
     }
     if (message.disableCopyDataPolicy !== undefined) {
       DisableCopyDataPolicy.encode(message.disableCopyDataPolicy, writer.uint32(130).fork()).join();
@@ -1150,6 +1149,9 @@ export const Policy: MessageFns<Policy> = {
     }
     if (message.exportDataPolicy !== undefined) {
       ExportDataPolicy.encode(message.exportDataPolicy, writer.uint32(186).fork()).join();
+    }
+    if (message.queryDataPolicy !== undefined) {
+      QueryDataPolicy.encode(message.queryDataPolicy, writer.uint32(194).fork()).join();
     }
     if (message.enforce !== false) {
       writer.uint32(104).bool(message.enforce);
@@ -1197,14 +1199,6 @@ export const Policy: MessageFns<Policy> = {
           }
 
           message.rolloutPolicy = RolloutPolicy.decode(reader, reader.uint32());
-          continue;
-        }
-        case 12: {
-          if (tag !== 98) {
-            break;
-          }
-
-          message.slowQueryPolicy = SlowQueryPolicy.decode(reader, reader.uint32());
           continue;
         }
         case 16: {
@@ -1266,6 +1260,14 @@ export const Policy: MessageFns<Policy> = {
           message.exportDataPolicy = ExportDataPolicy.decode(reader, reader.uint32());
           continue;
         }
+        case 24: {
+          if (tag !== 194) {
+            break;
+          }
+
+          message.queryDataPolicy = QueryDataPolicy.decode(reader, reader.uint32());
+          continue;
+        }
         case 13: {
           if (tag !== 104) {
             break;
@@ -1297,7 +1299,6 @@ export const Policy: MessageFns<Policy> = {
       inheritFromParent: isSet(object.inheritFromParent) ? globalThis.Boolean(object.inheritFromParent) : false,
       type: isSet(object.type) ? policyTypeFromJSON(object.type) : PolicyType.POLICY_TYPE_UNSPECIFIED,
       rolloutPolicy: isSet(object.rolloutPolicy) ? RolloutPolicy.fromJSON(object.rolloutPolicy) : undefined,
-      slowQueryPolicy: isSet(object.slowQueryPolicy) ? SlowQueryPolicy.fromJSON(object.slowQueryPolicy) : undefined,
       disableCopyDataPolicy: isSet(object.disableCopyDataPolicy)
         ? DisableCopyDataPolicy.fromJSON(object.disableCopyDataPolicy)
         : undefined,
@@ -1315,6 +1316,7 @@ export const Policy: MessageFns<Policy> = {
         ? DataSourceQueryPolicy.fromJSON(object.dataSourceQueryPolicy)
         : undefined,
       exportDataPolicy: isSet(object.exportDataPolicy) ? ExportDataPolicy.fromJSON(object.exportDataPolicy) : undefined,
+      queryDataPolicy: isSet(object.queryDataPolicy) ? QueryDataPolicy.fromJSON(object.queryDataPolicy) : undefined,
       enforce: isSet(object.enforce) ? globalThis.Boolean(object.enforce) : false,
       resourceType: isSet(object.resourceType)
         ? policyResourceTypeFromJSON(object.resourceType)
@@ -1335,9 +1337,6 @@ export const Policy: MessageFns<Policy> = {
     }
     if (message.rolloutPolicy !== undefined) {
       obj.rolloutPolicy = RolloutPolicy.toJSON(message.rolloutPolicy);
-    }
-    if (message.slowQueryPolicy !== undefined) {
-      obj.slowQueryPolicy = SlowQueryPolicy.toJSON(message.slowQueryPolicy);
     }
     if (message.disableCopyDataPolicy !== undefined) {
       obj.disableCopyDataPolicy = DisableCopyDataPolicy.toJSON(message.disableCopyDataPolicy);
@@ -1362,6 +1361,9 @@ export const Policy: MessageFns<Policy> = {
     if (message.exportDataPolicy !== undefined) {
       obj.exportDataPolicy = ExportDataPolicy.toJSON(message.exportDataPolicy);
     }
+    if (message.queryDataPolicy !== undefined) {
+      obj.queryDataPolicy = QueryDataPolicy.toJSON(message.queryDataPolicy);
+    }
     if (message.enforce !== false) {
       obj.enforce = message.enforce;
     }
@@ -1381,9 +1383,6 @@ export const Policy: MessageFns<Policy> = {
     message.type = object.type ?? PolicyType.POLICY_TYPE_UNSPECIFIED;
     message.rolloutPolicy = (object.rolloutPolicy !== undefined && object.rolloutPolicy !== null)
       ? RolloutPolicy.fromPartial(object.rolloutPolicy)
-      : undefined;
-    message.slowQueryPolicy = (object.slowQueryPolicy !== undefined && object.slowQueryPolicy !== null)
-      ? SlowQueryPolicy.fromPartial(object.slowQueryPolicy)
       : undefined;
     message.disableCopyDataPolicy =
       (object.disableCopyDataPolicy !== undefined && object.disableCopyDataPolicy !== null)
@@ -1411,6 +1410,9 @@ export const Policy: MessageFns<Policy> = {
     message.exportDataPolicy = (object.exportDataPolicy !== undefined && object.exportDataPolicy !== null)
       ? ExportDataPolicy.fromPartial(object.exportDataPolicy)
       : undefined;
+    message.queryDataPolicy = (object.queryDataPolicy !== undefined && object.queryDataPolicy !== null)
+      ? QueryDataPolicy.fromPartial(object.queryDataPolicy)
+      : undefined;
     message.enforce = object.enforce ?? false;
     message.resourceType = object.resourceType ?? PolicyResourceType.RESOURCE_TYPE_UNSPECIFIED;
     return message;
@@ -1418,7 +1420,7 @@ export const Policy: MessageFns<Policy> = {
 };
 
 function createBaseRolloutPolicy(): RolloutPolicy {
-  return { automatic: false, workspaceRoles: [], projectRoles: [], issueRoles: [] };
+  return { automatic: false, roles: [], issueRoles: [] };
 }
 
 export const RolloutPolicy: MessageFns<RolloutPolicy> = {
@@ -1426,14 +1428,11 @@ export const RolloutPolicy: MessageFns<RolloutPolicy> = {
     if (message.automatic !== false) {
       writer.uint32(8).bool(message.automatic);
     }
-    for (const v of message.workspaceRoles) {
+    for (const v of message.roles) {
       writer.uint32(18).string(v!);
     }
-    for (const v of message.projectRoles) {
-      writer.uint32(26).string(v!);
-    }
     for (const v of message.issueRoles) {
-      writer.uint32(34).string(v!);
+      writer.uint32(26).string(v!);
     }
     return writer;
   },
@@ -1458,19 +1457,11 @@ export const RolloutPolicy: MessageFns<RolloutPolicy> = {
             break;
           }
 
-          message.workspaceRoles.push(reader.string());
+          message.roles.push(reader.string());
           continue;
         }
         case 3: {
           if (tag !== 26) {
-            break;
-          }
-
-          message.projectRoles.push(reader.string());
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
             break;
           }
 
@@ -1489,12 +1480,7 @@ export const RolloutPolicy: MessageFns<RolloutPolicy> = {
   fromJSON(object: any): RolloutPolicy {
     return {
       automatic: isSet(object.automatic) ? globalThis.Boolean(object.automatic) : false,
-      workspaceRoles: globalThis.Array.isArray(object?.workspaceRoles)
-        ? object.workspaceRoles.map((e: any) => globalThis.String(e))
-        : [],
-      projectRoles: globalThis.Array.isArray(object?.projectRoles)
-        ? object.projectRoles.map((e: any) => globalThis.String(e))
-        : [],
+      roles: globalThis.Array.isArray(object?.roles) ? object.roles.map((e: any) => globalThis.String(e)) : [],
       issueRoles: globalThis.Array.isArray(object?.issueRoles)
         ? object.issueRoles.map((e: any) => globalThis.String(e))
         : [],
@@ -1506,11 +1492,8 @@ export const RolloutPolicy: MessageFns<RolloutPolicy> = {
     if (message.automatic !== false) {
       obj.automatic = message.automatic;
     }
-    if (message.workspaceRoles?.length) {
-      obj.workspaceRoles = message.workspaceRoles;
-    }
-    if (message.projectRoles?.length) {
-      obj.projectRoles = message.projectRoles;
+    if (message.roles?.length) {
+      obj.roles = message.roles;
     }
     if (message.issueRoles?.length) {
       obj.issueRoles = message.issueRoles;
@@ -1524,67 +1507,8 @@ export const RolloutPolicy: MessageFns<RolloutPolicy> = {
   fromPartial(object: DeepPartial<RolloutPolicy>): RolloutPolicy {
     const message = createBaseRolloutPolicy();
     message.automatic = object.automatic ?? false;
-    message.workspaceRoles = object.workspaceRoles?.map((e) => e) || [];
-    message.projectRoles = object.projectRoles?.map((e) => e) || [];
+    message.roles = object.roles?.map((e) => e) || [];
     message.issueRoles = object.issueRoles?.map((e) => e) || [];
-    return message;
-  },
-};
-
-function createBaseSlowQueryPolicy(): SlowQueryPolicy {
-  return { active: false };
-}
-
-export const SlowQueryPolicy: MessageFns<SlowQueryPolicy> = {
-  encode(message: SlowQueryPolicy, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.active !== false) {
-      writer.uint32(8).bool(message.active);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SlowQueryPolicy {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSlowQueryPolicy();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.active = reader.bool();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): SlowQueryPolicy {
-    return { active: isSet(object.active) ? globalThis.Boolean(object.active) : false };
-  },
-
-  toJSON(message: SlowQueryPolicy): unknown {
-    const obj: any = {};
-    if (message.active !== false) {
-      obj.active = message.active;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<SlowQueryPolicy>): SlowQueryPolicy {
-    return SlowQueryPolicy.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<SlowQueryPolicy>): SlowQueryPolicy {
-    const message = createBaseSlowQueryPolicy();
-    message.active = object.active ?? false;
     return message;
   },
 };
@@ -1701,6 +1625,66 @@ export const ExportDataPolicy: MessageFns<ExportDataPolicy> = {
   fromPartial(object: DeepPartial<ExportDataPolicy>): ExportDataPolicy {
     const message = createBaseExportDataPolicy();
     message.disable = object.disable ?? false;
+    return message;
+  },
+};
+
+function createBaseQueryDataPolicy(): QueryDataPolicy {
+  return { timeout: undefined };
+}
+
+export const QueryDataPolicy: MessageFns<QueryDataPolicy> = {
+  encode(message: QueryDataPolicy, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.timeout !== undefined) {
+      Duration.encode(message.timeout, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryDataPolicy {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryDataPolicy();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.timeout = Duration.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryDataPolicy {
+    return { timeout: isSet(object.timeout) ? Duration.fromJSON(object.timeout) : undefined };
+  },
+
+  toJSON(message: QueryDataPolicy): unknown {
+    const obj: any = {};
+    if (message.timeout !== undefined) {
+      obj.timeout = Duration.toJSON(message.timeout);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryDataPolicy>): QueryDataPolicy {
+    return QueryDataPolicy.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryDataPolicy>): QueryDataPolicy {
+    const message = createBaseQueryDataPolicy();
+    message.timeout = (object.timeout !== undefined && object.timeout !== null)
+      ? Duration.fromPartial(object.timeout)
+      : undefined;
     return message;
   },
 };

@@ -2,7 +2,6 @@ package ghost
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -11,12 +10,13 @@ import (
 	"github.com/pkg/errors"
 
 	secretcomp "github.com/bytebase/bytebase/backend/component/secret"
+	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 
-	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/store"
 )
 
 var defaultConfig = struct {
+	attemptInstantDDL                   bool
 	allowedRunningOnMaster              bool
 	concurrentCountTableRows            bool
 	timestampOldTable                   bool
@@ -32,20 +32,21 @@ var defaultConfig = struct {
 	throttleHTTPIntervalMillis          int64
 	throttleHTTPTimeoutMillis           int64
 }{
-	allowedRunningOnMaster:              true, // allow-on-master
-	concurrentCountTableRows:            true, // concurrent-rowcount
-	timestampOldTable:                   true, // doesn't have a gh-ost cli flag counterpart
-	hooksStatusIntervalSec:              60,   // hooks-status-interval
-	heartbeatIntervalMilliseconds:       100,  // heartbeat-interval-millis
-	niceRatio:                           0,    // nice-ratio
-	chunkSize:                           1000, // chunk-size
-	dmlBatchSize:                        10,   // dml-batch-size
-	maxLagMillisecondsThrottleThreshold: 1500, // max-lag-millis
-	defaultNumRetries:                   60,   // default-retries
-	cutoverLockTimeoutSeconds:           10,   // cut-over-lock-timeout-seconds
-	exponentialBackoffMaxInterval:       64,   // exponential-backoff-max-interval
-	throttleHTTPIntervalMillis:          100,  // throttle-http-interval-millis
-	throttleHTTPTimeoutMillis:           1000, // throttle-http-timeout-millis
+	attemptInstantDDL:                   true,  // attempt-instant-ddl
+	allowedRunningOnMaster:              true,  // allow-on-master
+	concurrentCountTableRows:            true,  // concurrent-rowcount
+	timestampOldTable:                   false, // doesn't have a gh-ost cli flag counterpart
+	hooksStatusIntervalSec:              60,    // hooks-status-interval
+	heartbeatIntervalMilliseconds:       100,   // heartbeat-interval-millis
+	niceRatio:                           0,     // nice-ratio
+	chunkSize:                           1000,  // chunk-size
+	dmlBatchSize:                        10,    // dml-batch-size
+	maxLagMillisecondsThrottleThreshold: 1500,  // max-lag-millis
+	defaultNumRetries:                   60,    // default-retries
+	cutoverLockTimeoutSeconds:           10,    // cut-over-lock-timeout-seconds
+	exponentialBackoffMaxInterval:       64,    // exponential-backoff-max-interval
+	throttleHTTPIntervalMillis:          100,   // throttle-http-interval-millis
+	throttleHTTPTimeoutMillis:           1000,  // throttle-http-timeout-millis
 }
 
 type UserFlags struct {
@@ -61,6 +62,8 @@ type UserFlags struct {
 	assumeRBR                     *bool
 	heartbeatIntervalMillis       *int64
 	niceRatio                     *float64
+	throttleControlReplicas       *string
+	attemptInstantDDL             *bool
 }
 
 var knownKeys = map[string]bool{
@@ -76,6 +79,8 @@ var knownKeys = map[string]bool{
 	"assume-rbr":                       true,
 	"heartbeat-interval-millis":        true,
 	"nice-ratio":                       true,
+	"throttle-control-replicas":        true,
+	"attempt-instant-ddl":              true,
 }
 
 func GetUserFlags(flags map[string]string) (*UserFlags, error) {
@@ -173,69 +178,52 @@ func GetUserFlags(flags map[string]string) (*UserFlags, error) {
 		}
 		f.niceRatio = &niceRatio
 	}
+	if v, ok := flags["throttle-control-replicas"]; ok {
+		f.throttleControlReplicas = &v
+	}
+	if v, ok := flags["attempt-instant-ddl"]; ok {
+		attemptInstantDDL, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to convert attempt-instant-ddl %q to bool", v)
+		}
+		f.attemptInstantDDL = &attemptInstantDDL
+	}
 	return f, nil
 }
 
-func getSocketFilename(taskID int, databaseID int, databaseName, tableName string) string {
-	return fmt.Sprintf("/tmp/gh-ost.%v.%v.%v.%v.sock", taskID, databaseID, databaseName, tableName)
-}
-
-// GetPostponeFlagFilename gets the postpone flag filename for gh-ost.
-func GetPostponeFlagFilename(taskID int, databaseID int, databaseName, tableName string) string {
-	return fmt.Sprintf("/tmp/gh-ost.%v.%v.%v.%v.postponeFlag", taskID, databaseID, databaseName, tableName)
-}
-
 // NewMigrationContext is the context for gh-ost migration.
-func NewMigrationContext(ctx context.Context, taskID int, database *store.DatabaseMessage, dataSource *store.DataSourceMessage, secret string, tableName string, tmpTableNameSuffix string, statement string, noop bool, flags map[string]string, serverIDOffset uint) (*base.MigrationContext, error) {
-	password, err := common.Unobfuscate(dataSource.ObfuscatedPassword, secret)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get password")
-	}
-	updatedPassword, err := secretcomp.ReplaceExternalSecret(ctx, password, dataSource.ExternalSecret)
+func NewMigrationContext(ctx context.Context, taskID int, database *store.DatabaseMessage, dataSource *storepb.DataSource, tableName string, tmpTableNameSuffix string, statement string, noop bool, flags map[string]string, serverIDOffset uint) (*base.MigrationContext, error) {
+	password, err := secretcomp.ReplaceExternalSecret(ctx, dataSource.GetPassword(), dataSource.GetExternalSecret())
 	if err != nil {
 		return nil, err
 	}
-	password = updatedPassword
 
 	migrationContext := base.NewMigrationContext()
 	migrationContext.Log = newGhostLogger()
-	migrationContext.InspectorConnectionConfig.Key.Hostname = dataSource.Host
+	migrationContext.InspectorConnectionConfig.Key.Hostname = dataSource.GetHost()
 	port := 3306
-	if dataSource.Port != "" {
-		dsPort, err := strconv.Atoi(dataSource.Port)
+	if dataSource.GetPort() != "" {
+		dsPort, err := strconv.Atoi(dataSource.GetPort())
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to convert port from string to int")
 		}
 		port = dsPort
 	}
-	if dataSource.UseSSL {
-		ca, err := common.Unobfuscate(dataSource.ObfuscatedSslCa, secret)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get ssl ca")
-		}
-
-		cert, err := common.Unobfuscate(dataSource.ObfuscatedSslCert, secret)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get ssl cert")
-		}
-
-		key, err := common.Unobfuscate(dataSource.ObfuscatedSslKey, secret)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get ssl key")
-		}
-
+	if dataSource.GetUseSsl() {
 		migrationContext.UseTLS = true
-		migrationContext.TLSCACertificate = ca
-		migrationContext.TLSCertificate = cert
-		migrationContext.TLSKey = key
+		migrationContext.TLSCACertificate = dataSource.GetSslCa()
+		migrationContext.TLSCertificate = dataSource.GetSslCert()
+		migrationContext.TLSKey = dataSource.GetSslKey()
 		migrationContext.TLSAllowInsecure = true
 		if err := migrationContext.SetupTLS(); err != nil {
 			return nil, errors.Wrapf(err, "failed to set up tls")
 		}
 	}
 	migrationContext.InspectorConnectionConfig.Key.Port = port
-	migrationContext.CliUser = dataSource.Username
+	migrationContext.CliUser = dataSource.GetUsername()
 	migrationContext.CliPassword = password
+	// GhostDatabaseName is our homemade parameter to allow creating temporary tables under another database.
+	migrationContext.GhostDatabaseName = "bbdataarchive"
 	migrationContext.DatabaseName = database.DatabaseName
 	migrationContext.OriginalTableName = tableName
 	migrationContext.AlterStatement = strings.Join(strings.Fields(statement), " ")
@@ -248,6 +236,7 @@ func NewMigrationContext(ctx context.Context, taskID int, database *store.Databa
 	if err := migrationContext.SetConnectionConfig(""); err != nil {
 		return nil, err
 	}
+	migrationContext.AttemptInstantDDL = defaultConfig.attemptInstantDDL
 	migrationContext.AllowedRunningOnMaster = defaultConfig.allowedRunningOnMaster
 	migrationContext.ConcurrentCountTableRows = defaultConfig.concurrentCountTableRows
 	migrationContext.HooksStatusIntervalSec = defaultConfig.hooksStatusIntervalSec
@@ -273,8 +262,8 @@ func NewMigrationContext(ctx context.Context, taskID int, database *store.Databa
 		}
 		migrationContext.OriginalTableName = parser.GetExplicitTable()
 	}
-	migrationContext.ServeSocketFile = getSocketFilename(taskID, database.UID, database.DatabaseName, tableName)
-	migrationContext.PostponeCutOverFlagFile = GetPostponeFlagFilename(taskID, database.UID, database.DatabaseName, tableName)
+	migrationContext.ServeSocketFile = ""
+	migrationContext.PostponeCutOverFlagFile = ""
 	migrationContext.TimestampOldTable = defaultConfig.timestampOldTable
 	migrationContext.SetHeartbeatIntervalMilliseconds(defaultConfig.heartbeatIntervalMilliseconds)
 	migrationContext.SetNiceRatio(defaultConfig.niceRatio)
@@ -293,6 +282,9 @@ func NewMigrationContext(ctx context.Context, taskID int, database *store.Databa
 	userFlags, err := GetUserFlags(flags)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get user flags")
+	}
+	if v := userFlags.attemptInstantDDL; v != nil {
+		migrationContext.AttemptInstantDDL = *v
 	}
 	if v := userFlags.maxLoad; v != nil {
 		if err := migrationContext.ReadMaxLoad(*v); err != nil {
@@ -335,6 +327,11 @@ func NewMigrationContext(ctx context.Context, taskID int, database *store.Databa
 	}
 	if v := userFlags.niceRatio; v != nil {
 		migrationContext.SetNiceRatio(*v)
+	}
+	if v := userFlags.throttleControlReplicas; v != nil {
+		if err := migrationContext.ReadThrottleControlReplicaKeys(*v); err != nil {
+			return nil, errors.Wrapf(err, "failed to set throttleControlReplicas")
+		}
 	}
 	// Uses specified port. GCP, Aliyun, Azure are equivalent here.
 	migrationContext.GoogleCloudPlatform = true

@@ -1,12 +1,12 @@
 import type { Ref, VNode } from "vue";
 import { computed, h, unref } from "vue";
 import { useRoute } from "vue-router";
-import GitIcon from "@/components/GitIcon.vue";
 import {
   InstanceV1Name,
   ProjectV1Name,
   RichDatabaseName,
   EnvironmentV1Name,
+  RichEngineName,
 } from "@/components/v2";
 import { t } from "@/plugins/i18n";
 import {
@@ -14,18 +14,17 @@ import {
   useEnvironmentV1List,
   useEnvironmentV1Store,
   useInstanceResourceList,
-  useProjectV1Store,
+  useProjectV1List,
 } from "@/store";
-import { useDatabaseV1List } from "@/store/modules/v1/databaseList";
-import { UNKNOWN_ID, type MaybeRef } from "@/types";
+import { UNKNOWN_ID, isValidProjectName, type MaybeRef } from "@/types";
 import { engineToJSON } from "@/types/proto/v1/common";
-import { Workflow } from "@/types/proto/v1/project_service";
 import type { SearchParams, SearchScopeId } from "@/utils";
 import {
   environmentV1Name,
   extractEnvironmentResourceName,
   extractInstanceResourceName,
   extractProjectResourceName,
+  supportedEngineV1List,
 } from "@/utils";
 import type { ScopeOption, ValueOption } from "./types";
 
@@ -37,7 +36,7 @@ export const useCommonSearchScopeOptions = (
   const databaseV1Store = useDatabaseV1Store();
   const environmentStore = useEnvironmentV1Store();
   const environmentList = useEnvironmentV1List();
-  const projectList = useProjectV1Store().projectList;
+  const { projectList } = useProjectV1List();
 
   const project = computed(() => {
     const { projectId } = route?.params ?? {};
@@ -53,10 +52,12 @@ export const useCommonSearchScopeOptions = (
     return undefined;
   });
 
-  const databaseList = computed(() =>
-    // Only use the database list from the store if the project is set.
-    project.value ? useDatabaseV1List(project.value).databaseList.value : []
-  );
+  const databaseList = computed(() => {
+    if (!isValidProjectName(project.value)) {
+      return [];
+    }
+    return databaseV1Store.databaseListByProject(project.value!);
+  });
 
   const instanceList = computed(() => useInstanceResourceList().value);
 
@@ -68,7 +69,7 @@ export const useCommonSearchScopeOptions = (
         id: "project",
         title: t("issue.advanced-search.scope.project.title"),
         description: t("issue.advanced-search.scope.project.description"),
-        options: projectList.map<ValueOption>((project) => {
+        options: projectList.value.map<ValueOption>((project) => {
           const name = extractProjectResourceName(project.name);
           return {
             value: name,
@@ -81,9 +82,6 @@ export const useCommonSearchScopeOptions = (
               const children: VNode[] = [
                 h(ProjectV1Name, { project: project, link: false }),
               ];
-              if (project.workflow === Workflow.VCS) {
-                children.push(h(GitIcon, { class: "h-4" }));
-              }
               return h("div", { class: "flex items-center gap-x-2" }, children);
             },
           };
@@ -161,6 +159,28 @@ export const useCommonSearchScopeOptions = (
               }),
           };
         }),
+      }),
+      label: () => ({
+        id: "label",
+        title: t("issue.advanced-search.scope.database-label.title"),
+        description: t(
+          "issue.advanced-search.scope.database-label.description"
+        ),
+        options: [] as ValueOption[],
+        allowMultiple: true,
+      }),
+      engine: () => ({
+        id: "engine",
+        title: t("issue.advanced-search.scope.engine.title"),
+        description: t("issue.advanced-search.scope.engine.description"),
+        options: supportedEngineV1List().map((engine) => {
+          return {
+            value: engine,
+            keywords: [engineToJSON(engine).toLowerCase()],
+            render: () => h(RichEngineName, { engine, tag: "p" }),
+          };
+        }),
+        allowMultiple: true,
       }),
     } as Record<SearchScopeId, () => ScopeOption>;
 

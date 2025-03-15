@@ -23,7 +23,6 @@ import (
 
 func init() {
 	base.RegisterSchemaDiffFunc(storepb.Engine_POSTGRES, SchemaDiff)
-	base.RegisterSchemaDiffFunc(storepb.Engine_COCKROACHDB, SchemaDiff)
 }
 
 // diffNode defines different modification types as the safe change order.
@@ -2140,13 +2139,13 @@ func getObjectID(schema, object string) string {
 
 func (diff *diffNode) getNewDatabaseMetadataFunc() base.GetDatabaseMetadataFunc {
 	return func(context.Context, string, string) (string, *model.DatabaseMetadata, error) {
-		return "", model.NewDatabaseMetadata(schemaMapToMetadata(diff.newSchemaMap)), nil
+		return "", model.NewDatabaseMetadata(schemaMapToMetadata(diff.newSchemaMap), true /* isObjectCaseSensitive */, true /* isDetailCaseSensitive */), nil
 	}
 }
 
 func (diff *diffNode) getOldDatabaseMetadataFunc() base.GetDatabaseMetadataFunc {
 	return func(context.Context, string, string) (string, *model.DatabaseMetadata, error) {
-		return "", model.NewDatabaseMetadata(schemaMapToMetadata(diff.oldSchemaMap)), nil
+		return "", model.NewDatabaseMetadata(schemaMapToMetadata(diff.oldSchemaMap), true /* isObjectCaseSensitive */, true /* isDetailCaseSensitive */), nil
 	}
 }
 

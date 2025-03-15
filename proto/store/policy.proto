@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package bytebase.store;
 
+import "google/protobuf/duration.proto";
 import "google/type/expr.proto";
 import "store/common.proto";
 
@@ -9,11 +10,10 @@ option go_package = "generated-go/store";
 
 message RolloutPolicy {
   bool automatic = 1;
-  repeated string workspace_roles = 2;
-  repeated string project_roles = 3;
+  repeated string roles = 2;
   // roles/LAST_APPROVER
   // roles/CREATOR
-  repeated string issue_roles = 4;
+  repeated string issue_roles = 3;
 }
 
 // MaskingExceptionPolicy is the allowlist of users who can access sensitive data.
@@ -106,11 +106,6 @@ message EnvironmentTierPolicy {
   string color = 2;
 }
 
-// SlowQueryPolicy is the policy configuration for slow query.
-message SlowQueryPolicy {
-  bool active = 1;
-}
-
 // DisableCopyDataPolicy is the policy configuration for disabling copying data.
 message DisableCopyDataPolicy {
   bool active = 1;
@@ -119,6 +114,12 @@ message DisableCopyDataPolicy {
 // ExportDataPolicy is the policy configuration for export data.
 message ExportDataPolicy {
   bool disable = 1;
+}
+
+// QueryDataPolicy is the policy configuration for querying data.
+message QueryDataPolicy {
+  // The query timeout duration.
+  google.protobuf.Duration timeout = 1;
 }
 
 // RestrictIssueCreationForSQLReviewPolicy is the policy configuration for restricting issue creation for SQL review.

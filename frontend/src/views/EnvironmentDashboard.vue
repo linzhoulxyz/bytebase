@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full flex flex-col gap-4 px-2 overflow-y-auto">
+  <div class="w-full flex flex-col gap-4 px-2">
     <NTabs
       type="line"
       :bar-width="200"
@@ -27,7 +27,6 @@
           class="flex items-center justify-end space-x-2 px-2 pb-1"
         >
           <NButton
-            size="small"
             v-if="
               hasWorkspacePermissionV2('bb.environments.list') &&
               hasWorkspacePermissionV2('bb.environments.update')
@@ -42,7 +41,6 @@
           <NButton
             v-if="hasWorkspacePermissionV2('bb.environments.create')"
             type="primary"
-            size="small"
             @click="createEnvironment"
           >
             <template #icon>
@@ -340,6 +338,6 @@ const renderTab = (env: Environment, index: number) => {
     }
   }
 
-  return h("div", { class: "flex items-center space-x-2" }, child);
+  return h("div", { class: "flex items-center space-x-2 py-1" }, child);
 };
 </script>

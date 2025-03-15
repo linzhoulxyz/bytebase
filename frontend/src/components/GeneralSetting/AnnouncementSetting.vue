@@ -3,7 +3,7 @@
     <div class="text-left lg:w-1/4">
       <div class="flex items-center space-x-2">
         <h1 class="text-2xl font-bold">
-          {{ $t("settings.general.workspace.announcement.self") }}
+          {{ title }}
         </h1>
         <FeatureBadge feature="bb.feature.announcement" />
       </div>
@@ -27,8 +27,8 @@
           <template #trigger>
             <div class="flex flex-wrap py-2 radio-set-row gap-4">
               <AnnouncementLevelSelect
-                v-model:level="state.announcement.level"
-                :allow-edit="allowEdit"
+                v-model:level="state.level"
+                :allow-edit="allowEdit && hasAnnouncementFeature"
               />
             </div>
           </template>
@@ -52,12 +52,12 @@
         <NTooltip placement="top-start" :disabled="allowEdit">
           <template #trigger>
             <NInput
-              v-model:value="state.announcement.text"
+              v-model:value="state.text"
               class="mb-3 w-full"
               :placeholder="
                 $t('settings.general.workspace.announcement-text.placeholder')
               "
-              :disabled="!allowEdit"
+              :disabled="!allowEdit || !hasAnnouncementFeature"
             />
           </template>
           <span class="text-sm text-gray-400 -translate-y-2">
@@ -77,12 +77,12 @@
         <NTooltip placement="top-start" :disabled="allowEdit">
           <template #trigger>
             <NInput
-              v-model:value="state.announcement.link"
+              v-model:value="state.link"
               class="mb-5 w-full"
               :placeholder="
                 $t('settings.general.workspace.extra-link.placeholder')
               "
-              :disabled="!allowEdit"
+              :disabled="!allowEdit || !hasAnnouncementFeature"
             />
           </template>
           <span class="text-sm text-gray-400 -translate-y-2">
@@ -93,125 +93,60 @@
             }}
           </span>
         </NTooltip>
-
-        <div class="flex justify-end">
-          <NButton
-            type="primary"
-            :disabled="!allowEdit || !allowSave"
-            @click.prevent="updateAnnouncementSetting"
-          >
-            <FeatureBadge
-              feature="bb.feature.announcement"
-              custom-class="mr-1 text-white pointer-events-none"
-            />
-            {{ $t("common.update") }}
-          </NButton>
-        </div>
       </div>
     </div>
-
-    <FeatureModal
-      feature="bb.feature.announcement"
-      :open="state.showFeatureModal"
-      @cancel="state.showFeatureModal = false"
-    />
   </div>
 </template>
 
 <script lang="ts" setup>
 import { cloneDeep, isEqual } from "lodash-es";
-import { NButton, NInput, NTooltip } from "naive-ui";
-import { computed, reactive, watchEffect } from "vue";
-import { useI18n } from "vue-i18n";
+import { NInput, NTooltip } from "naive-ui";
+import { computed, reactive } from "vue";
 import { AnnouncementLevelSelect } from "@/components/v2";
-import { pushNotification, featureToRef } from "@/store";
+import { featureToRef } from "@/store";
 import { useSettingV1Store } from "@/store/modules/v1/setting";
-import type { Announcement } from "@/types/proto/v1/setting_service";
+import { Announcement } from "@/types/proto/v1/setting_service";
 import { Announcement_AlertLevel } from "@/types/proto/v1/setting_service";
-import { FeatureBadge, FeatureModal } from "../FeatureGuard";
+import { FeatureBadge } from "../FeatureGuard";
 
-interface LocalState {
-  announcement: Announcement;
-  showFeatureModal: boolean;
-}
-
-defineProps<{
+const props = defineProps<{
+  title: string;
   allowEdit: boolean;
 }>();
 
-const { t } = useI18n();
 const settingV1Store = useSettingV1Store();
-const hasAnnouncementSetting = featureToRef("bb.feature.announcement");
+const hasAnnouncementFeature = featureToRef("bb.feature.announcement");
 
-const defaultAnnouncement = function (): Announcement {
-  return {
-    level: Announcement_AlertLevel.ALERT_LEVEL_INFO,
-    text: "",
-    link: "",
-  };
-};
+const rawAnnouncement = computed(() =>
+  cloneDeep(
+    settingV1Store.workspaceProfileSetting?.announcement ??
+      Announcement.fromPartial({
+        level: Announcement_AlertLevel.ALERT_LEVEL_INFO,
+      })
+  )
+);
 
-const state = reactive<LocalState>({
-  announcement: defaultAnnouncement(),
-  showFeatureModal: false,
-});
-
-watchEffect(() => {
-  const announcement = settingV1Store.workspaceProfileSetting?.announcement;
-  if (announcement) {
-    state.announcement = cloneDeep(announcement);
-  }
-});
+const state = reactive<Announcement>(rawAnnouncement.value);
 
 const allowSave = computed((): boolean => {
-  if (
-    settingV1Store.workspaceProfileSetting?.announcement === undefined &&
-    state.announcement.text === ""
-  ) {
-    return false;
-  }
-
-  return !isEqual(
-    settingV1Store.workspaceProfileSetting?.announcement,
-    state.announcement
-  );
+  return !isEqual(rawAnnouncement.value, state);
 });
 
 const updateAnnouncementSetting = async () => {
-  if (!hasAnnouncementSetting.value) {
-    state.showFeatureModal = true;
-    return;
-  }
-
-  if (state.announcement.text === "" && state.announcement.link !== "") {
-    state.announcement.link = "";
-  }
-
-  // remove announcement setting from store if both text and link are empty regardless of level.
-  let announcement: Announcement | undefined = cloneDeep(state.announcement);
-  if (announcement.text === "" && announcement.link === "") {
-    announcement = undefined;
-  }
-
   await settingV1Store.updateWorkspaceProfile({
     payload: {
-      announcement: announcement,
+      announcement: { ...state },
     },
     updateMask: ["value.workspace_profile_setting_value.announcement"],
   });
-  pushNotification({
-    module: "bytebase",
-    style: "SUCCESS",
-    title: t("settings.general.workspace.announcement.update-success"),
-  });
-
-  const currentSetting: Announcement | undefined = cloneDeep(
-    settingV1Store.workspaceProfileSetting?.announcement
-  );
-  if (currentSetting === undefined) {
-    state.announcement = defaultAnnouncement();
-  } else {
-    state.announcement = cloneDeep(currentSetting);
-  }
 };
+
+defineExpose({
+  isDirty: allowSave,
+  title: props.title,
+  update: updateAnnouncementSetting,
+  revert: () => {
+    Object.assign(state, rawAnnouncement.value);
+  },
+});
 </script>

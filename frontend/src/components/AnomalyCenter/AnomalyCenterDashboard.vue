@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col space-y-4">
+  <div v-if="!loading" class="flex flex-col space-y-4">
     <FeatureAttentionForInstanceLicense
       v-if="hasSchemaDriftFeature"
       feature="bb.feature.schema-drift"
@@ -75,21 +75,27 @@
       }}
     </div>
   </div>
+  <div v-else class="flex justify-center items-center py-10">
+    <BBSpin />
+  </div>
 </template>
 
 <script lang="ts" setup>
 import { computed, onMounted, ref } from "vue";
+import { BBSpin } from "@/bbkit";
 import type { BBTableSectionDataSource } from "@/bbkit/types";
 import {
   featureToRef,
   useAnomalyV1Store,
   useDatabaseV1Store,
   useEnvironmentV1List,
+  batchGetOrFetchDatabases,
 } from "@/store";
-import type { ComposedProject } from "@/types";
+import type { ComposedDatabase, ComposedProject } from "@/types";
+import { isValidDatabaseName } from "@/types";
 import type { Anomaly } from "@/types/proto/v1/anomaly_service";
 import { Anomaly_AnomalySeverity } from "@/types/proto/v1/anomaly_service";
-import { databaseV1Url, sortDatabaseV1List } from "@/utils";
+import { databaseV1Url } from "@/utils";
 import {
   FeatureAttention,
   FeatureAttentionForInstanceLicense,
@@ -103,6 +109,10 @@ type Summary = {
   mediumCount: number;
 };
 
+interface LocalDataSource extends BBTableSectionDataSource<Anomaly> {
+  database: ComposedDatabase;
+}
+
 const props = defineProps<{
   project: ComposedProject;
 }>();
@@ -110,6 +120,7 @@ const props = defineProps<{
 const databaseStore = useDatabaseV1Store();
 const environmentList = useEnvironmentV1List(false /* !showDeleted */);
 const allAnomalyList = ref<Anomaly[]>([]);
+const loading = ref(true);
 
 onMounted(async () => {
   // Prepare all anomaly list.
@@ -117,48 +128,42 @@ onMounted(async () => {
     props.project?.name,
     {}
   );
-});
-
-const databaseListByProject = computed(() => {
-  return sortDatabaseV1List(
-    databaseStore.databaseListByUser.filter((db) => {
-      return props.project.name === db.project;
-    })
+  await batchGetOrFetchDatabases(
+    allAnomalyList.value.map((anomaly) => anomaly.resource)
   );
+  loading.value = false;
 });
 
-const databaseAnomalySectionList = computed(
-  (): BBTableSectionDataSource<Anomaly>[] => {
-    const sectionList: BBTableSectionDataSource<Anomaly>[] = [];
+const databaseAnomalySectionList = computed((): LocalDataSource[] => {
+  const sectionMap: Map<string, LocalDataSource> = new Map();
 
-    for (const database of databaseListByProject.value) {
-      const anomalyListOfDatabase = allAnomalyList.value.filter(
-        (anomaly) => anomaly.resource === database.name
-      );
-
-      if (anomalyListOfDatabase.length > 0) {
-        sectionList.push({
+  for (const anomaly of allAnomalyList.value) {
+    const database = databaseStore.getDatabaseByName(anomaly.resource);
+    if (isValidDatabaseName(database.name)) {
+      if (!sectionMap.has(database.name)) {
+        sectionMap.set(database.name, {
+          database,
           title: `${database.databaseName} (${database.effectiveEnvironmentEntity.title})`,
           link: databaseV1Url(database),
-          list: anomalyListOfDatabase,
+          list: [],
         });
       }
+      sectionMap.get(database.name)!.list.push(anomaly);
     }
-
-    return sectionList;
   }
-);
+
+  return [...sectionMap.values()];
+});
 
 const databaseAnomalySummaryList = computed((): Summary[] => {
   const envMap: Map<string, Summary> = new Map();
-  for (const database of databaseListByProject.value) {
+  for (const item of databaseAnomalySectionList.value) {
+    const { database, list } = item;
     let criticalCount = 0;
     let highCount = 0;
     let mediumCount = 0;
-    const anomalyListOfDatabase = allAnomalyList.value.filter(
-      (anomaly) => anomaly.resource === database.name
-    );
-    for (const anomaly of anomalyListOfDatabase) {
+
+    for (const anomaly of list) {
       switch (anomaly.severity) {
         case Anomaly_AnomalySeverity.CRITICAL:
           criticalCount++;

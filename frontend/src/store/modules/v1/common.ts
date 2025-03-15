@@ -14,12 +14,9 @@ export const settingNamePrefix = "settings/";
 export const sheetNamePrefix = "sheets/";
 export const worksheetNamePrefix = "worksheets/";
 export const databaseGroupNamePrefix = "databaseGroups/";
-export const vcsProviderPrefix = "vcsProviders/";
-export const vcsConnectorPrefix = "vcsConnectors/";
 export const logNamePrefix = "logs/";
 export const issueNamePrefix = "issues/";
 export const secretNamePrefix = "secrets/";
-export const branchNamePrefix = "branches/";
 export const ssoNamePrefix = "idps/";
 export const issueCommentNamePrefix = "issueComments/";
 export const groupNamePrefix = "groups/";
@@ -105,15 +102,6 @@ export const getWorksheetId = (name: string): string => {
   return tokens[0];
 };
 
-export const getProjectAndBranchId = (name: string): string[] => {
-  const branchRegex = /^projects\/([^/]+)\/branches\/(.+)$/;
-  const matches = name.match(branchRegex);
-  if (!matches || matches.length != 3) {
-    return ["", ""];
-  }
-  return [matches[1], matches[2]];
-};
-
 export const getInstanceId = (name: string): string[] => {
   const tokens = getNameParentTokens(name, [instanceNamePrefix]);
   if (tokens.length !== 1) {
@@ -135,8 +123,9 @@ export const getInstanceAndDatabaseId = (name: string): string[] => {
   return tokens;
 };
 
-export const getUserEmailFromIdentifier = (identifier: string): string => {
-  return identifier.replace(/^(user:|users\/)/, "");
+export const extractUserId = (identifier: string) => {
+  const matches = identifier.match(/^(?:user:|users\/)(.+)$/);
+  return matches?.[1] ?? identifier;
 };
 
 export const getIdentityProviderResourceId = (name: string): ResourceId => {
@@ -155,29 +144,6 @@ export const getProjectNameAndDatabaseGroupName = (name: string): string[] => {
   }
 
   return tokens;
-};
-
-export const getProjectPathFromRepoName = (repoName: string): string => {
-  return repoName.split("/gitOpsInfo")[0];
-};
-
-export const getVCSProviderId = (name: string): string => {
-  const tokens = getNameParentTokens(name, [vcsProviderPrefix]);
-  return tokens[0];
-};
-
-export const getVCSConnectorId = (
-  name: string
-): { projectId: string; vcsConnectorId: string } => {
-  const tokens = getNameParentTokens(name, [
-    projectNamePrefix,
-    vcsConnectorPrefix,
-  ]);
-  if (tokens.length !== 2) {
-    return { projectId: "", vcsConnectorId: "" };
-  }
-
-  return { projectId: tokens[0], vcsConnectorId: tokens[1] };
 };
 
 export const getSSOId = (name: string) => {

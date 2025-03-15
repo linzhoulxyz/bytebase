@@ -93,20 +93,19 @@ func (e *StatementAdviseExecutor) Run(ctx context.Context, config *storepb.PlanC
 	changeType := config.ChangeDatabaseType
 	preUpdateBackupDetail := config.PreUpdateBackupDetail
 
-	instanceUID := int(config.InstanceUid)
-	instance, err := e.store.GetInstanceV2(ctx, &store.FindInstanceMessage{UID: &instanceUID})
+	instance, err := e.store.GetInstanceV2(ctx, &store.FindInstanceMessage{ResourceID: &config.InstanceId})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get instance UID %v", instanceUID)
+		return nil, errors.Wrapf(err, "failed to get instance %s", config.InstanceId)
 	}
 	if instance == nil {
-		return nil, errors.Errorf("instance not found UID %v", instanceUID)
+		return nil, errors.Errorf("instance %s not found", config.InstanceId)
 	}
-	if !common.StatementAdviseEngines[instance.Engine] {
+	if !common.StatementAdviseEngines[instance.Metadata.GetEngine()] {
 		return []*storepb.PlanCheckRunResult_Result{
 			{
 				Status:  storepb.PlanCheckRunResult_Result_SUCCESS,
 				Code:    common.Ok.Int32(),
-				Title:   fmt.Sprintf("Statement advise is not supported for %s", instance.Engine),
+				Title:   fmt.Sprintf("Statement advise is not supported for %s", instance.Metadata.GetEngine()),
 				Content: "",
 			},
 		}, nil
@@ -152,10 +151,10 @@ func (e *StatementAdviseExecutor) runReview(
 		return nil, err
 	}
 	if dbSchema == nil {
-		return nil, errors.Errorf("database schema not found: %d", database.UID)
+		return nil, errors.Errorf("database schema %s not found", database.String())
 	}
 	if dbSchema.GetMetadata() == nil {
-		return nil, errors.Errorf("database schema metadata not found: %d", database.UID)
+		return nil, errors.Errorf("database schema metadata %s not found", database.String())
 	}
 
 	reviewConfig, err := e.store.GetReviewConfigForDatabase(ctx, database)
@@ -168,7 +167,7 @@ func (e *StatementAdviseExecutor) runReview(
 		}
 	}
 
-	catalog, err := catalog.NewCatalog(ctx, e.store, database.InstanceID, database.DatabaseName, instance.Engine, store.IgnoreDatabaseAndTableCaseSensitive(instance), nil /* Override Metadata */)
+	catalog, err := catalog.NewCatalog(ctx, e.store, database.InstanceID, database.DatabaseName, instance.Metadata.GetEngine(), store.IsObjectCaseSensitive(instance), nil /* Override Metadata */)
 	if err != nil {
 		return nil, common.Wrapf(err, common.Internal, "failed to create a catalog")
 	}
@@ -192,20 +191,20 @@ func (e *StatementAdviseExecutor) runReview(
 	renderedStatement := utils.RenderStatement(statement, materials)
 	classificationConfig := getClassificationByProject(ctx, e.store, database.ProjectID)
 
-	adviceList, err := advisor.SQLReviewCheck(e.sheetManager, renderedStatement, reviewConfig.SqlReviewRules, advisor.SQLReviewCheckContext{
+	adviceList, err := advisor.SQLReviewCheck(ctx, e.sheetManager, renderedStatement, reviewConfig.SqlReviewRules, advisor.SQLReviewCheckContext{
 		Charset:                  dbSchema.GetMetadata().CharacterSet,
 		Collation:                dbSchema.GetMetadata().Collation,
 		DBSchema:                 dbSchema.GetMetadata(),
 		ChangeType:               changeType,
-		DbType:                   instance.Engine,
+		DbType:                   instance.Metadata.GetEngine(),
 		Catalog:                  catalog,
 		Driver:                   connection,
-		Context:                  ctx,
 		PreUpdateBackupDetail:    preUpdateBackupDetail,
 		ClassificationConfig:     classificationConfig,
 		UsePostgresDatabaseOwner: useDatabaseOwner,
 		ListDatabaseNamesFunc:    e.buildListDatabaseNamesFunc(),
 		InstanceID:               instance.ResourceID,
+		IsObjectCaseSensitive:    store.IsObjectCaseSensitive(instance),
 	})
 	if err != nil {
 		return nil, err

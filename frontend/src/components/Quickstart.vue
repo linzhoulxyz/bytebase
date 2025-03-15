@@ -107,6 +107,7 @@
 </template>
 
 <script setup lang="ts">
+import { computedAsync } from "@vueuse/core";
 import { XIcon, CheckCircleIcon } from "lucide-vue-next";
 import type { Ref } from "vue";
 import { computed, unref, watchEffect } from "vue";
@@ -125,7 +126,7 @@ import {
   pushNotification,
   useUIStateStore,
   useProjectV1Store,
-  useActiveUsers,
+  useUserStore,
 } from "@/store";
 import { projectNamePrefix } from "@/store/modules/v1/common";
 import type { Permission } from "@/types";
@@ -151,14 +152,16 @@ type IntroItem = {
 const { t } = useI18n();
 const projectStore = useProjectV1Store();
 const uiStateStore = useUIStateStore();
+const userStore = useUserStore();
 
 const show = computed(() => {
   return !uiStateStore.getIntroStateByKey("hidden");
 });
 
-const sampleProject = computed(() => {
-  const project = projectStore.getProjectByName(
-    `${projectNamePrefix}${SAMPLE_PROJECT_NAME}`
+const sampleProject = computedAsync(async () => {
+  const project = await projectStore.getOrFetchProjectByName(
+    `${projectNamePrefix}${SAMPLE_PROJECT_NAME}`,
+    true /* silent */
   );
   if (!isValidProjectName(project.name)) {
     return;
@@ -248,7 +251,9 @@ const introList = computed(() => {
   );
 });
 
-const isFirstUser = computed(() => useActiveUsers().length === 1);
+const isFirstUser = computed(() => {
+  return userStore.activeUserCountWithoutBot === 1;
+});
 
 const showQuickstart = computed(() => {
   // Only show quickstart for the first user.

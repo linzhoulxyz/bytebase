@@ -1,4 +1,3 @@
-import { startCase } from "lodash-es";
 import {
   Database,
   CircleDot,
@@ -9,7 +8,6 @@ import {
   PencilRuler,
   SearchCodeIcon,
   DownloadIcon,
-  SquareGanttChartIcon,
   PackageIcon,
 } from "lucide-vue-next";
 import { computed, h, unref } from "vue";
@@ -21,15 +19,12 @@ import projectV1Routes, {
   PROJECT_V1_ROUTE_DATABASES,
   PROJECT_V1_ROUTE_ISSUES,
   PROJECT_V1_ROUTE_SYNC_SCHEMA,
-  PROJECT_V1_ROUTE_SLOW_QUERIES,
   PROJECT_V1_ROUTE_ANOMALIES,
-  PROJECT_V1_ROUTE_GITOPS,
   PROJECT_V1_ROUTE_MEMBERS,
   PROJECT_V1_ROUTE_SETTINGS,
   PROJECT_V1_ROUTE_WEBHOOKS,
   PROJECT_V1_ROUTE_CHANGELISTS,
   PROJECT_V1_ROUTE_DATABASE_GROUPS,
-  PROJECT_V1_ROUTE_DEPLOYMENT_CONFIG,
   PROJECT_V1_ROUTE_EXPORT_CENTER,
   PROJECT_V1_ROUTE_AUDIT_LOGS,
   PROJECT_V1_ROUTE_REVIEW_CENTER,
@@ -147,11 +142,6 @@ export const useProjectSidebar = (
             hide: databaseChangeMode.value === DatabaseChangeMode.EDITOR,
           },
           {
-            title: startCase(t("slow-query.slow-queries")),
-            path: PROJECT_V1_ROUTE_SLOW_QUERIES,
-            type: "div",
-          },
-          {
             title: t("common.anomalies"),
             path: PROJECT_V1_ROUTE_ANOMALIES,
             type: "div",
@@ -213,11 +203,6 @@ export const useProjectSidebar = (
         expand: true,
         children: [
           {
-            title: t("common.gitops"),
-            path: PROJECT_V1_ROUTE_GITOPS,
-            type: "div",
-          },
-          {
             title: t("common.webhooks"),
             path: PROJECT_V1_ROUTE_WEBHOOKS,
             type: "div",
@@ -247,15 +232,6 @@ export const useProjectSidebar = (
             type: "div",
           },
         ],
-      },
-      {
-        title: t("common.deployment-config"),
-        icon: () => h(SquareGanttChartIcon),
-        path: PROJECT_V1_ROUTE_DEPLOYMENT_CONFIG,
-        type: "div",
-        hide:
-          isDefaultProject.value ||
-          databaseChangeMode.value === DatabaseChangeMode.EDITOR,
       },
       {
         title: t("common.setting"),

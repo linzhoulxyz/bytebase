@@ -1,5 +1,3 @@
-import { orderBy } from "lodash-es";
-import { allowGhostForDatabase } from "@/components/IssueV1/components/Sidebar/GhostSection/common";
 import { checkQuerierPermission, hasFeature } from "@/store";
 import {
   databaseNamePrefix,
@@ -46,19 +44,6 @@ export const extractDatabaseResourceName = (
   };
 };
 
-export const sortDatabaseV1List = (databaseList: ComposedDatabase[]) => {
-  return orderBy(
-    databaseList,
-    [
-      (db) => db.effectiveEnvironmentEntity.order,
-      (db) => db.instance,
-      (db) => db.projectEntity.name,
-      (db) => db.databaseName,
-    ],
-    ["asc", "asc", "asc", "asc"]
-  );
-};
-
 export const isArchivedDatabaseV1 = (db: ComposedDatabase): boolean => {
   if (db.effectiveEnvironmentEntity.state === State.DELETED) {
     return true;
@@ -99,56 +84,3 @@ export const isDatabaseV1Queryable = (
   // denied otherwise
   return false;
 };
-
-type DatabaseV1FilterFields = "name" | "project" | "instance" | "environment";
-export function filterDatabaseV1ByKeyword(
-  db: ComposedDatabase,
-  keyword: string,
-  columns: DatabaseV1FilterFields[] = ["name"]
-): boolean {
-  keyword = keyword.trim().toLowerCase();
-  if (!keyword) {
-    // Skip the filter
-    return true;
-  }
-
-  if (
-    columns.includes("name") &&
-    db.databaseName.toLowerCase().includes(keyword)
-  ) {
-    return true;
-  }
-
-  if (
-    columns.includes("project") &&
-    db.projectEntity.title.toLowerCase().includes(keyword)
-  ) {
-    return true;
-  }
-
-  if (
-    columns.includes("instance") &&
-    db.instanceResource.title.toLowerCase().includes(keyword)
-  ) {
-    return true;
-  }
-
-  if (
-    columns.includes("environment") &&
-    db.effectiveEnvironmentEntity.title.toLowerCase().includes(keyword)
-  ) {
-    return true;
-  }
-
-  return false;
-}
-
-export const MIN_GHOST_SUPPORT_MYSQL_VERSION = "5.6.0";
-
-export const MIN_GHOST_SUPPORT_MARIADB_VERSION = "10.6.0";
-
-export function allowGhostMigrationV1(
-  databaseList: ComposedDatabase[]
-): boolean {
-  return databaseList.every((db) => allowGhostForDatabase(db));
-}

@@ -7,7 +7,6 @@
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import Long from "long";
-import { Duration } from "../google/protobuf/duration";
 import { Empty } from "../google/protobuf/empty";
 import { FieldMask } from "../google/protobuf/field_mask";
 import { Timestamp } from "../google/protobuf/timestamp";
@@ -143,55 +142,18 @@ export interface GetDatabaseRequest {
   name: string;
 }
 
-export interface ListInstanceDatabasesRequest {
-  /**
-   * The parent, which owns this collection of databases.
-   * - instances/{instance}: list all databases for an instance. Use
-   * "instances/-" to list all databases.
-   */
-  parent: string;
-  /**
-   * The maximum number of databases to return. The service may return fewer
-   * than this value. If unspecified, at most 10 databases will be returned.
-   */
-  pageSize: number;
-  /**
-   * A page token, received from a previous `ListInstanceDatabases` call.
-   * Provide this to retrieve the subsequent page.
-   *
-   * When paginating, all other parameters provided to `ListInstanceDatabases`
-   * must match the call that provided the page token.
-   */
-  pageToken: string;
-  /**
-   * Deprecated.
-   * Filter is used to filter databases returned in the list.
-   * For example, `project == "projects/{project}"` can be used to list
-   * databases in a project. Note: the project filter will be moved to parent.
-   */
-  filter: string;
-}
-
-export interface ListInstanceDatabasesResponse {
-  /** The databases from the specified request. */
-  databases: Database[];
-  /**
-   * A token, which can be sent as `page_token` to retrieve the next page.
-   * If this field is omitted, there are no subsequent pages.
-   */
-  nextPageToken: string;
-}
-
 export interface ListDatabasesRequest {
   /**
-   * The parent, which owns this collection of databases.
-   * - projects/{project}: list all databases in a project.
-   * - workspaces/{workspace}: list all databases in a workspace.
+   * - projects/{project}: list databases in a project, require "bb.projects.get" permission.
+   * - workspaces/-: list databases in the workspace, require "bb.databases.list" permission.
+   * - instances/{instances}: list databases in a instance, require "bb.instances.get" permission
    */
   parent: string;
   /**
    * The maximum number of databases to return. The service may return fewer
-   * than this value. If unspecified, at most 10 databases will be returned.
+   * than this value.
+   * If unspecified, at most 10 databases will be returned.
+   * The maximum value is 1000; values above 1000 will be coerced to 1000.
    */
   pageSize: number;
   /**
@@ -202,6 +164,33 @@ export interface ListDatabasesRequest {
    * match the call that provided the page token.
    */
   pageToken: string;
+  /**
+   * Filter is used to filter databases returned in the list.
+   * Supported filter:
+   * - environment
+   * - name
+   * - project
+   * - instance
+   * - engine
+   * - label
+   * - exclude_unassigned: Not show unassigned databases if specified
+   *
+   * For example:
+   * environment == "environments/{environment resource id}"
+   * project == "projects/{project resource id}"
+   * instance == "instances/{instance resource id}"
+   * name.matches("database name")
+   * engine == "MYSQL"
+   * engine in ["MYSQL", "POSTGRES"]
+   * !(engine in ["MYSQL", "POSTGRES"])
+   * label == "region:asia"
+   * label == "tenant:asia,europe"
+   * label == "region:asia" && label == "tenant:bytebase"
+   * exclude_unassigned == true
+   */
+  filter: string;
+  /** Show deleted database if specified. */
+  showDeleted: boolean;
 }
 
 export interface ListDatabasesResponse {
@@ -320,8 +309,8 @@ export interface Database {
    * {database} is the database name in the instance.
    */
   name: string;
-  /** The existence of a database on latest sync. */
-  syncState: State;
+  /** The existence of a database. */
+  state: State;
   /** The latest synchronization time. */
   successfulSyncTime:
     | Timestamp
@@ -417,6 +406,7 @@ export interface SchemaMetadata {
   sequences: SequenceMetadata[];
   events: EventMetadata[];
   enumTypes: EnumTypeMetadata[];
+  skipDump: boolean;
 }
 
 export interface EnumTypeMetadata {
@@ -425,6 +415,7 @@ export interface EnumTypeMetadata {
   /** The enum values of a type. */
   values: string[];
   comment: string;
+  skipDump: boolean;
 }
 
 export interface EventMetadata {
@@ -463,6 +454,7 @@ export interface SequenceMetadata {
   /** The owner column of the sequence. */
   ownerColumn: string;
   comment: string;
+  skipDump: boolean;
 }
 
 export interface TriggerMetadata {
@@ -481,6 +473,7 @@ export interface TriggerMetadata {
   characterSetClient: string;
   collationConnection: string;
   comment: string;
+  skipDump: boolean;
 }
 
 export interface ExternalTableMetadata {
@@ -538,6 +531,7 @@ export interface TableMetadata {
    */
   sortingKeys: string[];
   triggers: TriggerMetadata[];
+  skipDump: boolean;
 }
 
 /** CheckConstraintMetadata is the metadata for check constraints. */
@@ -866,6 +860,7 @@ export interface ViewMetadata {
   columns: ColumnMetadata[];
   /** The triggers is the list of triggers in a view. */
   triggers: TriggerMetadata[];
+  skipDump: boolean;
 }
 
 /** DependencyColumn is the metadata for dependency columns. */
@@ -895,6 +890,7 @@ export interface MaterializedViewMetadata {
   triggers: TriggerMetadata[];
   /** The indexes is the list of indexes in a table. */
   indexes: IndexMetadata[];
+  skipDump: boolean;
 }
 
 export interface DependencyTable {
@@ -926,6 +922,7 @@ export interface FunctionMetadata {
    * For PostgreSQL, it's the list of tables that the function depends on the return type definition.
    */
   dependencyTables: DependencyTable[];
+  skipDump: boolean;
 }
 
 /** ProcedureMetadata is the metadata for procedures. */
@@ -944,6 +941,7 @@ export interface ProcedureMetadata {
   collationConnection: string;
   databaseCollation: string;
   sqlMode: string;
+  skipDump: boolean;
 }
 
 /** PackageMetadata is the metadata for packages. */
@@ -1247,117 +1245,6 @@ export interface DatabaseSchema {
   schema: string;
 }
 
-/** ListSlowQueriesRequest is the request of listing slow query. */
-export interface ListSlowQueriesRequest {
-  /** Format: projects/{project} */
-  parent: string;
-  /**
-   * The filter of the slow query log.
-   * follow the
-   * [ebnf](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form)
-   * syntax. Support filter by database and start_time in SlowQueryDetails for
-   * now. For example: Search the slow query log of the specific database:
-   *   - the specific database: database =
-   *   "instances/{instance}/databases/{database}"
-   * Search the slow query log that start_time after 2022-01-01T12:00:00.000Z:
-   *   - start_time > "2022-01-01T12:00:00.000Z"
-   *   - Should use [RFC-3339 format](https://www.rfc-editor.org/rfc/rfc3339).
-   *   - Currently we only support filtering down to date granularity.
-   */
-  filter: string;
-  /**
-   * The order by of the slow query log.
-   * Support order by count, latest_log_time, average_query_time,
-   * maximum_query_time, average_rows_sent, maximum_rows_sent,
-   * average_rows_examined, maximum_rows_examined for now. For example:
-   *  - order by count: order_by = "count"
-   *  - order by latest_log_time desc: order_by = "latest_log_time desc"
-   * Default: order by average_query_time desc.
-   */
-  orderBy: string;
-}
-
-/** ListSlowQueriesResponse is the response of listing slow query. */
-export interface ListSlowQueriesResponse {
-  /** The slow query logs. */
-  slowQueryLogs: SlowQueryLog[];
-}
-
-/** SlowQueryLog is the slow query log. */
-export interface SlowQueryLog {
-  /**
-   * The resource of the slow query log.
-   * The format is "instances/{instance}/databases/{database}".
-   */
-  resource: string;
-  /**
-   * The project of the slow query log.
-   * The format is "projects/{project}".
-   */
-  project: string;
-  /** The statistics of the slow query log. */
-  statistics: SlowQueryStatistics | undefined;
-}
-
-/** SlowQueryStatistics is the statistics of the slow query log. */
-export interface SlowQueryStatistics {
-  /** The fingerprint of the slow query log. */
-  sqlFingerprint: string;
-  /** The count of the slow query log. */
-  count: Long;
-  /** The latest log time of the slow query log. */
-  latestLogTime:
-    | Timestamp
-    | undefined;
-  /** The average query time of the slow query log. */
-  averageQueryTime:
-    | Duration
-    | undefined;
-  /** The maximum query time of the slow query log. */
-  maximumQueryTime:
-    | Duration
-    | undefined;
-  /** The average rows sent of the slow query log. */
-  averageRowsSent: Long;
-  /** The maximum rows sent of the slow query log. */
-  maximumRowsSent: Long;
-  /** The average rows examined of the slow query log. */
-  averageRowsExamined: Long;
-  /** The maximum rows examined of the slow query log. */
-  maximumRowsExamined: Long;
-  /** The percentage of the query time. */
-  queryTimePercent: number;
-  /** The percentage of the count. */
-  countPercent: number;
-  /**
-   * Samples are details of the sample slow query logs with the same
-   * fingerprint.
-   */
-  samples: SlowQueryDetails[];
-}
-
-/** SlowQueryDetails is the details of the slow query log. */
-export interface SlowQueryDetails {
-  /** The start time of the slow query log. */
-  startTime:
-    | Timestamp
-    | undefined;
-  /** The query time of the slow query log. */
-  queryTime:
-    | Duration
-    | undefined;
-  /** The lock time of the slow query log. */
-  lockTime:
-    | Duration
-    | undefined;
-  /** The rows sent of the slow query log. */
-  rowsSent: Long;
-  /** The rows examined of the slow query log. */
-  rowsExamined: Long;
-  /** The sql text of the slow query log. */
-  sqlText: string;
-}
-
 export interface ListSecretsRequest {
   /**
    * The parent of the secret.
@@ -1435,24 +1322,6 @@ export interface Secret {
   value: string;
   /** The description of the secret. */
   description: string;
-}
-
-/** AdviseIndexRequest is the request of advising index. */
-export interface AdviseIndexRequest {
-  /** Format: instances/{instance}/databases/{database} */
-  parent: string;
-  /** The statement to be advised. */
-  statement: string;
-}
-
-/** AdviseIndexResponse is the response of advising index. */
-export interface AdviseIndexResponse {
-  /** The current index of the statement used. */
-  currentIndex: string;
-  /** The suggested index of the statement. */
-  suggestion: string;
-  /** The create index statement of the suggested index. */
-  createIndexStatement: string;
 }
 
 export interface ChangedResources {
@@ -1630,7 +1499,7 @@ export interface ListChangelogsRequest {
    * syntax. Support filter by type, source or table. For example: table =
    * "tableExists('{database}', '{schema}', '{table}')" table =
    * "tableExists('db', 'public', 'table1') || tableExists('db', 'public',
-   * 'table2')" type = "MIGRATE | DATA" source = "UI" source = "VCS"
+   * 'table2')"
    *
    * The table filter follow the CEL syntax.
    * currently, we have one function for CEL:
@@ -1849,6 +1718,129 @@ export function changelog_TypeToNumber(object: Changelog_Type): number {
   }
 }
 
+export interface GetSchemaStringRequest {
+  /**
+   * The name of the database.
+   * Format: instances/{instance}/databases/{database}
+   */
+  name: string;
+  type: GetSchemaStringRequest_ObjectType;
+  /** It's empty for DATABASE. */
+  schema: string;
+  /** It's empty for DATABASE and SCHEMA. */
+  object: string;
+  /**
+   * If use the metadata to generate the schema string, the type is OBJECT_TYPE_UNSPECIFIED.
+   * Also the schema and object are empty.
+   */
+  metadata: DatabaseMetadata | undefined;
+}
+
+export enum GetSchemaStringRequest_ObjectType {
+  OBJECT_TYPE_UNSPECIFIED = "OBJECT_TYPE_UNSPECIFIED",
+  DATABASE = "DATABASE",
+  SCHEMA = "SCHEMA",
+  TABLE = "TABLE",
+  VIEW = "VIEW",
+  MATERIALIZED_VIEW = "MATERIALIZED_VIEW",
+  FUNCTION = "FUNCTION",
+  PROCEDURE = "PROCEDURE",
+  SEQUENCE = "SEQUENCE",
+  UNRECOGNIZED = "UNRECOGNIZED",
+}
+
+export function getSchemaStringRequest_ObjectTypeFromJSON(object: any): GetSchemaStringRequest_ObjectType {
+  switch (object) {
+    case 0:
+    case "OBJECT_TYPE_UNSPECIFIED":
+      return GetSchemaStringRequest_ObjectType.OBJECT_TYPE_UNSPECIFIED;
+    case 1:
+    case "DATABASE":
+      return GetSchemaStringRequest_ObjectType.DATABASE;
+    case 2:
+    case "SCHEMA":
+      return GetSchemaStringRequest_ObjectType.SCHEMA;
+    case 3:
+    case "TABLE":
+      return GetSchemaStringRequest_ObjectType.TABLE;
+    case 4:
+    case "VIEW":
+      return GetSchemaStringRequest_ObjectType.VIEW;
+    case 5:
+    case "MATERIALIZED_VIEW":
+      return GetSchemaStringRequest_ObjectType.MATERIALIZED_VIEW;
+    case 6:
+    case "FUNCTION":
+      return GetSchemaStringRequest_ObjectType.FUNCTION;
+    case 7:
+    case "PROCEDURE":
+      return GetSchemaStringRequest_ObjectType.PROCEDURE;
+    case 8:
+    case "SEQUENCE":
+      return GetSchemaStringRequest_ObjectType.SEQUENCE;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return GetSchemaStringRequest_ObjectType.UNRECOGNIZED;
+  }
+}
+
+export function getSchemaStringRequest_ObjectTypeToJSON(object: GetSchemaStringRequest_ObjectType): string {
+  switch (object) {
+    case GetSchemaStringRequest_ObjectType.OBJECT_TYPE_UNSPECIFIED:
+      return "OBJECT_TYPE_UNSPECIFIED";
+    case GetSchemaStringRequest_ObjectType.DATABASE:
+      return "DATABASE";
+    case GetSchemaStringRequest_ObjectType.SCHEMA:
+      return "SCHEMA";
+    case GetSchemaStringRequest_ObjectType.TABLE:
+      return "TABLE";
+    case GetSchemaStringRequest_ObjectType.VIEW:
+      return "VIEW";
+    case GetSchemaStringRequest_ObjectType.MATERIALIZED_VIEW:
+      return "MATERIALIZED_VIEW";
+    case GetSchemaStringRequest_ObjectType.FUNCTION:
+      return "FUNCTION";
+    case GetSchemaStringRequest_ObjectType.PROCEDURE:
+      return "PROCEDURE";
+    case GetSchemaStringRequest_ObjectType.SEQUENCE:
+      return "SEQUENCE";
+    case GetSchemaStringRequest_ObjectType.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export function getSchemaStringRequest_ObjectTypeToNumber(object: GetSchemaStringRequest_ObjectType): number {
+  switch (object) {
+    case GetSchemaStringRequest_ObjectType.OBJECT_TYPE_UNSPECIFIED:
+      return 0;
+    case GetSchemaStringRequest_ObjectType.DATABASE:
+      return 1;
+    case GetSchemaStringRequest_ObjectType.SCHEMA:
+      return 2;
+    case GetSchemaStringRequest_ObjectType.TABLE:
+      return 3;
+    case GetSchemaStringRequest_ObjectType.VIEW:
+      return 4;
+    case GetSchemaStringRequest_ObjectType.MATERIALIZED_VIEW:
+      return 5;
+    case GetSchemaStringRequest_ObjectType.FUNCTION:
+      return 6;
+    case GetSchemaStringRequest_ObjectType.PROCEDURE:
+      return 7;
+    case GetSchemaStringRequest_ObjectType.SEQUENCE:
+      return 8;
+    case GetSchemaStringRequest_ObjectType.UNRECOGNIZED:
+    default:
+      return -1;
+  }
+}
+
+export interface GetSchemaStringResponse {
+  schemaString: string;
+}
+
 function createBaseGetDatabaseRequest(): GetDatabaseRequest {
   return { name: "" };
 }
@@ -1907,194 +1899,8 @@ export const GetDatabaseRequest: MessageFns<GetDatabaseRequest> = {
   },
 };
 
-function createBaseListInstanceDatabasesRequest(): ListInstanceDatabasesRequest {
-  return { parent: "", pageSize: 0, pageToken: "", filter: "" };
-}
-
-export const ListInstanceDatabasesRequest: MessageFns<ListInstanceDatabasesRequest> = {
-  encode(message: ListInstanceDatabasesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.parent !== "") {
-      writer.uint32(10).string(message.parent);
-    }
-    if (message.pageSize !== 0) {
-      writer.uint32(16).int32(message.pageSize);
-    }
-    if (message.pageToken !== "") {
-      writer.uint32(26).string(message.pageToken);
-    }
-    if (message.filter !== "") {
-      writer.uint32(34).string(message.filter);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ListInstanceDatabasesRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseListInstanceDatabasesRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.parent = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.pageSize = reader.int32();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.pageToken = reader.string();
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.filter = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ListInstanceDatabasesRequest {
-    return {
-      parent: isSet(object.parent) ? globalThis.String(object.parent) : "",
-      pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
-      pageToken: isSet(object.pageToken) ? globalThis.String(object.pageToken) : "",
-      filter: isSet(object.filter) ? globalThis.String(object.filter) : "",
-    };
-  },
-
-  toJSON(message: ListInstanceDatabasesRequest): unknown {
-    const obj: any = {};
-    if (message.parent !== "") {
-      obj.parent = message.parent;
-    }
-    if (message.pageSize !== 0) {
-      obj.pageSize = Math.round(message.pageSize);
-    }
-    if (message.pageToken !== "") {
-      obj.pageToken = message.pageToken;
-    }
-    if (message.filter !== "") {
-      obj.filter = message.filter;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<ListInstanceDatabasesRequest>): ListInstanceDatabasesRequest {
-    return ListInstanceDatabasesRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<ListInstanceDatabasesRequest>): ListInstanceDatabasesRequest {
-    const message = createBaseListInstanceDatabasesRequest();
-    message.parent = object.parent ?? "";
-    message.pageSize = object.pageSize ?? 0;
-    message.pageToken = object.pageToken ?? "";
-    message.filter = object.filter ?? "";
-    return message;
-  },
-};
-
-function createBaseListInstanceDatabasesResponse(): ListInstanceDatabasesResponse {
-  return { databases: [], nextPageToken: "" };
-}
-
-export const ListInstanceDatabasesResponse: MessageFns<ListInstanceDatabasesResponse> = {
-  encode(message: ListInstanceDatabasesResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.databases) {
-      Database.encode(v!, writer.uint32(10).fork()).join();
-    }
-    if (message.nextPageToken !== "") {
-      writer.uint32(18).string(message.nextPageToken);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ListInstanceDatabasesResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseListInstanceDatabasesResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.databases.push(Database.decode(reader, reader.uint32()));
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.nextPageToken = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ListInstanceDatabasesResponse {
-    return {
-      databases: globalThis.Array.isArray(object?.databases)
-        ? object.databases.map((e: any) => Database.fromJSON(e))
-        : [],
-      nextPageToken: isSet(object.nextPageToken) ? globalThis.String(object.nextPageToken) : "",
-    };
-  },
-
-  toJSON(message: ListInstanceDatabasesResponse): unknown {
-    const obj: any = {};
-    if (message.databases?.length) {
-      obj.databases = message.databases.map((e) => Database.toJSON(e));
-    }
-    if (message.nextPageToken !== "") {
-      obj.nextPageToken = message.nextPageToken;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<ListInstanceDatabasesResponse>): ListInstanceDatabasesResponse {
-    return ListInstanceDatabasesResponse.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<ListInstanceDatabasesResponse>): ListInstanceDatabasesResponse {
-    const message = createBaseListInstanceDatabasesResponse();
-    message.databases = object.databases?.map((e) => Database.fromPartial(e)) || [];
-    message.nextPageToken = object.nextPageToken ?? "";
-    return message;
-  },
-};
-
 function createBaseListDatabasesRequest(): ListDatabasesRequest {
-  return { parent: "", pageSize: 0, pageToken: "" };
+  return { parent: "", pageSize: 0, pageToken: "", filter: "", showDeleted: false };
 }
 
 export const ListDatabasesRequest: MessageFns<ListDatabasesRequest> = {
@@ -2107,6 +1913,12 @@ export const ListDatabasesRequest: MessageFns<ListDatabasesRequest> = {
     }
     if (message.pageToken !== "") {
       writer.uint32(26).string(message.pageToken);
+    }
+    if (message.filter !== "") {
+      writer.uint32(34).string(message.filter);
+    }
+    if (message.showDeleted !== false) {
+      writer.uint32(40).bool(message.showDeleted);
     }
     return writer;
   },
@@ -2142,6 +1954,22 @@ export const ListDatabasesRequest: MessageFns<ListDatabasesRequest> = {
           message.pageToken = reader.string();
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.filter = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.showDeleted = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2156,6 +1984,8 @@ export const ListDatabasesRequest: MessageFns<ListDatabasesRequest> = {
       parent: isSet(object.parent) ? globalThis.String(object.parent) : "",
       pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
       pageToken: isSet(object.pageToken) ? globalThis.String(object.pageToken) : "",
+      filter: isSet(object.filter) ? globalThis.String(object.filter) : "",
+      showDeleted: isSet(object.showDeleted) ? globalThis.Boolean(object.showDeleted) : false,
     };
   },
 
@@ -2170,6 +2000,12 @@ export const ListDatabasesRequest: MessageFns<ListDatabasesRequest> = {
     if (message.pageToken !== "") {
       obj.pageToken = message.pageToken;
     }
+    if (message.filter !== "") {
+      obj.filter = message.filter;
+    }
+    if (message.showDeleted !== false) {
+      obj.showDeleted = message.showDeleted;
+    }
     return obj;
   },
 
@@ -2181,6 +2017,8 @@ export const ListDatabasesRequest: MessageFns<ListDatabasesRequest> = {
     message.parent = object.parent ?? "";
     message.pageSize = object.pageSize ?? 0;
     message.pageToken = object.pageToken ?? "";
+    message.filter = object.filter ?? "";
+    message.showDeleted = object.showDeleted ?? false;
     return message;
   },
 };
@@ -2921,7 +2759,7 @@ export const DiffSchemaResponse: MessageFns<DiffSchemaResponse> = {
 function createBaseDatabase(): Database {
   return {
     name: "",
-    syncState: State.STATE_UNSPECIFIED,
+    state: State.STATE_UNSPECIFIED,
     successfulSyncTime: undefined,
     project: "",
     schemaVersion: "",
@@ -2938,8 +2776,8 @@ export const Database: MessageFns<Database> = {
     if (message.name !== "") {
       writer.uint32(10).string(message.name);
     }
-    if (message.syncState !== State.STATE_UNSPECIFIED) {
-      writer.uint32(24).int32(stateToNumber(message.syncState));
+    if (message.state !== State.STATE_UNSPECIFIED) {
+      writer.uint32(24).int32(stateToNumber(message.state));
     }
     if (message.successfulSyncTime !== undefined) {
       Timestamp.encode(message.successfulSyncTime, writer.uint32(34).fork()).join();
@@ -2988,7 +2826,7 @@ export const Database: MessageFns<Database> = {
             break;
           }
 
-          message.syncState = stateFromJSON(reader.int32());
+          message.state = stateFromJSON(reader.int32());
           continue;
         }
         case 4: {
@@ -3070,7 +2908,7 @@ export const Database: MessageFns<Database> = {
   fromJSON(object: any): Database {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
-      syncState: isSet(object.syncState) ? stateFromJSON(object.syncState) : State.STATE_UNSPECIFIED,
+      state: isSet(object.state) ? stateFromJSON(object.state) : State.STATE_UNSPECIFIED,
       successfulSyncTime: isSet(object.successfulSyncTime) ? fromJsonTimestamp(object.successfulSyncTime) : undefined,
       project: isSet(object.project) ? globalThis.String(object.project) : "",
       schemaVersion: isSet(object.schemaVersion) ? globalThis.String(object.schemaVersion) : "",
@@ -3092,8 +2930,8 @@ export const Database: MessageFns<Database> = {
     if (message.name !== "") {
       obj.name = message.name;
     }
-    if (message.syncState !== State.STATE_UNSPECIFIED) {
-      obj.syncState = stateToJSON(message.syncState);
+    if (message.state !== State.STATE_UNSPECIFIED) {
+      obj.state = stateToJSON(message.state);
     }
     if (message.successfulSyncTime !== undefined) {
       obj.successfulSyncTime = fromTimestamp(message.successfulSyncTime).toISOString();
@@ -3134,7 +2972,7 @@ export const Database: MessageFns<Database> = {
   fromPartial(object: DeepPartial<Database>): Database {
     const message = createBaseDatabase();
     message.name = object.name ?? "";
-    message.syncState = object.syncState ?? State.STATE_UNSPECIFIED;
+    message.state = object.state ?? State.STATE_UNSPECIFIED;
     message.successfulSyncTime = (object.successfulSyncTime !== undefined && object.successfulSyncTime !== null)
       ? Timestamp.fromPartial(object.successfulSyncTime)
       : undefined;
@@ -3392,6 +3230,7 @@ function createBaseSchemaMetadata(): SchemaMetadata {
     sequences: [],
     events: [],
     enumTypes: [],
+    skipDump: false,
   };
 }
 
@@ -3438,6 +3277,9 @@ export const SchemaMetadata: MessageFns<SchemaMetadata> = {
     }
     for (const v of message.enumTypes) {
       EnumTypeMetadata.encode(v!, writer.uint32(122).fork()).join();
+    }
+    if (message.skipDump !== false) {
+      writer.uint32(128).bool(message.skipDump);
     }
     return writer;
   },
@@ -3561,6 +3403,14 @@ export const SchemaMetadata: MessageFns<SchemaMetadata> = {
           message.enumTypes.push(EnumTypeMetadata.decode(reader, reader.uint32()));
           continue;
         }
+        case 16: {
+          if (tag !== 128) {
+            break;
+          }
+
+          message.skipDump = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3602,6 +3452,7 @@ export const SchemaMetadata: MessageFns<SchemaMetadata> = {
       enumTypes: globalThis.Array.isArray(object?.enumTypes)
         ? object.enumTypes.map((e: any) => EnumTypeMetadata.fromJSON(e))
         : [],
+      skipDump: isSet(object.skipDump) ? globalThis.Boolean(object.skipDump) : false,
     };
   },
 
@@ -3649,6 +3500,9 @@ export const SchemaMetadata: MessageFns<SchemaMetadata> = {
     if (message.enumTypes?.length) {
       obj.enumTypes = message.enumTypes.map((e) => EnumTypeMetadata.toJSON(e));
     }
+    if (message.skipDump !== false) {
+      obj.skipDump = message.skipDump;
+    }
     return obj;
   },
 
@@ -3671,12 +3525,13 @@ export const SchemaMetadata: MessageFns<SchemaMetadata> = {
     message.sequences = object.sequences?.map((e) => SequenceMetadata.fromPartial(e)) || [];
     message.events = object.events?.map((e) => EventMetadata.fromPartial(e)) || [];
     message.enumTypes = object.enumTypes?.map((e) => EnumTypeMetadata.fromPartial(e)) || [];
+    message.skipDump = object.skipDump ?? false;
     return message;
   },
 };
 
 function createBaseEnumTypeMetadata(): EnumTypeMetadata {
-  return { name: "", values: [], comment: "" };
+  return { name: "", values: [], comment: "", skipDump: false };
 }
 
 export const EnumTypeMetadata: MessageFns<EnumTypeMetadata> = {
@@ -3689,6 +3544,9 @@ export const EnumTypeMetadata: MessageFns<EnumTypeMetadata> = {
     }
     if (message.comment !== "") {
       writer.uint32(26).string(message.comment);
+    }
+    if (message.skipDump !== false) {
+      writer.uint32(32).bool(message.skipDump);
     }
     return writer;
   },
@@ -3724,6 +3582,14 @@ export const EnumTypeMetadata: MessageFns<EnumTypeMetadata> = {
           message.comment = reader.string();
           continue;
         }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.skipDump = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3738,6 +3604,7 @@ export const EnumTypeMetadata: MessageFns<EnumTypeMetadata> = {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
       values: globalThis.Array.isArray(object?.values) ? object.values.map((e: any) => globalThis.String(e)) : [],
       comment: isSet(object.comment) ? globalThis.String(object.comment) : "",
+      skipDump: isSet(object.skipDump) ? globalThis.Boolean(object.skipDump) : false,
     };
   },
 
@@ -3752,6 +3619,9 @@ export const EnumTypeMetadata: MessageFns<EnumTypeMetadata> = {
     if (message.comment !== "") {
       obj.comment = message.comment;
     }
+    if (message.skipDump !== false) {
+      obj.skipDump = message.skipDump;
+    }
     return obj;
   },
 
@@ -3763,6 +3633,7 @@ export const EnumTypeMetadata: MessageFns<EnumTypeMetadata> = {
     message.name = object.name ?? "";
     message.values = object.values?.map((e) => e) || [];
     message.comment = object.comment ?? "";
+    message.skipDump = object.skipDump ?? false;
     return message;
   },
 };
@@ -3921,6 +3792,7 @@ function createBaseSequenceMetadata(): SequenceMetadata {
     ownerTable: "",
     ownerColumn: "",
     comment: "",
+    skipDump: false,
   };
 }
 
@@ -3961,6 +3833,9 @@ export const SequenceMetadata: MessageFns<SequenceMetadata> = {
     }
     if (message.comment !== "") {
       writer.uint32(98).string(message.comment);
+    }
+    if (message.skipDump !== false) {
+      writer.uint32(104).bool(message.skipDump);
     }
     return writer;
   },
@@ -4068,6 +3943,14 @@ export const SequenceMetadata: MessageFns<SequenceMetadata> = {
           message.comment = reader.string();
           continue;
         }
+        case 13: {
+          if (tag !== 104) {
+            break;
+          }
+
+          message.skipDump = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -4091,6 +3974,7 @@ export const SequenceMetadata: MessageFns<SequenceMetadata> = {
       ownerTable: isSet(object.ownerTable) ? globalThis.String(object.ownerTable) : "",
       ownerColumn: isSet(object.ownerColumn) ? globalThis.String(object.ownerColumn) : "",
       comment: isSet(object.comment) ? globalThis.String(object.comment) : "",
+      skipDump: isSet(object.skipDump) ? globalThis.Boolean(object.skipDump) : false,
     };
   },
 
@@ -4132,6 +4016,9 @@ export const SequenceMetadata: MessageFns<SequenceMetadata> = {
     if (message.comment !== "") {
       obj.comment = message.comment;
     }
+    if (message.skipDump !== false) {
+      obj.skipDump = message.skipDump;
+    }
     return obj;
   },
 
@@ -4152,6 +4039,7 @@ export const SequenceMetadata: MessageFns<SequenceMetadata> = {
     message.ownerTable = object.ownerTable ?? "";
     message.ownerColumn = object.ownerColumn ?? "";
     message.comment = object.comment ?? "";
+    message.skipDump = object.skipDump ?? false;
     return message;
   },
 };
@@ -4166,6 +4054,7 @@ function createBaseTriggerMetadata(): TriggerMetadata {
     characterSetClient: "",
     collationConnection: "",
     comment: "",
+    skipDump: false,
   };
 }
 
@@ -4194,6 +4083,9 @@ export const TriggerMetadata: MessageFns<TriggerMetadata> = {
     }
     if (message.comment !== "") {
       writer.uint32(74).string(message.comment);
+    }
+    if (message.skipDump !== false) {
+      writer.uint32(80).bool(message.skipDump);
     }
     return writer;
   },
@@ -4269,6 +4161,14 @@ export const TriggerMetadata: MessageFns<TriggerMetadata> = {
           message.comment = reader.string();
           continue;
         }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.skipDump = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -4288,6 +4188,7 @@ export const TriggerMetadata: MessageFns<TriggerMetadata> = {
       characterSetClient: isSet(object.characterSetClient) ? globalThis.String(object.characterSetClient) : "",
       collationConnection: isSet(object.collationConnection) ? globalThis.String(object.collationConnection) : "",
       comment: isSet(object.comment) ? globalThis.String(object.comment) : "",
+      skipDump: isSet(object.skipDump) ? globalThis.Boolean(object.skipDump) : false,
     };
   },
 
@@ -4317,6 +4218,9 @@ export const TriggerMetadata: MessageFns<TriggerMetadata> = {
     if (message.comment !== "") {
       obj.comment = message.comment;
     }
+    if (message.skipDump !== false) {
+      obj.skipDump = message.skipDump;
+    }
     return obj;
   },
 
@@ -4333,6 +4237,7 @@ export const TriggerMetadata: MessageFns<TriggerMetadata> = {
     message.characterSetClient = object.characterSetClient ?? "";
     message.collationConnection = object.collationConnection ?? "";
     message.comment = object.comment ?? "";
+    message.skipDump = object.skipDump ?? false;
     return message;
   },
 };
@@ -4468,6 +4373,7 @@ function createBaseTableMetadata(): TableMetadata {
     owner: "",
     sortingKeys: [],
     triggers: [],
+    skipDump: false,
   };
 }
 
@@ -4529,6 +4435,9 @@ export const TableMetadata: MessageFns<TableMetadata> = {
     }
     for (const v of message.triggers) {
       TriggerMetadata.encode(v!, writer.uint32(162).fork()).join();
+    }
+    if (message.skipDump !== false) {
+      writer.uint32(168).bool(message.skipDump);
     }
     return writer;
   },
@@ -4692,6 +4601,14 @@ export const TableMetadata: MessageFns<TableMetadata> = {
           message.triggers.push(TriggerMetadata.decode(reader, reader.uint32()));
           continue;
         }
+        case 21: {
+          if (tag !== 168) {
+            break;
+          }
+
+          message.skipDump = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -4736,6 +4653,7 @@ export const TableMetadata: MessageFns<TableMetadata> = {
       triggers: globalThis.Array.isArray(object?.triggers)
         ? object.triggers.map((e: any) => TriggerMetadata.fromJSON(e))
         : [],
+      skipDump: isSet(object.skipDump) ? globalThis.Boolean(object.skipDump) : false,
     };
   },
 
@@ -4798,6 +4716,9 @@ export const TableMetadata: MessageFns<TableMetadata> = {
     if (message.triggers?.length) {
       obj.triggers = message.triggers.map((e) => TriggerMetadata.toJSON(e));
     }
+    if (message.skipDump !== false) {
+      obj.skipDump = message.skipDump;
+    }
     return obj;
   },
 
@@ -4833,6 +4754,7 @@ export const TableMetadata: MessageFns<TableMetadata> = {
     message.owner = object.owner ?? "";
     message.sortingKeys = object.sortingKeys?.map((e) => e) || [];
     message.triggers = object.triggers?.map((e) => TriggerMetadata.fromPartial(e)) || [];
+    message.skipDump = object.skipDump ?? false;
     return message;
   },
 };
@@ -5467,7 +5389,7 @@ export const GenerationMetadata: MessageFns<GenerationMetadata> = {
 };
 
 function createBaseViewMetadata(): ViewMetadata {
-  return { name: "", definition: "", comment: "", dependencyColumns: [], columns: [], triggers: [] };
+  return { name: "", definition: "", comment: "", dependencyColumns: [], columns: [], triggers: [], skipDump: false };
 }
 
 export const ViewMetadata: MessageFns<ViewMetadata> = {
@@ -5489,6 +5411,9 @@ export const ViewMetadata: MessageFns<ViewMetadata> = {
     }
     for (const v of message.triggers) {
       TriggerMetadata.encode(v!, writer.uint32(50).fork()).join();
+    }
+    if (message.skipDump !== false) {
+      writer.uint32(56).bool(message.skipDump);
     }
     return writer;
   },
@@ -5548,6 +5473,14 @@ export const ViewMetadata: MessageFns<ViewMetadata> = {
           message.triggers.push(TriggerMetadata.decode(reader, reader.uint32()));
           continue;
         }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.skipDump = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5571,6 +5504,7 @@ export const ViewMetadata: MessageFns<ViewMetadata> = {
       triggers: globalThis.Array.isArray(object?.triggers)
         ? object.triggers.map((e: any) => TriggerMetadata.fromJSON(e))
         : [],
+      skipDump: isSet(object.skipDump) ? globalThis.Boolean(object.skipDump) : false,
     };
   },
 
@@ -5594,6 +5528,9 @@ export const ViewMetadata: MessageFns<ViewMetadata> = {
     if (message.triggers?.length) {
       obj.triggers = message.triggers.map((e) => TriggerMetadata.toJSON(e));
     }
+    if (message.skipDump !== false) {
+      obj.skipDump = message.skipDump;
+    }
     return obj;
   },
 
@@ -5608,6 +5545,7 @@ export const ViewMetadata: MessageFns<ViewMetadata> = {
     message.dependencyColumns = object.dependencyColumns?.map((e) => DependencyColumn.fromPartial(e)) || [];
     message.columns = object.columns?.map((e) => ColumnMetadata.fromPartial(e)) || [];
     message.triggers = object.triggers?.map((e) => TriggerMetadata.fromPartial(e)) || [];
+    message.skipDump = object.skipDump ?? false;
     return message;
   },
 };
@@ -5705,7 +5643,7 @@ export const DependencyColumn: MessageFns<DependencyColumn> = {
 };
 
 function createBaseMaterializedViewMetadata(): MaterializedViewMetadata {
-  return { name: "", definition: "", comment: "", dependencyColumns: [], triggers: [], indexes: [] };
+  return { name: "", definition: "", comment: "", dependencyColumns: [], triggers: [], indexes: [], skipDump: false };
 }
 
 export const MaterializedViewMetadata: MessageFns<MaterializedViewMetadata> = {
@@ -5727,6 +5665,9 @@ export const MaterializedViewMetadata: MessageFns<MaterializedViewMetadata> = {
     }
     for (const v of message.indexes) {
       IndexMetadata.encode(v!, writer.uint32(50).fork()).join();
+    }
+    if (message.skipDump !== false) {
+      writer.uint32(56).bool(message.skipDump);
     }
     return writer;
   },
@@ -5786,6 +5727,14 @@ export const MaterializedViewMetadata: MessageFns<MaterializedViewMetadata> = {
           message.indexes.push(IndexMetadata.decode(reader, reader.uint32()));
           continue;
         }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.skipDump = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5809,6 +5758,7 @@ export const MaterializedViewMetadata: MessageFns<MaterializedViewMetadata> = {
       indexes: globalThis.Array.isArray(object?.indexes)
         ? object.indexes.map((e: any) => IndexMetadata.fromJSON(e))
         : [],
+      skipDump: isSet(object.skipDump) ? globalThis.Boolean(object.skipDump) : false,
     };
   },
 
@@ -5832,6 +5782,9 @@ export const MaterializedViewMetadata: MessageFns<MaterializedViewMetadata> = {
     if (message.indexes?.length) {
       obj.indexes = message.indexes.map((e) => IndexMetadata.toJSON(e));
     }
+    if (message.skipDump !== false) {
+      obj.skipDump = message.skipDump;
+    }
     return obj;
   },
 
@@ -5846,6 +5799,7 @@ export const MaterializedViewMetadata: MessageFns<MaterializedViewMetadata> = {
     message.dependencyColumns = object.dependencyColumns?.map((e) => DependencyColumn.fromPartial(e)) || [];
     message.triggers = object.triggers?.map((e) => TriggerMetadata.fromPartial(e)) || [];
     message.indexes = object.indexes?.map((e) => IndexMetadata.fromPartial(e)) || [];
+    message.skipDump = object.skipDump ?? false;
     return message;
   },
 };
@@ -5937,6 +5891,7 @@ function createBaseFunctionMetadata(): FunctionMetadata {
     sqlMode: "",
     comment: "",
     dependencyTables: [],
+    skipDump: false,
   };
 }
 
@@ -5968,6 +5923,9 @@ export const FunctionMetadata: MessageFns<FunctionMetadata> = {
     }
     for (const v of message.dependencyTables) {
       DependencyTable.encode(v!, writer.uint32(74).fork()).join();
+    }
+    if (message.skipDump !== false) {
+      writer.uint32(80).bool(message.skipDump);
     }
     return writer;
   },
@@ -6051,6 +6009,14 @@ export const FunctionMetadata: MessageFns<FunctionMetadata> = {
           message.dependencyTables.push(DependencyTable.decode(reader, reader.uint32()));
           continue;
         }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.skipDump = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -6073,6 +6039,7 @@ export const FunctionMetadata: MessageFns<FunctionMetadata> = {
       dependencyTables: globalThis.Array.isArray(object?.dependencyTables)
         ? object.dependencyTables.map((e: any) => DependencyTable.fromJSON(e))
         : [],
+      skipDump: isSet(object.skipDump) ? globalThis.Boolean(object.skipDump) : false,
     };
   },
 
@@ -6105,6 +6072,9 @@ export const FunctionMetadata: MessageFns<FunctionMetadata> = {
     if (message.dependencyTables?.length) {
       obj.dependencyTables = message.dependencyTables.map((e) => DependencyTable.toJSON(e));
     }
+    if (message.skipDump !== false) {
+      obj.skipDump = message.skipDump;
+    }
     return obj;
   },
 
@@ -6122,6 +6092,7 @@ export const FunctionMetadata: MessageFns<FunctionMetadata> = {
     message.sqlMode = object.sqlMode ?? "";
     message.comment = object.comment ?? "";
     message.dependencyTables = object.dependencyTables?.map((e) => DependencyTable.fromPartial(e)) || [];
+    message.skipDump = object.skipDump ?? false;
     return message;
   },
 };
@@ -6135,6 +6106,7 @@ function createBaseProcedureMetadata(): ProcedureMetadata {
     collationConnection: "",
     databaseCollation: "",
     sqlMode: "",
+    skipDump: false,
   };
 }
 
@@ -6160,6 +6132,9 @@ export const ProcedureMetadata: MessageFns<ProcedureMetadata> = {
     }
     if (message.sqlMode !== "") {
       writer.uint32(58).string(message.sqlMode);
+    }
+    if (message.skipDump !== false) {
+      writer.uint32(64).bool(message.skipDump);
     }
     return writer;
   },
@@ -6227,6 +6202,14 @@ export const ProcedureMetadata: MessageFns<ProcedureMetadata> = {
           message.sqlMode = reader.string();
           continue;
         }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.skipDump = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -6245,6 +6228,7 @@ export const ProcedureMetadata: MessageFns<ProcedureMetadata> = {
       collationConnection: isSet(object.collationConnection) ? globalThis.String(object.collationConnection) : "",
       databaseCollation: isSet(object.databaseCollation) ? globalThis.String(object.databaseCollation) : "",
       sqlMode: isSet(object.sqlMode) ? globalThis.String(object.sqlMode) : "",
+      skipDump: isSet(object.skipDump) ? globalThis.Boolean(object.skipDump) : false,
     };
   },
 
@@ -6271,6 +6255,9 @@ export const ProcedureMetadata: MessageFns<ProcedureMetadata> = {
     if (message.sqlMode !== "") {
       obj.sqlMode = message.sqlMode;
     }
+    if (message.skipDump !== false) {
+      obj.skipDump = message.skipDump;
+    }
     return obj;
   },
 
@@ -6286,6 +6273,7 @@ export const ProcedureMetadata: MessageFns<ProcedureMetadata> = {
     message.collationConnection = object.collationConnection ?? "";
     message.databaseCollation = object.databaseCollation ?? "";
     message.sqlMode = object.sqlMode ?? "";
+    message.skipDump = object.skipDump ?? false;
     return message;
   },
 };
@@ -7426,676 +7414,6 @@ export const DatabaseSchema: MessageFns<DatabaseSchema> = {
   },
 };
 
-function createBaseListSlowQueriesRequest(): ListSlowQueriesRequest {
-  return { parent: "", filter: "", orderBy: "" };
-}
-
-export const ListSlowQueriesRequest: MessageFns<ListSlowQueriesRequest> = {
-  encode(message: ListSlowQueriesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.parent !== "") {
-      writer.uint32(10).string(message.parent);
-    }
-    if (message.filter !== "") {
-      writer.uint32(18).string(message.filter);
-    }
-    if (message.orderBy !== "") {
-      writer.uint32(26).string(message.orderBy);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ListSlowQueriesRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseListSlowQueriesRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.parent = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.filter = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.orderBy = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ListSlowQueriesRequest {
-    return {
-      parent: isSet(object.parent) ? globalThis.String(object.parent) : "",
-      filter: isSet(object.filter) ? globalThis.String(object.filter) : "",
-      orderBy: isSet(object.orderBy) ? globalThis.String(object.orderBy) : "",
-    };
-  },
-
-  toJSON(message: ListSlowQueriesRequest): unknown {
-    const obj: any = {};
-    if (message.parent !== "") {
-      obj.parent = message.parent;
-    }
-    if (message.filter !== "") {
-      obj.filter = message.filter;
-    }
-    if (message.orderBy !== "") {
-      obj.orderBy = message.orderBy;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<ListSlowQueriesRequest>): ListSlowQueriesRequest {
-    return ListSlowQueriesRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<ListSlowQueriesRequest>): ListSlowQueriesRequest {
-    const message = createBaseListSlowQueriesRequest();
-    message.parent = object.parent ?? "";
-    message.filter = object.filter ?? "";
-    message.orderBy = object.orderBy ?? "";
-    return message;
-  },
-};
-
-function createBaseListSlowQueriesResponse(): ListSlowQueriesResponse {
-  return { slowQueryLogs: [] };
-}
-
-export const ListSlowQueriesResponse: MessageFns<ListSlowQueriesResponse> = {
-  encode(message: ListSlowQueriesResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.slowQueryLogs) {
-      SlowQueryLog.encode(v!, writer.uint32(10).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ListSlowQueriesResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseListSlowQueriesResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.slowQueryLogs.push(SlowQueryLog.decode(reader, reader.uint32()));
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ListSlowQueriesResponse {
-    return {
-      slowQueryLogs: globalThis.Array.isArray(object?.slowQueryLogs)
-        ? object.slowQueryLogs.map((e: any) => SlowQueryLog.fromJSON(e))
-        : [],
-    };
-  },
-
-  toJSON(message: ListSlowQueriesResponse): unknown {
-    const obj: any = {};
-    if (message.slowQueryLogs?.length) {
-      obj.slowQueryLogs = message.slowQueryLogs.map((e) => SlowQueryLog.toJSON(e));
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<ListSlowQueriesResponse>): ListSlowQueriesResponse {
-    return ListSlowQueriesResponse.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<ListSlowQueriesResponse>): ListSlowQueriesResponse {
-    const message = createBaseListSlowQueriesResponse();
-    message.slowQueryLogs = object.slowQueryLogs?.map((e) => SlowQueryLog.fromPartial(e)) || [];
-    return message;
-  },
-};
-
-function createBaseSlowQueryLog(): SlowQueryLog {
-  return { resource: "", project: "", statistics: undefined };
-}
-
-export const SlowQueryLog: MessageFns<SlowQueryLog> = {
-  encode(message: SlowQueryLog, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.resource !== "") {
-      writer.uint32(10).string(message.resource);
-    }
-    if (message.project !== "") {
-      writer.uint32(18).string(message.project);
-    }
-    if (message.statistics !== undefined) {
-      SlowQueryStatistics.encode(message.statistics, writer.uint32(26).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SlowQueryLog {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSlowQueryLog();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.resource = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.project = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.statistics = SlowQueryStatistics.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): SlowQueryLog {
-    return {
-      resource: isSet(object.resource) ? globalThis.String(object.resource) : "",
-      project: isSet(object.project) ? globalThis.String(object.project) : "",
-      statistics: isSet(object.statistics) ? SlowQueryStatistics.fromJSON(object.statistics) : undefined,
-    };
-  },
-
-  toJSON(message: SlowQueryLog): unknown {
-    const obj: any = {};
-    if (message.resource !== "") {
-      obj.resource = message.resource;
-    }
-    if (message.project !== "") {
-      obj.project = message.project;
-    }
-    if (message.statistics !== undefined) {
-      obj.statistics = SlowQueryStatistics.toJSON(message.statistics);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<SlowQueryLog>): SlowQueryLog {
-    return SlowQueryLog.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<SlowQueryLog>): SlowQueryLog {
-    const message = createBaseSlowQueryLog();
-    message.resource = object.resource ?? "";
-    message.project = object.project ?? "";
-    message.statistics = (object.statistics !== undefined && object.statistics !== null)
-      ? SlowQueryStatistics.fromPartial(object.statistics)
-      : undefined;
-    return message;
-  },
-};
-
-function createBaseSlowQueryStatistics(): SlowQueryStatistics {
-  return {
-    sqlFingerprint: "",
-    count: Long.ZERO,
-    latestLogTime: undefined,
-    averageQueryTime: undefined,
-    maximumQueryTime: undefined,
-    averageRowsSent: Long.ZERO,
-    maximumRowsSent: Long.ZERO,
-    averageRowsExamined: Long.ZERO,
-    maximumRowsExamined: Long.ZERO,
-    queryTimePercent: 0,
-    countPercent: 0,
-    samples: [],
-  };
-}
-
-export const SlowQueryStatistics: MessageFns<SlowQueryStatistics> = {
-  encode(message: SlowQueryStatistics, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.sqlFingerprint !== "") {
-      writer.uint32(10).string(message.sqlFingerprint);
-    }
-    if (!message.count.equals(Long.ZERO)) {
-      writer.uint32(16).int64(message.count.toString());
-    }
-    if (message.latestLogTime !== undefined) {
-      Timestamp.encode(message.latestLogTime, writer.uint32(26).fork()).join();
-    }
-    if (message.averageQueryTime !== undefined) {
-      Duration.encode(message.averageQueryTime, writer.uint32(34).fork()).join();
-    }
-    if (message.maximumQueryTime !== undefined) {
-      Duration.encode(message.maximumQueryTime, writer.uint32(42).fork()).join();
-    }
-    if (!message.averageRowsSent.equals(Long.ZERO)) {
-      writer.uint32(48).int64(message.averageRowsSent.toString());
-    }
-    if (!message.maximumRowsSent.equals(Long.ZERO)) {
-      writer.uint32(56).int64(message.maximumRowsSent.toString());
-    }
-    if (!message.averageRowsExamined.equals(Long.ZERO)) {
-      writer.uint32(64).int64(message.averageRowsExamined.toString());
-    }
-    if (!message.maximumRowsExamined.equals(Long.ZERO)) {
-      writer.uint32(72).int64(message.maximumRowsExamined.toString());
-    }
-    if (message.queryTimePercent !== 0) {
-      writer.uint32(81).double(message.queryTimePercent);
-    }
-    if (message.countPercent !== 0) {
-      writer.uint32(89).double(message.countPercent);
-    }
-    for (const v of message.samples) {
-      SlowQueryDetails.encode(v!, writer.uint32(98).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SlowQueryStatistics {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSlowQueryStatistics();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.sqlFingerprint = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.count = Long.fromString(reader.int64().toString());
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.latestLogTime = Timestamp.decode(reader, reader.uint32());
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.averageQueryTime = Duration.decode(reader, reader.uint32());
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.maximumQueryTime = Duration.decode(reader, reader.uint32());
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.averageRowsSent = Long.fromString(reader.int64().toString());
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.maximumRowsSent = Long.fromString(reader.int64().toString());
-          continue;
-        }
-        case 8: {
-          if (tag !== 64) {
-            break;
-          }
-
-          message.averageRowsExamined = Long.fromString(reader.int64().toString());
-          continue;
-        }
-        case 9: {
-          if (tag !== 72) {
-            break;
-          }
-
-          message.maximumRowsExamined = Long.fromString(reader.int64().toString());
-          continue;
-        }
-        case 10: {
-          if (tag !== 81) {
-            break;
-          }
-
-          message.queryTimePercent = reader.double();
-          continue;
-        }
-        case 11: {
-          if (tag !== 89) {
-            break;
-          }
-
-          message.countPercent = reader.double();
-          continue;
-        }
-        case 12: {
-          if (tag !== 98) {
-            break;
-          }
-
-          message.samples.push(SlowQueryDetails.decode(reader, reader.uint32()));
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): SlowQueryStatistics {
-    return {
-      sqlFingerprint: isSet(object.sqlFingerprint) ? globalThis.String(object.sqlFingerprint) : "",
-      count: isSet(object.count) ? Long.fromValue(object.count) : Long.ZERO,
-      latestLogTime: isSet(object.latestLogTime) ? fromJsonTimestamp(object.latestLogTime) : undefined,
-      averageQueryTime: isSet(object.averageQueryTime) ? Duration.fromJSON(object.averageQueryTime) : undefined,
-      maximumQueryTime: isSet(object.maximumQueryTime) ? Duration.fromJSON(object.maximumQueryTime) : undefined,
-      averageRowsSent: isSet(object.averageRowsSent) ? Long.fromValue(object.averageRowsSent) : Long.ZERO,
-      maximumRowsSent: isSet(object.maximumRowsSent) ? Long.fromValue(object.maximumRowsSent) : Long.ZERO,
-      averageRowsExamined: isSet(object.averageRowsExamined) ? Long.fromValue(object.averageRowsExamined) : Long.ZERO,
-      maximumRowsExamined: isSet(object.maximumRowsExamined) ? Long.fromValue(object.maximumRowsExamined) : Long.ZERO,
-      queryTimePercent: isSet(object.queryTimePercent) ? globalThis.Number(object.queryTimePercent) : 0,
-      countPercent: isSet(object.countPercent) ? globalThis.Number(object.countPercent) : 0,
-      samples: globalThis.Array.isArray(object?.samples)
-        ? object.samples.map((e: any) => SlowQueryDetails.fromJSON(e))
-        : [],
-    };
-  },
-
-  toJSON(message: SlowQueryStatistics): unknown {
-    const obj: any = {};
-    if (message.sqlFingerprint !== "") {
-      obj.sqlFingerprint = message.sqlFingerprint;
-    }
-    if (!message.count.equals(Long.ZERO)) {
-      obj.count = (message.count || Long.ZERO).toString();
-    }
-    if (message.latestLogTime !== undefined) {
-      obj.latestLogTime = fromTimestamp(message.latestLogTime).toISOString();
-    }
-    if (message.averageQueryTime !== undefined) {
-      obj.averageQueryTime = Duration.toJSON(message.averageQueryTime);
-    }
-    if (message.maximumQueryTime !== undefined) {
-      obj.maximumQueryTime = Duration.toJSON(message.maximumQueryTime);
-    }
-    if (!message.averageRowsSent.equals(Long.ZERO)) {
-      obj.averageRowsSent = (message.averageRowsSent || Long.ZERO).toString();
-    }
-    if (!message.maximumRowsSent.equals(Long.ZERO)) {
-      obj.maximumRowsSent = (message.maximumRowsSent || Long.ZERO).toString();
-    }
-    if (!message.averageRowsExamined.equals(Long.ZERO)) {
-      obj.averageRowsExamined = (message.averageRowsExamined || Long.ZERO).toString();
-    }
-    if (!message.maximumRowsExamined.equals(Long.ZERO)) {
-      obj.maximumRowsExamined = (message.maximumRowsExamined || Long.ZERO).toString();
-    }
-    if (message.queryTimePercent !== 0) {
-      obj.queryTimePercent = message.queryTimePercent;
-    }
-    if (message.countPercent !== 0) {
-      obj.countPercent = message.countPercent;
-    }
-    if (message.samples?.length) {
-      obj.samples = message.samples.map((e) => SlowQueryDetails.toJSON(e));
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<SlowQueryStatistics>): SlowQueryStatistics {
-    return SlowQueryStatistics.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<SlowQueryStatistics>): SlowQueryStatistics {
-    const message = createBaseSlowQueryStatistics();
-    message.sqlFingerprint = object.sqlFingerprint ?? "";
-    message.count = (object.count !== undefined && object.count !== null) ? Long.fromValue(object.count) : Long.ZERO;
-    message.latestLogTime = (object.latestLogTime !== undefined && object.latestLogTime !== null)
-      ? Timestamp.fromPartial(object.latestLogTime)
-      : undefined;
-    message.averageQueryTime = (object.averageQueryTime !== undefined && object.averageQueryTime !== null)
-      ? Duration.fromPartial(object.averageQueryTime)
-      : undefined;
-    message.maximumQueryTime = (object.maximumQueryTime !== undefined && object.maximumQueryTime !== null)
-      ? Duration.fromPartial(object.maximumQueryTime)
-      : undefined;
-    message.averageRowsSent = (object.averageRowsSent !== undefined && object.averageRowsSent !== null)
-      ? Long.fromValue(object.averageRowsSent)
-      : Long.ZERO;
-    message.maximumRowsSent = (object.maximumRowsSent !== undefined && object.maximumRowsSent !== null)
-      ? Long.fromValue(object.maximumRowsSent)
-      : Long.ZERO;
-    message.averageRowsExamined = (object.averageRowsExamined !== undefined && object.averageRowsExamined !== null)
-      ? Long.fromValue(object.averageRowsExamined)
-      : Long.ZERO;
-    message.maximumRowsExamined = (object.maximumRowsExamined !== undefined && object.maximumRowsExamined !== null)
-      ? Long.fromValue(object.maximumRowsExamined)
-      : Long.ZERO;
-    message.queryTimePercent = object.queryTimePercent ?? 0;
-    message.countPercent = object.countPercent ?? 0;
-    message.samples = object.samples?.map((e) => SlowQueryDetails.fromPartial(e)) || [];
-    return message;
-  },
-};
-
-function createBaseSlowQueryDetails(): SlowQueryDetails {
-  return {
-    startTime: undefined,
-    queryTime: undefined,
-    lockTime: undefined,
-    rowsSent: Long.ZERO,
-    rowsExamined: Long.ZERO,
-    sqlText: "",
-  };
-}
-
-export const SlowQueryDetails: MessageFns<SlowQueryDetails> = {
-  encode(message: SlowQueryDetails, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.startTime !== undefined) {
-      Timestamp.encode(message.startTime, writer.uint32(10).fork()).join();
-    }
-    if (message.queryTime !== undefined) {
-      Duration.encode(message.queryTime, writer.uint32(18).fork()).join();
-    }
-    if (message.lockTime !== undefined) {
-      Duration.encode(message.lockTime, writer.uint32(26).fork()).join();
-    }
-    if (!message.rowsSent.equals(Long.ZERO)) {
-      writer.uint32(32).int64(message.rowsSent.toString());
-    }
-    if (!message.rowsExamined.equals(Long.ZERO)) {
-      writer.uint32(40).int64(message.rowsExamined.toString());
-    }
-    if (message.sqlText !== "") {
-      writer.uint32(50).string(message.sqlText);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SlowQueryDetails {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSlowQueryDetails();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.startTime = Timestamp.decode(reader, reader.uint32());
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.queryTime = Duration.decode(reader, reader.uint32());
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.lockTime = Duration.decode(reader, reader.uint32());
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.rowsSent = Long.fromString(reader.int64().toString());
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.rowsExamined = Long.fromString(reader.int64().toString());
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.sqlText = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): SlowQueryDetails {
-    return {
-      startTime: isSet(object.startTime) ? fromJsonTimestamp(object.startTime) : undefined,
-      queryTime: isSet(object.queryTime) ? Duration.fromJSON(object.queryTime) : undefined,
-      lockTime: isSet(object.lockTime) ? Duration.fromJSON(object.lockTime) : undefined,
-      rowsSent: isSet(object.rowsSent) ? Long.fromValue(object.rowsSent) : Long.ZERO,
-      rowsExamined: isSet(object.rowsExamined) ? Long.fromValue(object.rowsExamined) : Long.ZERO,
-      sqlText: isSet(object.sqlText) ? globalThis.String(object.sqlText) : "",
-    };
-  },
-
-  toJSON(message: SlowQueryDetails): unknown {
-    const obj: any = {};
-    if (message.startTime !== undefined) {
-      obj.startTime = fromTimestamp(message.startTime).toISOString();
-    }
-    if (message.queryTime !== undefined) {
-      obj.queryTime = Duration.toJSON(message.queryTime);
-    }
-    if (message.lockTime !== undefined) {
-      obj.lockTime = Duration.toJSON(message.lockTime);
-    }
-    if (!message.rowsSent.equals(Long.ZERO)) {
-      obj.rowsSent = (message.rowsSent || Long.ZERO).toString();
-    }
-    if (!message.rowsExamined.equals(Long.ZERO)) {
-      obj.rowsExamined = (message.rowsExamined || Long.ZERO).toString();
-    }
-    if (message.sqlText !== "") {
-      obj.sqlText = message.sqlText;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<SlowQueryDetails>): SlowQueryDetails {
-    return SlowQueryDetails.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<SlowQueryDetails>): SlowQueryDetails {
-    const message = createBaseSlowQueryDetails();
-    message.startTime = (object.startTime !== undefined && object.startTime !== null)
-      ? Timestamp.fromPartial(object.startTime)
-      : undefined;
-    message.queryTime = (object.queryTime !== undefined && object.queryTime !== null)
-      ? Duration.fromPartial(object.queryTime)
-      : undefined;
-    message.lockTime = (object.lockTime !== undefined && object.lockTime !== null)
-      ? Duration.fromPartial(object.lockTime)
-      : undefined;
-    message.rowsSent = (object.rowsSent !== undefined && object.rowsSent !== null)
-      ? Long.fromValue(object.rowsSent)
-      : Long.ZERO;
-    message.rowsExamined = (object.rowsExamined !== undefined && object.rowsExamined !== null)
-      ? Long.fromValue(object.rowsExamined)
-      : Long.ZERO;
-    message.sqlText = object.sqlText ?? "";
-    return message;
-  },
-};
-
 function createBaseListSecretsRequest(): ListSecretsRequest {
   return { parent: "", pageSize: 0, pageToken: "" };
 }
@@ -8540,174 +7858,6 @@ export const Secret: MessageFns<Secret> = {
       : undefined;
     message.value = object.value ?? "";
     message.description = object.description ?? "";
-    return message;
-  },
-};
-
-function createBaseAdviseIndexRequest(): AdviseIndexRequest {
-  return { parent: "", statement: "" };
-}
-
-export const AdviseIndexRequest: MessageFns<AdviseIndexRequest> = {
-  encode(message: AdviseIndexRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.parent !== "") {
-      writer.uint32(10).string(message.parent);
-    }
-    if (message.statement !== "") {
-      writer.uint32(18).string(message.statement);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): AdviseIndexRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseAdviseIndexRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.parent = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.statement = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): AdviseIndexRequest {
-    return {
-      parent: isSet(object.parent) ? globalThis.String(object.parent) : "",
-      statement: isSet(object.statement) ? globalThis.String(object.statement) : "",
-    };
-  },
-
-  toJSON(message: AdviseIndexRequest): unknown {
-    const obj: any = {};
-    if (message.parent !== "") {
-      obj.parent = message.parent;
-    }
-    if (message.statement !== "") {
-      obj.statement = message.statement;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<AdviseIndexRequest>): AdviseIndexRequest {
-    return AdviseIndexRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<AdviseIndexRequest>): AdviseIndexRequest {
-    const message = createBaseAdviseIndexRequest();
-    message.parent = object.parent ?? "";
-    message.statement = object.statement ?? "";
-    return message;
-  },
-};
-
-function createBaseAdviseIndexResponse(): AdviseIndexResponse {
-  return { currentIndex: "", suggestion: "", createIndexStatement: "" };
-}
-
-export const AdviseIndexResponse: MessageFns<AdviseIndexResponse> = {
-  encode(message: AdviseIndexResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.currentIndex !== "") {
-      writer.uint32(10).string(message.currentIndex);
-    }
-    if (message.suggestion !== "") {
-      writer.uint32(18).string(message.suggestion);
-    }
-    if (message.createIndexStatement !== "") {
-      writer.uint32(26).string(message.createIndexStatement);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): AdviseIndexResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseAdviseIndexResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.currentIndex = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.suggestion = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.createIndexStatement = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): AdviseIndexResponse {
-    return {
-      currentIndex: isSet(object.currentIndex) ? globalThis.String(object.currentIndex) : "",
-      suggestion: isSet(object.suggestion) ? globalThis.String(object.suggestion) : "",
-      createIndexStatement: isSet(object.createIndexStatement) ? globalThis.String(object.createIndexStatement) : "",
-    };
-  },
-
-  toJSON(message: AdviseIndexResponse): unknown {
-    const obj: any = {};
-    if (message.currentIndex !== "") {
-      obj.currentIndex = message.currentIndex;
-    }
-    if (message.suggestion !== "") {
-      obj.suggestion = message.suggestion;
-    }
-    if (message.createIndexStatement !== "") {
-      obj.createIndexStatement = message.createIndexStatement;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<AdviseIndexResponse>): AdviseIndexResponse {
-    return AdviseIndexResponse.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<AdviseIndexResponse>): AdviseIndexResponse {
-    const message = createBaseAdviseIndexResponse();
-    message.currentIndex = object.currentIndex ?? "";
-    message.suggestion = object.suggestion ?? "";
-    message.createIndexStatement = object.createIndexStatement ?? "";
     return message;
   },
 };
@@ -10561,6 +9711,198 @@ export const Changelog: MessageFns<Changelog> = {
   },
 };
 
+function createBaseGetSchemaStringRequest(): GetSchemaStringRequest {
+  return {
+    name: "",
+    type: GetSchemaStringRequest_ObjectType.OBJECT_TYPE_UNSPECIFIED,
+    schema: "",
+    object: "",
+    metadata: undefined,
+  };
+}
+
+export const GetSchemaStringRequest: MessageFns<GetSchemaStringRequest> = {
+  encode(message: GetSchemaStringRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.name !== "") {
+      writer.uint32(10).string(message.name);
+    }
+    if (message.type !== GetSchemaStringRequest_ObjectType.OBJECT_TYPE_UNSPECIFIED) {
+      writer.uint32(16).int32(getSchemaStringRequest_ObjectTypeToNumber(message.type));
+    }
+    if (message.schema !== "") {
+      writer.uint32(26).string(message.schema);
+    }
+    if (message.object !== "") {
+      writer.uint32(34).string(message.object);
+    }
+    if (message.metadata !== undefined) {
+      DatabaseMetadata.encode(message.metadata, writer.uint32(42).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetSchemaStringRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetSchemaStringRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.type = getSchemaStringRequest_ObjectTypeFromJSON(reader.int32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.schema = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.object = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.metadata = DatabaseMetadata.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetSchemaStringRequest {
+    return {
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      type: isSet(object.type)
+        ? getSchemaStringRequest_ObjectTypeFromJSON(object.type)
+        : GetSchemaStringRequest_ObjectType.OBJECT_TYPE_UNSPECIFIED,
+      schema: isSet(object.schema) ? globalThis.String(object.schema) : "",
+      object: isSet(object.object) ? globalThis.String(object.object) : "",
+      metadata: isSet(object.metadata) ? DatabaseMetadata.fromJSON(object.metadata) : undefined,
+    };
+  },
+
+  toJSON(message: GetSchemaStringRequest): unknown {
+    const obj: any = {};
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.type !== GetSchemaStringRequest_ObjectType.OBJECT_TYPE_UNSPECIFIED) {
+      obj.type = getSchemaStringRequest_ObjectTypeToJSON(message.type);
+    }
+    if (message.schema !== "") {
+      obj.schema = message.schema;
+    }
+    if (message.object !== "") {
+      obj.object = message.object;
+    }
+    if (message.metadata !== undefined) {
+      obj.metadata = DatabaseMetadata.toJSON(message.metadata);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetSchemaStringRequest>): GetSchemaStringRequest {
+    return GetSchemaStringRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetSchemaStringRequest>): GetSchemaStringRequest {
+    const message = createBaseGetSchemaStringRequest();
+    message.name = object.name ?? "";
+    message.type = object.type ?? GetSchemaStringRequest_ObjectType.OBJECT_TYPE_UNSPECIFIED;
+    message.schema = object.schema ?? "";
+    message.object = object.object ?? "";
+    message.metadata = (object.metadata !== undefined && object.metadata !== null)
+      ? DatabaseMetadata.fromPartial(object.metadata)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseGetSchemaStringResponse(): GetSchemaStringResponse {
+  return { schemaString: "" };
+}
+
+export const GetSchemaStringResponse: MessageFns<GetSchemaStringResponse> = {
+  encode(message: GetSchemaStringResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.schemaString !== "") {
+      writer.uint32(10).string(message.schemaString);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetSchemaStringResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetSchemaStringResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.schemaString = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetSchemaStringResponse {
+    return { schemaString: isSet(object.schemaString) ? globalThis.String(object.schemaString) : "" };
+  },
+
+  toJSON(message: GetSchemaStringResponse): unknown {
+    const obj: any = {};
+    if (message.schemaString !== "") {
+      obj.schemaString = message.schemaString;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetSchemaStringResponse>): GetSchemaStringResponse {
+    return GetSchemaStringResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetSchemaStringResponse>): GetSchemaStringResponse {
+    const message = createBaseGetSchemaStringResponse();
+    message.schemaString = object.schemaString ?? "";
+    return message;
+  },
+};
+
 export type DatabaseServiceDefinition = typeof DatabaseServiceDefinition;
 export const DatabaseServiceDefinition = {
   name: "DatabaseService",
@@ -10621,19 +9963,21 @@ export const DatabaseServiceDefinition = {
         },
       },
     },
-    listInstanceDatabases: {
-      name: "ListInstanceDatabases",
-      requestType: ListInstanceDatabasesRequest,
+    listDatabases: {
+      name: "ListDatabases",
+      requestType: ListDatabasesRequest,
       requestStream: false,
-      responseType: ListInstanceDatabasesResponse,
+      responseType: ListDatabasesResponse,
       responseStream: false,
       options: {
         _unknownFields: {
           8410: [new Uint8Array([0])],
-          800010: [new Uint8Array([16, 98, 98, 46, 105, 110, 115, 116, 97, 110, 99, 101, 115, 46, 103, 101, 116])],
-          800016: [new Uint8Array([1])],
+          800010: [new Uint8Array([17, 98, 98, 46, 100, 97, 116, 97, 98, 97, 115, 101, 115, 46, 108, 105, 115, 116])],
+          800016: [new Uint8Array([2])],
           578365826: [
             new Uint8Array([
+              112,
+              90,
               36,
               18,
               34,
@@ -10671,25 +10015,6 @@ export const DatabaseServiceDefinition = {
               115,
               101,
               115,
-            ]),
-          ],
-        },
-      },
-    },
-    listDatabases: {
-      name: "ListDatabases",
-      requestType: ListDatabasesRequest,
-      requestStream: false,
-      responseType: ListDatabasesResponse,
-      responseStream: false,
-      options: {
-        _unknownFields: {
-          8410: [new Uint8Array([0])],
-          800010: [new Uint8Array([17, 98, 98, 46, 100, 97, 116, 97, 98, 97, 115, 101, 115, 46, 108, 105, 115, 116])],
-          800016: [new Uint8Array([1])],
-          578365826: [
-            new Uint8Array([
-              74,
               90,
               37,
               18,
@@ -11313,85 +10638,6 @@ export const DatabaseServiceDefinition = {
         },
       },
     },
-    listSlowQueries: {
-      name: "ListSlowQueries",
-      requestType: ListSlowQueriesRequest,
-      requestStream: false,
-      responseType: ListSlowQueriesResponse,
-      responseStream: false,
-      options: {
-        _unknownFields: {
-          8410: [new Uint8Array([6, 112, 97, 114, 101, 110, 116])],
-          800010: [
-            new Uint8Array([
-              19,
-              98,
-              98,
-              46,
-              115,
-              108,
-              111,
-              119,
-              81,
-              117,
-              101,
-              114,
-              105,
-              101,
-              115,
-              46,
-              108,
-              105,
-              115,
-              116,
-            ]),
-          ],
-          800016: [new Uint8Array([1])],
-          578365826: [
-            new Uint8Array([
-              37,
-              18,
-              35,
-              47,
-              118,
-              49,
-              47,
-              123,
-              112,
-              97,
-              114,
-              101,
-              110,
-              116,
-              61,
-              112,
-              114,
-              111,
-              106,
-              101,
-              99,
-              116,
-              115,
-              47,
-              42,
-              125,
-              47,
-              115,
-              108,
-              111,
-              119,
-              81,
-              117,
-              101,
-              114,
-              105,
-              101,
-              115,
-            ]),
-          ],
-        },
-      },
-    },
     listSecrets: {
       name: "ListSecrets",
       requestType: ListSecretsRequest,
@@ -11682,103 +10928,6 @@ export const DatabaseServiceDefinition = {
               47,
               42,
               125,
-            ]),
-          ],
-        },
-      },
-    },
-    adviseIndex: {
-      name: "AdviseIndex",
-      requestType: AdviseIndexRequest,
-      requestStream: false,
-      responseType: AdviseIndexResponse,
-      responseStream: false,
-      options: {
-        _unknownFields: {
-          8410: [new Uint8Array([6, 112, 97, 114, 101, 110, 116])],
-          800010: [
-            new Uint8Array([
-              24,
-              98,
-              98,
-              46,
-              100,
-              97,
-              116,
-              97,
-              98,
-              97,
-              115,
-              101,
-              115,
-              46,
-              97,
-              100,
-              118,
-              105,
-              115,
-              101,
-              73,
-              110,
-              100,
-              101,
-              120,
-            ]),
-          ],
-          800016: [new Uint8Array([1])],
-          578365826: [
-            new Uint8Array([
-              50,
-              34,
-              48,
-              47,
-              118,
-              49,
-              47,
-              123,
-              112,
-              97,
-              114,
-              101,
-              110,
-              116,
-              61,
-              105,
-              110,
-              115,
-              116,
-              97,
-              110,
-              99,
-              101,
-              115,
-              47,
-              42,
-              47,
-              100,
-              97,
-              116,
-              97,
-              98,
-              97,
-              115,
-              101,
-              115,
-              47,
-              42,
-              125,
-              58,
-              97,
-              100,
-              118,
-              105,
-              115,
-              101,
-              73,
-              110,
-              100,
-              101,
-              120,
             ]),
           ],
         },
@@ -12241,6 +11390,100 @@ export const DatabaseServiceDefinition = {
               115,
               47,
               42,
+              125,
+            ]),
+          ],
+        },
+      },
+    },
+    getSchemaString: {
+      name: "GetSchemaString",
+      requestType: GetSchemaStringRequest,
+      requestStream: false,
+      responseType: GetSchemaStringResponse,
+      responseStream: false,
+      options: {
+        _unknownFields: {
+          8410: [new Uint8Array([4, 110, 97, 109, 101])],
+          800010: [
+            new Uint8Array([
+              22,
+              98,
+              98,
+              46,
+              100,
+              97,
+              116,
+              97,
+              98,
+              97,
+              115,
+              101,
+              115,
+              46,
+              103,
+              101,
+              116,
+              83,
+              99,
+              104,
+              101,
+              109,
+              97,
+            ]),
+          ],
+          800016: [new Uint8Array([1])],
+          578365826: [
+            new Uint8Array([
+              49,
+              18,
+              47,
+              47,
+              118,
+              49,
+              47,
+              123,
+              110,
+              97,
+              109,
+              101,
+              61,
+              105,
+              110,
+              115,
+              116,
+              97,
+              110,
+              99,
+              101,
+              115,
+              47,
+              42,
+              47,
+              100,
+              97,
+              116,
+              97,
+              98,
+              97,
+              115,
+              101,
+              115,
+              47,
+              42,
+              47,
+              115,
+              99,
+              104,
+              101,
+              109,
+              97,
+              83,
+              116,
+              114,
+              105,
+              110,
+              103,
               125,
             ]),
           ],

@@ -259,7 +259,7 @@ const tryChangeStep = async (nextStepIndex: number) => {
       dialog.create({
         positiveText: t("common.confirm"),
         negativeText: t("common.cancel"),
-        title: t("deployment-config.confirm-to-revert"),
+        title: t("common.confirm-to-revert"),
         autoFocus: false,
         closable: false,
         maskClosable: false,
@@ -297,7 +297,6 @@ const tryFinishSetup = async () => {
   const query: Record<string, any> = {
     template: "bb.issue.database.schema.update",
     mode: "normal",
-    ghost: undefined,
   };
   const sqlMap: Record<string, string> = {};
   targetDatabaseList.forEach((db) => {

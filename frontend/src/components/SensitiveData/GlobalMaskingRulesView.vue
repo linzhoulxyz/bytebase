@@ -23,8 +23,6 @@
       </div>
       <div v-else class="flex items-center gap-x-2">
         <NButton
-          secondary
-          type="primary"
           class="capitalize"
           :disabled="
             !hasPermission ||
@@ -53,10 +51,13 @@
     <div class="textinfolabel">
       {{ $t("settings.sensitive-data.global-rules.description") }}
       <LearnMoreLink
-        url="https://www.bytebase.com/docs/security/mask-data?source=console"
+        url="https://www.bytebase.com/docs/security/data-masking/overview/?source=console"
       />
     </div>
-    <NoDataPlaceholder v-if="state.maskingRuleItemList.length === 0" />
+    <NEmpty
+      class="py-12 border rounded"
+      v-if="state.maskingRuleItemList.length === 0"
+    />
     <div
       v-for="(item, index) in state.maskingRuleItemList"
       :key="item.rule.id"
@@ -99,7 +100,7 @@
           :masking-rule="item.rule"
           :readonly="item.mode === 'NORMAL' || state.reorderRules"
           :factor-list="factorList"
-          :factor-options-map="factorOptionsMap"
+          :option-config-map="factorOptionsMap"
           :allow-delete="item.mode === 'EDIT'"
           @cancel="onCancel(index)"
           @delete="onRuleDelete(index)"
@@ -118,13 +119,24 @@ import {
   ChevronDownIcon,
   ListOrderedIcon,
 } from "lucide-vue-next";
-import { NButton, type SelectOption } from "naive-ui";
+import { NButton, NEmpty, type SelectOption } from "naive-ui";
 import { v4 as uuidv4 } from "uuid";
 import { computed, reactive, nextTick, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import {
+  getEnvironmentIdOptions,
+  getProjectIdOptions,
+} from "@/components/CustomApproval/Settings/components/common";
+import { type OptionConfig } from "@/components/ExprEditor/context";
 import { useBodyLayoutContext } from "@/layouts/common";
 import type { Factor } from "@/plugins/cel";
-import { featureToRef, pushNotification, usePolicyV1Store } from "@/store";
+import {
+  featureToRef,
+  pushNotification,
+  usePolicyV1Store,
+  useInstanceV1List,
+  useProjectV1Store,
+} from "@/store";
 import type { Policy } from "@/types/proto/v1/org_policy_service";
 import {
   PolicyType,
@@ -133,14 +145,11 @@ import {
 } from "@/types/proto/v1/org_policy_service";
 import { arraySwap, hasWorkspacePermissionV2 } from "@/utils";
 import LearnMoreLink from "../LearnMoreLink.vue";
-import NoDataPlaceholder from "../misc/NoDataPlaceholder.vue";
 import { MiniActionButton } from "../v2";
 import MaskingRuleConfig from "./components/MaskingRuleConfig.vue";
 import {
   getClassificationLevelOptions,
-  getEnvironmentIdOptions,
   getInstanceIdOptions,
-  getProjectIdOptions,
 } from "./components/utils";
 
 type MaskingRuleMode = "NORMAL" | "EDIT" | "CREATE";
@@ -165,6 +174,7 @@ const state = reactive<LocalState>({
   reorderRules: false,
 });
 
+useInstanceV1List();
 const policyStore = usePolicyV1Store();
 const hasPermission = computed(() => {
   return hasWorkspacePermissionV2("bb.policies.update");
@@ -335,7 +345,7 @@ const factorList = computed((): Factor[] => {
   return list;
 });
 
-const factorOptionsMap = computed((): Map<Factor, SelectOption[]> => {
+const factorOptionsMap = computed((): Map<Factor, OptionConfig> => {
   return factorList.value.reduce((map, factor) => {
     let options: SelectOption[] = [];
     switch (factor) {
@@ -346,14 +356,26 @@ const factorOptionsMap = computed((): Map<Factor, SelectOption[]> => {
         options = getInstanceIdOptions();
         break;
       case "project_id":
-        options = getProjectIdOptions();
-        break;
+        const projectStore = useProjectV1Store();
+        map.set(factor, {
+          remote: true,
+          options: getProjectIdOptions(projectStore.getProjectList()),
+          search: async (keyword: string) => {
+            return projectStore
+              .fetchProjectList({ query: keyword })
+              .then((resp) => getProjectIdOptions(resp.projects));
+          },
+        });
+        return map;
       case "classification_level":
         options = getClassificationLevelOptions();
         break;
     }
-    map.set(factor, options);
+    map.set(factor, {
+      remote: false,
+      options,
+    });
     return map;
-  }, new Map<Factor, SelectOption[]>());
+  }, new Map<Factor, OptionConfig>());
 });
 </script>

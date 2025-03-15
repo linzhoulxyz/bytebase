@@ -31,7 +31,8 @@
           </label>
           <RiskSourceSelect
             v-model:value="state.risk.source"
-            :disabled="mode === 'EDIT' || !allowAdmin"
+            :disabled="sourceList.length <= 1 || !allowAdmin"
+            :sources="sourceList"
             @update:value="$emit('update')"
           />
         </div>
@@ -54,7 +55,7 @@
             :allow-admin="allowAdmin"
             :factor-list="getFactorList(state.risk.source)"
             :factor-support-dropdown="factorSupportDropdown"
-            :factor-options-map="getFactorOptionsMap(state.risk.source)"
+            :option-config-map="getOptionConfigMap(state.risk.source)"
             @update="$emit('update')"
           />
         </div>
@@ -90,12 +91,13 @@
 </template>
 
 <script lang="ts" setup>
-import { cloneDeep, head } from "lodash-es";
+import { cloneDeep, head, uniq, flatten } from "lodash-es";
 import { NButton, NInput } from "naive-ui";
 import { computed, ref, watch } from "vue";
 import ExprEditor from "@/components/ExprEditor";
 import LearnMoreLink from "@/components/LearnMoreLink.vue";
 import type { ConditionGroupExpr, SimpleExpr } from "@/plugins/cel";
+import { ExprType } from "@/plugins/cel";
 import {
   resolveCELExpr,
   buildCELExpr,
@@ -103,8 +105,9 @@ import {
   validateSimpleExpr,
   emptySimpleExpr,
 } from "@/plugins/cel";
+import { useSupportedSourceList } from "@/types";
 import { Expr } from "@/types/proto/google/type/expr";
-import { Risk } from "@/types/proto/v1/risk_service";
+import { Risk, Risk_Source } from "@/types/proto/v1/risk_service";
 import {
   batchConvertCELStringToParsedExpr,
   batchConvertParsedExprToCELString,
@@ -112,8 +115,9 @@ import {
 } from "@/utils";
 import {
   getFactorList,
-  getFactorOptionsMap,
+  getOptionConfigMap,
   factorSupportDropdown,
+  RiskSourceFactorMap,
 } from "../../common/utils";
 import { useRiskCenterContext } from "../context";
 import RiskLevelSelect from "./RiskLevelSelect.vue";
@@ -137,6 +141,7 @@ const emit = defineEmits<{
 
 const context = useRiskCenterContext();
 const { allowAdmin } = context;
+const SupportedSourceList = useSupportedSourceList();
 
 const state = ref<LocalState>({
   risk: Risk.fromPartial({}),
@@ -144,9 +149,39 @@ const state = ref<LocalState>({
 });
 const mode = computed(() => context.dialog.value?.mode ?? "CREATE");
 
+const extractFactorList = (expr: SimpleExpr): string[] => {
+  switch (expr.type) {
+    case ExprType.Condition:
+      return expr.args.length > 1 ? [expr.args[0]] : [];
+    case ExprType.ConditionGroup:
+      return uniq(flatten(expr.args.map(extractFactorList)));
+    case ExprType.RawString:
+      return [];
+  }
+};
+
+const sourceList = computed(() => {
+  if (mode.value !== "EDIT") {
+    return SupportedSourceList.value;
+  }
+
+  const selectedFactor = extractFactorList(state.value.expr);
+  const sourceList: Risk_Source[] = [];
+
+  for (const [source, factorList] of RiskSourceFactorMap.entries()) {
+    if (!SupportedSourceList.value.includes(source)) {
+      continue;
+    }
+    if (selectedFactor.every((v) => factorList.includes(v))) {
+      sourceList.push(source);
+    }
+  }
+
+  return sourceList;
+});
+
 const resolveLocalState = async () => {
   const risk = cloneDeep(context.dialog.value!.risk);
-
   let expr: SimpleExpr = emptySimpleExpr();
   if (risk.condition?.expression) {
     const parsedExprs = await batchConvertCELStringToParsedExpr([

@@ -1,11 +1,10 @@
-import { computed, unref } from "vue";
-import { t } from "@/plugins/i18n";
+import { computed, unref, watchEffect } from "vue";
 import {
   candidatesOfApprovalStepV1,
   useAuthStore,
-  useSettingV1Store,
-  useUserStore,
+  batchGetOrFetchUsers,
 } from "@/store";
+import { userNamePrefix } from "@/store/modules/v1/common";
 import type {
   ReviewFlow,
   MaybeRef,
@@ -19,7 +18,8 @@ import {
   ApprovalNode_Type,
   Issue_Approver_Status,
 } from "@/types/proto/v1/issue_service";
-import { displayRoleTitle, extractUserResourceName } from "@/utils";
+import { displayRoleTitle } from "@/utils";
+import { isUserIncludedInList } from "@/utils";
 import type { ReviewContext } from "./context";
 
 export const extractReviewContext = (issue: MaybeRef<Issue>): ReviewContext => {
@@ -96,8 +96,19 @@ export const useWrappedReviewStepsV1 = (
   issue: MaybeRef<ComposedIssue>,
   context: ReviewContext
 ) => {
-  const userStore = useUserStore();
-  const currentUserName = computed(() => useAuthStore().currentUser.name);
+  const currentUserName = computed(
+    () => `${userNamePrefix}${useAuthStore().currentUser.email}`
+  );
+
+  watchEffect(async () => {
+    const { flow } = context;
+    const approvers = flow.value.approvers;
+    const steps = flow.value.template.flow?.steps;
+    await batchGetOrFetchUsers(
+      steps?.map((_, i) => approvers[i]?.principal) ?? []
+    );
+  });
+
   return computed(() => {
     const { flow, done } = context;
     const steps = flow.value.template.flow?.steps;
@@ -124,22 +135,23 @@ export const useWrappedReviewStepsV1 = (
       }
       return "PENDING";
     };
+
     const approverOfStep = (index: number) => {
-      const principal = approvers[index]?.principal;
-      if (!principal) return undefined;
-      const email = extractUserResourceName(principal);
-      return userStore.getUserByEmail(email);
+      return approvers[index]?.principal;
     };
+
     const candidatesOfStep = (index: number) => {
       const step = steps?.[index];
       if (!step) return [];
       const users = candidatesOfApprovalStepV1(unref(issue), step);
-      const idx = users.indexOf(currentUserName.value);
-      if (idx > 0) {
-        users.splice(idx, 1);
+      if (isUserIncludedInList(currentUserName.value, users)) {
+        const idx = users.indexOf(currentUserName.value);
+        if (idx >= 0) {
+          users.splice(idx, 1);
+        }
         users.unshift(currentUserName.value);
       }
-      return users.map((user) => userStore.getUserByName(user)!);
+      return users;
     };
 
     return steps?.map<WrappedReviewStep>((step, index) => ({
@@ -154,7 +166,6 @@ export const useWrappedReviewStepsV1 = (
 
 export const displayReviewRoleTitle = (node: ApprovalNode) => {
   const {
-    externalNodeId,
     type,
     groupValue = ApprovalNode_GroupValue.UNRECOGNIZED,
     role,
@@ -163,20 +174,7 @@ export const displayReviewRoleTitle = (node: ApprovalNode) => {
     return "";
   }
 
-  if (externalNodeId) {
-    const setting = useSettingV1Store().getSettingByName(
-      "bb.workspace.approval.external"
-    );
-    const nodes = setting?.value?.externalApprovalSettingValue?.nodes ?? [];
-    const node = nodes.find((n) => n.id === externalNodeId);
-    if (node) {
-      return node.title;
-    } else {
-      return `${t(
-        "custom-approval.approval-flow.external-approval.self"
-      )}: ${externalNodeId}}`;
-    }
-  } else if (groupValue === ApprovalNode_GroupValue.WORKSPACE_OWNER) {
+  if (groupValue === ApprovalNode_GroupValue.WORKSPACE_OWNER) {
     return displayRoleTitle(PresetRoleType.WORKSPACE_ADMIN);
   } else if (groupValue === ApprovalNode_GroupValue.WORKSPACE_DBA) {
     return displayRoleTitle(PresetRoleType.WORKSPACE_DBA);

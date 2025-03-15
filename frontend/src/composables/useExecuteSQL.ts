@@ -2,7 +2,6 @@ import Emittery from "emittery";
 import { head, isEmpty } from "lodash-es";
 import { Status } from "nice-grpc-common";
 import { markRaw, reactive } from "vue";
-import { parseSQL } from "@/components/MonacoEditor/sqlParser";
 import { sqlServiceClient } from "@/grpcweb";
 import { t } from "@/plugins/i18n";
 import {
@@ -198,14 +197,8 @@ const useExecuteSQL = () => {
 
     const queryContext = tab.queryContext!;
     const batchQueryContext = tab.batchQueryContext;
-    const { data } = await parseSQL(params.statement);
 
-    if (data === undefined) {
-      notify("CRITICAL", t("sql-editor.notify-invalid-sql-statement"));
-      return cleanup();
-    }
-
-    const selectedDatabase = useDatabaseV1Store().getDatabaseByName(
+    const selectedDatabase = await databaseStore.getOrFetchDatabaseByName(
       params.connection.database
     );
     const databaseName = isValidDatabaseName(selectedDatabase.name)
@@ -220,10 +213,11 @@ const useExecuteSQL = () => {
       batchQueryContext.databases.length > 0
     ) {
       for (const databaseResourceName of batchQueryContext.databases) {
-        const database = databaseStore.getDatabaseByName(databaseResourceName);
-        if (database.name === selectedDatabase.name) {
+        if (databaseResourceName === selectedDatabase.name) {
           continue;
         }
+        const database =
+          await databaseStore.getOrFetchDatabaseByName(databaseResourceName);
         batchQueryDatabases.push(database);
       }
     }
@@ -340,7 +334,6 @@ const useExecuteSQL = () => {
             explain: params.explain,
             schema: params.connection.schema,
             container: params.connection.table,
-            timeout: undefined, // TODO: make this param configurable
             queryOption: {
               redisRunCommandsOn: sqlEditorStore.redisCommandOption,
             },

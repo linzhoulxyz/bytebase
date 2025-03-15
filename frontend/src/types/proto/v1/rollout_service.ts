@@ -118,13 +118,12 @@ export interface CreateRolloutRequest {
     | Rollout
     | undefined;
   /**
-   * stage_id is the id in the plan deployment_config_snapshot.
-   * The rollout is created according to the plan and the
-   * stages are created up to the stage_id.
+   * Create the rollout and the stages up to the target stage.
+   * Format: environments/{environment}
    * If unspecified, all stages are created.
    * If set to "", no stages are created.
    */
-  stageId?:
+  target?:
     | string
     | undefined;
   /**
@@ -228,14 +227,13 @@ export interface Stage {
    * Empty for legacy stages.
    */
   id: string;
-  title: string;
+  environment: string;
   tasks: Task[];
 }
 
 export interface Task {
   /** Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task} */
   name: string;
-  title: string;
   /**
    * A UUID4 string that uniquely identifies the Spec.
    * Could be empty if the rollout of the task does not have an associating plan.
@@ -245,8 +243,6 @@ export interface Task {
   status: Task_Status;
   skippedReason: string;
   type: Task_Type;
-  /** Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task} */
-  dependsOnTasks: string[];
   /**
    * Format: instances/{instance} if the task is DatabaseCreate.
    * Format: instances/{instance}/databases/{database}
@@ -363,10 +359,8 @@ export enum Task_Type {
   DATABASE_SCHEMA_UPDATE = "DATABASE_SCHEMA_UPDATE",
   /** DATABASE_SCHEMA_UPDATE_SDL - use payload DatabaseSchemaUpdate */
   DATABASE_SCHEMA_UPDATE_SDL = "DATABASE_SCHEMA_UPDATE_SDL",
-  /** DATABASE_SCHEMA_UPDATE_GHOST_SYNC - use payload DatabaseSchemaUpdate */
-  DATABASE_SCHEMA_UPDATE_GHOST_SYNC = "DATABASE_SCHEMA_UPDATE_GHOST_SYNC",
-  /** DATABASE_SCHEMA_UPDATE_GHOST_CUTOVER - use payload nil */
-  DATABASE_SCHEMA_UPDATE_GHOST_CUTOVER = "DATABASE_SCHEMA_UPDATE_GHOST_CUTOVER",
+  /** DATABASE_SCHEMA_UPDATE_GHOST - use payload DatabaseSchemaUpdate */
+  DATABASE_SCHEMA_UPDATE_GHOST = "DATABASE_SCHEMA_UPDATE_GHOST",
   /** DATABASE_DATA_UPDATE - use payload DatabaseDataUpdate */
   DATABASE_DATA_UPDATE = "DATABASE_DATA_UPDATE",
   /** DATABASE_DATA_EXPORT - use payload DatabaseDataExport */
@@ -394,12 +388,9 @@ export function task_TypeFromJSON(object: any): Task_Type {
     case 5:
     case "DATABASE_SCHEMA_UPDATE_SDL":
       return Task_Type.DATABASE_SCHEMA_UPDATE_SDL;
-    case 6:
-    case "DATABASE_SCHEMA_UPDATE_GHOST_SYNC":
-      return Task_Type.DATABASE_SCHEMA_UPDATE_GHOST_SYNC;
-    case 7:
-    case "DATABASE_SCHEMA_UPDATE_GHOST_CUTOVER":
-      return Task_Type.DATABASE_SCHEMA_UPDATE_GHOST_CUTOVER;
+    case 9:
+    case "DATABASE_SCHEMA_UPDATE_GHOST":
+      return Task_Type.DATABASE_SCHEMA_UPDATE_GHOST;
     case 8:
     case "DATABASE_DATA_UPDATE":
       return Task_Type.DATABASE_DATA_UPDATE;
@@ -427,10 +418,8 @@ export function task_TypeToJSON(object: Task_Type): string {
       return "DATABASE_SCHEMA_UPDATE";
     case Task_Type.DATABASE_SCHEMA_UPDATE_SDL:
       return "DATABASE_SCHEMA_UPDATE_SDL";
-    case Task_Type.DATABASE_SCHEMA_UPDATE_GHOST_SYNC:
-      return "DATABASE_SCHEMA_UPDATE_GHOST_SYNC";
-    case Task_Type.DATABASE_SCHEMA_UPDATE_GHOST_CUTOVER:
-      return "DATABASE_SCHEMA_UPDATE_GHOST_CUTOVER";
+    case Task_Type.DATABASE_SCHEMA_UPDATE_GHOST:
+      return "DATABASE_SCHEMA_UPDATE_GHOST";
     case Task_Type.DATABASE_DATA_UPDATE:
       return "DATABASE_DATA_UPDATE";
     case Task_Type.DATABASE_DATA_EXPORT:
@@ -455,10 +444,8 @@ export function task_TypeToNumber(object: Task_Type): number {
       return 4;
     case Task_Type.DATABASE_SCHEMA_UPDATE_SDL:
       return 5;
-    case Task_Type.DATABASE_SCHEMA_UPDATE_GHOST_SYNC:
-      return 6;
-    case Task_Type.DATABASE_SCHEMA_UPDATE_GHOST_CUTOVER:
-      return 7;
+    case Task_Type.DATABASE_SCHEMA_UPDATE_GHOST:
+      return 9;
     case Task_Type.DATABASE_DATA_UPDATE:
       return 8;
     case Task_Type.DATABASE_DATA_EXPORT:
@@ -484,12 +471,6 @@ export interface Task_DatabaseCreate {
   characterSet: string;
   collation: string;
   environment: string;
-  labels: { [key: string]: string };
-}
-
-export interface Task_DatabaseCreate_LabelsEntry {
-  key: string;
-  value: string;
 }
 
 export interface Task_DatabaseSchemaBaseline {
@@ -535,7 +516,6 @@ export interface TaskRun {
   creator: string;
   createTime: Timestamp | undefined;
   updateTime: Timestamp | undefined;
-  title: string;
   status: TaskRun_Status;
   /** Below are the results of a task run. */
   detail: string;
@@ -1684,7 +1664,7 @@ export const ListRolloutsResponse: MessageFns<ListRolloutsResponse> = {
 };
 
 function createBaseCreateRolloutRequest(): CreateRolloutRequest {
-  return { parent: "", rollout: undefined, stageId: undefined, validateOnly: false };
+  return { parent: "", rollout: undefined, target: undefined, validateOnly: false };
 }
 
 export const CreateRolloutRequest: MessageFns<CreateRolloutRequest> = {
@@ -1695,8 +1675,8 @@ export const CreateRolloutRequest: MessageFns<CreateRolloutRequest> = {
     if (message.rollout !== undefined) {
       Rollout.encode(message.rollout, writer.uint32(18).fork()).join();
     }
-    if (message.stageId !== undefined) {
-      writer.uint32(26).string(message.stageId);
+    if (message.target !== undefined) {
+      writer.uint32(26).string(message.target);
     }
     if (message.validateOnly !== false) {
       writer.uint32(32).bool(message.validateOnly);
@@ -1732,7 +1712,7 @@ export const CreateRolloutRequest: MessageFns<CreateRolloutRequest> = {
             break;
           }
 
-          message.stageId = reader.string();
+          message.target = reader.string();
           continue;
         }
         case 4: {
@@ -1756,7 +1736,7 @@ export const CreateRolloutRequest: MessageFns<CreateRolloutRequest> = {
     return {
       parent: isSet(object.parent) ? globalThis.String(object.parent) : "",
       rollout: isSet(object.rollout) ? Rollout.fromJSON(object.rollout) : undefined,
-      stageId: isSet(object.stageId) ? globalThis.String(object.stageId) : undefined,
+      target: isSet(object.target) ? globalThis.String(object.target) : undefined,
       validateOnly: isSet(object.validateOnly) ? globalThis.Boolean(object.validateOnly) : false,
     };
   },
@@ -1769,8 +1749,8 @@ export const CreateRolloutRequest: MessageFns<CreateRolloutRequest> = {
     if (message.rollout !== undefined) {
       obj.rollout = Rollout.toJSON(message.rollout);
     }
-    if (message.stageId !== undefined) {
-      obj.stageId = message.stageId;
+    if (message.target !== undefined) {
+      obj.target = message.target;
     }
     if (message.validateOnly !== false) {
       obj.validateOnly = message.validateOnly;
@@ -1787,7 +1767,7 @@ export const CreateRolloutRequest: MessageFns<CreateRolloutRequest> = {
     message.rollout = (object.rollout !== undefined && object.rollout !== null)
       ? Rollout.fromPartial(object.rollout)
       : undefined;
-    message.stageId = object.stageId ?? undefined;
+    message.target = object.target ?? undefined;
     message.validateOnly = object.validateOnly ?? false;
     return message;
   },
@@ -2312,7 +2292,7 @@ export const Rollout: MessageFns<Rollout> = {
 };
 
 function createBaseStage(): Stage {
-  return { name: "", id: "", title: "", tasks: [] };
+  return { name: "", id: "", environment: "", tasks: [] };
 }
 
 export const Stage: MessageFns<Stage> = {
@@ -2323,8 +2303,8 @@ export const Stage: MessageFns<Stage> = {
     if (message.id !== "") {
       writer.uint32(26).string(message.id);
     }
-    if (message.title !== "") {
-      writer.uint32(34).string(message.title);
+    if (message.environment !== "") {
+      writer.uint32(34).string(message.environment);
     }
     for (const v of message.tasks) {
       Task.encode(v!, writer.uint32(42).fork()).join();
@@ -2360,7 +2340,7 @@ export const Stage: MessageFns<Stage> = {
             break;
           }
 
-          message.title = reader.string();
+          message.environment = reader.string();
           continue;
         }
         case 5: {
@@ -2384,7 +2364,7 @@ export const Stage: MessageFns<Stage> = {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
       id: isSet(object.id) ? globalThis.String(object.id) : "",
-      title: isSet(object.title) ? globalThis.String(object.title) : "",
+      environment: isSet(object.environment) ? globalThis.String(object.environment) : "",
       tasks: globalThis.Array.isArray(object?.tasks) ? object.tasks.map((e: any) => Task.fromJSON(e)) : [],
     };
   },
@@ -2397,8 +2377,8 @@ export const Stage: MessageFns<Stage> = {
     if (message.id !== "") {
       obj.id = message.id;
     }
-    if (message.title !== "") {
-      obj.title = message.title;
+    if (message.environment !== "") {
+      obj.environment = message.environment;
     }
     if (message.tasks?.length) {
       obj.tasks = message.tasks.map((e) => Task.toJSON(e));
@@ -2413,7 +2393,7 @@ export const Stage: MessageFns<Stage> = {
     const message = createBaseStage();
     message.name = object.name ?? "";
     message.id = object.id ?? "";
-    message.title = object.title ?? "";
+    message.environment = object.environment ?? "";
     message.tasks = object.tasks?.map((e) => Task.fromPartial(e)) || [];
     return message;
   },
@@ -2422,12 +2402,10 @@ export const Stage: MessageFns<Stage> = {
 function createBaseTask(): Task {
   return {
     name: "",
-    title: "",
     specId: "",
     status: Task_Status.STATUS_UNSPECIFIED,
     skippedReason: "",
     type: Task_Type.TYPE_UNSPECIFIED,
-    dependsOnTasks: [],
     target: "",
     databaseCreate: undefined,
     databaseSchemaBaseline: undefined,
@@ -2442,9 +2420,6 @@ export const Task: MessageFns<Task> = {
     if (message.name !== "") {
       writer.uint32(10).string(message.name);
     }
-    if (message.title !== "") {
-      writer.uint32(26).string(message.title);
-    }
     if (message.specId !== "") {
       writer.uint32(34).string(message.specId);
     }
@@ -2456,9 +2431,6 @@ export const Task: MessageFns<Task> = {
     }
     if (message.type !== Task_Type.TYPE_UNSPECIFIED) {
       writer.uint32(48).int32(task_TypeToNumber(message.type));
-    }
-    for (const v of message.dependsOnTasks) {
-      writer.uint32(58).string(v!);
     }
     if (message.target !== "") {
       writer.uint32(66).string(message.target);
@@ -2496,14 +2468,6 @@ export const Task: MessageFns<Task> = {
           message.name = reader.string();
           continue;
         }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.title = reader.string();
-          continue;
-        }
         case 4: {
           if (tag !== 34) {
             break;
@@ -2534,14 +2498,6 @@ export const Task: MessageFns<Task> = {
           }
 
           message.type = task_TypeFromJSON(reader.int32());
-          continue;
-        }
-        case 7: {
-          if (tag !== 58) {
-            break;
-          }
-
-          message.dependsOnTasks.push(reader.string());
           continue;
         }
         case 8: {
@@ -2604,14 +2560,10 @@ export const Task: MessageFns<Task> = {
   fromJSON(object: any): Task {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
-      title: isSet(object.title) ? globalThis.String(object.title) : "",
       specId: isSet(object.specId) ? globalThis.String(object.specId) : "",
       status: isSet(object.status) ? task_StatusFromJSON(object.status) : Task_Status.STATUS_UNSPECIFIED,
       skippedReason: isSet(object.skippedReason) ? globalThis.String(object.skippedReason) : "",
       type: isSet(object.type) ? task_TypeFromJSON(object.type) : Task_Type.TYPE_UNSPECIFIED,
-      dependsOnTasks: globalThis.Array.isArray(object?.dependsOnTasks)
-        ? object.dependsOnTasks.map((e: any) => globalThis.String(e))
-        : [],
       target: isSet(object.target) ? globalThis.String(object.target) : "",
       databaseCreate: isSet(object.databaseCreate) ? Task_DatabaseCreate.fromJSON(object.databaseCreate) : undefined,
       databaseSchemaBaseline: isSet(object.databaseSchemaBaseline)
@@ -2634,9 +2586,6 @@ export const Task: MessageFns<Task> = {
     if (message.name !== "") {
       obj.name = message.name;
     }
-    if (message.title !== "") {
-      obj.title = message.title;
-    }
     if (message.specId !== "") {
       obj.specId = message.specId;
     }
@@ -2648,9 +2597,6 @@ export const Task: MessageFns<Task> = {
     }
     if (message.type !== Task_Type.TYPE_UNSPECIFIED) {
       obj.type = task_TypeToJSON(message.type);
-    }
-    if (message.dependsOnTasks?.length) {
-      obj.dependsOnTasks = message.dependsOnTasks;
     }
     if (message.target !== "") {
       obj.target = message.target;
@@ -2679,12 +2625,10 @@ export const Task: MessageFns<Task> = {
   fromPartial(object: DeepPartial<Task>): Task {
     const message = createBaseTask();
     message.name = object.name ?? "";
-    message.title = object.title ?? "";
     message.specId = object.specId ?? "";
     message.status = object.status ?? Task_Status.STATUS_UNSPECIFIED;
     message.skippedReason = object.skippedReason ?? "";
     message.type = object.type ?? Task_Type.TYPE_UNSPECIFIED;
-    message.dependsOnTasks = object.dependsOnTasks?.map((e) => e) || [];
     message.target = object.target ?? "";
     message.databaseCreate = (object.databaseCreate !== undefined && object.databaseCreate !== null)
       ? Task_DatabaseCreate.fromPartial(object.databaseCreate)
@@ -2707,16 +2651,7 @@ export const Task: MessageFns<Task> = {
 };
 
 function createBaseTask_DatabaseCreate(): Task_DatabaseCreate {
-  return {
-    project: "",
-    database: "",
-    table: "",
-    sheet: "",
-    characterSet: "",
-    collation: "",
-    environment: "",
-    labels: {},
-  };
+  return { project: "", database: "", table: "", sheet: "", characterSet: "", collation: "", environment: "" };
 }
 
 export const Task_DatabaseCreate: MessageFns<Task_DatabaseCreate> = {
@@ -2742,9 +2677,6 @@ export const Task_DatabaseCreate: MessageFns<Task_DatabaseCreate> = {
     if (message.environment !== "") {
       writer.uint32(58).string(message.environment);
     }
-    Object.entries(message.labels).forEach(([key, value]) => {
-      Task_DatabaseCreate_LabelsEntry.encode({ key: key as any, value }, writer.uint32(66).fork()).join();
-    });
     return writer;
   },
 
@@ -2811,17 +2743,6 @@ export const Task_DatabaseCreate: MessageFns<Task_DatabaseCreate> = {
           message.environment = reader.string();
           continue;
         }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          const entry8 = Task_DatabaseCreate_LabelsEntry.decode(reader, reader.uint32());
-          if (entry8.value !== undefined) {
-            message.labels[entry8.key] = entry8.value;
-          }
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2840,12 +2761,6 @@ export const Task_DatabaseCreate: MessageFns<Task_DatabaseCreate> = {
       characterSet: isSet(object.characterSet) ? globalThis.String(object.characterSet) : "",
       collation: isSet(object.collation) ? globalThis.String(object.collation) : "",
       environment: isSet(object.environment) ? globalThis.String(object.environment) : "",
-      labels: isObject(object.labels)
-        ? Object.entries(object.labels).reduce<{ [key: string]: string }>((acc, [key, value]) => {
-          acc[key] = String(value);
-          return acc;
-        }, {})
-        : {},
     };
   },
 
@@ -2872,15 +2787,6 @@ export const Task_DatabaseCreate: MessageFns<Task_DatabaseCreate> = {
     if (message.environment !== "") {
       obj.environment = message.environment;
     }
-    if (message.labels) {
-      const entries = Object.entries(message.labels);
-      if (entries.length > 0) {
-        obj.labels = {};
-        entries.forEach(([k, v]) => {
-          obj.labels[k] = v;
-        });
-      }
-    }
     return obj;
   },
 
@@ -2896,88 +2802,6 @@ export const Task_DatabaseCreate: MessageFns<Task_DatabaseCreate> = {
     message.characterSet = object.characterSet ?? "";
     message.collation = object.collation ?? "";
     message.environment = object.environment ?? "";
-    message.labels = Object.entries(object.labels ?? {}).reduce<{ [key: string]: string }>((acc, [key, value]) => {
-      if (value !== undefined) {
-        acc[key] = globalThis.String(value);
-      }
-      return acc;
-    }, {});
-    return message;
-  },
-};
-
-function createBaseTask_DatabaseCreate_LabelsEntry(): Task_DatabaseCreate_LabelsEntry {
-  return { key: "", value: "" };
-}
-
-export const Task_DatabaseCreate_LabelsEntry: MessageFns<Task_DatabaseCreate_LabelsEntry> = {
-  encode(message: Task_DatabaseCreate_LabelsEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.key !== "") {
-      writer.uint32(10).string(message.key);
-    }
-    if (message.value !== "") {
-      writer.uint32(18).string(message.value);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): Task_DatabaseCreate_LabelsEntry {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseTask_DatabaseCreate_LabelsEntry();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.key = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.value = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): Task_DatabaseCreate_LabelsEntry {
-    return {
-      key: isSet(object.key) ? globalThis.String(object.key) : "",
-      value: isSet(object.value) ? globalThis.String(object.value) : "",
-    };
-  },
-
-  toJSON(message: Task_DatabaseCreate_LabelsEntry): unknown {
-    const obj: any = {};
-    if (message.key !== "") {
-      obj.key = message.key;
-    }
-    if (message.value !== "") {
-      obj.value = message.value;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<Task_DatabaseCreate_LabelsEntry>): Task_DatabaseCreate_LabelsEntry {
-    return Task_DatabaseCreate_LabelsEntry.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<Task_DatabaseCreate_LabelsEntry>): Task_DatabaseCreate_LabelsEntry {
-    const message = createBaseTask_DatabaseCreate_LabelsEntry();
-    message.key = object.key ?? "";
-    message.value = object.value ?? "";
     return message;
   },
 };
@@ -3306,7 +3130,6 @@ function createBaseTaskRun(): TaskRun {
     creator: "",
     createTime: undefined,
     updateTime: undefined,
-    title: "",
     status: TaskRun_Status.STATUS_UNSPECIFIED,
     detail: "",
     changelog: "",
@@ -3332,9 +3155,6 @@ export const TaskRun: MessageFns<TaskRun> = {
     }
     if (message.updateTime !== undefined) {
       Timestamp.encode(message.updateTime, writer.uint32(50).fork()).join();
-    }
-    if (message.title !== "") {
-      writer.uint32(58).string(message.title);
     }
     if (message.status !== TaskRun_Status.STATUS_UNSPECIFIED) {
       writer.uint32(64).int32(taskRun_StatusToNumber(message.status));
@@ -3403,14 +3223,6 @@ export const TaskRun: MessageFns<TaskRun> = {
           }
 
           message.updateTime = Timestamp.decode(reader, reader.uint32());
-          continue;
-        }
-        case 7: {
-          if (tag !== 58) {
-            break;
-          }
-
-          message.title = reader.string();
           continue;
         }
         case 8: {
@@ -3500,7 +3312,6 @@ export const TaskRun: MessageFns<TaskRun> = {
       creator: isSet(object.creator) ? globalThis.String(object.creator) : "",
       createTime: isSet(object.createTime) ? fromJsonTimestamp(object.createTime) : undefined,
       updateTime: isSet(object.updateTime) ? fromJsonTimestamp(object.updateTime) : undefined,
-      title: isSet(object.title) ? globalThis.String(object.title) : "",
       status: isSet(object.status) ? taskRun_StatusFromJSON(object.status) : TaskRun_Status.STATUS_UNSPECIFIED,
       detail: isSet(object.detail) ? globalThis.String(object.detail) : "",
       changelog: isSet(object.changelog) ? globalThis.String(object.changelog) : "",
@@ -3530,9 +3341,6 @@ export const TaskRun: MessageFns<TaskRun> = {
     }
     if (message.updateTime !== undefined) {
       obj.updateTime = fromTimestamp(message.updateTime).toISOString();
-    }
-    if (message.title !== "") {
-      obj.title = message.title;
     }
     if (message.status !== TaskRun_Status.STATUS_UNSPECIFIED) {
       obj.status = taskRun_StatusToJSON(message.status);
@@ -3577,7 +3385,6 @@ export const TaskRun: MessageFns<TaskRun> = {
     message.updateTime = (object.updateTime !== undefined && object.updateTime !== null)
       ? Timestamp.fromPartial(object.updateTime)
       : undefined;
-    message.title = object.title ?? "";
     message.status = object.status ?? TaskRun_Status.STATUS_UNSPECIFIED;
     message.detail = object.detail ?? "";
     message.changelog = object.changelog ?? "";
@@ -6749,10 +6556,6 @@ function fromJsonTimestamp(o: any): Timestamp {
 
 function numberToLong(number: number) {
   return Long.fromNumber(number);
-}
-
-function isObject(value: any): boolean {
-  return typeof value === "object" && value !== null;
 }
 
 function isSet(value: any): boolean {

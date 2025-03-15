@@ -4,11 +4,14 @@ import { t } from "@/plugins/i18n";
 import { useCurrentUserV1 } from "@/store";
 import { userNamePrefix } from "@/store/modules/v1/common";
 import type { ComposedIssue } from "@/types";
-import { type User } from "@/types/proto/v1/user_service";
 import { IssueStatus, Issue_Type } from "@/types/proto/v1/issue_service";
 import type { Task } from "@/types/proto/v1/rollout_service";
 import { Task_Status, Task_Type } from "@/types/proto/v1/rollout_service";
-import { hasProjectPermissionV2, hasWorkspacePermissionV2 } from "@/utils";
+import {
+  hasProjectPermissionV2,
+  hasWorkspacePermissionV2,
+  isUserIncludedInList,
+} from "@/utils";
 
 export type TaskRolloutAction =
   | "ROLLOUT" // NOT_STARTED -> PENDING
@@ -33,7 +36,7 @@ export const CancelableTaskTypeList: Task_Type[] = [
   Task_Type.DATABASE_DATA_UPDATE,
   Task_Type.DATABASE_SCHEMA_UPDATE,
   Task_Type.DATABASE_SCHEMA_UPDATE_SDL,
-  Task_Type.DATABASE_SCHEMA_UPDATE_GHOST_SYNC,
+  Task_Type.DATABASE_SCHEMA_UPDATE_GHOST,
 ];
 
 export const TaskRolloutActionMap: Record<Task_Status, TaskRolloutAction[]> = {
@@ -62,12 +65,6 @@ export const getApplicableTaskRolloutActionList = (
   return list.filter((action) => {
     if (action === "CANCEL") {
       return CancelableTaskTypeList.includes(task.type);
-    }
-    if (action === "RETRY") {
-      // RETRYing gh-ost cut-over task is not allowed.
-      if (task.type === Task_Type.DATABASE_SCHEMA_UPDATE_GHOST_CUTOVER) {
-        return false;
-      }
     }
     if (action === "SKIP") {
       if (task.status !== Task_Status.FAILED && !allowSkipPendingTask) {
@@ -134,9 +131,8 @@ export const taskRolloutActionButtonProps = (
 
 export const allowUserToApplyTaskRolloutAction = (
   issue: ComposedIssue,
-  task: Task,
   action: TaskRolloutAction,
-  releaserCandidates: User[]
+  releaserCandidates: string[]
 ) => {
   const me = useCurrentUserV1();
   // For data export issues, only the creator can take actions.
@@ -152,7 +148,5 @@ export const allowUserToApplyTaskRolloutAction = (
     return true;
   }
 
-  return releaserCandidates.some(
-    (candidate) => candidate.name === me.value.name
-  );
+  return isUserIncludedInList(me.value.email, releaserCandidates);
 };

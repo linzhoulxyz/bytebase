@@ -11,7 +11,6 @@ import "google/protobuf/timestamp.proto";
 import "v1/annotation.proto";
 import "v1/common.proto";
 import "v1/database_service.proto";
-import "v1/project_service.proto";
 
 option go_package = "generated-go/v1";
 
@@ -230,9 +229,6 @@ message Plan {
     google.protobuf.Timestamp earliest_allowed_time = 4;
     // A UUID4 string that uniquely identifies the Spec.
     string id = 5;
-    // IDs of the specs that this spec depends on.
-    // Must be a subset of the specs in the same step.
-    repeated string depends_on_specs = 6;
 
     SpecReleaseSource spec_release_source = 8;
 
@@ -242,7 +238,6 @@ message Plan {
       ExportDataConfig export_data_config = 7;
     }
   }
-  VCSSource vcs_source = 7;
 
   // Format: users/hello@world.com
   string creator = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -260,9 +255,7 @@ message Plan {
 
   ReleaseSource release_source = 12;
 
-  // The deployment config snapshot taken at the time of plan creation.
-  // This is to ensure that we get consistent rollout for the plan.
-  DeploymentConfig deployment_config_snapshot = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  Deployment deployment = 13;
 
   message CreateDatabaseConfig {
     // The resource name of the instance on which the database is created.
@@ -284,8 +277,6 @@ message Plan {
     // The environment resource.
     // Format: environments/prod where prod is the environment resource ID.
     string environment = 9 [(google.api.field_behavior) = OPTIONAL];
-    // labels of the database.
-    map<string, string> labels = 10 [(google.api.field_behavior) = OPTIONAL];
   }
 
   message ChangeDatabaseConfig {
@@ -315,7 +306,7 @@ message Plan {
       DATA = 6;
     }
     Type type = 3;
-    // schema_version is parsed from VCS file name.
+    // schema_version is parsed from file name.
     // It is automatically generated in the UI workflow.
     string schema_version = 4;
 
@@ -344,13 +335,18 @@ message Plan {
     optional string password = 4;
   }
 
-  message VCSSource {
-    VCSType vcs_type = 1;
-    // Optional.
-    // If present, we will update the pull request for rollout status.
-    // Format: projects/{project-ID}/vcsConnectors/{vcs-connector}
-    string vcs_connector = 2;
-    string pull_request_url = 3;
+  message Deployment {
+    // The environments deploy order.
+    repeated string environments = 1;
+    // The database group mapping.
+    repeated DatabaseGroupMapping database_group_mappings = 2;
+
+    message DatabaseGroupMapping {
+      // Format: projects/{project}/databaseGroups/{databaseGroup}.
+      string database_group = 1;
+      // Format: instances/{instance-id}/databases/{database-name}.
+      repeated string databases = 2;
+    }
   }
 
   message ReleaseSource {

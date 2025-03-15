@@ -1,16 +1,14 @@
-import { head, uniq } from "lodash-es";
+import { head } from "lodash-es";
 import { defineStore } from "pinia";
 import { computed, reactive, ref, unref, watch } from "vue";
 import { releaseServiceClient } from "@/grpcweb";
 import type { MaybeRef, ComposedRelease, Pagination } from "@/types";
 import { isValidReleaseName, unknownRelease, unknownUser } from "@/types";
-import { DEFAULT_PROJECT_NAME } from "@/types";
 import { State } from "@/types/proto/v1/common";
 import type { DeepPartial, Release } from "@/types/proto/v1/release_service";
-import { extractUserResourceName } from "@/utils";
 import { DEFAULT_PAGE_SIZE } from "./common";
-import { useUserStore } from "./user";
-import { useProjectV1Store } from "./v1";
+import { useUserStore, batchGetOrFetchUsers } from "./user";
+import { useProjectV1Store, batchGetOrFetchProjects } from "./v1";
 import { getProjectNameReleaseId, projectNamePrefix } from "./v1/common";
 
 export const useReleaseStore = defineStore("release", () => {
@@ -123,27 +121,22 @@ export const useReleaseByName = (name: MaybeRef<string>) => {
 
 export const batchComposeRelease = async (releaseList: Release[]) => {
   const userStore = useUserStore();
+
+  await batchGetOrFetchUsers(releaseList.map((release) => release.creator));
+
   const composedReleaseList = releaseList.map((release) => {
     const composed = release as ComposedRelease;
     composed.project = `${projectNamePrefix}${head(getProjectNameReleaseId(release.name))}`;
     composed.creatorEntity =
-      userStore.getUserByEmail(extractUserResourceName(composed.creator)) ??
-      unknownUser();
+      userStore.getUserByIdentifier(composed.creator) ?? unknownUser();
     return composed;
   });
-  const distinctProjectList = uniq(
+
+  await batchGetOrFetchProjects(
     composedReleaseList.map((release) => release.project)
   );
 
   const projectV1Store = useProjectV1Store();
-  await Promise.all(
-    distinctProjectList.map((project) => {
-      if (project === DEFAULT_PROJECT_NAME) {
-        return;
-      }
-      return projectV1Store.getOrFetchProjectByName(project);
-    })
-  );
   return composedReleaseList.map((release) => {
     release.projectEntity = projectV1Store.getProjectByName(release.project);
     return release;

@@ -3,12 +3,10 @@ package utils
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"reflect"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"unicode"
@@ -26,205 +24,18 @@ import (
 
 	"github.com/bytebase/bytebase/backend/common"
 	api "github.com/bytebase/bytebase/backend/legacyapi"
-	"github.com/bytebase/bytebase/backend/plugin/app/relay"
 	"github.com/bytebase/bytebase/backend/store"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 // DataSourceFromInstanceWithType gets a typed data source from an instance.
-func DataSourceFromInstanceWithType(instance *store.InstanceMessage, dataSourceType api.DataSourceType) *store.DataSourceMessage {
-	for _, dataSource := range instance.DataSources {
-		if dataSource.Type == dataSourceType {
+func DataSourceFromInstanceWithType(instance *store.InstanceMessage, dataSourceType storepb.DataSourceType) *storepb.DataSource {
+	for _, dataSource := range instance.Metadata.GetDataSources() {
+		if dataSource.GetType() == dataSourceType {
 			return dataSource
 		}
 	}
 	return nil
-}
-
-// isMatchExpression checks whether a databases matches the query.
-// labels is a mapping from database label key to value.
-func isMatchExpression(labels map[string]string, expression *storepb.LabelSelectorRequirement) bool {
-	switch expression.Operator {
-	case storepb.LabelSelectorRequirement_IN:
-		return checkLabelIn(labels, expression)
-	case storepb.LabelSelectorRequirement_NOT_IN:
-		return !checkLabelIn(labels, expression)
-	case storepb.LabelSelectorRequirement_EXISTS:
-		_, ok := labels[expression.Key]
-		return ok
-	default:
-		return false
-	}
-}
-
-func checkLabelIn(labels map[string]string, expression *storepb.LabelSelectorRequirement) bool {
-	value, ok := labels[expression.Key]
-	if !ok {
-		return false
-	}
-
-	for _, exprValue := range expression.Values {
-		if exprValue == value {
-			return true
-		}
-	}
-	return false
-}
-
-func isMatchExpressions(labels map[string]string, expressionList []*storepb.LabelSelectorRequirement) bool {
-	// Empty expression list matches no databases.
-	if len(expressionList) == 0 {
-		return false
-	}
-	// Expressions are ANDed.
-	for _, expression := range expressionList {
-		if !isMatchExpression(labels, expression) {
-			return false
-		}
-	}
-	return true
-}
-
-// ValidateAndGetDeploymentSchedule validates and returns the deployment schedule.
-// Note: this validation only checks whether the payloads is a valid json, however, invalid field name errors are ignored.
-func ValidateDeploymentSchedule(schedule *storepb.Schedule) error {
-	for _, d := range schedule.Deployments {
-		if d.Title == "" {
-			return common.Errorf(common.Invalid, "Deployment title must not be empty")
-		}
-		hasEnv := false
-		for _, e := range d.Spec.Selector.MatchExpressions {
-			switch e.Operator {
-			case storepb.LabelSelectorRequirement_IN, storepb.LabelSelectorRequirement_NOT_IN:
-				if len(e.Values) == 0 {
-					return common.Errorf(common.Invalid, "expression key %q with %q operator should have at least one value", e.Key, e.Operator)
-				}
-			case storepb.LabelSelectorRequirement_EXISTS:
-				if len(e.Values) > 0 {
-					return common.Errorf(common.Invalid, "expression key %q with %q operator shouldn't have values", e.Key, e.Operator)
-				}
-			default:
-				return common.Errorf(common.Invalid, "expression key %q has invalid operator %q", e.Key, e.Operator)
-			}
-			if e.Key == api.EnvironmentLabelKey {
-				hasEnv = true
-				if e.Operator != storepb.LabelSelectorRequirement_IN || len(e.Values) != 1 {
-					return common.Errorf(common.Invalid, "label %q should must use operator %q with exactly one value", api.EnvironmentLabelKey, storepb.LabelSelectorRequirement_IN)
-				}
-			}
-		}
-		if !hasEnv {
-			return common.Errorf(common.Invalid, "deployment should contain %q label", api.EnvironmentLabelKey)
-		}
-	}
-	return nil
-}
-
-// GetDatabaseMatrixFromDeploymentSchedule gets a pipeline based on deployment schedule.
-// The matrix will include the stage even if the stage has no database.
-func GetDatabaseMatrixFromDeploymentSchedule(schedule *storepb.Schedule, databaseList []*store.DatabaseMessage) ([][]*store.DatabaseMessage, error) {
-	var matrix [][]*store.DatabaseMessage
-
-	// idToLabels maps databaseID -> label key -> label value
-	idToLabels := make(map[int]map[string]string)
-	databaseMap := make(map[int]*store.DatabaseMessage)
-	for _, database := range databaseList {
-		databaseMap[database.UID] = database
-		newMap := make(map[string]string)
-		for k, v := range database.Metadata.Labels {
-			newMap[k] = v
-		}
-		newMap[api.EnvironmentLabelKey] = database.EffectiveEnvironmentID
-
-		idToLabels[database.UID] = newMap
-	}
-
-	// idsSeen records database id which is already in a stage.
-	idsSeen := make(map[int]bool)
-
-	// For each stage, we loop over all databases to see if it is a match.
-	for _, deployment := range schedule.Deployments {
-		// For each stage, we will get a list of matched databases.
-		var matchedDatabaseList []int
-		// Loop over databaseList instead of idToLabels to get determinant results.
-		for _, database := range databaseList {
-			// Skip if the database is already in a stage.
-			if _, ok := idsSeen[database.UID]; ok {
-				continue
-			}
-			// Skip if the database is not found.
-			if database.SyncState == api.NotFound {
-				continue
-			}
-
-			if isMatchExpressions(idToLabels[database.UID], deployment.Spec.Selector.MatchExpressions) {
-				matchedDatabaseList = append(matchedDatabaseList, database.UID)
-				idsSeen[database.UID] = true
-			}
-		}
-
-		var databaseList []*store.DatabaseMessage
-		for _, id := range matchedDatabaseList {
-			databaseList = append(databaseList, databaseMap[id])
-		}
-		// sort databases in stage based on IDs.
-		if len(databaseList) > 0 {
-			sort.Slice(databaseList, func(i, j int) bool {
-				return databaseList[i].UID < databaseList[j].UID
-			})
-		}
-
-		matrix = append(matrix, databaseList)
-	}
-
-	return matrix, nil
-}
-
-// GetTaskSheetID gets the sheetID of a task.
-func GetTaskSheetID(taskPayload string) (int, error) {
-	var taskSheetID struct {
-		SheetID int `json:"sheetId"`
-	}
-	if err := json.Unmarshal([]byte(taskPayload), &taskSheetID); err != nil {
-		return 0, err
-	}
-	return taskSheetID.SheetID, nil
-}
-
-// GetTaskSkipped gets skipped from a task.
-func GetTaskSkipped(task *store.TaskMessage) (bool, error) {
-	var payload struct {
-		Skipped bool `json:"skipped,omitempty"`
-	}
-	if err := json.Unmarshal([]byte(task.Payload), &payload); err != nil {
-		return false, err
-	}
-	return payload.Skipped, nil
-}
-
-// MergeTaskCreateLists merges a matrix of taskCreate and taskIndexDAG to a list of taskCreate and taskIndexDAG.
-// The index of returned taskIndexDAG list is set regarding the merged taskCreate.
-func MergeTaskCreateLists(taskCreateLists [][]*store.TaskMessage, taskIndexDAGLists [][]store.TaskIndexDAG) ([]*store.TaskMessage, []store.TaskIndexDAG, error) {
-	if len(taskCreateLists) != len(taskIndexDAGLists) {
-		return nil, nil, errors.Errorf("expect taskCreateLists and taskIndexDAGLists to have the same length, get %d, %d respectively", len(taskCreateLists), len(taskIndexDAGLists))
-	}
-	var resTaskCreateList []*store.TaskMessage
-	var resTaskIndexDAGList []store.TaskIndexDAG
-	offset := 0
-	for i := range taskCreateLists {
-		taskCreateList := taskCreateLists[i]
-		taskIndexDAGList := taskIndexDAGLists[i]
-
-		resTaskCreateList = append(resTaskCreateList, taskCreateList...)
-		for _, dag := range taskIndexDAGList {
-			resTaskIndexDAGList = append(resTaskIndexDAGList, store.TaskIndexDAG{
-				FromIndex: dag.FromIndex + offset,
-				ToIndex:   dag.ToIndex + offset,
-			})
-		}
-		offset += len(taskCreateList)
-	}
-	return resTaskCreateList, resTaskIndexDAGList, nil
 }
 
 // FindNextPendingStep finds the next pending step in the approval flow.
@@ -276,96 +87,24 @@ func CheckIssueApproved(issue *store.IssueMessage) (bool, error) {
 
 // HandleIncomingApprovalSteps handles incoming approval steps.
 // - Blocks approval steps if no user can approve the step.
-// - creates external approvals for external approval nodes.
-func HandleIncomingApprovalSteps(ctx context.Context, s *store.Store, relayClient *relay.Client, issue *store.IssueMessage, approval *storepb.IssuePayloadApproval) ([]*storepb.IssuePayloadApproval_Approver, []*store.IssueCommentMessage, error) {
+func HandleIncomingApprovalSteps(approval *storepb.IssuePayloadApproval) ([]*storepb.IssuePayloadApproval_Approver, error) {
 	if len(approval.ApprovalTemplates) == 0 {
-		return nil, nil, nil
+		return nil, nil
 	}
 
 	var approvers []*storepb.IssuePayloadApproval_Approver
-	var issueComments []*store.IssueCommentMessage
 
 	step := FindNextPendingStep(approval.ApprovalTemplates[0], approval.Approvers)
 	if step == nil {
-		return nil, nil, nil
-	}
-	if len(step.Nodes) != 1 {
-		return nil, nil, errors.Errorf("expecting one node but got %v", len(step.Nodes))
-	}
-	if step.Type != storepb.ApprovalStep_ANY {
-		return nil, nil, errors.Errorf("expecting ANY step type but got %v", step.Type)
-	}
-	node := step.Nodes[0]
-	if v, ok := node.GetPayload().(*storepb.ApprovalNode_ExternalNodeId); ok {
-		if err := handleApprovalNodeExternalNode(ctx, s, relayClient, issue, v.ExternalNodeId); err != nil {
-			approvers = append(approvers, &storepb.IssuePayloadApproval_Approver{
-				Status:      storepb.IssuePayloadApproval_Approver_REJECTED,
-				PrincipalId: api.SystemBotID,
-			})
-
-			issueComments = append(issueComments, &store.IssueCommentMessage{
-				IssueUID: issue.UID,
-				Payload: &storepb.IssueCommentPayload{
-					Event: &storepb.IssueCommentPayload_Approval_{
-						Approval: &storepb.IssueCommentPayload_Approval{
-							Status: storepb.IssueCommentPayload_Approval_APPROVED,
-						},
-					},
-				},
-			})
-		}
-	}
-	return approvers, issueComments, nil
-}
-
-func handleApprovalNodeExternalNode(ctx context.Context, s *store.Store, relayClient *relay.Client, issue *store.IssueMessage, externalNodeID string) error {
-	getExternalApprovalByID := func(ctx context.Context, s *store.Store, externalApprovalID string) (*storepb.ExternalApprovalSetting_Node, error) {
-		setting, err := s.GetWorkspaceExternalApprovalSetting(ctx)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get workspace external approval setting")
-		}
-		for _, node := range setting.Nodes {
-			if node.Id == externalApprovalID {
-				return node, nil
-			}
-		}
 		return nil, nil
 	}
-	node, err := getExternalApprovalByID(ctx, s, externalNodeID)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get external approval node %s", externalNodeID)
+	if len(step.Nodes) != 1 {
+		return nil, errors.Errorf("expecting one node but got %v", len(step.Nodes))
 	}
-	if node == nil {
-		return errors.Errorf("external approval node %s not found", externalNodeID)
+	if step.Type != storepb.ApprovalStep_ANY {
+		return nil, errors.Errorf("expecting ANY step type but got %v", step.Type)
 	}
-	id, err := relayClient.Create(node.Endpoint, &relay.CreatePayload{
-		IssueID:     fmt.Sprintf("%d", issue.UID),
-		Title:       issue.Title,
-		Description: issue.Description,
-		Project:     issue.Project.ResourceID,
-		CreateTime:  issue.CreatedAt,
-		Creator:     issue.Creator.Email,
-	})
-	if err != nil {
-		return errors.Wrapf(err, "failed to create external approval")
-	}
-	payload, err := protojson.Marshal(&storepb.ExternalApprovalPayload{
-		ExternalApprovalNodeId: node.Id,
-		Id:                     id,
-	})
-	if err != nil {
-		return errors.Wrapf(err, "failed to marshal external approval payload")
-	}
-	if _, err := s.CreateExternalApprovalV2(ctx, &store.ExternalApprovalMessage{
-		IssueUID:     issue.UID,
-		ApproverUID:  api.SystemBotID,
-		Type:         api.ExternalApprovalTypeRelay,
-		Payload:      string(payload),
-		RequesterUID: api.SystemBotID,
-	}); err != nil {
-		return errors.Wrapf(err, "failed to create external approval")
-	}
-	return nil
+	return approvers, nil
 }
 
 // UpdateProjectPolicyFromGrantIssue updates the project policy from grant issue.
@@ -473,15 +212,11 @@ func RenderStatement(templateStatement string, secrets map[string]string) string
 
 // GetSecretMapFromDatabaseMessage extracts the secret map from the given database message.
 func GetSecretMapFromDatabaseMessage(databaseMessage *store.DatabaseMessage) map[string]string {
-	materials := make(map[string]string)
-	if databaseMessage.Secrets == nil || len(databaseMessage.Secrets.Items) == 0 {
-		return materials
+	secrets := make(map[string]string)
+	for _, v := range databaseMessage.Metadata.GetSecrets() {
+		secrets[v.Name] = v.Value
 	}
-
-	for _, item := range databaseMessage.Secrets.Items {
-		materials[item.Name] = item.Value
-	}
-	return materials
+	return secrets
 }
 
 // GetMatchedAndUnmatchedDatabasesInDatabaseGroup returns the matched and unmatched databases in the given database group.

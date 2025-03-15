@@ -4,7 +4,6 @@
 ## Table of Contents
 
 - [store/common.proto](#store_common-proto)
-    - [DatabaseLabel](#bytebase-store-DatabaseLabel)
     - [PageToken](#bytebase-store-PageToken)
     - [Position](#bytebase-store-Position)
     - [Range](#bytebase-store-Range)
@@ -60,19 +59,6 @@
     - [ChangelogPayload.Type](#bytebase-store-ChangelogPayload-Type)
   
 - [store/data_source.proto](#store_data_source-proto)
-    - [DataSourceExternalSecret](#bytebase-store-DataSourceExternalSecret)
-    - [DataSourceExternalSecret.AppRoleAuthOption](#bytebase-store-DataSourceExternalSecret-AppRoleAuthOption)
-    - [DataSourceOptions](#bytebase-store-DataSourceOptions)
-    - [DataSourceOptions.Address](#bytebase-store-DataSourceOptions-Address)
-    - [KerberosConfig](#bytebase-store-KerberosConfig)
-    - [SASLConfig](#bytebase-store-SASLConfig)
-  
-    - [DataSourceExternalSecret.AppRoleAuthOption.SecretType](#bytebase-store-DataSourceExternalSecret-AppRoleAuthOption-SecretType)
-    - [DataSourceExternalSecret.AuthType](#bytebase-store-DataSourceExternalSecret-AuthType)
-    - [DataSourceExternalSecret.SecretType](#bytebase-store-DataSourceExternalSecret-SecretType)
-    - [DataSourceOptions.AuthenticationType](#bytebase-store-DataSourceOptions-AuthenticationType)
-    - [DataSourceOptions.RedisType](#bytebase-store-DataSourceOptions-RedisType)
-  
 - [store/database.proto](#store_database-proto)
     - [CheckConstraintMetadata](#bytebase-store-CheckConstraintMetadata)
     - [ColumnCatalog](#bytebase-store-ColumnCatalog)
@@ -103,8 +89,7 @@
     - [ProcedureMetadata](#bytebase-store-ProcedureMetadata)
     - [SchemaCatalog](#bytebase-store-SchemaCatalog)
     - [SchemaMetadata](#bytebase-store-SchemaMetadata)
-    - [SecretItem](#bytebase-store-SecretItem)
-    - [Secrets](#bytebase-store-Secrets)
+    - [Secret](#bytebase-store-Secret)
     - [SequenceMetadata](#bytebase-store-SequenceMetadata)
     - [StreamMetadata](#bytebase-store-StreamMetadata)
     - [TableCatalog](#bytebase-store-TableCatalog)
@@ -124,20 +109,6 @@
   
 - [store/db_group.proto](#store_db_group-proto)
     - [DatabaseGroupPayload](#bytebase-store-DatabaseGroupPayload)
-  
-- [store/deployment_config.proto](#store_deployment_config-proto)
-    - [DeploymentConfig](#bytebase-store-DeploymentConfig)
-    - [DeploymentSpec](#bytebase-store-DeploymentSpec)
-    - [LabelSelector](#bytebase-store-LabelSelector)
-    - [LabelSelectorRequirement](#bytebase-store-LabelSelectorRequirement)
-    - [Schedule](#bytebase-store-Schedule)
-    - [ScheduleDeployment](#bytebase-store-ScheduleDeployment)
-  
-    - [LabelSelectorRequirement.OperatorType](#bytebase-store-LabelSelectorRequirement-OperatorType)
-  
-- [store/deprecated.proto](#store_deprecated-proto)
-    - [DeprecatedMaskData](#bytebase-store-DeprecatedMaskData)
-    - [DeprecatedMaskingPolicy](#bytebase-store-DeprecatedMaskingPolicy)
   
 - [store/export_archive.proto](#store_export_archive-proto)
     - [ExportArchivePayload](#bytebase-store-ExportArchivePayload)
@@ -160,9 +131,23 @@
     - [OAuth2AuthStyle](#bytebase-store-OAuth2AuthStyle)
   
 - [store/instance.proto](#store_instance-proto)
-    - [InstanceMetadata](#bytebase-store-InstanceMetadata)
-    - [InstanceOptions](#bytebase-store-InstanceOptions)
+    - [DataSource](#bytebase-store-DataSource)
+    - [DataSource.Address](#bytebase-store-DataSource-Address)
+    - [DataSource.ClientSecretCredential](#bytebase-store-DataSource-ClientSecretCredential)
+    - [DataSource.ExtraConnectionParametersEntry](#bytebase-store-DataSource-ExtraConnectionParametersEntry)
+    - [DataSourceExternalSecret](#bytebase-store-DataSourceExternalSecret)
+    - [DataSourceExternalSecret.AppRoleAuthOption](#bytebase-store-DataSourceExternalSecret-AppRoleAuthOption)
+    - [Instance](#bytebase-store-Instance)
     - [InstanceRole](#bytebase-store-InstanceRole)
+    - [KerberosConfig](#bytebase-store-KerberosConfig)
+    - [SASLConfig](#bytebase-store-SASLConfig)
+  
+    - [DataSource.AuthenticationType](#bytebase-store-DataSource-AuthenticationType)
+    - [DataSource.RedisType](#bytebase-store-DataSource-RedisType)
+    - [DataSourceExternalSecret.AppRoleAuthOption.SecretType](#bytebase-store-DataSourceExternalSecret-AppRoleAuthOption-SecretType)
+    - [DataSourceExternalSecret.AuthType](#bytebase-store-DataSourceExternalSecret-AuthType)
+    - [DataSourceExternalSecret.SecretType](#bytebase-store-DataSourceExternalSecret-SecretType)
+    - [DataSourceType](#bytebase-store-DataSourceType)
   
 - [store/instance_change_history.proto](#store_instance_change_history-proto)
     - [InstanceChangeHistoryPayload](#bytebase-store-InstanceChangeHistoryPayload)
@@ -201,16 +186,13 @@
     - [PlanConfig.ChangeDatabaseConfig](#bytebase-store-PlanConfig-ChangeDatabaseConfig)
     - [PlanConfig.ChangeDatabaseConfig.GhostFlagsEntry](#bytebase-store-PlanConfig-ChangeDatabaseConfig-GhostFlagsEntry)
     - [PlanConfig.CreateDatabaseConfig](#bytebase-store-PlanConfig-CreateDatabaseConfig)
-    - [PlanConfig.CreateDatabaseConfig.LabelsEntry](#bytebase-store-PlanConfig-CreateDatabaseConfig-LabelsEntry)
-    - [PlanConfig.DeploymentSnapshot](#bytebase-store-PlanConfig-DeploymentSnapshot)
-    - [PlanConfig.DeploymentSnapshot.DatabaseGroupSnapshot](#bytebase-store-PlanConfig-DeploymentSnapshot-DatabaseGroupSnapshot)
-    - [PlanConfig.DeploymentSnapshot.DeploymentConfigSnapshot](#bytebase-store-PlanConfig-DeploymentSnapshot-DeploymentConfigSnapshot)
+    - [PlanConfig.Deployment](#bytebase-store-PlanConfig-Deployment)
+    - [PlanConfig.Deployment.DatabaseGroupMapping](#bytebase-store-PlanConfig-Deployment-DatabaseGroupMapping)
     - [PlanConfig.ExportDataConfig](#bytebase-store-PlanConfig-ExportDataConfig)
     - [PlanConfig.ReleaseSource](#bytebase-store-PlanConfig-ReleaseSource)
     - [PlanConfig.Spec](#bytebase-store-PlanConfig-Spec)
     - [PlanConfig.SpecReleaseSource](#bytebase-store-PlanConfig-SpecReleaseSource)
     - [PlanConfig.Step](#bytebase-store-PlanConfig-Step)
-    - [PlanConfig.VCSSource](#bytebase-store-PlanConfig-VCSSource)
   
     - [PlanConfig.ChangeDatabaseConfig.Type](#bytebase-store-PlanConfig-ChangeDatabaseConfig-Type)
   
@@ -225,10 +207,10 @@
     - [MaskingExceptionPolicy.MaskingException](#bytebase-store-MaskingExceptionPolicy-MaskingException)
     - [MaskingRulePolicy](#bytebase-store-MaskingRulePolicy)
     - [MaskingRulePolicy.MaskingRule](#bytebase-store-MaskingRulePolicy-MaskingRule)
+    - [QueryDataPolicy](#bytebase-store-QueryDataPolicy)
     - [RestrictIssueCreationForSQLReviewPolicy](#bytebase-store-RestrictIssueCreationForSQLReviewPolicy)
     - [RolloutPolicy](#bytebase-store-RolloutPolicy)
     - [SQLReviewRule](#bytebase-store-SQLReviewRule)
-    - [SlowQueryPolicy](#bytebase-store-SlowQueryPolicy)
     - [TagPolicy](#bytebase-store-TagPolicy)
     - [TagPolicy.TagsEntry](#bytebase-store-TagPolicy-TagsEntry)
   
@@ -274,6 +256,7 @@
     - [Algorithm.RangeMask.Slice](#bytebase-store-Algorithm-RangeMask-Slice)
     - [Announcement](#bytebase-store-Announcement)
     - [AppIMSetting](#bytebase-store-AppIMSetting)
+    - [AppIMSetting.DingTalk](#bytebase-store-AppIMSetting-DingTalk)
     - [AppIMSetting.Feishu](#bytebase-store-AppIMSetting-Feishu)
     - [AppIMSetting.Lark](#bytebase-store-AppIMSetting-Lark)
     - [AppIMSetting.Slack](#bytebase-store-AppIMSetting-Slack)
@@ -283,9 +266,6 @@
     - [DataClassificationSetting.DataClassificationConfig.ClassificationEntry](#bytebase-store-DataClassificationSetting-DataClassificationConfig-ClassificationEntry)
     - [DataClassificationSetting.DataClassificationConfig.DataClassification](#bytebase-store-DataClassificationSetting-DataClassificationConfig-DataClassification)
     - [DataClassificationSetting.DataClassificationConfig.Level](#bytebase-store-DataClassificationSetting-DataClassificationConfig-Level)
-    - [ExternalApprovalPayload](#bytebase-store-ExternalApprovalPayload)
-    - [ExternalApprovalSetting](#bytebase-store-ExternalApprovalSetting)
-    - [ExternalApprovalSetting.Node](#bytebase-store-ExternalApprovalSetting-Node)
     - [MaximumSQLResultSizeSetting](#bytebase-store-MaximumSQLResultSizeSetting)
     - [PasswordRestrictionSetting](#bytebase-store-PasswordRestrictionSetting)
     - [SCIMSetting](#bytebase-store-SCIMSetting)
@@ -310,16 +290,9 @@
     - [SheetCommand](#bytebase-store-SheetCommand)
     - [SheetPayload](#bytebase-store-SheetPayload)
   
-- [store/slow_query.proto](#store_slow_query-proto)
-    - [SlowQueryDetails](#bytebase-store-SlowQueryDetails)
-    - [SlowQueryStatistics](#bytebase-store-SlowQueryStatistics)
-    - [SlowQueryStatisticsItem](#bytebase-store-SlowQueryStatisticsItem)
-  
 - [store/task.proto](#store_task-proto)
-    - [TaskDatabaseCreatePayload](#bytebase-store-TaskDatabaseCreatePayload)
-    - [TaskDatabaseDataExportPayload](#bytebase-store-TaskDatabaseDataExportPayload)
-    - [TaskDatabaseUpdatePayload](#bytebase-store-TaskDatabaseUpdatePayload)
-    - [TaskDatabaseUpdatePayload.FlagsEntry](#bytebase-store-TaskDatabaseUpdatePayload-FlagsEntry)
+    - [TaskPayload](#bytebase-store-TaskPayload)
+    - [TaskPayload.FlagsEntry](#bytebase-store-TaskPayload-FlagsEntry)
     - [TaskReleaseSource](#bytebase-store-TaskReleaseSource)
   
 - [store/task_run.proto](#store_task_run-proto)
@@ -352,9 +325,6 @@
     - [MFAConfig](#bytebase-store-MFAConfig)
     - [UserProfile](#bytebase-store-UserProfile)
   
-- [store/vcs.proto](#store_vcs-proto)
-    - [VCSConnector](#bytebase-store-VCSConnector)
-  
 - [Scalar Value Types](#scalar-value-types)
 
 
@@ -363,22 +333,6 @@
 <p align="right"><a href="#top">Top</a></p>
 
 ## store/common.proto
-
-
-
-<a name="bytebase-store-DatabaseLabel"></a>
-
-### DatabaseLabel
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| key | [string](#string) |  |  |
-| value | [string](#string) |  |  |
-
-
-
 
 
 
@@ -506,10 +460,10 @@ Used internally for obfuscating the page token.
 | Name | Number | Description |
 | ---- | ------ | ----------- |
 | VCS_TYPE_UNSPECIFIED | 0 |  |
-| GITHUB | 1 | GitHub type. Using for GitHub community edition(ce). |
-| GITLAB | 2 | GitLab type. Using for GitLab community edition(ce) and enterprise edition(ee). |
-| BITBUCKET | 3 | BitBucket type. Using for BitBucket cloud or BitBucket server. |
-| AZURE_DEVOPS | 4 | Azure DevOps. Using for Azure DevOps GitOps workflow. |
+| GITHUB | 1 |  |
+| GITLAB | 2 |  |
+| BITBUCKET | 3 |  |
+| AZURE_DEVOPS | 4 |  |
 
 
  
@@ -651,7 +605,6 @@ Used internally for obfuscating the page token.
 | type | [ApprovalNode.Type](#bytebase-store-ApprovalNode-Type) |  |  |
 | group_value | [ApprovalNode.GroupValue](#bytebase-store-ApprovalNode-GroupValue) |  |  |
 | role | [string](#string) |  | Format: roles/{role} |
-| external_node_id | [string](#string) |  |  |
 
 
 
@@ -1112,205 +1065,7 @@ Metadata about the request.
 ## store/data_source.proto
 
 
-
-<a name="bytebase-store-DataSourceExternalSecret"></a>
-
-### DataSourceExternalSecret
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| secret_type | [DataSourceExternalSecret.SecretType](#bytebase-store-DataSourceExternalSecret-SecretType) |  |  |
-| url | [string](#string) |  |  |
-| auth_type | [DataSourceExternalSecret.AuthType](#bytebase-store-DataSourceExternalSecret-AuthType) |  |  |
-| app_role | [DataSourceExternalSecret.AppRoleAuthOption](#bytebase-store-DataSourceExternalSecret-AppRoleAuthOption) |  |  |
-| token | [string](#string) |  |  |
-| engine_name | [string](#string) |  | engine name is the name for secret engine. |
-| secret_name | [string](#string) |  | the secret name in the engine to store the password. |
-| password_key_name | [string](#string) |  | the key name for the password. |
-
-
-
-
-
-
-<a name="bytebase-store-DataSourceExternalSecret-AppRoleAuthOption"></a>
-
-### DataSourceExternalSecret.AppRoleAuthOption
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| role_id | [string](#string) |  |  |
-| secret_id | [string](#string) |  | the secret id for the role without ttl. |
-| type | [DataSourceExternalSecret.AppRoleAuthOption.SecretType](#bytebase-store-DataSourceExternalSecret-AppRoleAuthOption-SecretType) |  |  |
-| mount_path | [string](#string) |  | The path where the approle auth method is mounted. |
-
-
-
-
-
-
-<a name="bytebase-store-DataSourceOptions"></a>
-
-### DataSourceOptions
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| srv | [bool](#bool) |  | srv is a boolean flag that indicates whether the host is a DNS SRV record. |
-| authentication_database | [string](#string) |  | authentication_database is the database name to authenticate against, which stores the user credentials. |
-| sid | [string](#string) |  | sid and service_name are used for Oracle. |
-| service_name | [string](#string) |  |  |
-| ssh_host | [string](#string) |  | SSH related The hostname of the SSH server agent. |
-| ssh_port | [string](#string) |  | The port of the SSH server agent. It&#39;s 22 typically. |
-| ssh_user | [string](#string) |  | The user to login the server. |
-| ssh_obfuscated_password | [string](#string) |  | The password to login the server. If it&#39;s empty string, no password is required. |
-| ssh_obfuscated_private_key | [string](#string) |  | The private key to login the server. If it&#39;s empty string, we will use the system default private key from os.Getenv(&#34;SSH_AUTH_SOCK&#34;). |
-| authentication_private_key_obfuscated | [string](#string) |  | PKCS#8 private key in PEM format. If it&#39;s empty string, no private key is required. Used for authentication when connecting to the data source. |
-| external_secret | [DataSourceExternalSecret](#bytebase-store-DataSourceExternalSecret) |  |  |
-| authentication_type | [DataSourceOptions.AuthenticationType](#bytebase-store-DataSourceOptions-AuthenticationType) |  |  |
-| sasl_config | [SASLConfig](#bytebase-store-SASLConfig) |  |  |
-| additional_addresses | [DataSourceOptions.Address](#bytebase-store-DataSourceOptions-Address) | repeated | additional_addresses is used for MongoDB replica set. |
-| replica_set | [string](#string) |  | replica_set is used for MongoDB replica set. |
-| direct_connection | [bool](#bool) |  | direct_connection is used for MongoDB to dispatch all the operations to the node specified in the connection string. |
-| region | [string](#string) |  | region is the location of where the DB is, works for AWS RDS. For example, us-east-1. |
-| warehouse_id | [string](#string) |  | warehouse_id is used by Databricks. |
-| master_name | [string](#string) |  | master_name is the master name used by connecting redis-master via redis sentinel. |
-| master_username | [string](#string) |  | master_username and master_obfuscated_password are master credentials used by redis sentinel mode. |
-| master_obfuscated_password | [string](#string) |  |  |
-| redis_type | [DataSourceOptions.RedisType](#bytebase-store-DataSourceOptions-RedisType) |  |  |
-| use_ssl | [bool](#bool) |  | Use SSL to connect to the data source. By default, we use system default SSL configuration. |
-| cluster | [string](#string) |  | Cluster is the cluster name for the data source. Used by CockroachDB. |
-
-
-
-
-
-
-<a name="bytebase-store-DataSourceOptions-Address"></a>
-
-### DataSourceOptions.Address
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| host | [string](#string) |  |  |
-| port | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="bytebase-store-KerberosConfig"></a>
-
-### KerberosConfig
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| primary | [string](#string) |  |  |
-| instance | [string](#string) |  |  |
-| realm | [string](#string) |  |  |
-| keytab | [bytes](#bytes) |  |  |
-| kdc_host | [string](#string) |  |  |
-| kdc_port | [string](#string) |  |  |
-| kdc_transport_protocol | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="bytebase-store-SASLConfig"></a>
-
-### SASLConfig
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| krb_config | [KerberosConfig](#bytebase-store-KerberosConfig) |  |  |
-
-
-
-
-
  
-
-
-<a name="bytebase-store-DataSourceExternalSecret-AppRoleAuthOption-SecretType"></a>
-
-### DataSourceExternalSecret.AppRoleAuthOption.SecretType
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| SECRET_TYPE_UNSPECIFIED | 0 |  |
-| PLAIN | 1 |  |
-| ENVIRONMENT | 2 |  |
-
-
-
-<a name="bytebase-store-DataSourceExternalSecret-AuthType"></a>
-
-### DataSourceExternalSecret.AuthType
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| AUTH_TYPE_UNSPECIFIED | 0 |  |
-| TOKEN | 1 | ref: https://developer.hashicorp.com/vault/docs/auth/token |
-| VAULT_APP_ROLE | 2 | ref: https://developer.hashicorp.com/vault/docs/auth/approle |
-
-
-
-<a name="bytebase-store-DataSourceExternalSecret-SecretType"></a>
-
-### DataSourceExternalSecret.SecretType
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| SAECRET_TYPE_UNSPECIFIED | 0 |  |
-| VAULT_KV_V2 | 1 | ref: https://developer.hashicorp.com/vault/api-docs/secret/kv/kv-v2 |
-| AWS_SECRETS_MANAGER | 2 | ref: https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html |
-| GCP_SECRET_MANAGER | 3 | ref: https://cloud.google.com/secret-manager/docs |
-
-
-
-<a name="bytebase-store-DataSourceOptions-AuthenticationType"></a>
-
-### DataSourceOptions.AuthenticationType
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| AUTHENTICATION_UNSPECIFIED | 0 |  |
-| PASSWORD | 1 |  |
-| GOOGLE_CLOUD_SQL_IAM | 2 |  |
-| AWS_RDS_IAM | 3 |  |
-
-
-
-<a name="bytebase-store-DataSourceOptions-RedisType"></a>
-
-### DataSourceOptions.RedisType
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| REDIS_TYPE_UNSPECIFIED | 0 |  |
-| STANDALONE | 1 |  |
-| SENTINEL | 2 |  |
-| CLUSTER | 3 |  |
-
 
  
 
@@ -1436,6 +1191,8 @@ DatabaseMetadata is the metadata for databases.
 | labels | [DatabaseMetadata.LabelsEntry](#bytebase-store-DatabaseMetadata-LabelsEntry) | repeated |  |
 | last_sync_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | backup_available | [bool](#bool) |  |  |
+| datashare | [bool](#bool) |  |  |
+| secrets | [Secret](#bytebase-store-Secret) | repeated |  |
 
 
 
@@ -1525,6 +1282,7 @@ DependencyColumn is the metadata for dependency columns.
 | name | [string](#string) |  | The name of a type. |
 | values | [string](#string) | repeated | The enum values of a type. |
 | comment | [string](#string) |  |  |
+| skip_dump | [bool](#bool) |  |  |
 
 
 
@@ -1626,6 +1384,7 @@ FunctionMetadata is the metadata for functions.
 | sql_mode | [string](#string) |  |  |
 | comment | [string](#string) |  |  |
 | dependency_tables | [DependencyTable](#bytebase-store-DependencyTable) | repeated | The dependency_tables is the list of dependency tables of a function. For PostgreSQL, it&#39;s the list of tables that the function depends on the return type definition. |
+| skip_dump | [bool](#bool) |  |  |
 
 
 
@@ -1723,6 +1482,7 @@ MaterializedViewMetadata is the metadata for materialized views.
 | dependency_columns | [DependencyColumn](#bytebase-store-DependencyColumn) | repeated | The dependency_columns is the list of dependency columns of a view. |
 | triggers | [TriggerMetadata](#bytebase-store-TriggerMetadata) | repeated | The columns is the ordered list of columns in a table. |
 | indexes | [IndexMetadata](#bytebase-store-IndexMetadata) | repeated | The indexes is the list of indexes in a table. |
+| skip_dump | [bool](#bool) |  |  |
 
 
 
@@ -1824,6 +1584,7 @@ ProcedureMetadata is the metadata for procedures.
 | collation_connection | [string](#string) |  |  |
 | database_collation | [string](#string) |  |  |
 | sql_mode | [string](#string) |  |  |
+| skip_dump | [bool](#bool) |  |  |
 
 
 
@@ -1869,15 +1630,16 @@ This is the concept of schema in Postgres, but it&#39;s a no-op for MySQL.
 | owner | [string](#string) |  |  |
 | events | [EventMetadata](#bytebase-store-EventMetadata) | repeated |  |
 | enum_types | [EnumTypeMetadata](#bytebase-store-EnumTypeMetadata) | repeated |  |
+| skip_dump | [bool](#bool) |  |  |
 
 
 
 
 
 
-<a name="bytebase-store-SecretItem"></a>
+<a name="bytebase-store-Secret"></a>
 
-### SecretItem
+### Secret
 
 
 
@@ -1886,21 +1648,6 @@ This is the concept of schema in Postgres, but it&#39;s a no-op for MySQL.
 | name | [string](#string) |  | The name is the name of the secret. |
 | value | [string](#string) |  | The value is the value of the secret. |
 | description | [string](#string) |  | The description is the description of the secret. |
-
-
-
-
-
-
-<a name="bytebase-store-Secrets"></a>
-
-### Secrets
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| items | [SecretItem](#bytebase-store-SecretItem) | repeated | The list of secrets. |
 
 
 
@@ -1927,6 +1674,7 @@ This is the concept of schema in Postgres, but it&#39;s a no-op for MySQL.
 | owner_table | [string](#string) |  | The owner table of the sequence. |
 | owner_column | [string](#string) |  | The owner column of the sequence. |
 | comment | [string](#string) |  |  |
+| skip_dump | [bool](#bool) |  |  |
 
 
 
@@ -2000,6 +1748,7 @@ TableMetadata is the metadata for tables.
 | owner | [string](#string) |  |  |
 | sorting_keys | [string](#string) | repeated | The sorting_keys is a tuple of column names or arbitrary expressions. ClickHouse specific field. Reference: https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/mergetree#order_by |
 | triggers | [TriggerMetadata](#bytebase-store-TriggerMetadata) | repeated |  |
+| skip_dump | [bool](#bool) |  |  |
 
 
 
@@ -2067,6 +1816,7 @@ TablePartitionMetadata is the metadata for table partitions.
 | character_set_client | [string](#string) |  |  |
 | collation_connection | [string](#string) |  |  |
 | comment | [string](#string) |  |  |
+| skip_dump | [bool](#bool) |  |  |
 
 
 
@@ -2087,6 +1837,7 @@ ViewMetadata is the metadata for views.
 | dependency_columns | [DependencyColumn](#bytebase-store-DependencyColumn) | repeated | The dependency_columns is the list of dependency columns of a view. |
 | columns | [ColumnMetadata](#bytebase-store-ColumnMetadata) | repeated | The columns is the ordered list of columns in a table. |
 | triggers | [TriggerMetadata](#bytebase-store-TriggerMetadata) | repeated | The triggers is the list of triggers in a view. |
+| skip_dump | [bool](#bool) |  |  |
 
 
 
@@ -2224,181 +1975,6 @@ LIST, HASH (https://www.postgresql.org/docs/current/ddl-partitioning.html)
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | multitenancy | [bool](#bool) |  |  |
-
-
-
-
-
- 
-
- 
-
- 
-
- 
-
-
-
-<a name="store_deployment_config-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## store/deployment_config.proto
-
-
-
-<a name="bytebase-store-DeploymentConfig"></a>
-
-### DeploymentConfig
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| schedule | [Schedule](#bytebase-store-Schedule) |  |  |
-
-
-
-
-
-
-<a name="bytebase-store-DeploymentSpec"></a>
-
-### DeploymentSpec
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| selector | [LabelSelector](#bytebase-store-LabelSelector) |  |  |
-
-
-
-
-
-
-<a name="bytebase-store-LabelSelector"></a>
-
-### LabelSelector
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| match_expressions | [LabelSelectorRequirement](#bytebase-store-LabelSelectorRequirement) | repeated | match_expressions is a list of label selector requirements. The requirements are ANDed. |
-
-
-
-
-
-
-<a name="bytebase-store-LabelSelectorRequirement"></a>
-
-### LabelSelectorRequirement
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| key | [string](#string) |  |  |
-| operator | [LabelSelectorRequirement.OperatorType](#bytebase-store-LabelSelectorRequirement-OperatorType) |  |  |
-| values | [string](#string) | repeated | Values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch. |
-
-
-
-
-
-
-<a name="bytebase-store-Schedule"></a>
-
-### Schedule
-Schedule is the message for deployment schedule.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| deployments | [ScheduleDeployment](#bytebase-store-ScheduleDeployment) | repeated |  |
-
-
-
-
-
-
-<a name="bytebase-store-ScheduleDeployment"></a>
-
-### ScheduleDeployment
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| title | [string](#string) |  | The title of the deployment (stage) in a schedule. |
-| id | [string](#string) |  |  |
-| spec | [DeploymentSpec](#bytebase-store-DeploymentSpec) |  |  |
-
-
-
-
-
- 
-
-
-<a name="bytebase-store-LabelSelectorRequirement-OperatorType"></a>
-
-### LabelSelectorRequirement.OperatorType
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| OPERATOR_TYPE_UNSPECIFIED | 0 | The operator is not specified. |
-| IN | 1 | The operator is &#34;In&#34;. |
-| EXISTS | 2 | The operator is &#34;Exists&#34;. |
-| NOT_IN | 3 | The operator is &#34;Not In&#34;. |
-
-
- 
-
- 
-
- 
-
-
-
-<a name="store_deprecated-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## store/deprecated.proto
-
-
-
-<a name="bytebase-store-DeprecatedMaskData"></a>
-
-### DeprecatedMaskData
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| schema | [string](#string) |  |  |
-| table | [string](#string) |  |  |
-| column | [string](#string) |  |  |
-| masking_level | [MaskingLevel](#bytebase-store-MaskingLevel) |  |  |
-| full_masking_algorithm_id | [string](#string) |  |  |
-| partial_masking_algorithm_id | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="bytebase-store-DeprecatedMaskingPolicy"></a>
-
-### DeprecatedMaskingPolicy
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| mask_data | [DeprecatedMaskData](#bytebase-store-DeprecatedMaskData) | repeated |  |
 
 
 
@@ -2684,34 +2260,174 @@ OIDCIdentityProviderConfig is the structure for OIDC identity provider config.
 
 
 
-<a name="bytebase-store-InstanceMetadata"></a>
+<a name="bytebase-store-DataSource"></a>
 
-### InstanceMetadata
-InstanceMetadata is the metadata for instances.
+### DataSource
+
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| mysql_lower_case_table_names | [int32](#int32) |  | The lower_case_table_names config for MySQL instances. It is used to determine whether the table names and database names are case sensitive. |
-| last_sync_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
-| roles | [InstanceRole](#bytebase-store-InstanceRole) | repeated |  |
+| id | [string](#string) |  |  |
+| type | [DataSourceType](#bytebase-store-DataSourceType) |  |  |
+| username | [string](#string) |  |  |
+| password | [string](#string) |  |  |
+| obfuscated_password | [string](#string) |  |  |
+| use_ssl | [bool](#bool) |  | Use SSL to connect to the data source. By default, we use system default SSL configuration. |
+| ssl_ca | [string](#string) |  |  |
+| obfuscated_ssl_ca | [string](#string) |  |  |
+| ssl_cert | [string](#string) |  |  |
+| obfuscated_ssl_cert | [string](#string) |  |  |
+| ssl_key | [string](#string) |  |  |
+| obfuscated_ssl_key | [string](#string) |  |  |
+| host | [string](#string) |  |  |
+| port | [string](#string) |  |  |
+| database | [string](#string) |  |  |
+| srv | [bool](#bool) |  | srv, authentication_database and replica_set are used for MongoDB. srv is a boolean flag that indicates whether the host is a DNS SRV record. |
+| authentication_database | [string](#string) |  | authentication_database is the database name to authenticate against, which stores the user credentials. |
+| replica_set | [string](#string) |  | replica_set is used for MongoDB replica set. |
+| sid | [string](#string) |  | sid and service_name are used for Oracle. |
+| service_name | [string](#string) |  |  |
+| ssh_host | [string](#string) |  | SSH related The hostname of the SSH server agent. |
+| ssh_port | [string](#string) |  | The port of the SSH server agent. It&#39;s 22 typically. |
+| ssh_user | [string](#string) |  | The user to login the server. |
+| ssh_password | [string](#string) |  | The password to login the server. If it&#39;s empty string, no password is required. |
+| obfuscated_ssh_password | [string](#string) |  |  |
+| ssh_private_key | [string](#string) |  | The private key to login the server. If it&#39;s empty string, we will use the system default private key from os.Getenv(&#34;SSH_AUTH_SOCK&#34;). |
+| obfuscated_ssh_private_key | [string](#string) |  |  |
+| authentication_private_key | [string](#string) |  | PKCS#8 private key in PEM format. If it&#39;s empty string, no private key is required. Used for authentication when connecting to the data source. |
+| obfuscated_authentication_private_key | [string](#string) |  |  |
+| external_secret | [DataSourceExternalSecret](#bytebase-store-DataSourceExternalSecret) |  |  |
+| authentication_type | [DataSource.AuthenticationType](#bytebase-store-DataSource-AuthenticationType) |  |  |
+| client_secret_credential | [DataSource.ClientSecretCredential](#bytebase-store-DataSource-ClientSecretCredential) |  |  |
+| sasl_config | [SASLConfig](#bytebase-store-SASLConfig) |  |  |
+| additional_addresses | [DataSource.Address](#bytebase-store-DataSource-Address) | repeated | additional_addresses is used for MongoDB replica set. |
+| direct_connection | [bool](#bool) |  | direct_connection is used for MongoDB to dispatch all the operations to the node specified in the connection string. |
+| region | [string](#string) |  | region is the location of where the DB is, works for AWS RDS. For example, us-east-1. |
+| warehouse_id | [string](#string) |  | warehouse_id is used by Databricks. |
+| master_name | [string](#string) |  | master_name is the master name used by connecting redis-master via redis sentinel. |
+| master_username | [string](#string) |  | master_username and master_obfuscated_password are master credentials used by redis sentinel mode. |
+| master_password | [string](#string) |  |  |
+| obfuscated_master_password | [string](#string) |  |  |
+| redis_type | [DataSource.RedisType](#bytebase-store-DataSource-RedisType) |  |  |
+| cluster | [string](#string) |  | Cluster is the cluster name for the data source. Used by CockroachDB. |
+| extra_connection_parameters | [DataSource.ExtraConnectionParametersEntry](#bytebase-store-DataSource-ExtraConnectionParametersEntry) | repeated | Extra connection parameters for the database connection. For PostgreSQL HA, this can be used to set target_session_attrs=read-write |
 
 
 
 
 
 
-<a name="bytebase-store-InstanceOptions"></a>
+<a name="bytebase-store-DataSource-Address"></a>
 
-### InstanceOptions
-InstanceOptions is the option for instances.
+### DataSource.Address
+
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
+| host | [string](#string) |  |  |
+| port | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="bytebase-store-DataSource-ClientSecretCredential"></a>
+
+### DataSource.ClientSecretCredential
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| tenant_id | [string](#string) |  |  |
+| client_id | [string](#string) |  |  |
+| client_secret | [string](#string) |  |  |
+| obfuscated_client_secret | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="bytebase-store-DataSource-ExtraConnectionParametersEntry"></a>
+
+### DataSource.ExtraConnectionParametersEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="bytebase-store-DataSourceExternalSecret"></a>
+
+### DataSourceExternalSecret
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| secret_type | [DataSourceExternalSecret.SecretType](#bytebase-store-DataSourceExternalSecret-SecretType) |  |  |
+| url | [string](#string) |  |  |
+| auth_type | [DataSourceExternalSecret.AuthType](#bytebase-store-DataSourceExternalSecret-AuthType) |  |  |
+| app_role | [DataSourceExternalSecret.AppRoleAuthOption](#bytebase-store-DataSourceExternalSecret-AppRoleAuthOption) |  |  |
+| token | [string](#string) |  |  |
+| engine_name | [string](#string) |  | engine name is the name for secret engine. |
+| secret_name | [string](#string) |  | the secret name in the engine to store the password. |
+| password_key_name | [string](#string) |  | the key name for the password. |
+
+
+
+
+
+
+<a name="bytebase-store-DataSourceExternalSecret-AppRoleAuthOption"></a>
+
+### DataSourceExternalSecret.AppRoleAuthOption
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| role_id | [string](#string) |  |  |
+| secret_id | [string](#string) |  | the secret id for the role without ttl. |
+| type | [DataSourceExternalSecret.AppRoleAuthOption.SecretType](#bytebase-store-DataSourceExternalSecret-AppRoleAuthOption-SecretType) |  |  |
+| mount_path | [string](#string) |  | The path where the approle auth method is mounted. |
+
+
+
+
+
+
+<a name="bytebase-store-Instance"></a>
+
+### Instance
+Instance is the proto for instances.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| title | [string](#string) |  |  |
+| engine | [Engine](#bytebase-store-Engine) |  |  |
+| activation | [bool](#bool) |  |  |
+| version | [string](#string) |  |  |
+| external_link | [string](#string) |  |  |
+| data_sources | [DataSource](#bytebase-store-DataSource) | repeated |  |
 | sync_interval | [google.protobuf.Duration](#google-protobuf-Duration) |  | How often the instance is synced. |
 | maximum_connections | [int32](#int32) |  | The maximum number of connections. The default is 10 if the value is unset or zero. |
 | sync_databases | [string](#string) | repeated | Enable sync for following databases. Default empty, means sync all schemas &amp; databases. |
+| mysql_lower_case_table_names | [int32](#int32) |  | The lower_case_table_names config for MySQL instances. It is used to determine whether the table names and database names are case sensitive. |
+| last_sync_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| roles | [InstanceRole](#bytebase-store-InstanceRole) | repeated |  |
 
 
 
@@ -2735,7 +2451,125 @@ InstanceRole is the API message for instance role.
 
 
 
+
+<a name="bytebase-store-KerberosConfig"></a>
+
+### KerberosConfig
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| primary | [string](#string) |  |  |
+| instance | [string](#string) |  |  |
+| realm | [string](#string) |  |  |
+| keytab | [bytes](#bytes) |  |  |
+| kdc_host | [string](#string) |  |  |
+| kdc_port | [string](#string) |  |  |
+| kdc_transport_protocol | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="bytebase-store-SASLConfig"></a>
+
+### SASLConfig
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| krb_config | [KerberosConfig](#bytebase-store-KerberosConfig) |  |  |
+
+
+
+
+
  
+
+
+<a name="bytebase-store-DataSource-AuthenticationType"></a>
+
+### DataSource.AuthenticationType
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| AUTHENTICATION_UNSPECIFIED | 0 |  |
+| PASSWORD | 1 |  |
+| GOOGLE_CLOUD_SQL_IAM | 2 |  |
+| AWS_RDS_IAM | 3 |  |
+| AZURE_IAM | 4 |  |
+
+
+
+<a name="bytebase-store-DataSource-RedisType"></a>
+
+### DataSource.RedisType
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| REDIS_TYPE_UNSPECIFIED | 0 |  |
+| STANDALONE | 1 |  |
+| SENTINEL | 2 |  |
+| CLUSTER | 3 |  |
+
+
+
+<a name="bytebase-store-DataSourceExternalSecret-AppRoleAuthOption-SecretType"></a>
+
+### DataSourceExternalSecret.AppRoleAuthOption.SecretType
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| SECRET_TYPE_UNSPECIFIED | 0 |  |
+| PLAIN | 1 |  |
+| ENVIRONMENT | 2 |  |
+
+
+
+<a name="bytebase-store-DataSourceExternalSecret-AuthType"></a>
+
+### DataSourceExternalSecret.AuthType
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| AUTH_TYPE_UNSPECIFIED | 0 |  |
+| TOKEN | 1 | ref: https://developer.hashicorp.com/vault/docs/auth/token |
+| VAULT_APP_ROLE | 2 | ref: https://developer.hashicorp.com/vault/docs/auth/approle |
+
+
+
+<a name="bytebase-store-DataSourceExternalSecret-SecretType"></a>
+
+### DataSourceExternalSecret.SecretType
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| SAECRET_TYPE_UNSPECIFIED | 0 |  |
+| VAULT_KV_V2 | 1 | ref: https://developer.hashicorp.com/vault/api-docs/secret/kv/kv-v2 |
+| AWS_SECRETS_MANAGER | 2 | ref: https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html |
+| GCP_SECRET_MANAGER | 3 | ref: https://cloud.google.com/secret-manager/docs |
+
+
+
+<a name="bytebase-store-DataSourceType"></a>
+
+### DataSourceType
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| DATA_SOURCE_UNSPECIFIED | 0 |  |
+| ADMIN | 1 |  |
+| READ_ONLY | 2 |  |
+
 
  
 
@@ -3032,7 +2866,7 @@ InstanceRole is the API message for instance role.
 | ----- | ---- | ----- | ----------- |
 | sheet_uid | [int32](#int32) |  |  |
 | change_database_type | [PlanCheckRunConfig.ChangeDatabaseType](#bytebase-store-PlanCheckRunConfig-ChangeDatabaseType) |  |  |
-| instance_uid | [int32](#int32) |  |  |
+| instance_id | [string](#string) |  |  |
 | database_name | [string](#string) |  |  |
 | database_group_uid | [int64](#int64) | optional | **Deprecated.**  |
 | ghost_flags | [PlanCheckRunConfig.GhostFlagsEntry](#bytebase-store-PlanCheckRunConfig-GhostFlagsEntry) | repeated |  |
@@ -3200,9 +3034,8 @@ InstanceRole is the API message for instance role.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | steps | [PlanConfig.Step](#bytebase-store-PlanConfig-Step) | repeated |  |
-| vcs_source | [PlanConfig.VCSSource](#bytebase-store-PlanConfig-VCSSource) |  |  |
 | release_source | [PlanConfig.ReleaseSource](#bytebase-store-PlanConfig-ReleaseSource) |  |  |
-| deployment_snapshot | [PlanConfig.DeploymentSnapshot](#bytebase-store-PlanConfig-DeploymentSnapshot) |  |  |
+| deployment | [PlanConfig.Deployment](#bytebase-store-PlanConfig-Deployment) |  |  |
 
 
 
@@ -3220,7 +3053,7 @@ InstanceRole is the API message for instance role.
 | target | [string](#string) |  | The resource name of the target. Format: instances/{instance-id}/databases/{database-name}. Format: projects/{project}/databaseGroups/{databaseGroup}. |
 | sheet | [string](#string) |  | The resource name of the sheet. Format: projects/{project}/sheets/{sheet} |
 | type | [PlanConfig.ChangeDatabaseConfig.Type](#bytebase-store-PlanConfig-ChangeDatabaseConfig-Type) |  |  |
-| schema_version | [string](#string) |  | schema_version is parsed from VCS file name. It is automatically generated in the UI workflow. |
+| schema_version | [string](#string) |  | schema_version is parsed from file name. It is automatically generated in the UI workflow. |
 | ghost_flags | [PlanConfig.ChangeDatabaseConfig.GhostFlagsEntry](#bytebase-store-PlanConfig-ChangeDatabaseConfig-GhostFlagsEntry) | repeated |  |
 | pre_update_backup_detail | [PreUpdateBackupDetail](#bytebase-store-PreUpdateBackupDetail) | optional | If set, a backup of the modified data will be created automatically before any changes are applied. |
 
@@ -3262,72 +3095,38 @@ InstanceRole is the API message for instance role.
 | owner | [string](#string) |  | owner is the owner of the database. This is only applicable to Postgres for &#34;WITH OWNER &lt;&lt;owner&gt;&gt;&#34;. |
 | backup | [string](#string) |  | backup is the resource name of the backup. Format: instances/{instance}/databases/{database}/backups/{backup-name} |
 | environment | [string](#string) |  | The environment resource. Format: environments/prod where prod is the environment resource ID. |
-| labels | [PlanConfig.CreateDatabaseConfig.LabelsEntry](#bytebase-store-PlanConfig-CreateDatabaseConfig-LabelsEntry) | repeated | labels of the database. |
 
 
 
 
 
 
-<a name="bytebase-store-PlanConfig-CreateDatabaseConfig-LabelsEntry"></a>
+<a name="bytebase-store-PlanConfig-Deployment"></a>
 
-### PlanConfig.CreateDatabaseConfig.LabelsEntry
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| key | [string](#string) |  |  |
-| value | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="bytebase-store-PlanConfig-DeploymentSnapshot"></a>
-
-### PlanConfig.DeploymentSnapshot
+### PlanConfig.Deployment
 
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| deployment_config_snapshot | [PlanConfig.DeploymentSnapshot.DeploymentConfigSnapshot](#bytebase-store-PlanConfig-DeploymentSnapshot-DeploymentConfigSnapshot) |  |  |
-| database_group_snapshots | [PlanConfig.DeploymentSnapshot.DatabaseGroupSnapshot](#bytebase-store-PlanConfig-DeploymentSnapshot-DatabaseGroupSnapshot) | repeated |  |
+| environments | [string](#string) | repeated | The environments deploy order. |
+| database_group_mappings | [PlanConfig.Deployment.DatabaseGroupMapping](#bytebase-store-PlanConfig-Deployment-DatabaseGroupMapping) | repeated | The database group mapping. |
 
 
 
 
 
 
-<a name="bytebase-store-PlanConfig-DeploymentSnapshot-DatabaseGroupSnapshot"></a>
+<a name="bytebase-store-PlanConfig-Deployment-DatabaseGroupMapping"></a>
 
-### PlanConfig.DeploymentSnapshot.DatabaseGroupSnapshot
-The snapshot of the database group at the time of creation.
+### PlanConfig.Deployment.DatabaseGroupMapping
+
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | database_group | [string](#string) |  | Format: projects/{project}/databaseGroups/{databaseGroup}. |
 | databases | [string](#string) | repeated | Format: instances/{instance-id}/databases/{database-name}. |
-
-
-
-
-
-
-<a name="bytebase-store-PlanConfig-DeploymentSnapshot-DeploymentConfigSnapshot"></a>
-
-### PlanConfig.DeploymentSnapshot.DeploymentConfigSnapshot
-The snapshot of the project deployment config at the time of creation.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  |  |
-| title | [string](#string) |  |  |
-| deployment_config | [DeploymentConfig](#bytebase-store-DeploymentConfig) |  |  |
 
 
 
@@ -3377,7 +3176,6 @@ The snapshot of the project deployment config at the time of creation.
 | ----- | ---- | ----- | ----------- |
 | earliest_allowed_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | earliest_allowed_time the earliest execution time of the change. |
 | id | [string](#string) |  | A UUID4 string that uniquely identifies the Spec. |
-| depends_on_specs | [string](#string) | repeated | IDs of the specs that this spec depends on. Must be a subset of the specs in the same step. |
 | spec_release_source | [PlanConfig.SpecReleaseSource](#bytebase-store-PlanConfig-SpecReleaseSource) |  |  |
 | create_database_config | [PlanConfig.CreateDatabaseConfig](#bytebase-store-PlanConfig-CreateDatabaseConfig) |  |  |
 | change_database_config | [PlanConfig.ChangeDatabaseConfig](#bytebase-store-PlanConfig-ChangeDatabaseConfig) |  |  |
@@ -3413,23 +3211,6 @@ The snapshot of the project deployment config at the time of creation.
 | ----- | ---- | ----- | ----------- |
 | title | [string](#string) |  | Use the title if set. Use a generated title if empty. |
 | specs | [PlanConfig.Spec](#bytebase-store-PlanConfig-Spec) | repeated |  |
-
-
-
-
-
-
-<a name="bytebase-store-PlanConfig-VCSSource"></a>
-
-### PlanConfig.VCSSource
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| vcs_type | [VCSType](#bytebase-store-VCSType) |  |  |
-| vcs_connector | [string](#string) |  | Optional. If present, we will update the pull request for rollout status. Format: projects/{project-ID}/vcsConnectors/{vcs-connector} |
-| pull_request_url | [string](#string) |  |  |
 
 
 
@@ -3629,6 +3410,21 @@ Format: users/{userUID} or groups/{group email} |
 
 
 
+<a name="bytebase-store-QueryDataPolicy"></a>
+
+### QueryDataPolicy
+QueryDataPolicy is the policy configuration for querying data.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| timeout | [google.protobuf.Duration](#google-protobuf-Duration) |  | The query timeout duration. |
+
+
+
+
+
+
 <a name="bytebase-store-RestrictIssueCreationForSQLReviewPolicy"></a>
 
 ### RestrictIssueCreationForSQLReviewPolicy
@@ -3653,8 +3449,7 @@ RestrictIssueCreationForSQLReviewPolicy is the policy configuration for restrict
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | automatic | [bool](#bool) |  |  |
-| workspace_roles | [string](#string) | repeated |  |
-| project_roles | [string](#string) | repeated |  |
+| roles | [string](#string) | repeated |  |
 | issue_roles | [string](#string) | repeated | roles/LAST_APPROVER roles/CREATOR |
 
 
@@ -3675,21 +3470,6 @@ RestrictIssueCreationForSQLReviewPolicy is the policy configuration for restrict
 | payload | [string](#string) |  |  |
 | engine | [Engine](#bytebase-store-Engine) |  |  |
 | comment | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="bytebase-store-SlowQueryPolicy"></a>
-
-### SlowQueryPolicy
-SlowQueryPolicy is the policy configuration for slow query.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| active | [bool](#bool) |  |  |
 
 
 
@@ -4251,6 +4031,25 @@ SlowQueryPolicy is the policy configuration for slow query.
 | feishu | [AppIMSetting.Feishu](#bytebase-store-AppIMSetting-Feishu) |  |  |
 | wecom | [AppIMSetting.Wecom](#bytebase-store-AppIMSetting-Wecom) |  |  |
 | lark | [AppIMSetting.Lark](#bytebase-store-AppIMSetting-Lark) |  |  |
+| dingtalk | [AppIMSetting.DingTalk](#bytebase-store-AppIMSetting-DingTalk) |  |  |
+
+
+
+
+
+
+<a name="bytebase-store-AppIMSetting-DingTalk"></a>
+
+### AppIMSetting.DingTalk
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| enabled | [bool](#bool) |  |  |
+| client_id | [string](#string) |  |  |
+| client_secret | [string](#string) |  |  |
+| robot_code | [string](#string) |  |  |
 
 
 
@@ -4404,54 +4203,6 @@ SlowQueryPolicy is the policy configuration for slow query.
 | id | [string](#string) |  |  |
 | title | [string](#string) |  |  |
 | description | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="bytebase-store-ExternalApprovalPayload"></a>
-
-### ExternalApprovalPayload
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| external_approval_node_id | [string](#string) |  |  |
-| id | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="bytebase-store-ExternalApprovalSetting"></a>
-
-### ExternalApprovalSetting
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| nodes | [ExternalApprovalSetting.Node](#bytebase-store-ExternalApprovalSetting-Node) | repeated |  |
-
-
-
-
-
-
-<a name="bytebase-store-ExternalApprovalSetting-Node"></a>
-
-### ExternalApprovalSetting.Node
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| id | [string](#string) |  | A unique identifier for a node in UUID format. We will also include the id in the message sending to the external relay service to identify the node. |
-| title | [string](#string) |  | The title of the node. |
-| endpoint | [string](#string) |  | The external endpoint for the relay service, e.g. &#34;http://hello:1234&#34;. |
 
 
 
@@ -4678,13 +4429,10 @@ SlowQueryPolicy is the policy configuration for slow query.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| external_url | [string](#string) |  | The URL user visits Bytebase.
-
-The external URL is used for: 1. Constructing the correct callback URL when configuring the VCS provider. The callback URL points to the frontend. 2. Creating the correct webhook endpoint when configuring the project GitOps workflow. The webhook endpoint points to the backend. |
+| external_url | [string](#string) |  | The external URL is used for sso authentication callback. |
 | disallow_signup | [bool](#bool) |  | Disallow self-service signup, users can only be invited by the owner. |
 | require_2fa | [bool](#bool) |  | Require 2FA for all users. |
 | outbound_ip_list | [string](#string) | repeated | outbound_ip_list is the outbound IP for Bytebase instance in SaaS mode. |
-| gitops_webhook_url | [string](#string) |  | The webhook URL for the GitOps workflow. |
 | token_duration | [google.protobuf.Duration](#google-protobuf-Duration) |  | The duration for token. |
 | announcement | [Announcement](#bytebase-store-Announcement) |  | The setting of custom announcement |
 | maximum_role_expiration | [google.protobuf.Duration](#google-protobuf-Duration) |  | The max duration for role expired. |
@@ -4825,81 +4573,6 @@ We support three types of SMTP encryption: NONE, STARTTLS, and SSL/TLS.
 
 
 
-<a name="store_slow_query-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## store/slow_query.proto
-
-
-
-<a name="bytebase-store-SlowQueryDetails"></a>
-
-### SlowQueryDetails
-SlowQueryDetails is the details of a slow query.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| start_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | start_time is the start time of the slow query. |
-| query_time | [google.protobuf.Duration](#google-protobuf-Duration) |  | query_time is the query time of the slow query. |
-| lock_time | [google.protobuf.Duration](#google-protobuf-Duration) |  | lock_time is the lock time of the slow query. |
-| rows_sent | [int64](#int64) |  | rows_sent is the number of rows sent by the slow query. |
-| rows_examined | [int64](#int64) |  | rows_examined is the number of rows examined by the slow query. |
-| sql_text | [string](#string) |  | sql_text is the SQL text of the slow query. |
-
-
-
-
-
-
-<a name="bytebase-store-SlowQueryStatistics"></a>
-
-### SlowQueryStatistics
-SlowQueryStatistics is the slow query statistics.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| items | [SlowQueryStatisticsItem](#bytebase-store-SlowQueryStatisticsItem) | repeated | Items is the list of slow query statistics. |
-
-
-
-
-
-
-<a name="bytebase-store-SlowQueryStatisticsItem"></a>
-
-### SlowQueryStatisticsItem
-SlowQueryStatisticsItem is the item of slow query statistics.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| sql_fingerprint | [string](#string) |  | sql_fingerprint is the fingerprint of the slow query. |
-| count | [int64](#int64) |  | count is the number of slow queries with the same fingerprint. |
-| latest_log_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | latest_log_time is the time of the latest slow query with the same fingerprint. |
-| total_query_time | [google.protobuf.Duration](#google-protobuf-Duration) |  | The total query time of the slow query log. |
-| maximum_query_time | [google.protobuf.Duration](#google-protobuf-Duration) |  | The maximum query time of the slow query log. |
-| total_rows_sent | [int64](#int64) |  | The total rows sent of the slow query log. |
-| maximum_rows_sent | [int64](#int64) |  | The maximum rows sent of the slow query log. |
-| total_rows_examined | [int64](#int64) |  | The total rows examined of the slow query log. |
-| maximum_rows_examined | [int64](#int64) |  | The maximum rows examined of the slow query log. |
-| samples | [SlowQueryDetails](#bytebase-store-SlowQueryDetails) | repeated | samples are the details of the sample slow queries with the same fingerprint. |
-
-
-
-
-
- 
-
- 
-
- 
-
- 
-
-
-
 <a name="store_task-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -4907,10 +4580,10 @@ SlowQueryStatisticsItem is the item of slow query statistics.
 
 
 
-<a name="bytebase-store-TaskDatabaseCreatePayload"></a>
+<a name="bytebase-store-TaskPayload"></a>
 
-### TaskDatabaseCreatePayload
-TaskDatabaseCreatePayload is the task payload for creating databases.
+### TaskPayload
+
 
 
 | Field | Type | Label | Description |
@@ -4918,30 +4591,17 @@ TaskDatabaseCreatePayload is the task payload for creating databases.
 | skipped | [bool](#bool) |  | common fields |
 | skipped_reason | [string](#string) |  |  |
 | spec_id | [string](#string) |  |  |
+| sheet_id | [int32](#int32) |  |  |
+| environment_id | [string](#string) |  | Create database fields. |
 | database_name | [string](#string) |  |  |
 | table_name | [string](#string) |  |  |
-| sheet_id | [int32](#int32) |  |  |
 | character_set | [string](#string) |  |  |
 | collation | [string](#string) |  |  |
-| environment_id | [string](#string) |  |  |
-| labels | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="bytebase-store-TaskDatabaseDataExportPayload"></a>
-
-### TaskDatabaseDataExportPayload
-TaskDatabaseDataExportPayload is the task payload for database data export.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| spec_id | [string](#string) |  | common fields |
-| sheet_id | [int32](#int32) |  |  |
-| password | [string](#string) |  |  |
+| schema_version | [string](#string) |  | Update database fields. |
+| pre_update_backup_detail | [PreUpdateBackupDetail](#bytebase-store-PreUpdateBackupDetail) |  |  |
+| flags | [TaskPayload.FlagsEntry](#bytebase-store-TaskPayload-FlagsEntry) | repeated | ghost flags. |
+| task_release_source | [TaskReleaseSource](#bytebase-store-TaskReleaseSource) |  |  |
+| password | [string](#string) |  | Export data fields. |
 | format | [ExportFormat](#bytebase-store-ExportFormat) |  |  |
 
 
@@ -4949,31 +4609,9 @@ TaskDatabaseDataExportPayload is the task payload for database data export.
 
 
 
-<a name="bytebase-store-TaskDatabaseUpdatePayload"></a>
+<a name="bytebase-store-TaskPayload-FlagsEntry"></a>
 
-### TaskDatabaseUpdatePayload
-TaskDatabaseUpdatePayload is the task payload for updating database (DDL &amp; DML).
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| skipped | [bool](#bool) |  | common fields |
-| skipped_reason | [string](#string) |  |  |
-| spec_id | [string](#string) |  |  |
-| schema_version | [string](#string) |  |  |
-| sheet_id | [int32](#int32) |  |  |
-| pre_update_backup_detail | [PreUpdateBackupDetail](#bytebase-store-PreUpdateBackupDetail) |  |  |
-| flags | [TaskDatabaseUpdatePayload.FlagsEntry](#bytebase-store-TaskDatabaseUpdatePayload-FlagsEntry) | repeated | flags is used for ghost sync |
-| task_release_source | [TaskReleaseSource](#bytebase-store-TaskReleaseSource) |  |  |
-
-
-
-
-
-
-<a name="bytebase-store-TaskDatabaseUpdatePayload-FlagsEntry"></a>
-
-### TaskDatabaseUpdatePayload.FlagsEntry
+### TaskPayload.FlagsEntry
 
 
 
@@ -5412,45 +5050,6 @@ MFAConfig is the MFA configuration for a user.
 | last_login_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | last_change_password_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | source | [string](#string) |  | source means where the user comes from. For now we support Entra ID SCIM sync, so the source could be Entra ID. |
-
-
-
-
-
- 
-
- 
-
- 
-
- 
-
-
-
-<a name="store_vcs-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## store/vcs.proto
-
-
-
-<a name="bytebase-store-VCSConnector"></a>
-
-### VCSConnector
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| title | [string](#string) |  | The title or display name of the VCS connector. |
-| full_path | [string](#string) |  | Full path from the corresponding VCS provider. For GitLab, this is the project full path. e.g. group1/project-1 |
-| web_url | [string](#string) |  | Web url from the corresponding VCS provider. For GitLab, this is the project web url. e.g. https://gitlab.example.com/group1/project-1 |
-| branch | [string](#string) |  | Branch to listen to. |
-| base_directory | [string](#string) |  | Base working directory we are interested. |
-| external_id | [string](#string) |  | Repository id from the corresponding VCS provider. For GitLab, this is the project id. e.g. 123 |
-| external_webhook_id | [string](#string) |  | Push webhook id from the corresponding VCS provider. For GitLab, this is the project webhook id. e.g. 123 |
-| webhook_secret_token | [string](#string) |  | For GitLab, webhook request contains this in the &#39;X-Gitlab-Token&#34; header and we compare it with the one stored in db to validate it sends to the expected endpoint. |
-| database_group | [string](#string) |  | Apply changes to the database group. Optional, if not set, will apply changes to all databases in the project. Format: projects/{project}/databaseGroups/{databaseGroup} |
 
 
 

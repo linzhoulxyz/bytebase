@@ -11,11 +11,13 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/durationpb"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 	"github.com/pkg/errors"
 
 	"github.com/bytebase/bytebase/backend/plugin/db"
+	"github.com/bytebase/bytebase/backend/plugin/parser/base"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
@@ -39,17 +41,27 @@ func newDriver(_ db.DriverConfig) db.Driver {
 
 // Open opens a CosmosDB driver.
 func (driver *Driver) Open(_ context.Context, _ storepb.Engine, connCfg db.ConnectionConfig) (db.Driver, error) {
-	endpoint := connCfg.Host
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to found default Azure credential")
+	endpoint := connCfg.DataSource.Host
+	var credential azcore.TokenCredential
+	if clientSecretCredential := connCfg.DataSource.GetClientSecretCredential(); clientSecretCredential != nil {
+		c, err := azidentity.NewClientSecretCredential(clientSecretCredential.TenantId, clientSecretCredential.ClientId, clientSecretCredential.ClientSecret, nil)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to create client secret credential")
+		}
+		credential = c
+	} else {
+		c, err := azidentity.NewDefaultAzureCredential(nil)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to found default Azure credential")
+		}
+		credential = c
 	}
 	client, err := azcosmos.NewClient(endpoint, credential, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create CosmosDB client")
 	}
 	driver.client = client
-	driver.databaseName = connCfg.Database
+	driver.databaseName = connCfg.ConnectionContext.DatabaseName
 	driver.connCfg = connCfg
 	return driver, nil
 }
@@ -60,10 +72,10 @@ func (*Driver) Close(_ context.Context) error {
 }
 
 // Ping pings the database.
-func (driver *Driver) Ping(_ context.Context) error {
+func (driver *Driver) Ping(ctx context.Context) error {
 	queryPager := driver.client.NewQueryDatabasesPager("select 1", nil)
 	for queryPager.More() {
-		_, err := queryPager.NextPage(context.Background())
+		_, err := queryPager.NextPage(ctx)
 		if err != nil {
 			// TODO(zp): Deserialize the error into azcore.ResponseError
 			return errors.Wrapf(err, "failed to ping CosmosDB")
@@ -90,6 +102,12 @@ func (*Driver) Dump(_ context.Context, _ io.Writer, _ *storepb.DatabaseSchemaMet
 func (driver *Driver) QueryConn(ctx context.Context, _ *sql.Conn, statement string, queryContext db.QueryContext) ([]*v1pb.QueryResult, error) {
 	if queryContext.Container == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "container argument is required for CosmosDB")
+	}
+
+	// Allow `SELECT * FROM {container} [alias]` only.
+	_, _, err := base.ValidateSQLForEditor(storepb.Engine_COSMOSDB, statement)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "support simple SELECT statement for Cosmos DB engine only, err: %s", err.Error())
 	}
 
 	startTime := time.Now()

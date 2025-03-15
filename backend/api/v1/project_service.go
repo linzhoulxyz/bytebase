@@ -11,7 +11,8 @@ import (
 
 	"github.com/google/cel-go/cel"
 	celast "github.com/google/cel-go/common/ast"
-	"github.com/google/uuid"
+	celoperators "github.com/google/cel-go/common/operators"
+	celoverloads "github.com/google/cel-go/common/overloads"
 	"github.com/gosimple/slug"
 	"github.com/pkg/errors"
 	"google.golang.org/genproto/googleapis/type/expr"
@@ -65,15 +66,132 @@ func (s *ProjectService) GetProject(ctx context.Context, request *v1pb.GetProjec
 
 // ListProjects lists all projects.
 func (s *ProjectService) ListProjects(ctx context.Context, request *v1pb.ListProjectsRequest) (*v1pb.ListProjectsResponse, error) {
-	projects, err := s.store.ListProjectV2(ctx, &store.FindProjectMessage{ShowDeleted: request.ShowDeleted})
+	offset, err := parseLimitAndOffset(&pageSize{
+		token:   request.PageToken,
+		limit:   int(request.PageSize),
+		maximum: 1000,
+	})
+	if err != nil {
+		return nil, err
+	}
+	limitPlusOne := offset.limit + 1
+
+	find := &store.FindProjectMessage{
+		ShowDeleted: request.ShowDeleted,
+		Limit:       &limitPlusOne,
+		Offset:      &offset.offset,
+	}
+	filter, err := getListProjectFilter(request.Filter)
+	if err != nil {
+		return nil, err
+	}
+	find.Filter = filter
+	projects, err := s.store.ListProjectV2(ctx, find)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	response := &v1pb.ListProjectsResponse{}
+
+	nextPageToken := ""
+	if len(projects) == limitPlusOne {
+		projects = projects[:offset.limit]
+		if nextPageToken, err = offset.getNextPageToken(); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to marshal next page token, error: %v", err)
+		}
+	}
+
+	response := &v1pb.ListProjectsResponse{
+		NextPageToken: nextPageToken,
+	}
 	for _, project := range projects {
 		response.Projects = append(response.Projects, convertToProject(project))
 	}
 	return response, nil
+}
+
+func getListProjectFilter(filter string) (*store.ListResourceFilter, error) {
+	if filter == "" {
+		return nil, nil
+	}
+	e, err := cel.NewEnv()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to create cel env")
+	}
+	ast, iss := e.Parse(filter)
+	if iss != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "failed to parse filter %v, error: %v", filter, iss.String())
+	}
+
+	var getFilter func(expr celast.Expr) (string, error)
+	var positionalArgs []any
+
+	parseToSQL := func(variable, value any) (string, error) {
+		switch variable {
+		case "name":
+			positionalArgs = append(positionalArgs, value.(string))
+			return fmt.Sprintf("project.name = $%d", len(positionalArgs)), nil
+		case "resource_id":
+			positionalArgs = append(positionalArgs, value.(string))
+			return fmt.Sprintf("project.resource_id = $%d", len(positionalArgs)), nil
+		case "exclude_default":
+			if _, ok := value.(bool); ok {
+				positionalArgs = append(positionalArgs, api.DefaultProjectID)
+				return fmt.Sprintf("project.resource_id != $%d", len(positionalArgs)), nil
+			}
+			return "TRUE", nil
+		default:
+			return "", status.Errorf(codes.InvalidArgument, "unsupport variable %q", variable)
+		}
+	}
+
+	getFilter = func(expr celast.Expr) (string, error) {
+		switch expr.Kind() {
+		case celast.CallKind:
+			functionName := expr.AsCall().FunctionName()
+			switch functionName {
+			case celoperators.LogicalOr:
+				return getSubConditionFromExpr(expr, getFilter, "OR")
+			case celoperators.LogicalAnd:
+				return getSubConditionFromExpr(expr, getFilter, "AND")
+			case celoperators.Equals:
+				variable, value := getVariableAndValueFromExpr(expr)
+				return parseToSQL(variable, value)
+			case celoverloads.Matches:
+				variable := expr.AsCall().Target().AsIdent()
+				args := expr.AsCall().Args()
+				if len(args) != 1 {
+					return "", status.Errorf(codes.InvalidArgument, `invalid args for %q`, variable)
+				}
+				value := args[0].AsLiteral().Value()
+				strValue, ok := value.(string)
+				if !ok {
+					return "", status.Errorf(codes.InvalidArgument, "expect string, got %T, hint: filter literals should be string", value)
+				}
+
+				switch variable {
+				case "name":
+					return "LOWER(project.name) LIKE '%" + strings.ToLower(strValue) + "%'", nil
+				case "resource_id":
+					return "LOWER(project.resource_id) LIKE '%" + strings.ToLower(strValue) + "%'", nil
+				default:
+					return "", status.Errorf(codes.InvalidArgument, "unsupport variable %q", variable)
+				}
+			default:
+				return "", status.Errorf(codes.InvalidArgument, "unexpected function %v", functionName)
+			}
+		default:
+			return "", status.Errorf(codes.InvalidArgument, "unexpected expr kind %v", expr.Kind())
+		}
+	}
+
+	where, err := getFilter(ast.NativeRep().Expr())
+	if err != nil {
+		return nil, err
+	}
+
+	return &store.ListResourceFilter{
+		Args:  positionalArgs,
+		Where: "(" + where + ")",
+	}, nil
 }
 
 // SearchProjects searches all projects on which the user has bb.projects.get permission.
@@ -83,11 +201,22 @@ func (s *ProjectService) SearchProjects(ctx context.Context, request *v1pb.Searc
 		return nil, status.Errorf(codes.Internal, "user not found")
 	}
 
-	projects, err := s.store.ListProjectV2(ctx, &store.FindProjectMessage{ShowDeleted: request.ShowDeleted})
+	find := &store.FindProjectMessage{
+		ShowDeleted: request.ShowDeleted,
+	}
+	filter, err := getListProjectFilter(request.Filter)
+	if err != nil {
+		return nil, err
+	}
+	find.Filter = filter
+
+	projects, err := s.store.ListProjectV2(ctx, find)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	// TODO(p0ny): support filter by permission in SQL
+	// So that we can support pagination in the API.
 	ok, err = s.iamManager.CheckPermission(ctx, iam.PermissionProjectsGet, user)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to check permission, error %v", err)
@@ -284,7 +413,7 @@ func (s *ProjectService) DeleteProject(ctx context.Context, request *v1pb.Delete
 	if request.Force {
 		if len(databases) > 0 {
 			defaultProject := api.DefaultProjectID
-			if _, err := s.store.BatchUpdateDatabaseProject(ctx, databases, defaultProject); err != nil {
+			if _, err := s.store.BatchUpdateDatabases(ctx, databases, &store.BatchUpdateDatabases{ProjectID: &defaultProject}); err != nil {
 				return nil, err
 			}
 		}
@@ -574,67 +703,6 @@ func findIamPolicyDeltas(oriIamPolicy *storepb.IamPolicy, newIamPolicy *storepb.
 	}
 
 	return deltas
-}
-
-// GetDeploymentConfig returns the deployment config for a project.
-func (s *ProjectService) GetDeploymentConfig(ctx context.Context, request *v1pb.GetDeploymentConfigRequest) (*v1pb.DeploymentConfig, error) {
-	projectID, _, err := common.GetProjectIDDeploymentConfigID(request.Name)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-	project, err := s.store.GetProjectV2(ctx, &store.FindProjectMessage{
-		ResourceID: &projectID,
-	})
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	if project == nil {
-		return nil, status.Errorf(codes.NotFound, "project %q not found", request.Name)
-	}
-
-	deploymentConfig, err := s.store.GetDeploymentConfigV2(ctx, project.ResourceID)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	if deploymentConfig == nil {
-		return nil, status.Errorf(codes.NotFound, "deployment config %q not found", request.Name)
-	}
-
-	return convertToDeploymentConfig(project.ResourceID, deploymentConfig), nil
-}
-
-// UpdateDeploymentConfig updates the deployment config for a project.
-func (s *ProjectService) UpdateDeploymentConfig(ctx context.Context, request *v1pb.UpdateDeploymentConfigRequest) (*v1pb.DeploymentConfig, error) {
-	if request.DeploymentConfig == nil {
-		return nil, status.Errorf(codes.InvalidArgument, "deployment config is required")
-	}
-	projectID, _, err := common.GetProjectIDDeploymentConfigID(request.DeploymentConfig.Name)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-	project, err := s.store.GetProjectV2(ctx, &store.FindProjectMessage{
-		ResourceID: &projectID,
-	})
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	if project == nil {
-		return nil, status.Errorf(codes.NotFound, "project %q not found", projectID)
-	}
-	if project.Deleted {
-		return nil, status.Errorf(codes.NotFound, "project %q has been deleted", projectID)
-	}
-
-	storeDeploymentConfig, err := validateAndConvertToStoreDeploymentSchedule(request.DeploymentConfig)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	deploymentConfig, err := s.store.UpsertDeploymentConfigV2(ctx, project.ResourceID, storeDeploymentConfig)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	return convertToDeploymentConfig(project.ResourceID, deploymentConfig), nil
 }
 
 // AddWebhook adds a webhook to a given project.
@@ -999,21 +1067,19 @@ func convertToAPIWebhookTypeString(tp v1pb.Webhook_Type) (string, error) {
 	case v1pb.Webhook_TYPE_UNSPECIFIED:
 		return "", common.Errorf(common.Invalid, "webhook type must not be unspecified")
 	// TODO(zp): find a better way to place the "bb.plugin.webhook.*".
-	case v1pb.Webhook_TYPE_SLACK:
+	case v1pb.Webhook_SLACK:
 		return "bb.plugin.webhook.slack", nil
-	case v1pb.Webhook_TYPE_DISCORD:
+	case v1pb.Webhook_DISCORD:
 		return "bb.plugin.webhook.discord", nil
-	case v1pb.Webhook_TYPE_TEAMS:
+	case v1pb.Webhook_TEAMS:
 		return "bb.plugin.webhook.teams", nil
-	case v1pb.Webhook_TYPE_DINGTALK:
+	case v1pb.Webhook_DINGTALK:
 		return "bb.plugin.webhook.dingtalk", nil
-	case v1pb.Webhook_TYPE_FEISHU:
+	case v1pb.Webhook_FEISHU:
 		return "bb.plugin.webhook.feishu", nil
-	case v1pb.Webhook_TYPE_WECOM:
+	case v1pb.Webhook_WECOM:
 		return "bb.plugin.webhook.wecom", nil
-	case v1pb.Webhook_TYPE_CUSTOM:
-		return "bb.plugin.webhook.custom", nil
-	case v1pb.Webhook_TYPE_LARK:
+	case v1pb.Webhook_LARK:
 		return "bb.plugin.webhook.lark", nil
 	default:
 		return "", common.Errorf(common.Invalid, "webhook type %q is not supported", tp)
@@ -1023,66 +1089,22 @@ func convertToAPIWebhookTypeString(tp v1pb.Webhook_Type) (string, error) {
 func convertWebhookTypeString(tp string) v1pb.Webhook_Type {
 	switch tp {
 	case "bb.plugin.webhook.slack":
-		return v1pb.Webhook_TYPE_SLACK
+		return v1pb.Webhook_SLACK
 	case "bb.plugin.webhook.discord":
-		return v1pb.Webhook_TYPE_DISCORD
+		return v1pb.Webhook_DISCORD
 	case "bb.plugin.webhook.teams":
-		return v1pb.Webhook_TYPE_TEAMS
+		return v1pb.Webhook_TEAMS
 	case "bb.plugin.webhook.dingtalk":
-		return v1pb.Webhook_TYPE_DINGTALK
+		return v1pb.Webhook_DINGTALK
 	case "bb.plugin.webhook.feishu":
-		return v1pb.Webhook_TYPE_FEISHU
+		return v1pb.Webhook_FEISHU
 	case "bb.plugin.webhook.wecom":
-		return v1pb.Webhook_TYPE_WECOM
-	case "bb.plugin.webhook.custom":
-		return v1pb.Webhook_TYPE_CUSTOM
+		return v1pb.Webhook_WECOM
 	case "bb.plugin.webhook.lark":
-		return v1pb.Webhook_TYPE_LARK
+		return v1pb.Webhook_LARK
 	default:
 		return v1pb.Webhook_TYPE_UNSPECIFIED
 	}
-}
-
-func validateAndConvertToStoreDeploymentSchedule(deployment *v1pb.DeploymentConfig) (*store.DeploymentConfigMessage, error) {
-	if deployment.Schedule == nil {
-		return nil, common.Errorf(common.Invalid, "schedule must not be empty")
-	}
-	for _, d := range deployment.Schedule.Deployments {
-		if d == nil {
-			return nil, common.Errorf(common.Invalid, "deployment must not be empty")
-		}
-		if d.Title == "" {
-			return nil, common.Errorf(common.Invalid, "Deployment name must not be empty")
-		}
-		hasEnv := false
-		for _, e := range d.Spec.LabelSelector.MatchExpressions {
-			if e == nil {
-				return nil, common.Errorf(common.Invalid, "label selector expression must not be empty")
-			}
-			switch e.Operator {
-			case v1pb.OperatorType_OPERATOR_TYPE_IN, v1pb.OperatorType_OPERATOR_TYPE_NOT_IN:
-				if len(e.Values) == 0 {
-					return nil, common.Errorf(common.Invalid, "expression key %q with %q operator should have at least one value", e.Key, e.Operator)
-				}
-			case v1pb.OperatorType_OPERATOR_TYPE_EXISTS:
-				if len(e.Values) > 0 {
-					return nil, common.Errorf(common.Invalid, "expression key %q with %q operator shouldn't have values", e.Key, e.Operator)
-				}
-			default:
-				return nil, common.Errorf(common.Invalid, "expression key %q has invalid operator %q", e.Key, e.Operator)
-			}
-			if e.Key == api.EnvironmentLabelKey {
-				hasEnv = true
-				if e.Operator != v1pb.OperatorType_OPERATOR_TYPE_IN || len(e.Values) != 1 {
-					return nil, common.Errorf(common.Invalid, "label %q should must use operator %q with exactly one value", api.EnvironmentLabelKey, v1pb.OperatorType_OPERATOR_TYPE_IN)
-				}
-			}
-		}
-		if !hasEnv {
-			return nil, common.Errorf(common.Invalid, "deployment should contain %q label", api.EnvironmentLabelKey)
-		}
-	}
-	return convertToStoreDeploymentConfig(deployment)
 }
 
 func (s *ProjectService) getProjectMessage(ctx context.Context, name string) (*store.ProjectMessage, error) {
@@ -1228,10 +1250,6 @@ func convertToStoreIamPolicyMember(ctx context.Context, stores *store.Store, mem
 }
 
 func convertToProject(projectMessage *store.ProjectMessage) *v1pb.Project {
-	workflow := v1pb.Workflow_UI
-	if projectMessage.VCSConnectorsCount > 0 {
-		workflow = v1pb.Workflow_VCS
-	}
 	var projectWebhooks []*v1pb.Webhook
 	for _, webhook := range projectMessage.Webhooks {
 		projectWebhooks = append(projectWebhooks, &v1pb.Webhook{
@@ -1257,7 +1275,6 @@ func convertToProject(projectMessage *store.ProjectMessage) *v1pb.Project {
 		Name:                       common.FormatProject(projectMessage.ResourceID),
 		State:                      convertDeletedToState(projectMessage.Deleted),
 		Title:                      projectMessage.Title,
-		Workflow:                   workflow,
 		Webhooks:                   projectWebhooks,
 		DataClassificationConfigId: projectMessage.DataClassificationConfigID,
 		IssueLabels:                issueLabels,
@@ -1287,162 +1304,6 @@ func convertToProjectMessage(resourceID string, project *v1pb.Project) (*store.P
 		Title:      project.Title,
 		Setting:    setting,
 	}, nil
-}
-
-func convertToDeploymentConfig(projectID string, deploymentConfig *store.DeploymentConfigMessage) *v1pb.DeploymentConfig {
-	resourceName := common.FormatDeploymentConfig(common.FormatProject(projectID))
-	return &v1pb.DeploymentConfig{
-		Name:     resourceName,
-		Title:    deploymentConfig.Name,
-		Schedule: convertToSchedule(deploymentConfig.Config.GetSchedule()),
-	}
-}
-
-func convertToStoreDeploymentConfig(deploymentConfig *v1pb.DeploymentConfig) (*store.DeploymentConfigMessage, error) {
-	schedule, err := convertToStoreSchedule(deploymentConfig.Schedule)
-	if err != nil {
-		return nil, err
-	}
-
-	return &store.DeploymentConfigMessage{
-		Name: deploymentConfig.Title,
-		Config: &storepb.DeploymentConfig{
-			Schedule: schedule,
-		},
-	}, nil
-}
-
-func convertToSchedule(schedule *storepb.Schedule) *v1pb.Schedule {
-	if schedule == nil {
-		return nil
-	}
-	var ds []*v1pb.ScheduleDeployment
-	for _, d := range schedule.Deployments {
-		ds = append(ds, convertToDeployment(d))
-	}
-	return &v1pb.Schedule{
-		Deployments: ds,
-	}
-}
-
-func convertToStoreSchedule(schedule *v1pb.Schedule) (*storepb.Schedule, error) {
-	var ds []*storepb.ScheduleDeployment
-	for _, d := range schedule.Deployments {
-		deployment, err := convertToStoreDeployment(d)
-		if err != nil {
-			return nil, err
-		}
-		ds = append(ds, deployment)
-	}
-	return &storepb.Schedule{
-		Deployments: ds,
-	}, nil
-}
-
-func convertToDeployment(deployment *storepb.ScheduleDeployment) *v1pb.ScheduleDeployment {
-	return &v1pb.ScheduleDeployment{
-		Title: deployment.Title,
-		Id:    deployment.Id,
-		Spec:  convertToSpec(deployment.Spec),
-	}
-}
-
-func convertToStoreDeployment(deployment *v1pb.ScheduleDeployment) (*storepb.ScheduleDeployment, error) {
-	spec, err := convertToStoreSpec(deployment.Spec)
-	if err != nil {
-		return nil, err
-	}
-
-	return &storepb.ScheduleDeployment{
-		Title: deployment.Title,
-		Id:    uuid.NewString(),
-		Spec:  spec,
-	}, nil
-}
-
-func convertToSpec(spec *storepb.DeploymentSpec) *v1pb.DeploymentSpec {
-	return &v1pb.DeploymentSpec{
-		LabelSelector: convertToLabelSelector(spec.Selector),
-	}
-}
-
-func convertToStoreSpec(spec *v1pb.DeploymentSpec) (*storepb.DeploymentSpec, error) {
-	selector, err := convertToStoreLabelSelector(spec.LabelSelector)
-	if err != nil {
-		return nil, err
-	}
-	return &storepb.DeploymentSpec{
-		Selector: selector,
-	}, nil
-}
-
-func convertToLabelSelector(selector *storepb.LabelSelector) *v1pb.LabelSelector {
-	var exprs []*v1pb.LabelSelectorRequirement
-	for _, expr := range selector.MatchExpressions {
-		exprs = append(exprs, convertToLabelSelectorRequirement(expr))
-	}
-
-	return &v1pb.LabelSelector{
-		MatchExpressions: exprs,
-	}
-}
-
-func convertToStoreLabelSelector(selector *v1pb.LabelSelector) (*storepb.LabelSelector, error) {
-	var exprs []*storepb.LabelSelectorRequirement
-	for _, expr := range selector.MatchExpressions {
-		requirement, err := convertToStoreLabelSelectorRequirement(expr)
-		if err != nil {
-			return nil, err
-		}
-		exprs = append(exprs, requirement)
-	}
-	return &storepb.LabelSelector{
-		MatchExpressions: exprs,
-	}, nil
-}
-
-func convertToLabelSelectorRequirement(requirements *storepb.LabelSelectorRequirement) *v1pb.LabelSelectorRequirement {
-	return &v1pb.LabelSelectorRequirement{
-		Key:      requirements.Key,
-		Operator: convertToLabelSelectorOperator(requirements.Operator),
-		Values:   requirements.Values,
-	}
-}
-
-func convertToStoreLabelSelectorRequirement(requirements *v1pb.LabelSelectorRequirement) (*storepb.LabelSelectorRequirement, error) {
-	op, err := convertToStoreLabelSelectorOperator(requirements.Operator)
-	if err != nil {
-		return nil, err
-	}
-	return &storepb.LabelSelectorRequirement{
-		Key:      requirements.Key,
-		Operator: op,
-		Values:   requirements.Values,
-	}, nil
-}
-
-func convertToLabelSelectorOperator(operator storepb.LabelSelectorRequirement_OperatorType) v1pb.OperatorType {
-	switch operator {
-	case storepb.LabelSelectorRequirement_IN:
-		return v1pb.OperatorType_OPERATOR_TYPE_IN
-	case storepb.LabelSelectorRequirement_NOT_IN:
-		return v1pb.OperatorType_OPERATOR_TYPE_NOT_IN
-	case storepb.LabelSelectorRequirement_EXISTS:
-		return v1pb.OperatorType_OPERATOR_TYPE_EXISTS
-	}
-	return v1pb.OperatorType_OPERATOR_TYPE_UNSPECIFIED
-}
-
-func convertToStoreLabelSelectorOperator(operator v1pb.OperatorType) (storepb.LabelSelectorRequirement_OperatorType, error) {
-	switch operator {
-	case v1pb.OperatorType_OPERATOR_TYPE_IN:
-		return storepb.LabelSelectorRequirement_IN, nil
-	case v1pb.OperatorType_OPERATOR_TYPE_NOT_IN:
-		return storepb.LabelSelectorRequirement_NOT_IN, nil
-	case v1pb.OperatorType_OPERATOR_TYPE_EXISTS:
-		return storepb.LabelSelectorRequirement_EXISTS, nil
-	}
-	return storepb.LabelSelectorRequirement_OPERATOR_TYPE_UNSPECIFIED, errors.Errorf("invalid operator type: %v", operator)
 }
 
 func (s *ProjectService) validateIAMPolicy(ctx context.Context, policy *v1pb.IamPolicy) error {

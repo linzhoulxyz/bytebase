@@ -1,3 +1,4 @@
+import { computedAsync } from "@vueuse/core";
 import Emittery from "emittery";
 import type { InjectionKey, Ref } from "vue";
 import { computed, inject, provide, ref, watchEffect } from "vue";
@@ -6,6 +7,7 @@ import {
   useChangelistStore,
   useCurrentUserV1,
   useProjectV1Store,
+  extractUserId,
 } from "@/store";
 import { projectNamePrefix } from "@/store/modules/v1/common";
 import type { ComposedProject, Permission } from "@/types";
@@ -15,7 +17,6 @@ import type {
   Changelist_Change as Change,
 } from "@/types/proto/v1/changelist_service";
 import {
-  extractUserResourceName,
   hasPermissionToCreateChangeDatabaseIssueInProject,
   hasProjectPermissionV2,
 } from "@/utils";
@@ -53,14 +54,17 @@ export const provideChangelistDetailContext = () => {
   const route = useRoute();
   const projectV1Store = useProjectV1Store();
 
-  const project = computed(() => {
+  const project = computedAsync(async () => {
     const projectId = route.params.projectId as string;
     if (!projectId) {
       return unknownProject();
     }
 
-    return projectV1Store.getProjectByName(`${projectNamePrefix}${projectId}`);
-  });
+    const proj = await projectV1Store.getOrFetchProjectByName(
+      `${projectNamePrefix}${projectId}`
+    );
+    return proj;
+  }, unknownProject());
 
   const name = computed(() => {
     return `${project.value.name}/changelists/${route.params.changelistName}`;
@@ -80,7 +84,7 @@ export const provideChangelistDetailContext = () => {
   const checkPermission = (permission: Permission): boolean => {
     return (
       hasProjectPermissionV2(project.value, permission) ||
-      extractUserResourceName(changelist.value.creator) === me.value.email
+      extractUserId(changelist.value.creator) === me.value.email
     );
   };
 

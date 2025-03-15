@@ -12,13 +12,7 @@ import "store/database.proto";
 option go_package = "generated-go/store";
 
 message WorkspaceProfileSetting {
-  // The URL user visits Bytebase.
-  //
-  // The external URL is used for:
-  // 1. Constructing the correct callback URL when configuring the VCS provider.
-  // The callback URL points to the frontend.
-  // 2. Creating the correct webhook endpoint when configuring the project
-  // GitOps workflow. The webhook endpoint points to the backend.
+  // The external URL is used for sso authentication callback.
   string external_url = 1;
 
   // Disallow self-service signup, users can only be invited by the owner.
@@ -29,9 +23,6 @@ message WorkspaceProfileSetting {
 
   // outbound_ip_list is the outbound IP for Bytebase instance in SaaS mode.
   repeated string outbound_ip_list = 4;
-
-  // The webhook URL for the GitOps workflow.
-  string gitops_webhook_url = 5;
 
   // The duration for token.
   google.protobuf.Duration token_duration = 6;
@@ -89,25 +80,6 @@ message WorkspaceApprovalSetting {
     google.type.Expr condition = 3;
   }
   repeated Rule rules = 1;
-}
-
-message ExternalApprovalSetting {
-  message Node {
-    // A unique identifier for a node in UUID format.
-    // We will also include the id in the message sending to the external relay
-    // service to identify the node.
-    string id = 1;
-    // The title of the node.
-    string title = 2;
-    // The external endpoint for the relay service, e.g. "http://hello:1234".
-    string endpoint = 3;
-  }
-  repeated Node nodes = 1;
-}
-
-message ExternalApprovalPayload {
-  string external_approval_node_id = 1;
-  string id = 2;
 }
 
 message SMTPMailDeliverySetting {
@@ -312,11 +284,18 @@ message AppIMSetting {
     string app_id = 2;
     string app_secret = 3;
   }
+  message DingTalk {
+    bool enabled = 1;
+    string client_id = 2;
+    string client_secret = 3;
+    string robot_code = 4;
+  }
 
   Slack slack = 1;
   Feishu feishu = 2;
   Wecom wecom = 3;
   Lark lark = 4;
+  DingTalk dingtalk = 5;
 }
 
 enum DatabaseChangeMode {

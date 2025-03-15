@@ -8,26 +8,15 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import Long from "long";
 import { Timestamp } from "../google/protobuf/timestamp";
-import {
-  ExportFormat,
-  exportFormatFromJSON,
-  exportFormatToJSON,
-  exportFormatToNumber,
-  VCSType,
-  vCSTypeFromJSON,
-  vCSTypeToJSON,
-  vCSTypeToNumber,
-} from "./common";
-import { DeploymentConfig } from "./deployment_config";
+import { ExportFormat, exportFormatFromJSON, exportFormatToJSON, exportFormatToNumber } from "./common";
 import { PreUpdateBackupDetail } from "./plan_check_run";
 
 export const protobufPackage = "bytebase.store";
 
 export interface PlanConfig {
   steps: PlanConfig_Step[];
-  vcsSource: PlanConfig_VCSSource | undefined;
   releaseSource: PlanConfig_ReleaseSource | undefined;
-  deploymentSnapshot: PlanConfig_DeploymentSnapshot | undefined;
+  deployment: PlanConfig_Deployment | undefined;
 }
 
 export interface PlanConfig_Step {
@@ -46,11 +35,6 @@ export interface PlanConfig_Spec {
     | undefined;
   /** A UUID4 string that uniquely identifies the Spec. */
   id: string;
-  /**
-   * IDs of the specs that this spec depends on.
-   * Must be a subset of the specs in the same step.
-   */
-  dependsOnSpecs: string[];
   specReleaseSource: PlanConfig_SpecReleaseSource | undefined;
   createDatabaseConfig?: PlanConfig_CreateDatabaseConfig | undefined;
   changeDatabaseConfig?: PlanConfig_ChangeDatabaseConfig | undefined;
@@ -88,13 +72,6 @@ export interface PlanConfig_CreateDatabaseConfig {
    * Format: environments/prod where prod is the environment resource ID.
    */
   environment: string;
-  /** labels of the database. */
-  labels: { [key: string]: string };
-}
-
-export interface PlanConfig_CreateDatabaseConfig_LabelsEntry {
-  key: string;
-  value: string;
 }
 
 export interface PlanConfig_ChangeDatabaseConfig {
@@ -111,7 +88,7 @@ export interface PlanConfig_ChangeDatabaseConfig {
   sheet: string;
   type: PlanConfig_ChangeDatabaseConfig_Type;
   /**
-   * schema_version is parsed from VCS file name.
+   * schema_version is parsed from file name.
    * It is automatically generated in the UI workflow.
    */
   schemaVersion: string;
@@ -232,17 +209,6 @@ export interface PlanConfig_ExportDataConfig {
   password?: string | undefined;
 }
 
-export interface PlanConfig_VCSSource {
-  vcsType: VCSType;
-  /**
-   * Optional.
-   * If present, we will update the pull request for rollout status.
-   * Format: projects/{project-ID}/vcsConnectors/{vcs-connector}
-   */
-  vcsConnector: string;
-  pullRequestUrl: string;
-}
-
 export interface PlanConfig_ReleaseSource {
   /**
    * The release.
@@ -256,20 +222,14 @@ export interface PlanConfig_SpecReleaseSource {
   file: string;
 }
 
-export interface PlanConfig_DeploymentSnapshot {
-  deploymentConfigSnapshot: PlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot | undefined;
-  databaseGroupSnapshots: PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot[];
+export interface PlanConfig_Deployment {
+  /** The environments deploy order. */
+  environments: string[];
+  /** The database group mapping. */
+  databaseGroupMappings: PlanConfig_Deployment_DatabaseGroupMapping[];
 }
 
-/** The snapshot of the project deployment config at the time of creation. */
-export interface PlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot {
-  name: string;
-  title: string;
-  deploymentConfig: DeploymentConfig | undefined;
-}
-
-/** The snapshot of the database group at the time of creation. */
-export interface PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot {
+export interface PlanConfig_Deployment_DatabaseGroupMapping {
   /** Format: projects/{project}/databaseGroups/{databaseGroup}. */
   databaseGroup: string;
   /** Format: instances/{instance-id}/databases/{database-name}. */
@@ -277,7 +237,7 @@ export interface PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot {
 }
 
 function createBasePlanConfig(): PlanConfig {
-  return { steps: [], vcsSource: undefined, releaseSource: undefined, deploymentSnapshot: undefined };
+  return { steps: [], releaseSource: undefined, deployment: undefined };
 }
 
 export const PlanConfig: MessageFns<PlanConfig> = {
@@ -285,14 +245,11 @@ export const PlanConfig: MessageFns<PlanConfig> = {
     for (const v of message.steps) {
       PlanConfig_Step.encode(v!, writer.uint32(10).fork()).join();
     }
-    if (message.vcsSource !== undefined) {
-      PlanConfig_VCSSource.encode(message.vcsSource, writer.uint32(18).fork()).join();
-    }
     if (message.releaseSource !== undefined) {
       PlanConfig_ReleaseSource.encode(message.releaseSource, writer.uint32(26).fork()).join();
     }
-    if (message.deploymentSnapshot !== undefined) {
-      PlanConfig_DeploymentSnapshot.encode(message.deploymentSnapshot, writer.uint32(34).fork()).join();
+    if (message.deployment !== undefined) {
+      PlanConfig_Deployment.encode(message.deployment, writer.uint32(34).fork()).join();
     }
     return writer;
   },
@@ -312,14 +269,6 @@ export const PlanConfig: MessageFns<PlanConfig> = {
           message.steps.push(PlanConfig_Step.decode(reader, reader.uint32()));
           continue;
         }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.vcsSource = PlanConfig_VCSSource.decode(reader, reader.uint32());
-          continue;
-        }
         case 3: {
           if (tag !== 26) {
             break;
@@ -333,7 +282,7 @@ export const PlanConfig: MessageFns<PlanConfig> = {
             break;
           }
 
-          message.deploymentSnapshot = PlanConfig_DeploymentSnapshot.decode(reader, reader.uint32());
+          message.deployment = PlanConfig_Deployment.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -348,11 +297,8 @@ export const PlanConfig: MessageFns<PlanConfig> = {
   fromJSON(object: any): PlanConfig {
     return {
       steps: globalThis.Array.isArray(object?.steps) ? object.steps.map((e: any) => PlanConfig_Step.fromJSON(e)) : [],
-      vcsSource: isSet(object.vcsSource) ? PlanConfig_VCSSource.fromJSON(object.vcsSource) : undefined,
       releaseSource: isSet(object.releaseSource) ? PlanConfig_ReleaseSource.fromJSON(object.releaseSource) : undefined,
-      deploymentSnapshot: isSet(object.deploymentSnapshot)
-        ? PlanConfig_DeploymentSnapshot.fromJSON(object.deploymentSnapshot)
-        : undefined,
+      deployment: isSet(object.deployment) ? PlanConfig_Deployment.fromJSON(object.deployment) : undefined,
     };
   },
 
@@ -361,14 +307,11 @@ export const PlanConfig: MessageFns<PlanConfig> = {
     if (message.steps?.length) {
       obj.steps = message.steps.map((e) => PlanConfig_Step.toJSON(e));
     }
-    if (message.vcsSource !== undefined) {
-      obj.vcsSource = PlanConfig_VCSSource.toJSON(message.vcsSource);
-    }
     if (message.releaseSource !== undefined) {
       obj.releaseSource = PlanConfig_ReleaseSource.toJSON(message.releaseSource);
     }
-    if (message.deploymentSnapshot !== undefined) {
-      obj.deploymentSnapshot = PlanConfig_DeploymentSnapshot.toJSON(message.deploymentSnapshot);
+    if (message.deployment !== undefined) {
+      obj.deployment = PlanConfig_Deployment.toJSON(message.deployment);
     }
     return obj;
   },
@@ -379,14 +322,11 @@ export const PlanConfig: MessageFns<PlanConfig> = {
   fromPartial(object: DeepPartial<PlanConfig>): PlanConfig {
     const message = createBasePlanConfig();
     message.steps = object.steps?.map((e) => PlanConfig_Step.fromPartial(e)) || [];
-    message.vcsSource = (object.vcsSource !== undefined && object.vcsSource !== null)
-      ? PlanConfig_VCSSource.fromPartial(object.vcsSource)
-      : undefined;
     message.releaseSource = (object.releaseSource !== undefined && object.releaseSource !== null)
       ? PlanConfig_ReleaseSource.fromPartial(object.releaseSource)
       : undefined;
-    message.deploymentSnapshot = (object.deploymentSnapshot !== undefined && object.deploymentSnapshot !== null)
-      ? PlanConfig_DeploymentSnapshot.fromPartial(object.deploymentSnapshot)
+    message.deployment = (object.deployment !== undefined && object.deployment !== null)
+      ? PlanConfig_Deployment.fromPartial(object.deployment)
       : undefined;
     return message;
   },
@@ -472,7 +412,6 @@ function createBasePlanConfig_Spec(): PlanConfig_Spec {
   return {
     earliestAllowedTime: undefined,
     id: "",
-    dependsOnSpecs: [],
     specReleaseSource: undefined,
     createDatabaseConfig: undefined,
     changeDatabaseConfig: undefined,
@@ -487,9 +426,6 @@ export const PlanConfig_Spec: MessageFns<PlanConfig_Spec> = {
     }
     if (message.id !== "") {
       writer.uint32(42).string(message.id);
-    }
-    for (const v of message.dependsOnSpecs) {
-      writer.uint32(50).string(v!);
     }
     if (message.specReleaseSource !== undefined) {
       PlanConfig_SpecReleaseSource.encode(message.specReleaseSource, writer.uint32(66).fork()).join();
@@ -527,14 +463,6 @@ export const PlanConfig_Spec: MessageFns<PlanConfig_Spec> = {
           }
 
           message.id = reader.string();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.dependsOnSpecs.push(reader.string());
           continue;
         }
         case 8: {
@@ -584,9 +512,6 @@ export const PlanConfig_Spec: MessageFns<PlanConfig_Spec> = {
         ? fromJsonTimestamp(object.earliestAllowedTime)
         : undefined,
       id: isSet(object.id) ? globalThis.String(object.id) : "",
-      dependsOnSpecs: globalThis.Array.isArray(object?.dependsOnSpecs)
-        ? object.dependsOnSpecs.map((e: any) => globalThis.String(e))
-        : [],
       specReleaseSource: isSet(object.specReleaseSource)
         ? PlanConfig_SpecReleaseSource.fromJSON(object.specReleaseSource)
         : undefined,
@@ -609,9 +534,6 @@ export const PlanConfig_Spec: MessageFns<PlanConfig_Spec> = {
     }
     if (message.id !== "") {
       obj.id = message.id;
-    }
-    if (message.dependsOnSpecs?.length) {
-      obj.dependsOnSpecs = message.dependsOnSpecs;
     }
     if (message.specReleaseSource !== undefined) {
       obj.specReleaseSource = PlanConfig_SpecReleaseSource.toJSON(message.specReleaseSource);
@@ -637,7 +559,6 @@ export const PlanConfig_Spec: MessageFns<PlanConfig_Spec> = {
       ? Timestamp.fromPartial(object.earliestAllowedTime)
       : undefined;
     message.id = object.id ?? "";
-    message.dependsOnSpecs = object.dependsOnSpecs?.map((e) => e) || [];
     message.specReleaseSource = (object.specReleaseSource !== undefined && object.specReleaseSource !== null)
       ? PlanConfig_SpecReleaseSource.fromPartial(object.specReleaseSource)
       : undefined;
@@ -665,7 +586,6 @@ function createBasePlanConfig_CreateDatabaseConfig(): PlanConfig_CreateDatabaseC
     owner: "",
     backup: "",
     environment: "",
-    labels: {},
   };
 }
 
@@ -698,9 +618,6 @@ export const PlanConfig_CreateDatabaseConfig: MessageFns<PlanConfig_CreateDataba
     if (message.environment !== "") {
       writer.uint32(74).string(message.environment);
     }
-    Object.entries(message.labels).forEach(([key, value]) => {
-      PlanConfig_CreateDatabaseConfig_LabelsEntry.encode({ key: key as any, value }, writer.uint32(82).fork()).join();
-    });
     return writer;
   },
 
@@ -783,17 +700,6 @@ export const PlanConfig_CreateDatabaseConfig: MessageFns<PlanConfig_CreateDataba
           message.environment = reader.string();
           continue;
         }
-        case 10: {
-          if (tag !== 82) {
-            break;
-          }
-
-          const entry10 = PlanConfig_CreateDatabaseConfig_LabelsEntry.decode(reader, reader.uint32());
-          if (entry10.value !== undefined) {
-            message.labels[entry10.key] = entry10.value;
-          }
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -814,12 +720,6 @@ export const PlanConfig_CreateDatabaseConfig: MessageFns<PlanConfig_CreateDataba
       owner: isSet(object.owner) ? globalThis.String(object.owner) : "",
       backup: isSet(object.backup) ? globalThis.String(object.backup) : "",
       environment: isSet(object.environment) ? globalThis.String(object.environment) : "",
-      labels: isObject(object.labels)
-        ? Object.entries(object.labels).reduce<{ [key: string]: string }>((acc, [key, value]) => {
-          acc[key] = String(value);
-          return acc;
-        }, {})
-        : {},
     };
   },
 
@@ -852,15 +752,6 @@ export const PlanConfig_CreateDatabaseConfig: MessageFns<PlanConfig_CreateDataba
     if (message.environment !== "") {
       obj.environment = message.environment;
     }
-    if (message.labels) {
-      const entries = Object.entries(message.labels);
-      if (entries.length > 0) {
-        obj.labels = {};
-        entries.forEach(([k, v]) => {
-          obj.labels[k] = v;
-        });
-      }
-    }
     return obj;
   },
 
@@ -878,93 +769,6 @@ export const PlanConfig_CreateDatabaseConfig: MessageFns<PlanConfig_CreateDataba
     message.owner = object.owner ?? "";
     message.backup = object.backup ?? "";
     message.environment = object.environment ?? "";
-    message.labels = Object.entries(object.labels ?? {}).reduce<{ [key: string]: string }>((acc, [key, value]) => {
-      if (value !== undefined) {
-        acc[key] = globalThis.String(value);
-      }
-      return acc;
-    }, {});
-    return message;
-  },
-};
-
-function createBasePlanConfig_CreateDatabaseConfig_LabelsEntry(): PlanConfig_CreateDatabaseConfig_LabelsEntry {
-  return { key: "", value: "" };
-}
-
-export const PlanConfig_CreateDatabaseConfig_LabelsEntry: MessageFns<PlanConfig_CreateDatabaseConfig_LabelsEntry> = {
-  encode(
-    message: PlanConfig_CreateDatabaseConfig_LabelsEntry,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
-    if (message.key !== "") {
-      writer.uint32(10).string(message.key);
-    }
-    if (message.value !== "") {
-      writer.uint32(18).string(message.value);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): PlanConfig_CreateDatabaseConfig_LabelsEntry {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBasePlanConfig_CreateDatabaseConfig_LabelsEntry();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.key = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.value = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): PlanConfig_CreateDatabaseConfig_LabelsEntry {
-    return {
-      key: isSet(object.key) ? globalThis.String(object.key) : "",
-      value: isSet(object.value) ? globalThis.String(object.value) : "",
-    };
-  },
-
-  toJSON(message: PlanConfig_CreateDatabaseConfig_LabelsEntry): unknown {
-    const obj: any = {};
-    if (message.key !== "") {
-      obj.key = message.key;
-    }
-    if (message.value !== "") {
-      obj.value = message.value;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<PlanConfig_CreateDatabaseConfig_LabelsEntry>): PlanConfig_CreateDatabaseConfig_LabelsEntry {
-    return PlanConfig_CreateDatabaseConfig_LabelsEntry.fromPartial(base ?? {});
-  },
-  fromPartial(
-    object: DeepPartial<PlanConfig_CreateDatabaseConfig_LabelsEntry>,
-  ): PlanConfig_CreateDatabaseConfig_LabelsEntry {
-    const message = createBasePlanConfig_CreateDatabaseConfig_LabelsEntry();
-    message.key = object.key ?? "";
-    message.value = object.value ?? "";
     return message;
   },
 };
@@ -1339,98 +1143,6 @@ export const PlanConfig_ExportDataConfig: MessageFns<PlanConfig_ExportDataConfig
   },
 };
 
-function createBasePlanConfig_VCSSource(): PlanConfig_VCSSource {
-  return { vcsType: VCSType.VCS_TYPE_UNSPECIFIED, vcsConnector: "", pullRequestUrl: "" };
-}
-
-export const PlanConfig_VCSSource: MessageFns<PlanConfig_VCSSource> = {
-  encode(message: PlanConfig_VCSSource, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.vcsType !== VCSType.VCS_TYPE_UNSPECIFIED) {
-      writer.uint32(8).int32(vCSTypeToNumber(message.vcsType));
-    }
-    if (message.vcsConnector !== "") {
-      writer.uint32(18).string(message.vcsConnector);
-    }
-    if (message.pullRequestUrl !== "") {
-      writer.uint32(26).string(message.pullRequestUrl);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): PlanConfig_VCSSource {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBasePlanConfig_VCSSource();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.vcsType = vCSTypeFromJSON(reader.int32());
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.vcsConnector = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.pullRequestUrl = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): PlanConfig_VCSSource {
-    return {
-      vcsType: isSet(object.vcsType) ? vCSTypeFromJSON(object.vcsType) : VCSType.VCS_TYPE_UNSPECIFIED,
-      vcsConnector: isSet(object.vcsConnector) ? globalThis.String(object.vcsConnector) : "",
-      pullRequestUrl: isSet(object.pullRequestUrl) ? globalThis.String(object.pullRequestUrl) : "",
-    };
-  },
-
-  toJSON(message: PlanConfig_VCSSource): unknown {
-    const obj: any = {};
-    if (message.vcsType !== VCSType.VCS_TYPE_UNSPECIFIED) {
-      obj.vcsType = vCSTypeToJSON(message.vcsType);
-    }
-    if (message.vcsConnector !== "") {
-      obj.vcsConnector = message.vcsConnector;
-    }
-    if (message.pullRequestUrl !== "") {
-      obj.pullRequestUrl = message.pullRequestUrl;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<PlanConfig_VCSSource>): PlanConfig_VCSSource {
-    return PlanConfig_VCSSource.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<PlanConfig_VCSSource>): PlanConfig_VCSSource {
-    const message = createBasePlanConfig_VCSSource();
-    message.vcsType = object.vcsType ?? VCSType.VCS_TYPE_UNSPECIFIED;
-    message.vcsConnector = object.vcsConnector ?? "";
-    message.pullRequestUrl = object.pullRequestUrl ?? "";
-    return message;
-  },
-};
-
 function createBasePlanConfig_ReleaseSource(): PlanConfig_ReleaseSource {
   return { release: "" };
 }
@@ -1547,28 +1259,25 @@ export const PlanConfig_SpecReleaseSource: MessageFns<PlanConfig_SpecReleaseSour
   },
 };
 
-function createBasePlanConfig_DeploymentSnapshot(): PlanConfig_DeploymentSnapshot {
-  return { deploymentConfigSnapshot: undefined, databaseGroupSnapshots: [] };
+function createBasePlanConfig_Deployment(): PlanConfig_Deployment {
+  return { environments: [], databaseGroupMappings: [] };
 }
 
-export const PlanConfig_DeploymentSnapshot: MessageFns<PlanConfig_DeploymentSnapshot> = {
-  encode(message: PlanConfig_DeploymentSnapshot, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.deploymentConfigSnapshot !== undefined) {
-      PlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot.encode(
-        message.deploymentConfigSnapshot,
-        writer.uint32(10).fork(),
-      ).join();
+export const PlanConfig_Deployment: MessageFns<PlanConfig_Deployment> = {
+  encode(message: PlanConfig_Deployment, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.environments) {
+      writer.uint32(10).string(v!);
     }
-    for (const v of message.databaseGroupSnapshots) {
-      PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot.encode(v!, writer.uint32(18).fork()).join();
+    for (const v of message.databaseGroupMappings) {
+      PlanConfig_Deployment_DatabaseGroupMapping.encode(v!, writer.uint32(18).fork()).join();
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): PlanConfig_DeploymentSnapshot {
+  decode(input: BinaryReader | Uint8Array, length?: number): PlanConfig_Deployment {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBasePlanConfig_DeploymentSnapshot();
+    const message = createBasePlanConfig_Deployment();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -1577,10 +1286,7 @@ export const PlanConfig_DeploymentSnapshot: MessageFns<PlanConfig_DeploymentSnap
             break;
           }
 
-          message.deploymentConfigSnapshot = PlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot.decode(
-            reader,
-            reader.uint32(),
-          );
+          message.environments.push(reader.string());
           continue;
         }
         case 2: {
@@ -1588,8 +1294,8 @@ export const PlanConfig_DeploymentSnapshot: MessageFns<PlanConfig_DeploymentSnap
             break;
           }
 
-          message.databaseGroupSnapshots.push(
-            PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot.decode(reader, reader.uint32()),
+          message.databaseGroupMappings.push(
+            PlanConfig_Deployment_DatabaseGroupMapping.decode(reader, reader.uint32()),
           );
           continue;
         }
@@ -1602,162 +1308,48 @@ export const PlanConfig_DeploymentSnapshot: MessageFns<PlanConfig_DeploymentSnap
     return message;
   },
 
-  fromJSON(object: any): PlanConfig_DeploymentSnapshot {
+  fromJSON(object: any): PlanConfig_Deployment {
     return {
-      deploymentConfigSnapshot: isSet(object.deploymentConfigSnapshot)
-        ? PlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot.fromJSON(object.deploymentConfigSnapshot)
-        : undefined,
-      databaseGroupSnapshots: globalThis.Array.isArray(object?.databaseGroupSnapshots)
-        ? object.databaseGroupSnapshots.map((e: any) => PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot.fromJSON(e))
+      environments: globalThis.Array.isArray(object?.environments)
+        ? object.environments.map((e: any) => globalThis.String(e))
+        : [],
+      databaseGroupMappings: globalThis.Array.isArray(object?.databaseGroupMappings)
+        ? object.databaseGroupMappings.map((e: any) => PlanConfig_Deployment_DatabaseGroupMapping.fromJSON(e))
         : [],
     };
   },
 
-  toJSON(message: PlanConfig_DeploymentSnapshot): unknown {
+  toJSON(message: PlanConfig_Deployment): unknown {
     const obj: any = {};
-    if (message.deploymentConfigSnapshot !== undefined) {
-      obj.deploymentConfigSnapshot = PlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot.toJSON(
-        message.deploymentConfigSnapshot,
-      );
+    if (message.environments?.length) {
+      obj.environments = message.environments;
     }
-    if (message.databaseGroupSnapshots?.length) {
-      obj.databaseGroupSnapshots = message.databaseGroupSnapshots.map((e) =>
-        PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot.toJSON(e)
+    if (message.databaseGroupMappings?.length) {
+      obj.databaseGroupMappings = message.databaseGroupMappings.map((e) =>
+        PlanConfig_Deployment_DatabaseGroupMapping.toJSON(e)
       );
     }
     return obj;
   },
 
-  create(base?: DeepPartial<PlanConfig_DeploymentSnapshot>): PlanConfig_DeploymentSnapshot {
-    return PlanConfig_DeploymentSnapshot.fromPartial(base ?? {});
+  create(base?: DeepPartial<PlanConfig_Deployment>): PlanConfig_Deployment {
+    return PlanConfig_Deployment.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<PlanConfig_DeploymentSnapshot>): PlanConfig_DeploymentSnapshot {
-    const message = createBasePlanConfig_DeploymentSnapshot();
-    message.deploymentConfigSnapshot =
-      (object.deploymentConfigSnapshot !== undefined && object.deploymentConfigSnapshot !== null)
-        ? PlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot.fromPartial(object.deploymentConfigSnapshot)
-        : undefined;
-    message.databaseGroupSnapshots =
-      object.databaseGroupSnapshots?.map((e) => PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot.fromPartial(e)) ||
-      [];
+  fromPartial(object: DeepPartial<PlanConfig_Deployment>): PlanConfig_Deployment {
+    const message = createBasePlanConfig_Deployment();
+    message.environments = object.environments?.map((e) => e) || [];
+    message.databaseGroupMappings =
+      object.databaseGroupMappings?.map((e) => PlanConfig_Deployment_DatabaseGroupMapping.fromPartial(e)) || [];
     return message;
   },
 };
 
-function createBasePlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot(): PlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot {
-  return { name: "", title: "", deploymentConfig: undefined };
-}
-
-export const PlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot: MessageFns<
-  PlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot
-> = {
-  encode(
-    message: PlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
-    if (message.name !== "") {
-      writer.uint32(10).string(message.name);
-    }
-    if (message.title !== "") {
-      writer.uint32(18).string(message.title);
-    }
-    if (message.deploymentConfig !== undefined) {
-      DeploymentConfig.encode(message.deploymentConfig, writer.uint32(26).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): PlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBasePlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.name = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.title = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.deploymentConfig = DeploymentConfig.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): PlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot {
-    return {
-      name: isSet(object.name) ? globalThis.String(object.name) : "",
-      title: isSet(object.title) ? globalThis.String(object.title) : "",
-      deploymentConfig: isSet(object.deploymentConfig) ? DeploymentConfig.fromJSON(object.deploymentConfig) : undefined,
-    };
-  },
-
-  toJSON(message: PlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot): unknown {
-    const obj: any = {};
-    if (message.name !== "") {
-      obj.name = message.name;
-    }
-    if (message.title !== "") {
-      obj.title = message.title;
-    }
-    if (message.deploymentConfig !== undefined) {
-      obj.deploymentConfig = DeploymentConfig.toJSON(message.deploymentConfig);
-    }
-    return obj;
-  },
-
-  create(
-    base?: DeepPartial<PlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot>,
-  ): PlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot {
-    return PlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot.fromPartial(base ?? {});
-  },
-  fromPartial(
-    object: DeepPartial<PlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot>,
-  ): PlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot {
-    const message = createBasePlanConfig_DeploymentSnapshot_DeploymentConfigSnapshot();
-    message.name = object.name ?? "";
-    message.title = object.title ?? "";
-    message.deploymentConfig = (object.deploymentConfig !== undefined && object.deploymentConfig !== null)
-      ? DeploymentConfig.fromPartial(object.deploymentConfig)
-      : undefined;
-    return message;
-  },
-};
-
-function createBasePlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot(): PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot {
+function createBasePlanConfig_Deployment_DatabaseGroupMapping(): PlanConfig_Deployment_DatabaseGroupMapping {
   return { databaseGroup: "", databases: [] };
 }
 
-export const PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot: MessageFns<
-  PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot
-> = {
-  encode(
-    message: PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
+export const PlanConfig_Deployment_DatabaseGroupMapping: MessageFns<PlanConfig_Deployment_DatabaseGroupMapping> = {
+  encode(message: PlanConfig_Deployment_DatabaseGroupMapping, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.databaseGroup !== "") {
       writer.uint32(10).string(message.databaseGroup);
     }
@@ -1767,10 +1359,10 @@ export const PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot: MessageFns<
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot {
+  decode(input: BinaryReader | Uint8Array, length?: number): PlanConfig_Deployment_DatabaseGroupMapping {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBasePlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot();
+    const message = createBasePlanConfig_Deployment_DatabaseGroupMapping();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -1799,7 +1391,7 @@ export const PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot: MessageFns<
     return message;
   },
 
-  fromJSON(object: any): PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot {
+  fromJSON(object: any): PlanConfig_Deployment_DatabaseGroupMapping {
     return {
       databaseGroup: isSet(object.databaseGroup) ? globalThis.String(object.databaseGroup) : "",
       databases: globalThis.Array.isArray(object?.databases)
@@ -1808,7 +1400,7 @@ export const PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot: MessageFns<
     };
   },
 
-  toJSON(message: PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot): unknown {
+  toJSON(message: PlanConfig_Deployment_DatabaseGroupMapping): unknown {
     const obj: any = {};
     if (message.databaseGroup !== "") {
       obj.databaseGroup = message.databaseGroup;
@@ -1819,15 +1411,13 @@ export const PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot: MessageFns<
     return obj;
   },
 
-  create(
-    base?: DeepPartial<PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot>,
-  ): PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot {
-    return PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot.fromPartial(base ?? {});
+  create(base?: DeepPartial<PlanConfig_Deployment_DatabaseGroupMapping>): PlanConfig_Deployment_DatabaseGroupMapping {
+    return PlanConfig_Deployment_DatabaseGroupMapping.fromPartial(base ?? {});
   },
   fromPartial(
-    object: DeepPartial<PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot>,
-  ): PlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot {
-    const message = createBasePlanConfig_DeploymentSnapshot_DatabaseGroupSnapshot();
+    object: DeepPartial<PlanConfig_Deployment_DatabaseGroupMapping>,
+  ): PlanConfig_Deployment_DatabaseGroupMapping {
+    const message = createBasePlanConfig_Deployment_DatabaseGroupMapping();
     message.databaseGroup = object.databaseGroup ?? "";
     message.databases = object.databases?.map((e) => e) || [];
     return message;

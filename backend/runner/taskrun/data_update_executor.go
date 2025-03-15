@@ -52,12 +52,7 @@ type DataUpdateExecutor struct {
 
 // RunOnce will run the data update (DML) task executor once.
 func (exec *DataUpdateExecutor) RunOnce(ctx context.Context, driverCtx context.Context, task *store.TaskMessage, taskRunUID int) (bool, *storepb.TaskRunResult, error) {
-	payload := &storepb.TaskDatabaseUpdatePayload{}
-	if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(task.Payload), payload); err != nil {
-		return true, nil, errors.Wrap(err, "invalid database data update payload")
-	}
-
-	sheetID := int(payload.SheetId)
+	sheetID := int(task.Payload.GetSheetId())
 	statement, err := exec.store.GetSheetStatementByID(ctx, sheetID)
 	if err != nil {
 		return true, nil, err
@@ -87,7 +82,7 @@ func (exec *DataUpdateExecutor) RunOnce(ctx context.Context, driverCtx context.C
 		PriorBackupStart: &storepb.TaskRunLog_PriorBackupStart{},
 	})
 
-	priorBackupDetail, backupErr := exec.backupData(ctx, driverCtx, statement, payload, task, issueN, instance, database)
+	priorBackupDetail, backupErr := exec.backupData(ctx, driverCtx, statement, task.Payload, task, issueN, instance, database)
 	if backupErr != nil {
 		exec.store.CreateTaskRunLogS(ctx, taskRunUID, time.Now(), exec.profile.DeployID, &storepb.TaskRunLog{
 			Type: storepb.TaskRunLog_PRIOR_BACKUP_END,
@@ -127,7 +122,7 @@ func (exec *DataUpdateExecutor) RunOnce(ctx context.Context, driverCtx context.C
 			},
 		})
 	}
-	terminated, result, err := runMigration(ctx, driverCtx, exec.store, exec.dbFactory, exec.stateCfg, exec.schemaSyncer, exec.profile, task, taskRunUID, db.Data, statement, payload.SchemaVersion, &sheetID)
+	terminated, result, err := runMigration(ctx, driverCtx, exec.store, exec.dbFactory, exec.stateCfg, exec.schemaSyncer, exec.profile, task, taskRunUID, db.Data, statement, task.Payload.GetSchemaVersion(), &sheetID)
 	if result != nil {
 		// Save prior backup detail to task run result.
 		result.PriorBackupDetail = priorBackupDetail
@@ -157,13 +152,13 @@ func (exec *DataUpdateExecutor) backupData(
 	ctx context.Context,
 	driverCtx context.Context,
 	originStatement string,
-	payload *storepb.TaskDatabaseUpdatePayload,
+	payload *storepb.TaskPayload,
 	task *store.TaskMessage,
 	issueN *store.IssueMessage,
 	instance *store.InstanceMessage,
 	database *store.DatabaseMessage,
 ) (*storepb.PriorBackupDetail, error) {
-	if payload.PreUpdateBackupDetail == nil || payload.PreUpdateBackupDetail.Database == "" {
+	if payload.GetPreUpdateBackupDetail().GetDatabase() == "" {
 		return nil, nil
 	}
 
@@ -178,7 +173,7 @@ func (exec *DataUpdateExecutor) backupData(
 		return nil, errors.Wrap(err, "failed to parse backup database")
 	}
 
-	if instance.Engine != storepb.Engine_POSTGRES {
+	if instance.Metadata.GetEngine() != storepb.Engine_POSTGRES {
 		backupDatabase, err = exec.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{InstanceID: &backupInstanceID, DatabaseName: &backupDatabaseName})
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get backup database")
@@ -209,9 +204,9 @@ func (exec *DataUpdateExecutor) backupData(
 		InstanceID:              instance.ResourceID,
 		GetDatabaseMetadataFunc: BuildGetDatabaseMetadataFunc(exec.store),
 		ListDatabaseNamesFunc:   BuildListDatabaseNamesFunc(exec.store),
-		IgnoreCaseSensitive:     store.IgnoreDatabaseAndTableCaseSensitive(instance),
+		IsCaseSensitive:         store.IsObjectCaseSensitive(instance),
 	}
-	if instance.Engine == storepb.Engine_ORACLE {
+	if instance.Metadata.GetEngine() == storepb.Engine_ORACLE {
 		oracleDriver, ok := driver.(*oracle.Driver)
 		if ok {
 			if version, err := oracleDriver.GetVersion(); err == nil {
@@ -221,16 +216,16 @@ func (exec *DataUpdateExecutor) backupData(
 	}
 
 	if len(originStatement) > common.MaxSheetCheckSize {
-		return nil, errors.Errorf("statement size %d exceeds the limit %d", len(originStatement), common.MaxSheetCheckSize)
+		return nil, errors.Errorf("statement size %d exceeds the limit %d, please disable data backup", len(originStatement), common.MaxSheetCheckSize)
 	}
 
 	prefix := "_" + time.Now().Format("20060102150405")
-	statements, err := base.TransformDMLToSelect(ctx, instance.Engine, tc, originStatement, database.DatabaseName, backupDatabaseName, prefix)
+	statements, err := base.TransformDMLToSelect(ctx, instance.Metadata.GetEngine(), tc, originStatement, database.DatabaseName, backupDatabaseName, prefix)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to transform DML to select")
 	}
 
-	preAppendStatements, err := getPreAppendStatements(instance.Engine, originStatement)
+	preAppendStatements, err := getPreAppendStatements(instance.Metadata.GetEngine(), originStatement)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get pre append statements")
 	}
@@ -248,7 +243,7 @@ func (exec *DataUpdateExecutor) backupData(
 		if _, err := driver.Execute(driverCtx, backupStatement, db.ExecuteOptions{}); err != nil {
 			return nil, errors.Wrapf(err, "failed to execute backup statement %q", backupStatement)
 		}
-		switch instance.Engine {
+		switch instance.Metadata.GetEngine() {
 		case storepb.Engine_TIDB:
 			if _, err := driver.Execute(driverCtx, fmt.Sprintf("ALTER TABLE `%s`.`%s` COMMENT = '%s, source table (%s, %s)'", backupDatabaseName, statement.TargetTableName, bbSource, database.DatabaseName, statement.SourceTableName), db.ExecuteOptions{}); err != nil {
 				return nil, errors.Wrap(err, "failed to set table comment")
@@ -293,7 +288,7 @@ func (exec *DataUpdateExecutor) backupData(
 			StartPosition: statement.StartPosition,
 			EndPosition:   statement.EndPosition,
 		}
-		if instance.Engine == storepb.Engine_POSTGRES {
+		if instance.Metadata.GetEngine() == storepb.Engine_POSTGRES {
 			item.TargetTable = &storepb.PriorBackupDetail_Item_Table{
 				Database: sourceDatabaseName,
 				// postgres uses schema as the backup database name currently.
@@ -326,15 +321,15 @@ func (exec *DataUpdateExecutor) backupData(
 		}
 	}
 
-	if instance.Engine != storepb.Engine_POSTGRES {
-		if err := exec.schemaSyncer.SyncDatabaseSchema(ctx, backupDatabase, false /* force */); err != nil {
+	if instance.Metadata.GetEngine() != storepb.Engine_POSTGRES {
+		if err := exec.schemaSyncer.SyncDatabaseSchema(ctx, backupDatabase); err != nil {
 			slog.Error("failed to sync backup database schema",
 				slog.String("database", payload.PreUpdateBackupDetail.Database),
 				log.BBError(err),
 			)
 		}
 	} else {
-		if err := exec.schemaSyncer.SyncDatabaseSchema(ctx, database, false /* force */); err != nil {
+		if err := exec.schemaSyncer.SyncDatabaseSchema(ctx, database); err != nil {
 			slog.Error("failed to sync backup database schema",
 				slog.String("database", fmt.Sprintf("/instances/%s/databases/%s", instance.ResourceID, database.DatabaseName)),
 				log.BBError(err),

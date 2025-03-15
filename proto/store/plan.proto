@@ -6,7 +6,6 @@ import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/protobuf/timestamp.proto";
 import "store/common.proto";
-import "store/deployment_config.proto";
 import "store/plan_check_run.proto";
 
 option go_package = "generated-go/store";
@@ -14,11 +13,9 @@ option go_package = "generated-go/store";
 message PlanConfig {
   repeated Step steps = 1;
 
-  VCSSource vcs_source = 2;
-
   ReleaseSource release_source = 3;
 
-  DeploymentSnapshot deployment_snapshot = 4;
+  Deployment deployment = 4;
 
   message Step {
     // Use the title if set.
@@ -31,9 +28,6 @@ message PlanConfig {
     google.protobuf.Timestamp earliest_allowed_time = 4;
     // A UUID4 string that uniquely identifies the Spec.
     string id = 5;
-    // IDs of the specs that this spec depends on.
-    // Must be a subset of the specs in the same step.
-    repeated string depends_on_specs = 6;
 
     SpecReleaseSource spec_release_source = 8;
 
@@ -67,8 +61,6 @@ message PlanConfig {
     // The environment resource.
     // Format: environments/prod where prod is the environment resource ID.
     string environment = 9 [(google.api.field_behavior) = OPTIONAL];
-    // labels of the database.
-    map<string, string> labels = 10 [(google.api.field_behavior) = OPTIONAL];
   }
 
   message ChangeDatabaseConfig {
@@ -98,7 +90,7 @@ message PlanConfig {
       DATA = 6;
     }
     Type type = 3;
-    // schema_version is parsed from VCS file name.
+    // schema_version is parsed from file name.
     // It is automatically generated in the UI workflow.
     string schema_version = 4;
 
@@ -122,15 +114,6 @@ message PlanConfig {
     optional string password = 4;
   }
 
-  message VCSSource {
-    VCSType vcs_type = 1;
-    // Optional.
-    // If present, we will update the pull request for rollout status.
-    // Format: projects/{project-ID}/vcsConnectors/{vcs-connector}
-    string vcs_connector = 2;
-    string pull_request_url = 3;
-  }
-
   message ReleaseSource {
     // The release.
     // Format: projects/{project}/releases/{release}
@@ -142,19 +125,13 @@ message PlanConfig {
     string file = 1;
   }
 
-  message DeploymentSnapshot {
-    DeploymentConfigSnapshot deployment_config_snapshot = 1;
-    repeated DatabaseGroupSnapshot database_group_snapshots = 2;
+  message Deployment {
+    // The environments deploy order.
+    repeated string environments = 1;
+    // The database group mapping.
+    repeated DatabaseGroupMapping database_group_mappings = 2;
 
-    // The snapshot of the project deployment config at the time of creation.
-    message DeploymentConfigSnapshot {
-      string name = 1;
-      string title = 2;
-      DeploymentConfig deployment_config = 3;
-    }
-
-    // The snapshot of the database group at the time of creation.
-    message DatabaseGroupSnapshot {
+    message DatabaseGroupMapping {
       // Format: projects/{project}/databaseGroups/{databaseGroup}.
       string database_group = 1;
       // Format: instances/{instance-id}/databases/{database-name}.

@@ -148,6 +148,21 @@ func (q *querySpanExtractor) getQuerySpan(ctx context.Context, stmt string) (*ba
 
 	tableSource, err := q.extractTableSourceFromNode(ast.Stmt)
 	if err != nil {
+		var functionNotSupported *parsererror.FunctionNotSupportedError
+		if errors.As(err, &functionNotSupported) {
+			// Sadly, getAccessTables() returns nil for resources not found.
+			if len(accessTables) == 0 {
+				accessTables[base.ColumnResource{
+					Database: q.defaultDatabase,
+				}] = true
+			}
+			return &base.QuerySpan{
+				Type:          base.Select,
+				SourceColumns: accessTables,
+				Results:       []base.QuerySpanResult{},
+				NotFoundError: functionNotSupported,
+			}, nil
+		}
 		var resourceNotFound *parsererror.ResourceNotFoundError
 		if errors.As(err, &resourceNotFound) {
 			// Sadly, getAccessTables() returns nil for resources not found.
@@ -529,9 +544,13 @@ func (q *querySpanExtractor) findFunctionDefine(schemaName, funcName string, arg
 	}
 
 	function := candidates[0]
-	columns, err := q.getColumnsForFunction(fmt.Sprintf("%s.%s", schemaName, funcName), function.Definition)
+	functionName := fmt.Sprintf("%s.%s", schemaName, funcName)
+	columns, err := q.getColumnsForFunction(functionName, function.Definition)
 	if err != nil {
-		return nil, err
+		return nil, &parsererror.FunctionNotSupportedError{
+			Err:      err,
+			Function: functionName,
+		}
 	}
 	return &base.PseudoTable{
 		Columns: columns,
@@ -1053,11 +1072,11 @@ func (q *querySpanExtractor) extractTableSourceFromSelect(node *pgquery.Node_Sel
 	case pgquery.SetOperation_SETOP_UNION, pgquery.SetOperation_SETOP_INTERSECT, pgquery.SetOperation_SETOP_EXCEPT:
 		leftSpanResults, err := q.extractTableSourceFromSelect(&pgquery.Node_SelectStmt{SelectStmt: node.SelectStmt.Larg})
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to extract span result from left select: %+v", node.SelectStmt.Larg)
+			return nil, errors.Wrapf(err, "failed to extract span result from left select")
 		}
 		rightSpanResults, err := q.extractTableSourceFromSelect(&pgquery.Node_SelectStmt{SelectStmt: node.SelectStmt.Rarg})
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to extract span result from right select: %+v", node.SelectStmt.Rarg)
+			return nil, errors.Wrapf(err, "failed to extract span result from right select")
 		}
 		leftQuerySpanResult, rightQuerySpanResult := leftSpanResults.GetQuerySpanResult(), rightSpanResults.GetQuerySpanResult()
 		if len(leftQuerySpanResult) != len(rightQuerySpanResult) {
@@ -1183,12 +1202,12 @@ func (q *querySpanExtractor) extractTableSourceFromSelect(node *pgquery.Node_Sel
 func (q *querySpanExtractor) extractTableSourceFromJoin(node *pgquery.Node_JoinExpr) (*base.PseudoTable, error) {
 	leftTableSource, err := q.extractTableSourceFromNode(node.JoinExpr.Larg)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to extract span result from left join: %+v", node.JoinExpr.Larg)
+		return nil, errors.Wrapf(err, "failed to extract span result from left join")
 	}
 	q.tableSourcesFrom = append(q.tableSourcesFrom, leftTableSource)
 	rightTableSource, err := q.extractTableSourceFromNode(node.JoinExpr.Rarg)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to extract span result from right join: %+v", node.JoinExpr.Rarg)
+		return nil, errors.Wrapf(err, "failed to extract span result from right join")
 	}
 	q.tableSourcesFrom = append(q.tableSourcesFrom, rightTableSource)
 	return q.mergeJoinTableSource(node, leftTableSource, rightTableSource)

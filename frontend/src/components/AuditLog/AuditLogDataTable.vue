@@ -15,7 +15,7 @@ import { NDataTable, type DataTableColumn } from "naive-ui";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import BBAvatar from "@/bbkit/BBAvatar.vue";
-import { extractUserEmail, useProjectV1Store, useUserStore } from "@/store";
+import { useProjectV1Store, useUserStore } from "@/store";
 import { projectNamePrefix } from "@/store/modules/v1/common";
 import { getDateForPbTimestamp } from "@/types";
 import { AuditData, type AuditLog } from "@/types/proto/v1/audit_log_service";
@@ -23,7 +23,7 @@ import { Setting } from "@/types/proto/v1/setting_service";
 import { extractProjectResourceName } from "@/utils";
 import JSONStringView from "./JSONStringView.vue";
 
-type ProjectDataTableColumn = DataTableColumn<AuditLog> & {
+type AuditDataTableColumn = DataTableColumn<AuditLog> & {
   hide?: boolean;
 };
 
@@ -43,7 +43,7 @@ const { t } = useI18n();
 const projectStore = useProjectV1Store();
 const userStore = useUserStore();
 
-const columnList = computed((): ProjectDataTableColumn[] => {
+const columnList = computed((): AuditDataTableColumn[] => {
   return (
     [
       {
@@ -67,12 +67,12 @@ const columnList = computed((): ProjectDataTableColumn[] => {
         title: t("common.project"),
         hide: !props.showProject,
         render: (auditLog) => {
-          const projectName = extractProjectResourceName(auditLog.name);
-          if (!projectName) {
+          const projectResourceId = extractProjectResourceName(auditLog.name);
+          if (!projectResourceId) {
             return <span>-</span>;
           }
           const project = projectStore.getProjectByName(
-            `${projectNamePrefix}${projectName}`
+            `${projectNamePrefix}${projectResourceId}`
           );
           return <span>{project.title}</span>;
         },
@@ -89,9 +89,7 @@ const columnList = computed((): ProjectDataTableColumn[] => {
         width: 128,
         title: t("audit-log.table.actor"),
         render: (auditLog) => {
-          const user = userStore.getUserByEmail(
-            extractUserEmail(auditLog.user)
-          );
+          const user = userStore.getUserByIdentifier(auditLog.user);
           if (!user) {
             return <span>-</span>;
           }
@@ -163,7 +161,7 @@ const columnList = computed((): ProjectDataTableColumn[] => {
             "-"
           ),
       },
-    ] as ProjectDataTableColumn[]
+    ] as AuditDataTableColumn[]
   ).filter((column) => !column.hide);
 });
 

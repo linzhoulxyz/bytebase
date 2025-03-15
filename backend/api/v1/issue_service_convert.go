@@ -118,20 +118,14 @@ func (s *IssueService) convertToIssueReleasers(ctx context.Context, issue *store
 	if activeStage == nil {
 		return nil, nil
 	}
-	policy, err := GetValidRolloutPolicyForStage(ctx, s.store, s.licenseService, activeStage)
+	policy, err := GetValidRolloutPolicyForStage(ctx, s.store, activeStage)
 	if err != nil {
 		return nil, err
 	}
 
 	var releasers []string
-	if policy.Automatic {
-		releasers = append(releasers, common.FormatRole(api.ProjectOwner.String()), common.FormatUserEmail(issue.Creator.Email))
-		return releasers, nil
-	}
 
-	releasers = append(releasers, policy.WorkspaceRoles...)
-	releasers = append(releasers, policy.ProjectRoles...)
-
+	releasers = append(releasers, policy.Roles...)
 	for _, role := range policy.IssueRoles {
 		switch role {
 		case "roles/CREATOR":
@@ -256,10 +250,6 @@ func convertToApprovalNode(node *storepb.ApprovalNode) *v1pb.ApprovalNode {
 	case *storepb.ApprovalNode_Role:
 		v1node.Payload = &v1pb.ApprovalNode_Role{
 			Role: payload.Role,
-		}
-	case *storepb.ApprovalNode_ExternalNodeId:
-		v1node.Payload = &v1pb.ApprovalNode_ExternalNodeId{
-			ExternalNodeId: payload.ExternalNodeId,
 		}
 	}
 	return v1node
