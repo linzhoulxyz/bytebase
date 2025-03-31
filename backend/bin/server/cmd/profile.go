@@ -22,6 +22,7 @@ func getBaseProfile(dataDir string) *config.Profile {
 		Port:               flags.port,     // Using flags.port as our gRPC server port.
 		DatastorePort:      flags.port + 2, // Using flags.port + 2 as our datastore port.
 		SampleDatabasePort: sampleDatabasePort,
+		HA:                 flags.ha,
 		SaaS:               flags.saas,
 		EnableJSONLogging:  flags.enableJSONLogging,
 		Debug:              flags.debug,
@@ -33,7 +34,7 @@ func getBaseProfile(dataDir string) *config.Profile {
 		GitCommit:          gitcommit,
 		PgURL:              flags.pgURL,
 		DeployID:           uuid.NewString()[:8],
-		LastActiveTs:       time.Now().Unix(),
+		LastActiveTS:       time.Now().Unix(),
 	}
 }
 

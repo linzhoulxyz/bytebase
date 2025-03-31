@@ -100,6 +100,14 @@ service SQLService {
     option (bytebase.v1.allow_without_credential) = true;
     // This is a util method requiring no authentication thus no authorization.
   }
+
+  rpc AICompletion(AICompletionRequest) returns (AICompletionResponse) {
+    option (google.api.http) = {
+      post: "/v1/sql/aiCompletion"
+      body: "*"
+    };
+    option (bytebase.v1.auth_method) = CUSTOM;
+  }
 }
 
 message AdminExecuteRequest {
@@ -321,8 +329,9 @@ message Advice {
   // The advice column number in the SQL statement.
   int32 column = 6;
 
-  // 1-based Position of the SQL statement.
   // To supersede `line` and `column` above.
+  // The start_position is inclusive and the end_position is exclusive.
+  // TODO: use range instead
   Position start_position = 8;
   Position end_position = 9;
 }
@@ -436,7 +445,8 @@ message DiffMetadataRequest {
   // The database engine of the schema.
   Engine engine = 3;
 
-  // If false, we will build the raw common by classification in database config.
+  // If false, we will build the raw common by classification in database
+  // config.
   bool classification_from_config = 4;
 }
 
@@ -505,4 +515,28 @@ message QueryHistory {
   }
 
   Type type = 8;
+}
+
+message AICompletionRequest {
+  message Message {
+    string role = 1;
+    string content = 2;
+  }
+  repeated Message messages = 1;
+}
+
+message AICompletionResponse {
+  message Candidate {
+    message Content {
+      message Part {
+        string text = 1;
+      }
+      // parts is used for a result content with multiple parts.
+      repeated Part parts = 1;
+    }
+    Content content = 1;
+  }
+  // candidates is used for results with multiple choices and candidates. Used
+  // for OpenAI and Gemini.
+  repeated Candidate candidates = 1;
 }

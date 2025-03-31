@@ -140,7 +140,7 @@ watchEffect(async () => {
   }
 });
 
-const { project, ready } = useProjectByName(projectName.value);
+const { project, ready } = useProjectByName(projectName);
 
 const initialized = computed(
   () => ready && project.value.name !== UNKNOWN_PROJECT_NAME
@@ -152,8 +152,10 @@ const isDefaultProject = computed((): boolean => {
 
 const requiredPermissions = computed(() => {
   const getPermissionListFunc =
-    router.currentRoute.value.meta.requiredProjectPermissionList;
-  return getPermissionListFunc ? getPermissionListFunc() : [];
+    router.currentRoute.value.meta.requiredPermissionList;
+  const permissions = getPermissionListFunc ? getPermissionListFunc() : [];
+  permissions.push("bb.projects.get");
+  return permissions;
 });
 
 const hasPermission = computed(() => {

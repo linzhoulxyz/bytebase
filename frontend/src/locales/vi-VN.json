@@ -195,6 +195,7 @@
     "info": "Thông tin",
     "minutes": "Phút",
     "filter-by-name": "Lọc theo tên",
+    "search-by-name": "Tìm kiếm theo tên",
     "license": "Giấy phép",
     "view-details": "Xem chi tiết",
     "force-verb": "Buộc {verb}",
@@ -210,7 +211,6 @@
     "resource": "Tài nguyên",
     "resources": "Tài nguyên",
     "closed": "Đã đóng",
-    "options": "Tùy chọn",
     "refresh": "Làm mới",
     "rollback": "Hoàn tác",
     "rows": {
@@ -225,7 +225,8 @@
     "text-wrap": "Ngắt dòng văn bản",
     "catalog": "Danh mục",
     "summary": "Tóm tắt",
-    "errors": "Lỗi"
+    "errors": "Lỗi",
+    "removed": "LOẠI BỎ"
   },
   "error-page": {
     "go-back-home": "Về trang chủ"
@@ -380,12 +381,8 @@
         "workspace-domain-required": "Vui lòng thiết lập tên miền không gian làm việc trước."
       },
       "action": {
-        "deactivate": "Vô hiệu hóa",
         "deactivate-confirm-title": "Bạn có chắc muốn vô hiệu hóa?",
         "reactivate-confirm-title": "Bạn có chắc muốn kích hoạt lại?"
-      },
-      "tooltip": {
-        "not-allow-remove": "Không thể xóa Quản trị viên cuối cùng"
       },
       "system-bot": "Bot hệ thống",
       "service-account": "Tài khoản dịch vụ",
@@ -407,7 +404,6 @@
         "reset-token": "Đặt lại mã thông báo",
         "reset-token-warning": "Bạn cần cập nhật cấu hình cung cấp ứng dụng Entra."
       },
-      "update-user": "Cập nhật người dùng",
       "search-member": "Tìm kiếm thành viên",
       "revoked": "Đã thu hồi",
       "view-by-members": "Xem theo thành viên",
@@ -555,20 +551,26 @@
         "failed-to-update-setting": "Không cập nhật được cài đặt \"{title}\"",
         "ai-assistant": {
           "self": "Trợ lý AI",
-          "description": "Sử dụng OpenAPI để hỗ trợ các tác vụ phát triển cơ sở dữ liệu.",
-          "openai-key": {
-            "self": "Khóa API OpenAI",
-            "description": "Cung cấp Khóa API OpenAI. {viewDoc}",
+          "enable-ai-assistant": "Bật Trợ lý AI",
+          "description": "Sử dụng AI để hỗ trợ các tác vụ phát triển cơ sở dữ liệu.",
+          "provider": {
+            "self": "Nhà cung cấp AI",
+            "open_ai": "Open AI",
+            "azure_open_ai": "Azure Open AI"
+          },
+          "api-key": {
+            "self": "Khóa API",
+            "description": "Cung cấp Khóa API, chỉ đọc. {viewDoc}",
             "find-my-key": "Tìm khóa của tôi",
-            "placeholder": "Khóa API OpenAI thường bắt đầu bằng sk-*****"
+            "placeholder": "Khóa API thường bắt đầu bằng sk-*****"
           },
-          "openai-endpoint": {
-            "self": "Điểm cuối API OpenAI",
-            "description": "Cung cấp triển khai riêng của Điểm cuối API OpenAI."
+          "endpoint": {
+            "self": "Điểm cuối API",
+            "description": "Cung cấp triển khai riêng của Điểm cuối API."
           },
-          "openai-model": {
-            "self": "Tên mô hình OpenAI",
-            "description": "Cung cấp triển khai riêng của tên mô hình OpenAI."
+          "model": {
+            "self": "Tên mô hình",
+            "description": "Cung cấp triển khai riêng của tên mô hình."
           }
         },
         "announcement": {
@@ -1049,6 +1051,9 @@
     },
     "schema": {
       "default": "Mặc định"
+    },
+    "catalog": {
+      "description": "Chỉnh sửa và tải lên danh mục bảng."
     }
   },
   "instance": {
@@ -1235,7 +1240,11 @@
           "description": "Lọc theo địa chỉ"
         }
       }
-    }
+    },
+    "no-params-yet-add-above": "Chưa có thông số nào được cấu hình. \nThêm tham số bằng cách sử dụng biểu mẫu trên.",
+    "no-extra-params-configured": "Không có thông số kết nối bổ sung được cấu hình",
+    "parameter-name-placeholder": "Tên tham số",
+    "parameter-value-placeholder": "Giá trị tham số"
   },
   "environment": {
     "select": "Chọn môi trường",
@@ -1655,6 +1664,10 @@
   },
   "data-source": {
     "snowflake-keypair-tip": "Xác thực cặp khóa",
+    "extra-params": {
+      "self": "Thông số bổ sung",
+      "description": "Các tham số bổ sung cho chuỗi kết nối cơ sở dữ liệu"
+    },
     "ssl": {
       "ca-cert": "Chứng chỉ CA",
       "client-key": "Khóa máy khách",
@@ -1707,16 +1720,18 @@
     "download-as-file": "Tải xuống dưới dạng {file}",
     "only-select-allowed": "Chỉ cho phép câu lệnh {select}.",
     "enable-ddl-for-environment": "Bạn có thể bật câu lệnh DDL/DML cho môi trường {environment}.",
-    "want-to-action": "Nếu bạn muốn {want}, hãy nhấp vào nút {action} {reaction}.",
     "and-submit-an-issue": "và gửi một vấn đề",
     "to-enable-admin-mode": "để bật chế độ quản trị",
     "notify-empty-statement": "Vui lòng nhập câu lệnh SQL của bạn vào trình soạn thảo",
-    "goto-edit-schema-hint": "Vui lòng chọn một kết nối cơ sở dữ liệu từ đầu trình soạn thảo",
     "can-not-execute-query": "Không thể thực hiện truy vấn khi đang tải dữ liệu.",
     "rows": "dòng | dòng",
     "vertical-display": "Hiển thị dọc",
     "no-history-found": "Không tìm thấy lịch sử",
     "search-history": "Tìm kiếm Lịch sử",
+    "binary-format": "Định dạng nhị phân",
+    "hex-format": "Định dạng thập lục phân",
+    "boolean-format": "Định dạng Boolean",
+    "text-format": "Định dạng văn bản",
     "hint-tips": {
       "confirm-to-close-unsaved-sheet": {
         "title": "Đóng trang tính chưa lưu?",
@@ -1742,7 +1757,6 @@
     "format": "Định dạng",
     "sql-review-result": "Kết quả đánh giá SQL",
     "visualize-explain": "Trực quan hóa Giải thích",
-    "sql-execute-in-production-environment": "Hãy cẩn thận, bạn đang truy cập cơ sở dữ liệu trong môi trường sản xuất.",
     "rows-upper-limit": "đã đạt đến giới hạn kết quả truy vấn",
     "close-sheet": "Đóng trang tính",
     "connect": "Kết nối",
@@ -1830,7 +1844,9 @@
       "contact-the-admin-to-grant-access": "Liên hệ với quản trị viên để cấp quyền truy cập."
     },
     "upload-file": "Tải lên tệp",
-    "copy-selected-results": "Sao chép dữ liệu đã chọn bằng {action} hoặc {button}"
+    "copy-selected-results": "Sao chép dữ liệu đã chọn bằng {action} hoặc {button}",
+    "format-default": "Mặc định",
+    "column-display-format": "Định dạng hiển thị cột"
   },
   "schema-editor": {
     "self": "Trình soạn thảo lược đồ",
@@ -2442,10 +2458,6 @@
     "edit": "Chỉnh sửa nhóm cơ sở dữ liệu",
     "matched-database": "Cơ sở dữ liệu phù hợp",
     "unmatched-database": "Cơ sở dữ liệu không phù hợp",
-    "multitenancy": {
-      "self": "Đa đối tượng thuê",
-      "description": "Cho phép quản lý nhiều cơ sở dữ liệu đồng nhất trong một quy trình công việc trên các đối tượng thuê khác nhau."
-    },
     "condition": {
       "self": "Điều kiện"
     },

@@ -225,7 +225,11 @@ func (s *RolloutService) CreateRollout(ctx context.Context, request *v1pb.Create
 		return nil, status.Errorf(codes.NotFound, "plan not found for id: %d", planID)
 	}
 
-	pipelineCreate, err := GetPipelineCreate(ctx, s.store, s.sheetManager, s.licenseService, s.dbFactory, plan.Name, plan.Config.GetSteps(), plan.Config.GetDeployment(), project)
+	rolloutTitle := request.GetRollout().GetTitle()
+	if rolloutTitle == "" {
+		rolloutTitle = plan.Name
+	}
+	pipelineCreate, err := GetPipelineCreate(ctx, s.store, s.sheetManager, s.licenseService, s.dbFactory, rolloutTitle, plan.Config.GetSteps(), plan.Config.GetDeployment(), project)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to get pipeline create, error: %v", err)
 	}
@@ -578,11 +582,13 @@ func (s *RolloutService) BatchRunTasks(ctx context.Context, request *v1pb.BatchR
 			continue
 		}
 
-		sheetUID := int(task.Payload.GetSheetId())
 		create := &store.TaskRunMessage{
 			TaskUID:   task.ID,
-			SheetUID:  &sheetUID,
 			CreatorID: user.ID,
+		}
+		if task.Payload.GetSheetId() != 0 {
+			sheetUID := int(task.Payload.GetSheetId())
+			create.SheetUID = &sheetUID
 		}
 		taskRunCreates = append(taskRunCreates, create)
 	}
@@ -598,19 +604,18 @@ func (s *RolloutService) BatchRunTasks(ctx context.Context, request *v1pb.BatchR
 		if err := s.store.CreateIssueCommentTaskUpdateStatus(ctx, issueN.UID, request.Tasks, storepb.IssueCommentPayload_TaskUpdate_PENDING, user.ID, request.Reason); err != nil {
 			slog.Warn("failed to create issue comment", "issueUID", issueN.UID, log.BBError(err))
 		}
-		s.webhookManager.CreateEvent(ctx, &webhook.Event{
-			Actor:   user,
-			Type:    webhook.EventTypeTaskRunStatusUpdate,
-			Comment: request.Reason,
-			Issue:   webhook.NewIssue(issueN),
-			Project: webhook.NewProject(issueN.Project),
-			TaskRunStatusUpdate: &webhook.EventTaskRunStatusUpdate{
-				Title:  issueN.Title,
-				Status: api.TaskRunPending.String(),
-			},
-		})
 	}
-
+	s.webhookManager.CreateEvent(ctx, &webhook.Event{
+		Actor:   user,
+		Type:    webhook.EventTypeTaskRunStatusUpdate,
+		Comment: request.Reason,
+		Issue:   webhook.NewIssue(issueN),
+		Project: webhook.NewProject(project),
+		Rollout: webhook.NewRollout(rollout),
+		TaskRunStatusUpdate: &webhook.EventTaskRunStatusUpdate{
+			Status: api.TaskRunPending.String(),
+		},
+	})
 	// Tickle task run scheduler.
 	s.stateCfg.TaskRunTickleChan <- 0
 
@@ -711,20 +716,19 @@ func (s *RolloutService) BatchSkipTasks(ctx context.Context, request *v1pb.Batch
 		if err := s.store.CreateIssueCommentTaskUpdateStatus(ctx, issueN.UID, request.Tasks, storepb.IssueCommentPayload_TaskUpdate_SKIPPED, user.ID, request.Reason); err != nil {
 			slog.Warn("failed to create issue comment", "issueUID", issueN.UID, log.BBError(err))
 		}
-
-		s.webhookManager.CreateEvent(ctx, &webhook.Event{
-			Actor:   user,
-			Type:    webhook.EventTypeTaskRunStatusUpdate,
-			Comment: request.Reason,
-			Issue:   webhook.NewIssue(issueN),
-			Project: webhook.NewProject(issueN.Project),
-			TaskRunStatusUpdate: &webhook.EventTaskRunStatusUpdate{
-				Title:         issueN.Title,
-				Status:        api.TaskRunSkipped.String(),
-				SkippedReason: request.Reason,
-			},
-		})
 	}
+	s.webhookManager.CreateEvent(ctx, &webhook.Event{
+		Actor:   user,
+		Type:    webhook.EventTypeTaskRunStatusUpdate,
+		Comment: request.Reason,
+		Issue:   webhook.NewIssue(issueN),
+		Project: webhook.NewProject(project),
+		Rollout: webhook.NewRollout(rollout),
+		TaskRunStatusUpdate: &webhook.EventTaskRunStatusUpdate{
+			Status:        api.TaskRunSkipped.String(),
+			SkippedReason: request.Reason,
+		},
+	})
 
 	return &v1pb.BatchSkipTasksResponse{}, nil
 }
@@ -845,19 +849,18 @@ func (s *RolloutService) BatchCancelTaskRuns(ctx context.Context, request *v1pb.
 		if err := s.store.CreateIssueCommentTaskUpdateStatus(ctx, issueN.UID, taskNames, storepb.IssueCommentPayload_TaskUpdate_CANCELED, user.ID, request.Reason); err != nil {
 			slog.Warn("failed to create issue comment", "issueUID", issueN.UID, log.BBError(err))
 		}
-
-		s.webhookManager.CreateEvent(ctx, &webhook.Event{
-			Actor:   user,
-			Type:    webhook.EventTypeTaskRunStatusUpdate,
-			Comment: request.Reason,
-			Issue:   webhook.NewIssue(issueN),
-			Project: webhook.NewProject(issueN.Project),
-			TaskRunStatusUpdate: &webhook.EventTaskRunStatusUpdate{
-				Title:  issueN.Title,
-				Status: api.TaskRunCanceled.String(),
-			},
-		})
 	}
+	s.webhookManager.CreateEvent(ctx, &webhook.Event{
+		Actor:   user,
+		Type:    webhook.EventTypeTaskRunStatusUpdate,
+		Comment: request.Reason,
+		Issue:   webhook.NewIssue(issueN),
+		Rollout: webhook.NewRollout(rollout),
+		Project: webhook.NewProject(project),
+		TaskRunStatusUpdate: &webhook.EventTaskRunStatusUpdate{
+			Status: api.TaskRunCanceled.String(),
+		},
+	})
 
 	return &v1pb.BatchCancelTaskRunsResponse{}, nil
 }

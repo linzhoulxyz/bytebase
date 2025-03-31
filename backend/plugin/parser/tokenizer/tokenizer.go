@@ -108,17 +108,6 @@ func NewTokenizer(statement string, options ...Option) *Tokenizer {
 	return t
 }
 
-func NewStreamTokenizer(src io.Reader, f func(string) error) *Tokenizer {
-	t := &Tokenizer{
-		cursor: 0,
-		line:   1,
-		reader: bufio.NewReader(src),
-		f:      f,
-	}
-	t.scan()
-	return t
-}
-
 func (t *Tokenizer) SetLineForMySQLCreateTableStmt(node *tidbast.CreateTableStmt, firstLine int) error {
 	// We assume that the parser will parse the columns and table constraints according to the order of the raw SQL statements
 	// and the identifiers don't equal any keywords in CREATE TABLE statements.
@@ -937,16 +926,17 @@ func (t *Tokenizer) scanTo(delimiter []rune) error {
 func (t *Tokenizer) scan() {
 	if t.reader != nil {
 		s, err := t.reader.ReadString('\n')
-		if err == nil {
+		switch err {
+		case nil:
 			t.buffer = append(t.buffer, []rune(s)...)
 			t.len = uint(len(t.buffer))
-		} else if err == io.EOF {
+		case io.EOF:
 			// bufio.Reader treates EOF as an error, we need special handling.
 			t.buffer = append(t.buffer, []rune(s)...)
 			t.len = uint(len(t.buffer))
 			t.reader = nil
 			t.buffer = append(t.buffer, eofRune)
-		} else {
+		default:
 			t.reader = nil
 			t.buffer = append(t.buffer, eofRune)
 			t.readErr = err

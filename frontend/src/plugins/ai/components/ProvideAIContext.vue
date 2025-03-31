@@ -3,9 +3,6 @@
 </template>
 
 <script lang="ts" setup>
-import Emittery from "emittery";
-import { storeToRefs } from "pinia";
-import { computed, reactive, ref, toRef } from "vue";
 import { useEmitteryEventListener } from "@/composables/useEmitteryEventListener";
 import {
   useConnectionOfCurrentSQLEditorTab,
@@ -13,8 +10,11 @@ import {
   useSettingV1Store,
   useSQLEditorTabStore,
 } from "@/store";
-import { DatabaseMetadataView } from "@/types/proto/v1/database_service";
+import { AISetting } from "@/types/proto/v1/setting_service";
 import { wrapRefAsPromise } from "@/utils";
+import Emittery from "emittery";
+import { storeToRefs } from "pinia";
+import { computed, reactive, ref, toRef } from "vue";
 import { provideAIContext, useChatByTab, useCurrentChat } from "../logic";
 import { useConversationStore } from "../store";
 import type { AIContext, AIContextEvents } from "../types";
@@ -28,28 +28,12 @@ const state = reactive<LocalState>({
 });
 
 const settingV1Store = useSettingV1Store();
-const openAIKeySetting = settingV1Store.getSettingByName(
-  "bb.plugin.openai.key"
-);
-const openAIEndpointSetting = settingV1Store.getSettingByName(
-  "bb.plugin.openai.endpoint"
-);
-const openAIModelSetting = settingV1Store.getSettingByName(
-  "bb.plugin.openai.model"
-);
-const openAIKey = computed(() => openAIKeySetting?.value?.stringValue ?? "");
-const openAIEndpoint = computed(
-  () => openAIEndpointSetting?.value?.stringValue ?? ""
-);
-const openAIModel = computed(
-  () => openAIModelSetting?.value?.stringValue ?? ""
-)
+const aiSetting = computed(() => settingV1Store.getSettingByName("bb.ai")?.value?.aiSetting ?? AISetting.create());
 const { instance, database } = useConnectionOfCurrentSQLEditorTab();
 
 const databaseMetadata = useMetadata(
   computed(() => database.value.name),
-  false /* !skipCache */,
-  DatabaseMetadataView.DATABASE_METADATA_VIEW_FULL
+  false /* !skipCache */
 );
 
 const events: AIContextEvents = new Emittery();
@@ -63,9 +47,7 @@ const schema = computed(() => tab.value?.connection.schema);
 const store = useConversationStore();
 
 const context: AIContext = {
-  openAIKey,
-  openAIEndpoint,
-  openAIModel,
+  aiSetting: aiSetting,
   engine: computed(() => instance.value.engine),
   databaseMetadata,
   schema,

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -141,7 +140,8 @@ func (s *SQLService) AdminExecute(server v1pb.SQLService_AdminExecuteServer) err
 			}
 		}
 
-		queryContext := db.QueryContext{OperatorEmail: user.Email, Container: request.GetContainer()}
+		maximumSQLResultSize := s.store.GetMaximumSQLResultLimit(ctx)
+		queryContext := db.QueryContext{OperatorEmail: user.Email, Container: request.GetContainer(), MaximumSQLResultSize: maximumSQLResultSize}
 		if request.Schema != nil {
 			queryContext.Schema = *request.Schema
 		}
@@ -213,12 +213,14 @@ func (s *SQLService) Query(ctx context.Context, request *v1pb.QueryRequest) (*v1
 		defer conn.Close()
 	}
 
+	maximumSQLResultSize := s.store.GetMaximumSQLResultLimit(ctx)
 	queryContext := db.QueryContext{
-		Explain:       request.Explain,
-		Limit:         int(request.Limit),
-		OperatorEmail: user.Email,
-		Option:        request.QueryOption,
-		Container:     request.GetContainer(),
+		Explain:              request.Explain,
+		Limit:                int(request.Limit),
+		OperatorEmail:        user.Email,
+		Option:               request.QueryOption,
+		Container:            request.GetContainer(),
+		MaximumSQLResultSize: maximumSQLResultSize,
 	}
 	if request.Schema != nil {
 		queryContext.Schema = *request.Schema
@@ -803,7 +805,7 @@ func (s *SQLService) doExportFromIssue(ctx context.Context, issueName string) (*
 // DoExport does the export.
 func DoExport(
 	ctx context.Context,
-	storeInstance *store.Store,
+	stores *store.Store,
 	dbFactory *dbfactory.DBFactory,
 	licenseService enterprise.LicenseService,
 	request *v1pb.ExportRequest,
@@ -813,7 +815,7 @@ func DoExport(
 	optionalAccessCheck accessCheckFunc,
 	schemaSyncer *schemasync.Syncer,
 ) ([]byte, time.Duration, error) {
-	dataSource, err := checkAndGetDataSourceQueriable(ctx, storeInstance, database, request.DataSourceId)
+	dataSource, err := checkAndGetDataSourceQueriable(ctx, stores, database, request.DataSourceId)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -836,11 +838,13 @@ func DoExport(
 		}
 		defer conn.Close()
 	}
+	maximumSQLResultSize := stores.GetMaximumSQLResultLimit(ctx)
 	queryContext := db.QueryContext{
-		Limit:         int(request.Limit),
-		OperatorEmail: user.Email,
+		Limit:                int(request.Limit),
+		OperatorEmail:        user.Email,
+		MaximumSQLResultSize: maximumSQLResultSize,
 	}
-	results, spans, duration, queryErr := queryRetry(ctx, storeInstance, user, instance, database, driver, conn, request.Statement, queryContext, true, licenseService, optionalAccessCheck, schemaSyncer, storepb.MaskingExceptionPolicy_MaskingException_EXPORT)
+	results, spans, duration, queryErr := queryRetry(ctx, stores, user, instance, database, driver, conn, request.Statement, queryContext, true, licenseService, optionalAccessCheck, schemaSyncer, storepb.MaskingExceptionPolicy_MaskingException_EXPORT)
 	if queryErr != nil {
 		return nil, duration, err
 	}
@@ -853,7 +857,7 @@ func DoExport(
 	}
 
 	if licenseService.IsFeatureEnabledForInstance(api.FeatureSensitiveData, instance) == nil {
-		masker := NewQueryResultMasker(storeInstance)
+		masker := NewQueryResultMasker(stores)
 		if err := masker.MaskResults(ctx, spans, results, instance, user, storepb.MaskingExceptionPolicy_MaskingException_EXPORT); err != nil {
 			return nil, duration, err
 		}
@@ -873,7 +877,7 @@ func DoExport(
 			return nil, duration, err
 		}
 	case v1pb.ExportFormat_SQL:
-		resourceList, err := extractResourceList(ctx, storeInstance, instance.Metadata.GetEngine(), database.DatabaseName, request.Statement, instance)
+		resourceList, err := extractResourceList(ctx, stores, instance.Metadata.GetEngine(), database.DatabaseName, request.Statement, instance)
 		if err != nil {
 			return nil, 0, status.Errorf(codes.InvalidArgument, "failed to extract resource list: %v", err)
 		}
@@ -1542,7 +1546,7 @@ func (s *SQLService) SQLReviewCheck(
 		Collation:                dbMetadata.Collation,
 		ChangeType:               changeType,
 		DBSchema:                 dbMetadata,
-		DbType:                   instance.Metadata.GetEngine(),
+		DBType:                   instance.Metadata.GetEngine(),
 		Catalog:                  catalog,
 		Driver:                   connection,
 		CurrentDatabase:          database.DatabaseName,
@@ -1771,21 +1775,6 @@ func (*SQLService) Pretty(_ context.Context, request *v1pb.PrettyRequest) (*v1pb
 		CurrentSchema:  prettyCurrentSchema,
 		ExpectedSchema: prettyExpectedSchema,
 	}, nil
-}
-
-func getOffsetAndOriginTable(backupTable string) (int, string, error) {
-	if backupTable == "" {
-		return 0, "", nil
-	}
-	parts := strings.Split(backupTable, "_")
-	if len(parts) < 4 {
-		return 0, "", status.Errorf(codes.InvalidArgument, "invalid backup table format: %s", backupTable)
-	}
-	offset, err := strconv.Atoi(parts[2])
-	if err != nil {
-		return 0, "", status.Errorf(codes.InvalidArgument, "invalid offset: %s", parts[0])
-	}
-	return offset, strings.Join(parts[3:], "_"), nil
 }
 
 func checkAndGetDataSourceQueriable(ctx context.Context, storeInstance *store.Store, database *store.DatabaseMessage, dataSourceID string) (*storepb.DataSource, error) {

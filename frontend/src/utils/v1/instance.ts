@@ -3,7 +3,12 @@ import { computed, unref } from "vue";
 import { t, locale } from "@/plugins/i18n";
 import { useEnvironmentV1Store, useSubscriptionV1Store } from "@/store";
 import type { ComposedInstance, MaybeRef } from "@/types";
-import { isValidProjectName, languageOfEngineV1 } from "@/types";
+import {
+  emptyInstance,
+  isValidInstanceName,
+  languageOfEngineV1,
+  unknownInstance,
+} from "@/types";
 import { Engine, State } from "@/types/proto/v1/common";
 import type { Environment } from "@/types/proto/v1/environment_service";
 import type {
@@ -19,11 +24,17 @@ import { PlanType } from "@/types/proto/v1/subscription_service";
 export function instanceV1Name(instance: Instance | InstanceResource) {
   const store = useSubscriptionV1Store();
   let name = instance.title;
-  // instance cannot be deleted and activated at the same time.
+  // For unknown or empty instance, we will use the name as the title.
+  if (
+    instance.title === unknownInstance().title ||
+    instance.title === emptyInstance().title
+  ) {
+    name = extractInstanceResourceName(instance.name);
+  }
   if ((instance as Instance).state === State.DELETED) {
     name += ` (${t("common.archived")})`;
   } else if (
-    isValidProjectName(instance.name) &&
+    isValidInstanceName(instance.name) &&
     !instance.activation &&
     store.currentPlan !== PlanType.FREE
   ) {
@@ -149,15 +160,20 @@ export const instanceV1HasCreateDatabase = (
   instanceOrEngine: Instance | InstanceResource | Engine
 ): boolean => {
   const engine = engineOfInstanceV1(instanceOrEngine);
-  if (engine === Engine.REDIS) return false;
-  if (engine === Engine.ORACLE) return false;
-  if (engine === Engine.DM) return false;
-  if (engine === Engine.ELASTICSEARCH) return false;
-  if (engine === Engine.SPANNER) return false;
-  if (engine === Engine.BIGQUERY) return false;
-  if (engine === Engine.DYNAMODB) return false;
-  if (engine == Engine.DATABRICKS) return false;
-  return true;
+
+  const excludedList: Engine[] = [
+    Engine.REDIS,
+    Engine.ORACLE,
+    Engine.DM,
+    Engine.ELASTICSEARCH,
+    Engine.SPANNER,
+    Engine.BIGQUERY,
+    Engine.DYNAMODB,
+    Engine.DATABRICKS,
+    Engine.COSMOSDB,
+  ];
+
+  return !excludedList.includes(engine);
 };
 
 export const instanceV1HasStructuredQueryResult = (
@@ -218,6 +234,7 @@ export const instanceV1HasCollationAndCharacterSet = (
     Engine.RISINGWAVE,
     Engine.STARROCKS,
     Engine.DORIS,
+    Engine.COSMOSDB,
   ];
   return !excludedList.includes(engine);
 };
@@ -234,6 +251,27 @@ export const instanceV1AllowsCrossDatabaseQuery = (
     Engine.OCEANBASE,
     Engine.STARROCKS,
     Engine.DORIS,
+  ].includes(engine);
+};
+
+export const instanceV1AllowsExplain = (
+  instanceOrEngine: Instance | InstanceResource | Engine
+) => {
+  const engine = engineOfInstanceV1(instanceOrEngine);
+  return [
+    Engine.MYSQL,
+    Engine.TIDB,
+    Engine.CLICKHOUSE,
+    Engine.COCKROACHDB,
+    Engine.DM,
+    Engine.HIVE,
+    Engine.OCEANBASE_ORACLE,
+    Engine.ORACLE,
+    Engine.POSTGRES,
+    Engine.REDSHIFT,
+    Engine.RISINGWAVE,
+    Engine.SNOWFLAKE,
+    Engine.STARROCKS,
   ].includes(engine);
 };
 
@@ -277,6 +315,27 @@ export const instanceV1SupportsTrigger = (
 ) => {
   const engine = engineOfInstanceV1(instanceOrEngine);
   return [Engine.MYSQL].includes(engine);
+};
+
+export const instanceV1SupportsColumn = (
+  instanceOrEngine: Instance | InstanceResource | Engine
+) => {
+  const engine = engineOfInstanceV1(instanceOrEngine);
+  return ![Engine.MONGODB, Engine.COSMOSDB].includes(engine);
+};
+
+export const instanceV1SupportsIndex = (
+  instanceOrEngine: Instance | InstanceResource | Engine
+) => {
+  const engine = engineOfInstanceV1(instanceOrEngine);
+  return ![Engine.SNOWFLAKE].includes(engine);
+};
+
+export const instanceV1MaskingForNoSQL = (
+  instanceOrEngine: Instance | InstanceResource | Engine
+) => {
+  const engine = engineOfInstanceV1(instanceOrEngine);
+  return [Engine.MONGODB, Engine.COSMOSDB].includes(engine);
 };
 
 export const engineOfInstanceV1 = (
@@ -367,26 +426,20 @@ export const hasTableEngineProperty = (
   instanceOrEngine: Instance | InstanceResource | Engine
 ) => {
   const engine = engineOfInstanceV1(instanceOrEngine);
-  return ![Engine.POSTGRES, Engine.COCKROACHDB, Engine.SNOWFLAKE].includes(
-    engine
-  );
+  return ![
+    Engine.POSTGRES,
+    Engine.COCKROACHDB,
+    Engine.SNOWFLAKE,
+    Engine.MONGODB,
+    Engine.COSMOSDB,
+  ].includes(engine);
 };
+
 export const hasIndexSizeProperty = (
   instanceOrEngine: Instance | InstanceResource | Engine
 ) => {
   const engine = engineOfInstanceV1(instanceOrEngine);
   return ![Engine.CLICKHOUSE, Engine.SNOWFLAKE].includes(engine);
-};
-export const hasCollationProperty = (
-  instanceOrEngine: Instance | InstanceResource | Engine
-) => {
-  const engine = engineOfInstanceV1(instanceOrEngine);
-  return ![
-    Engine.POSTGRES,
-    Engine.COCKROACHDB,
-    Engine.CLICKHOUSE,
-    Engine.SNOWFLAKE,
-  ].includes(engine);
 };
 
 export const useInstanceV1EditorLanguage = (
@@ -420,6 +473,6 @@ export const supportGetStringSchema = (engine: Engine) => {
     Engine.TIDB,
     Engine.CLICKHOUSE,
     Engine.REDSHIFT,
-    Engine.ORACLE
+    Engine.ORACLE,
   ].includes(engine);
 };

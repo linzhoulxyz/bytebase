@@ -123,7 +123,32 @@ func getSubConditionFromExpr(expr celast.Expr, getFilter func(expr celast.Expr) 
 	return strings.Join(args, fmt.Sprintf(" %s ", join)), nil
 }
 
-// TODO(ed): test it.
+func parseToEngineSQL(expr celast.Expr, relation string) (string, error) {
+	variable, value := getVariableAndValueFromExpr(expr)
+	if variable != "engine" {
+		return "", status.Errorf(codes.InvalidArgument, `only "engine" support "engine in [xx]"/"!(engine in [xx])" operator`)
+	}
+
+	rawEngineList, ok := value.([]any)
+	if !ok {
+		return "", status.Errorf(codes.InvalidArgument, "invalid engine value %q", value)
+	}
+	if len(rawEngineList) == 0 {
+		return "", status.Errorf(codes.InvalidArgument, "empty engine filter")
+	}
+	engineList := []string{}
+	for _, rawEngine := range rawEngineList {
+		v1Engine, ok := v1pb.Engine_value[rawEngine.(string)]
+		if !ok {
+			return "", status.Errorf(codes.InvalidArgument, "invalid engine filter %q", rawEngine)
+		}
+		engine := convertEngine(v1pb.Engine(v1Engine))
+		engineList = append(engineList, fmt.Sprintf(`'%s'`, engine.String()))
+	}
+
+	return fmt.Sprintf("instance.metadata->>'engine' %s (%s)", relation, strings.Join(engineList, ",")), nil
+}
+
 func getListDatabaseFilter(filter string) (*store.ListResourceFilter, error) {
 	if filter == "" {
 		return nil, nil
@@ -197,33 +222,6 @@ func getListDatabaseFilter(filter string) (*store.ListResourceFilter, error) {
 		default:
 			return "", status.Errorf(codes.InvalidArgument, "unsupport variable %q", variable)
 		}
-	}
-
-	parseToEngineSQL := func(expr celast.Expr, relation string) (string, error) {
-		variable, value := getVariableAndValueFromExpr(expr)
-		if variable != "engine" {
-			return "", status.Errorf(codes.InvalidArgument, `only "engine" support "engine in [xx]"/"!(engine in [xx])" operator`)
-		}
-
-		rawEngineList, ok := value.([]any)
-		if !ok {
-			return "", status.Errorf(codes.InvalidArgument, "invalid engine value %q", value)
-		}
-		if len(rawEngineList) == 0 {
-			return "", status.Errorf(codes.InvalidArgument, "empty engine filter")
-		}
-		engineList := []string{}
-		for _, rawEngine := range rawEngineList {
-			v1Engine, ok := v1pb.Engine_value[rawEngine.(string)]
-			if !ok {
-				return "", status.Errorf(codes.InvalidArgument, "invalid engine filter %q", rawEngine)
-			}
-			engine := convertEngine(v1pb.Engine(v1Engine))
-			positionalArgs = append(positionalArgs, engine)
-			engineList = append(engineList, fmt.Sprintf("$%d", len(positionalArgs)))
-		}
-
-		return fmt.Sprintf("instance.metadata->>'engine' %s (%s)", relation, strings.Join(engineList, ",")), nil
 	}
 
 	getFilter = func(expr celast.Expr) (string, error) {
@@ -627,6 +625,65 @@ func (s *DatabaseService) BatchUpdateDatabases(ctx context.Context, request *v1p
 	return response, nil
 }
 
+func getDatabaseMetadataFilter(filter string) (*metadataFilter, error) {
+	if filter == "" {
+		return nil, nil
+	}
+
+	e, err := cel.NewEnv()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to create cel env")
+	}
+	ast, iss := e.Parse(filter)
+	if iss != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "failed to parse filter %v, error: %v", filter, iss.String())
+	}
+
+	var getFilter func(expr celast.Expr) error
+	metaFilter := &metadataFilter{}
+
+	getFilter = func(expr celast.Expr) error {
+		switch expr.Kind() {
+		case celast.CallKind:
+			functionName := expr.AsCall().FunctionName()
+			switch functionName {
+			case celoperators.LogicalAnd:
+				for _, arg := range expr.AsCall().Args() {
+					if err := getFilter(arg); err != nil {
+						return err
+					}
+				}
+				return nil
+			case celoperators.Equals:
+				variable, value := getVariableAndValueFromExpr(expr)
+				stringVal, ok := value.(string)
+				if !ok {
+					return status.Errorf(codes.InvalidArgument, "unexpected string but found %q", value)
+				}
+				switch variable {
+				case "schema":
+					metaFilter.schema = &stringVal
+				case "table":
+					metaFilter.table = &stringVal
+				default:
+					return status.Errorf(codes.InvalidArgument, "unexpected variable %v", variable)
+				}
+				return nil
+			default:
+				return status.Errorf(codes.InvalidArgument, "unexpected function %v", functionName)
+			}
+		default:
+			return status.Errorf(codes.InvalidArgument, "unexpected expr kind %v", expr.Kind())
+		}
+	}
+
+	if err := getFilter(ast.NativeRep().Expr()); err != nil {
+		return nil, err
+	}
+
+	return metaFilter, nil
+}
+
 // GetDatabaseMetadata gets the metadata of a database.
 func (s *DatabaseService) GetDatabaseMetadata(ctx context.Context, request *v1pb.GetDatabaseMetadataRequest) (*v1pb.DatabaseMetadata, error) {
 	instanceID, databaseName, err := common.TrimSuffixAndGetInstanceDatabaseID(request.Name, common.MetadataSuffix)
@@ -669,13 +726,9 @@ func (s *DatabaseService) GetDatabaseMetadata(ctx context.Context, request *v1pb
 		dbSchema = newDBSchema
 	}
 
-	var filter *metadataFilter
-	if request.Filter != "" {
-		schema, table, err := common.GetSchemaTableName(request.Filter)
-		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid filter %q", filter)
-		}
-		filter = &metadataFilter{schema: schema, table: table}
+	filter, err := getDatabaseMetadataFilter(request.Filter)
+	if err != nil {
+		return nil, err
 	}
 	v1pbMetadata, err := convertStoreDatabaseMetadata(dbSchema.GetMetadata(), filter)
 	if err != nil {
@@ -759,10 +812,7 @@ func (s *DatabaseService) DiffSchema(ctx context.Context, request *v1pb.DiffSche
 		return nil, status.Errorf(codes.Internal, "failed to get parser engine, error: %v", err)
 	}
 
-	strictMode := true
-	if engine == storepb.Engine_ORACLE {
-		strictMode = false
-	}
+	strictMode := engine != storepb.Engine_ORACLE
 	diff, err := base.SchemaDiff(engine, base.DiffContext{
 		IgnoreCaseSensitive: false,
 		StrictMode:          strictMode,
@@ -1132,8 +1182,8 @@ func (s *DatabaseService) convertToDatabase(ctx context.Context, database *store
 }
 
 type metadataFilter struct {
-	schema string
-	table  string
+	schema *string
+	table  *string
 }
 
 func convertToV1Secrets(secrets []*storepb.Secret, instanceID, databaseName string) []*v1pb.Secret {

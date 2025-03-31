@@ -24,17 +24,6 @@ func SplitSQL(statement string) ([]base.SingleSQL, error) {
 	return list, nil
 }
 
-// SplitSQLKeepEmptyBlocks splits the given SQL statement into multiple SQL statements.
-// TODO: remove SplitSQL, and rename this to SplitSQL.
-func SplitSQLKeepEmptyBlocks(statement string) ([]base.SingleSQL, error) {
-	t := tokenizer.NewTokenizer(statement, tokenizer.KeepEmptyBlocks())
-	list, err := t.SplitTiDBMultiSQL()
-	if err != nil {
-		return nil, err
-	}
-	return list, nil
-}
-
 func hasDelimiterStatement(stream *antlr.CommonTokenStream) bool {
 	tokens := stream.GetAllTokens()
 	for _, token := range tokens {
@@ -84,10 +73,7 @@ func splitDelimiterModeSQL(stream *antlr.CommonTokenStream) ([]base.SingleSQL, e
 	start := 0
 
 	i := 0
-	for {
-		if i >= len(tokens) {
-			break
-		}
+	for i < len(tokens) {
 		token := tokens[i]
 		// Deal with delimiter statement.
 		if token.GetChannel() == antlr.TokenDefaultChannel && token.GetTokenType() == parser.MySQLLexerDELIMITER_SYMBOL {

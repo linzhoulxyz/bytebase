@@ -247,6 +247,7 @@
     - [RolePermissions](#bytebase-store-RolePermissions)
   
 - [store/setting.proto](#store_setting-proto)
+    - [AISetting](#bytebase-store-AISetting)
     - [AgentPluginSetting](#bytebase-store-AgentPluginSetting)
     - [Algorithm](#bytebase-store-Algorithm)
     - [Algorithm.FullMask](#bytebase-store-Algorithm-FullMask)
@@ -280,6 +281,7 @@
     - [WorkspaceApprovalSetting.Rule](#bytebase-store-WorkspaceApprovalSetting-Rule)
     - [WorkspaceProfileSetting](#bytebase-store-WorkspaceProfileSetting)
   
+    - [AISetting.Provider](#bytebase-store-AISetting-Provider)
     - [Algorithm.InnerOuterMask.MaskType](#bytebase-store-Algorithm-InnerOuterMask-MaskType)
     - [Announcement.AlertLevel](#bytebase-store-Announcement-AlertLevel)
     - [DatabaseChangeMode](#bytebase-store-DatabaseChangeMode)
@@ -355,13 +357,14 @@ Used internally for obfuscating the page token.
 <a name="bytebase-store-Position"></a>
 
 ### Position
-
+Position in a text expressed as zero-based line and zero-based column byte
+offset.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| line | [int32](#int32) |  |  |
-| column | [int32](#int32) |  |  |
+| line | [int32](#int32) |  | Line position in a text (zero-based). |
+| column | [int32](#int32) |  | Column position in a text (zero-based), equivalent to byte offset. |
 
 
 
@@ -420,6 +423,7 @@ Used internally for obfuscating the page token.
 | DATABRICKS | 24 |  |
 | COCKROACHDB | 25 |  |
 | COSMOSDB | 26 |  |
+| TRINO | 27 |  |
 
 
 
@@ -493,7 +497,7 @@ Used internally for obfuscating the page token.
 | code | [int32](#int32) |  | The advice code. |
 | title | [string](#string) |  | The advice title. |
 | content | [string](#string) |  | The advice content. |
-| start_position | [Position](#bytebase-store-Position) |  | 1-based positions of the sql statment. |
+| start_position | [Position](#bytebase-store-Position) |  | The start_position is inclusive and the end_position is exclusive. TODO: use range instead. |
 | end_position | [Position](#bytebase-store-Position) |  |  |
 
 
@@ -1149,6 +1153,7 @@ ColumnMetadata is the metadata for columns.
 | default | [google.protobuf.StringValue](#google-protobuf-StringValue) |  | The default is the default of a column. Use google.protobuf.StringValue to distinguish between an empty string default value or no default. |
 | default_null | [bool](#bool) |  |  |
 | default_expression | [string](#string) |  |  |
+| default_on_null | [bool](#bool) |  | Oracle specific metadata. The default_on_null is the default on null of a column. |
 | on_update | [string](#string) |  | The on_update is the on update action of a column. For MySQL like databases, it&#39;s only supported for TIMESTAMP columns with CURRENT_TIMESTAMP as on update value. |
 | nullable | [bool](#bool) |  | The nullable is the nullable of a column. |
 | type | [string](#string) |  | The type is the type of a column. |
@@ -1157,7 +1162,10 @@ ColumnMetadata is the metadata for columns.
 | comment | [string](#string) |  | The comment is the comment of a column. classification and user_comment is parsed from the comment. |
 | user_comment | [string](#string) |  | The user_comment is the user comment of a table parsed from the comment. |
 | generation | [GenerationMetadata](#bytebase-store-GenerationMetadata) |  | The generation is for generated columns. |
+| is_identity | [bool](#bool) |  |  |
 | identity_generation | [ColumnMetadata.IdentityGeneration](#bytebase-store-ColumnMetadata-IdentityGeneration) |  | The identity_generation is for identity columns, PG only. |
+| identity_seed | [int64](#int64) |  | The identity_seed is for identity columns, MSSQL only. |
+| identity_increment | [int64](#int64) |  | The identity_increment is for identity columns, MSSQL only. |
 
 
 
@@ -1970,11 +1978,6 @@ LIST, HASH (https://www.postgresql.org/docs/current/ddl-partitioning.html)
 
 ### DatabaseGroupPayload
 
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| multitenancy | [bool](#bool) |  |  |
 
 
 
@@ -3888,6 +3891,26 @@ RestrictIssueCreationForSQLReviewPolicy is the policy configuration for restrict
 
 
 
+<a name="bytebase-store-AISetting"></a>
+
+### AISetting
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| enabled | [bool](#bool) |  |  |
+| provider | [AISetting.Provider](#bytebase-store-AISetting-Provider) |  |  |
+| endpoint | [string](#string) |  |  |
+| api_key | [string](#string) |  |  |
+| model | [string](#string) |  |  |
+| version | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="bytebase-store-AgentPluginSetting"></a>
 
 ### AgentPluginSetting
@@ -4448,6 +4471,21 @@ RestrictIssueCreationForSQLReviewPolicy is the policy configuration for restrict
  
 
 
+<a name="bytebase-store-AISetting-Provider"></a>
+
+### AISetting.Provider
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| PROVIDER_UNSPECIFIED | 0 |  |
+| OPEN_AI | 1 |  |
+| CLAUDE | 2 |  |
+| GEMINI | 3 |  |
+| AZURE_OPENAI | 4 |  |
+
+
+
 <a name="bytebase-store-Algorithm-InnerOuterMask-MaskType"></a>
 
 ### Algorithm.InnerOuterMask.MaskType
@@ -4763,6 +4801,7 @@ We support three types of SMTP encryption: NONE, STARTTLS, and SSL/TLS.
 
 ### TaskRunResult.Position
 The following fields are used for error reporting.
+TODO(zp): Use common Position instead.
 
 
 | Field | Type | Label | Description |

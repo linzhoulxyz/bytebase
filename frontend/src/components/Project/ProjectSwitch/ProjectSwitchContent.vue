@@ -17,7 +17,7 @@
         <div class="flex flex-row justify-end items-center gap-x-2">
           <SearchBox
             v-model:value="state.searchText"
-            :placeholder="$t('common.filter-by-name')"
+            :placeholder="$t('common.search-by-name')"
             :autofocus="false"
             class="!w-40"
             size="small"
@@ -72,13 +72,14 @@ import { SearchBox, ProjectV1Table } from "@/components/v2";
 import { PROJECT_V1_ROUTE_DETAIL } from "@/router/dashboard/projectV1";
 import { WORKSPACE_ROUTE_LANDING } from "@/router/dashboard/workspaceRoutes";
 import { useRecentVisit } from "@/router/useRecentVisit";
-import { useProjectV1List, useProjectV1Store } from "@/store";
+import { useProjectV1Store } from "@/store";
 import { getProjectName } from "@/store/modules/v1/common";
 import type { ComposedProject } from "@/types";
 import { isValidProjectName, DEFAULT_PROJECT_NAME } from "@/types";
 import {
   filterProjectV1ListByKeyword,
   hasWorkspacePermissionV2,
+  getDefaultPagination,
 } from "@/utils";
 
 type LocalTabType = "recent" | "all";
@@ -100,24 +101,13 @@ const state = reactive<LocalState>({
   showPopover: false,
   searchText: "",
   selectedTab: "all",
-  loading: false,
+  loading: true,
   allProjects: [],
 });
 const projectStore = useProjectV1Store();
-const { projectList, ready } = useProjectV1List();
 const { recentViewProjects } = useRecentProjects();
 const router = useRouter();
 const { record } = useRecentVisit();
-
-watch(
-  () => ready.value,
-  () => {
-    if (ready.value) {
-      state.allProjects = [...projectList.value];
-    }
-  },
-  { immediate: true }
-);
 
 const params = computed(() => {
   const route = router.currentRoute.value;
@@ -156,21 +146,20 @@ const allowToCreateProject = computed(() =>
 watch(
   () => state.searchText,
   useDebounceFn(async () => {
-    if (!state.searchText) {
-      state.allProjects = [...projectList.value];
-      return;
-    }
     state.loading = true;
     try {
       const { projects } = await projectStore.fetchProjectList({
-        query: state.searchText,
-        showDeleted: false,
+        filter: {
+          query: state.searchText,
+        },
+        pageSize: getDefaultPagination(),
       });
       state.allProjects = [...projects];
     } finally {
       state.loading = false;
     }
-  }, 500)
+  }, 500),
+  { immediate: true }
 );
 
 const tabList = computed(
@@ -211,12 +200,16 @@ const onProjectSelect = (project: ComposedProject) => {
   record(route.fullPath);
 };
 
-const gotoWorkspace = () => {
+const gotoWorkspace = (e: MouseEvent) => {
   const route = router.resolve({
     name: WORKSPACE_ROUTE_LANDING,
   });
   record(route.fullPath);
-  router.push(route.fullPath);
+  if (e.ctrlKey || e.metaKey) {
+    window.open(route.fullPath, "_blank");
+  } else {
+    router.push(route.fullPath);
+  }
 };
 
 // Close popover when current project changed.

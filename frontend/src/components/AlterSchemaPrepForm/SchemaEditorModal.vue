@@ -135,7 +135,7 @@ import { ActionConfirmModal } from "@/components/SchemaEditorLite";
 import SQLUploadButton from "@/components/misc/SQLUploadButton.vue";
 import {
   PROJECT_V1_ROUTE_ISSUE_DETAIL,
-  PROJECT_V1_ROUTE_PLAN_DETAIL,
+  PROJECT_V1_ROUTE_REVIEW_CENTER_DETAIL,
 } from "@/router/dashboard/projectV1";
 import {
   pushNotification,
@@ -152,7 +152,6 @@ import { dialectOfEngineV1, isValidProjectName, unknownProject } from "@/types";
 import { Engine } from "@/types/proto/v1/common";
 import type { DatabaseCatalog } from "@/types/proto/v1/database_catalog_service";
 import type { DatabaseMetadata } from "@/types/proto/v1/database_service";
-import { DatabaseMetadataView } from "@/types/proto/v1/database_service";
 import { DatabaseChangeMode } from "@/types/proto/v1/setting_service";
 import {
   TinyTimer,
@@ -284,7 +283,6 @@ const prepareDatabaseMetadata = async () => {
     const database = databaseList.value[i];
     const metadata = await dbSchemaStore.getOrFetchDatabaseMetadata({
       database: database.name,
-      view: DatabaseMetadataView.DATABASE_METADATA_VIEW_FULL,
       skipCache: true,
     });
     const catalog = await dbCatalogStore.getOrFetchDatabaseCatalog({
@@ -503,7 +501,7 @@ const handlePreviewIssue = async () => {
 
   const routeInfo = {
     name: state.planOnly
-      ? PROJECT_V1_ROUTE_PLAN_DETAIL
+      ? PROJECT_V1_ROUTE_REVIEW_CENTER_DETAIL
       : PROJECT_V1_ROUTE_ISSUE_DETAIL,
     params: {
       projectId: extractProjectResourceName(project.value.name),

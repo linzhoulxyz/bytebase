@@ -15,68 +15,6 @@ import { InstanceResource } from "./instance_service";
 
 export const protobufPackage = "bytebase.v1";
 
-export enum DatabaseMetadataView {
-  /**
-   * DATABASE_METADATA_VIEW_UNSPECIFIED - The default and unset value.
-   * The API will default to the BASIC view.
-   */
-  DATABASE_METADATA_VIEW_UNSPECIFIED = "DATABASE_METADATA_VIEW_UNSPECIFIED",
-  /**
-   * DATABASE_METADATA_VIEW_BASIC - Include basic information of schema object names such as schema, table,
-   * view, function names.
-   */
-  DATABASE_METADATA_VIEW_BASIC = "DATABASE_METADATA_VIEW_BASIC",
-  /** DATABASE_METADATA_VIEW_FULL - Include everything such as columns and column masking level. */
-  DATABASE_METADATA_VIEW_FULL = "DATABASE_METADATA_VIEW_FULL",
-  UNRECOGNIZED = "UNRECOGNIZED",
-}
-
-export function databaseMetadataViewFromJSON(object: any): DatabaseMetadataView {
-  switch (object) {
-    case 0:
-    case "DATABASE_METADATA_VIEW_UNSPECIFIED":
-      return DatabaseMetadataView.DATABASE_METADATA_VIEW_UNSPECIFIED;
-    case 1:
-    case "DATABASE_METADATA_VIEW_BASIC":
-      return DatabaseMetadataView.DATABASE_METADATA_VIEW_BASIC;
-    case 2:
-    case "DATABASE_METADATA_VIEW_FULL":
-      return DatabaseMetadataView.DATABASE_METADATA_VIEW_FULL;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return DatabaseMetadataView.UNRECOGNIZED;
-  }
-}
-
-export function databaseMetadataViewToJSON(object: DatabaseMetadataView): string {
-  switch (object) {
-    case DatabaseMetadataView.DATABASE_METADATA_VIEW_UNSPECIFIED:
-      return "DATABASE_METADATA_VIEW_UNSPECIFIED";
-    case DatabaseMetadataView.DATABASE_METADATA_VIEW_BASIC:
-      return "DATABASE_METADATA_VIEW_BASIC";
-    case DatabaseMetadataView.DATABASE_METADATA_VIEW_FULL:
-      return "DATABASE_METADATA_VIEW_FULL";
-    case DatabaseMetadataView.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-export function databaseMetadataViewToNumber(object: DatabaseMetadataView): number {
-  switch (object) {
-    case DatabaseMetadataView.DATABASE_METADATA_VIEW_UNSPECIFIED:
-      return 0;
-    case DatabaseMetadataView.DATABASE_METADATA_VIEW_BASIC:
-      return 1;
-    case DatabaseMetadataView.DATABASE_METADATA_VIEW_FULL:
-      return 2;
-    case DatabaseMetadataView.UNRECOGNIZED:
-    default:
-      return -1;
-  }
-}
-
 export enum ChangelogView {
   /**
    * CHANGELOG_VIEW_UNSPECIFIED - The default / unset value.
@@ -187,6 +125,8 @@ export interface ListDatabasesRequest {
    * label == "tenant:asia,europe"
    * label == "region:asia" && label == "tenant:bytebase"
    * exclude_unassigned == true
+   * You can combine filter conditions like:
+   * environment == "environments/prod" && name.matches("employee")
    */
   filter: string;
   /** Show deleted database if specified. */
@@ -254,9 +194,16 @@ export interface GetDatabaseMetadataRequest {
    * Format: instances/{instance}/databases/{database}/metadata
    */
   name: string;
-  /** The view to return. Defaults to DATABASE_METADATA_VIEW_BASIC. */
-  view: DatabaseMetadataView;
   /**
+   * Filter is used to filter databases returned in the list.
+   * Supported filter:
+   * - schema
+   * - table
+   *
+   * For example:
+   * schema == "schema-a"
+   * table == "table-a"
+   * schema == "schema-a" && table == "table-a"
    * The filter used for a specific schema object such as
    * "schemas/schema-a/tables/table-a".
    * The column masking level will only be returned when a table filter is used.
@@ -707,6 +654,11 @@ export interface ColumnMetadata {
     | string
     | undefined;
   /**
+   * Oracle specific metadata.
+   * The default_on_null is the default on null of a column.
+   */
+  defaultOnNull: boolean;
+  /**
    * The on_update is the on update action of a column.
    * For MySQL like databases, it's only supported for TIMESTAMP columns with
    * CURRENT_TIMESTAMP as on update value.
@@ -728,11 +680,14 @@ export interface ColumnMetadata {
   /** The user_comment is the user comment of a column parsed from the comment. */
   userComment: string;
   /** The generation is the generation of a column. */
-  generation:
-    | GenerationMetadata
-    | undefined;
+  generation: GenerationMetadata | undefined;
+  isIdentity: boolean;
   /** The identity_generation is for identity columns, PG only. */
   identityGeneration: ColumnMetadata_IdentityGeneration;
+  /** The identity_seed is for identity columns, MSSQL only. */
+  identitySeed: Long;
+  /** The identity_increment is for identity columns, MSSQL only. */
+  identityIncrement: Long;
 }
 
 export enum ColumnMetadata_IdentityGeneration {
@@ -2421,7 +2376,7 @@ export const SyncDatabaseResponse: MessageFns<SyncDatabaseResponse> = {
 };
 
 function createBaseGetDatabaseMetadataRequest(): GetDatabaseMetadataRequest {
-  return { name: "", view: DatabaseMetadataView.DATABASE_METADATA_VIEW_UNSPECIFIED, filter: "" };
+  return { name: "", filter: "" };
 }
 
 export const GetDatabaseMetadataRequest: MessageFns<GetDatabaseMetadataRequest> = {
@@ -2429,11 +2384,8 @@ export const GetDatabaseMetadataRequest: MessageFns<GetDatabaseMetadataRequest> 
     if (message.name !== "") {
       writer.uint32(10).string(message.name);
     }
-    if (message.view !== DatabaseMetadataView.DATABASE_METADATA_VIEW_UNSPECIFIED) {
-      writer.uint32(16).int32(databaseMetadataViewToNumber(message.view));
-    }
     if (message.filter !== "") {
-      writer.uint32(26).string(message.filter);
+      writer.uint32(18).string(message.filter);
     }
     return writer;
   },
@@ -2454,15 +2406,7 @@ export const GetDatabaseMetadataRequest: MessageFns<GetDatabaseMetadataRequest> 
           continue;
         }
         case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.view = databaseMetadataViewFromJSON(reader.int32());
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
+          if (tag !== 18) {
             break;
           }
 
@@ -2481,9 +2425,6 @@ export const GetDatabaseMetadataRequest: MessageFns<GetDatabaseMetadataRequest> 
   fromJSON(object: any): GetDatabaseMetadataRequest {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
-      view: isSet(object.view)
-        ? databaseMetadataViewFromJSON(object.view)
-        : DatabaseMetadataView.DATABASE_METADATA_VIEW_UNSPECIFIED,
       filter: isSet(object.filter) ? globalThis.String(object.filter) : "",
     };
   },
@@ -2492,9 +2433,6 @@ export const GetDatabaseMetadataRequest: MessageFns<GetDatabaseMetadataRequest> 
     const obj: any = {};
     if (message.name !== "") {
       obj.name = message.name;
-    }
-    if (message.view !== DatabaseMetadataView.DATABASE_METADATA_VIEW_UNSPECIFIED) {
-      obj.view = databaseMetadataViewToJSON(message.view);
     }
     if (message.filter !== "") {
       obj.filter = message.filter;
@@ -2508,7 +2446,6 @@ export const GetDatabaseMetadataRequest: MessageFns<GetDatabaseMetadataRequest> 
   fromPartial(object: DeepPartial<GetDatabaseMetadataRequest>): GetDatabaseMetadataRequest {
     const message = createBaseGetDatabaseMetadataRequest();
     message.name = object.name ?? "";
-    message.view = object.view ?? DatabaseMetadataView.DATABASE_METADATA_VIEW_UNSPECIFIED;
     message.filter = object.filter ?? "";
     return message;
   },
@@ -5013,6 +4950,7 @@ function createBaseColumnMetadata(): ColumnMetadata {
     defaultNull: undefined,
     defaultString: undefined,
     defaultExpression: undefined,
+    defaultOnNull: false,
     onUpdate: "",
     nullable: false,
     type: "",
@@ -5021,7 +4959,10 @@ function createBaseColumnMetadata(): ColumnMetadata {
     comment: "",
     userComment: "",
     generation: undefined,
+    isIdentity: false,
     identityGeneration: ColumnMetadata_IdentityGeneration.IDENTITY_GENERATION_UNSPECIFIED,
+    identitySeed: Long.ZERO,
+    identityIncrement: Long.ZERO,
   };
 }
 
@@ -5044,6 +4985,9 @@ export const ColumnMetadata: MessageFns<ColumnMetadata> = {
     }
     if (message.defaultExpression !== undefined) {
       writer.uint32(50).string(message.defaultExpression);
+    }
+    if (message.defaultOnNull !== false) {
+      writer.uint32(144).bool(message.defaultOnNull);
     }
     if (message.onUpdate !== "") {
       writer.uint32(122).string(message.onUpdate);
@@ -5069,8 +5013,17 @@ export const ColumnMetadata: MessageFns<ColumnMetadata> = {
     if (message.generation !== undefined) {
       GenerationMetadata.encode(message.generation, writer.uint32(130).fork()).join();
     }
+    if (message.isIdentity !== false) {
+      writer.uint32(152).bool(message.isIdentity);
+    }
     if (message.identityGeneration !== ColumnMetadata_IdentityGeneration.IDENTITY_GENERATION_UNSPECIFIED) {
       writer.uint32(136).int32(columnMetadata_IdentityGenerationToNumber(message.identityGeneration));
+    }
+    if (!message.identitySeed.equals(Long.ZERO)) {
+      writer.uint32(160).int64(message.identitySeed.toString());
+    }
+    if (!message.identityIncrement.equals(Long.ZERO)) {
+      writer.uint32(168).int64(message.identityIncrement.toString());
     }
     return writer;
   },
@@ -5128,6 +5081,14 @@ export const ColumnMetadata: MessageFns<ColumnMetadata> = {
           }
 
           message.defaultExpression = reader.string();
+          continue;
+        }
+        case 18: {
+          if (tag !== 144) {
+            break;
+          }
+
+          message.defaultOnNull = reader.bool();
           continue;
         }
         case 15: {
@@ -5194,12 +5155,36 @@ export const ColumnMetadata: MessageFns<ColumnMetadata> = {
           message.generation = GenerationMetadata.decode(reader, reader.uint32());
           continue;
         }
+        case 19: {
+          if (tag !== 152) {
+            break;
+          }
+
+          message.isIdentity = reader.bool();
+          continue;
+        }
         case 17: {
           if (tag !== 136) {
             break;
           }
 
           message.identityGeneration = columnMetadata_IdentityGenerationFromJSON(reader.int32());
+          continue;
+        }
+        case 20: {
+          if (tag !== 160) {
+            break;
+          }
+
+          message.identitySeed = Long.fromString(reader.int64().toString());
+          continue;
+        }
+        case 21: {
+          if (tag !== 168) {
+            break;
+          }
+
+          message.identityIncrement = Long.fromString(reader.int64().toString());
           continue;
         }
       }
@@ -5219,6 +5204,7 @@ export const ColumnMetadata: MessageFns<ColumnMetadata> = {
       defaultNull: isSet(object.defaultNull) ? globalThis.Boolean(object.defaultNull) : undefined,
       defaultString: isSet(object.defaultString) ? globalThis.String(object.defaultString) : undefined,
       defaultExpression: isSet(object.defaultExpression) ? globalThis.String(object.defaultExpression) : undefined,
+      defaultOnNull: isSet(object.defaultOnNull) ? globalThis.Boolean(object.defaultOnNull) : false,
       onUpdate: isSet(object.onUpdate) ? globalThis.String(object.onUpdate) : "",
       nullable: isSet(object.nullable) ? globalThis.Boolean(object.nullable) : false,
       type: isSet(object.type) ? globalThis.String(object.type) : "",
@@ -5227,9 +5213,12 @@ export const ColumnMetadata: MessageFns<ColumnMetadata> = {
       comment: isSet(object.comment) ? globalThis.String(object.comment) : "",
       userComment: isSet(object.userComment) ? globalThis.String(object.userComment) : "",
       generation: isSet(object.generation) ? GenerationMetadata.fromJSON(object.generation) : undefined,
+      isIdentity: isSet(object.isIdentity) ? globalThis.Boolean(object.isIdentity) : false,
       identityGeneration: isSet(object.identityGeneration)
         ? columnMetadata_IdentityGenerationFromJSON(object.identityGeneration)
         : ColumnMetadata_IdentityGeneration.IDENTITY_GENERATION_UNSPECIFIED,
+      identitySeed: isSet(object.identitySeed) ? Long.fromValue(object.identitySeed) : Long.ZERO,
+      identityIncrement: isSet(object.identityIncrement) ? Long.fromValue(object.identityIncrement) : Long.ZERO,
     };
   },
 
@@ -5252,6 +5241,9 @@ export const ColumnMetadata: MessageFns<ColumnMetadata> = {
     }
     if (message.defaultExpression !== undefined) {
       obj.defaultExpression = message.defaultExpression;
+    }
+    if (message.defaultOnNull !== false) {
+      obj.defaultOnNull = message.defaultOnNull;
     }
     if (message.onUpdate !== "") {
       obj.onUpdate = message.onUpdate;
@@ -5277,8 +5269,17 @@ export const ColumnMetadata: MessageFns<ColumnMetadata> = {
     if (message.generation !== undefined) {
       obj.generation = GenerationMetadata.toJSON(message.generation);
     }
+    if (message.isIdentity !== false) {
+      obj.isIdentity = message.isIdentity;
+    }
     if (message.identityGeneration !== ColumnMetadata_IdentityGeneration.IDENTITY_GENERATION_UNSPECIFIED) {
       obj.identityGeneration = columnMetadata_IdentityGenerationToJSON(message.identityGeneration);
+    }
+    if (!message.identitySeed.equals(Long.ZERO)) {
+      obj.identitySeed = (message.identitySeed || Long.ZERO).toString();
+    }
+    if (!message.identityIncrement.equals(Long.ZERO)) {
+      obj.identityIncrement = (message.identityIncrement || Long.ZERO).toString();
     }
     return obj;
   },
@@ -5294,6 +5295,7 @@ export const ColumnMetadata: MessageFns<ColumnMetadata> = {
     message.defaultNull = object.defaultNull ?? undefined;
     message.defaultString = object.defaultString ?? undefined;
     message.defaultExpression = object.defaultExpression ?? undefined;
+    message.defaultOnNull = object.defaultOnNull ?? false;
     message.onUpdate = object.onUpdate ?? "";
     message.nullable = object.nullable ?? false;
     message.type = object.type ?? "";
@@ -5304,8 +5306,15 @@ export const ColumnMetadata: MessageFns<ColumnMetadata> = {
     message.generation = (object.generation !== undefined && object.generation !== null)
       ? GenerationMetadata.fromPartial(object.generation)
       : undefined;
+    message.isIdentity = object.isIdentity ?? false;
     message.identityGeneration = object.identityGeneration ??
       ColumnMetadata_IdentityGeneration.IDENTITY_GENERATION_UNSPECIFIED;
+    message.identitySeed = (object.identitySeed !== undefined && object.identitySeed !== null)
+      ? Long.fromValue(object.identitySeed)
+      : Long.ZERO;
+    message.identityIncrement = (object.identityIncrement !== undefined && object.identityIncrement !== null)
+      ? Long.fromValue(object.identityIncrement)
+      : Long.ZERO;
     return message;
   },
 };

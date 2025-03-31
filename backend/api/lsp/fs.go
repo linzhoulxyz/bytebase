@@ -5,8 +5,8 @@ import (
 	"strings"
 	"sync"
 
+	lsp "github.com/bytebase/lsp-protocol"
 	"github.com/pkg/errors"
-	"github.com/sourcegraph/go-lsp"
 )
 
 // MemFS is an in-memory file system.
@@ -122,11 +122,4 @@ func isFileSystemRequest(method string) bool {
 	default:
 		return false
 	}
-}
-
-// Reset resets the file system with lock.
-func (fs *MemFS) Reset() {
-	fs.mu.Lock()
-	defer fs.mu.Unlock()
-	fs.m = make(map[string][]byte)
 }

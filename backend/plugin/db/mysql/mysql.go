@@ -51,22 +51,17 @@ func init() {
 
 // Driver is the MySQL driver.
 type Driver struct {
-	connectionCtx db.ConnectionContext
-	connCfg       db.ConnectionConfig
-	dbType        storepb.Engine
-	dbBinDir      string
-	db            *sql.DB
-	databaseName  string
-	sshClient     *ssh.Client
+	dbType       storepb.Engine
+	db           *sql.DB
+	databaseName string
+	sshClient    *ssh.Client
 
 	// Called upon driver.Open() finishes.
 	openCleanUp []func()
 }
 
-func newDriver(dc db.DriverConfig) db.Driver {
-	return &Driver{
-		dbBinDir: dc.DbBinDir,
-	}
+func newDriver(_ db.DriverConfig) db.Driver {
+	return &Driver{}
 }
 
 // Open opens a MySQL driver.
@@ -101,8 +96,6 @@ func (d *Driver) Open(ctx context.Context, dbType storepb.Engine, connCfg db.Con
 	db.SetConnMaxLifetime(2 * time.Hour)
 	db.SetMaxOpenConns(50)
 	db.SetMaxIdleConns(15)
-	d.connectionCtx = connCfg.ConnectionContext
-	d.connCfg = connCfg
 	d.databaseName = connCfg.ConnectionContext.DatabaseName
 
 	return d, nil
@@ -115,6 +108,9 @@ func (d *Driver) getMySQLConnection(connCfg db.ConnectionConfig) (string, error)
 	}
 
 	params := []string{"multiStatements=true", "maxAllowedPacket=0"}
+	for key, value := range connCfg.DataSource.GetExtraConnectionParameters() {
+		params = append(params, fmt.Sprintf("%s=%s", key, value))
+	}
 	if connCfg.DataSource.GetSshHost() != "" {
 		sshClient, err := util.GetSSHClient(connCfg.DataSource)
 		if err != nil {
@@ -141,7 +137,6 @@ func (d *Driver) getMySQLConnection(connCfg db.ConnectionConfig) (string, error)
 		d.openCleanUp = append(d.openCleanUp, func() { mysql.DeregisterTLSConfig(tlsKey) })
 		params = append(params, fmt.Sprintf("tls=%s", tlsKey))
 	}
-
 	return fmt.Sprintf("%s:%s@%s(%s:%s)/%s?%s", connCfg.DataSource.Username, connCfg.Password, protocol, connCfg.DataSource.Host, connCfg.DataSource.Port, connCfg.ConnectionContext.DatabaseName, strings.Join(params, "&")), nil
 }
 
@@ -434,7 +429,7 @@ func (d *Driver) QueryConn(ctx context.Context, conn *sql.Conn, statement string
 					return nil, err
 				}
 				defer rows.Close()
-				r, err := util.RowsToQueryResult(rows, makeValueByTypeName, convertValue, d.connCfg.MaximumSQLResultSize)
+				r, err := util.RowsToQueryResult(rows, makeValueByTypeName, convertValue, queryContext.MaximumSQLResultSize)
 				if err != nil {
 					return nil, err
 				}

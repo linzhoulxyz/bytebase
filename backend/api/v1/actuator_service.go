@@ -126,7 +126,7 @@ func (s *ActuatorService) getServerInfo(ctx context.Context) (*v1pb.ActuatorInfo
 		ExternalUrl:            setting.ExternalUrl,
 		DisallowSignup:         setting.DisallowSignup,
 		Require_2Fa:            setting.Require_2Fa,
-		LastActiveTime:         timestamppb.New(time.Unix(s.profile.LastActiveTs, 0)),
+		LastActiveTime:         timestamppb.New(time.Unix(s.profile.LastActiveTS, 0)),
 		WorkspaceId:            workspaceID,
 		Debug:                  s.profile.RuntimeDebug.Load(),
 		Docker:                 s.profile.IsDocker,
@@ -134,6 +134,30 @@ func (s *ActuatorService) getServerInfo(ctx context.Context) (*v1pb.ActuatorInfo
 		DisallowPasswordSignin: setting.DisallowPasswordSignin,
 		PasswordRestriction:    passwordSetting,
 	}
+
+	stats, err := s.store.StatUsers(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to stat users, error: %v", err)
+	}
+	for _, stat := range stats {
+		serverInfo.UserStats = append(serverInfo.UserStats, &v1pb.ActuatorInfo_StatUser{
+			State:    convertDeletedToState(stat.Deleted),
+			UserType: convertToV1UserType(stat.Type),
+			Count:    int32(stat.Count),
+		})
+	}
+
+	activatedInstanceCount, err := s.store.GetActivatedInstanceCount(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to count activated instance, error: %v", err)
+	}
+	serverInfo.ActivatedInstanceCount = int32(activatedInstanceCount)
+
+	totalInstanceCount, err := s.store.CountInstance(ctx, &store.CountInstanceMessage{})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to count total instance, error: %v", err)
+	}
+	serverInfo.TotalInstanceCount = int32(totalInstanceCount)
 
 	return &serverInfo, nil
 }
@@ -167,11 +191,11 @@ func (s *ActuatorService) getUsedFeatures(ctx context.Context) ([]api.FeatureTyp
 		features = append(features, api.FeatureWatermark)
 	}
 
-	openAIKey, err := s.store.GetSettingV2(ctx, api.SettingPluginOpenAIKey)
+	aiSetting, err := s.store.GetAISetting(ctx)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get openai key setting")
+		return nil, errors.Wrapf(err, "failed to get ai setting")
 	}
-	if openAIKey != nil && openAIKey.Value != "" {
+	if aiSetting.ApiKey != "" {
 		features = append(features, api.FeatureAIAssistant)
 	}
 

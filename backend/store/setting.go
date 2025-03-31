@@ -181,6 +181,22 @@ func (s *Store) GetDataClassificationConfigByID(ctx context.Context, classificat
 	return &storepb.DataClassificationSetting_DataClassificationConfig{}, nil
 }
 
+func (s *Store) GetAISetting(ctx context.Context) (*storepb.AISetting, error) {
+	aiSetting := &storepb.AISetting{}
+	setting, err := s.GetSettingV2(ctx, api.SettingAI)
+	if err != nil {
+		return nil, err
+	}
+	if setting == nil {
+		return aiSetting, nil
+	}
+
+	if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(setting.Value), aiSetting); err != nil {
+		return nil, err
+	}
+	return aiSetting, nil
+}
+
 // DeleteCache deletes the cache.
 func (s *Store) DeleteCache() {
 	s.settingCache.Purge()
@@ -191,7 +207,7 @@ func (s *Store) DeleteCache() {
 
 // GetSettingV2 returns the setting by name.
 func (s *Store) GetSettingV2(ctx context.Context, name api.SettingName) (*SettingMessage, error) {
-	if v, ok := s.settingCache.Get(name); ok {
+	if v, ok := s.settingCache.Get(name); ok && s.enableCache {
 		return v, nil
 	}
 
@@ -293,7 +309,7 @@ func (s *Store) UpsertSettingV2(ctx context.Context, update *SetSettingMessage) 
 
 // CreateSettingIfNotExistV2 creates a new setting only if the named setting doesn't exist.
 func (s *Store) CreateSettingIfNotExistV2(ctx context.Context, create *SettingMessage) (*SettingMessage, bool, error) {
-	if v, ok := s.settingCache.Get(create.Name); ok {
+	if v, ok := s.settingCache.Get(create.Name); ok && s.enableCache {
 		return v, false, nil
 	}
 

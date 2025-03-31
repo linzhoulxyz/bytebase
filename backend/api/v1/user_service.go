@@ -48,7 +48,7 @@ type UserService struct {
 }
 
 // NewUserService creates a new UserService.
-func NewUserService(store *store.Store, secret string, licenseService enterprise.LicenseService, metricReporter *metricreport.Reporter, profile *config.Profile, stateCfg *state.State, iamManager *iam.Manager, postCreateUser func(ctx context.Context, user *store.UserMessage, firstEndUser bool) error) (*UserService, error) {
+func NewUserService(store *store.Store, secret string, licenseService enterprise.LicenseService, metricReporter *metricreport.Reporter, profile *config.Profile, stateCfg *state.State, iamManager *iam.Manager, postCreateUser func(ctx context.Context, user *store.UserMessage, firstEndUser bool) error) *UserService {
 	return &UserService{
 		store:          store,
 		secret:         secret,
@@ -58,7 +58,7 @@ func NewUserService(store *store.Store, secret string, licenseService enterprise
 		stateCfg:       stateCfg,
 		iamManager:     iamManager,
 		postCreateUser: postCreateUser,
-	}, nil
+	}
 }
 
 // GetUser gets a user.
@@ -88,24 +88,6 @@ func (s *UserService) GetUser(ctx context.Context, request *v1pb.GetUserRequest)
 	return convertToUser(user), nil
 }
 
-// StatUsers count users by type and state.
-func (s *UserService) StatUsers(ctx context.Context, _ *v1pb.StatUsersRequest) (*v1pb.StatUsersResponse, error) {
-	stats, err := s.store.StatUsers(ctx)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to stat users, error: %v", err)
-	}
-	response := &v1pb.StatUsersResponse{}
-
-	for _, stat := range stats {
-		response.Stats = append(response.Stats, &v1pb.StatUsersResponse_StatUser{
-			State:    convertDeletedToState(stat.Deleted),
-			UserType: convertToV1UserType(stat.Type),
-			Count:    int32(stat.Count),
-		})
-	}
-	return response, nil
-}
-
 // ListUsers lists all users.
 func (s *UserService) ListUsers(ctx context.Context, request *v1pb.ListUsersRequest) (*v1pb.ListUsersResponse, error) {
 	offset, err := parseLimitAndOffset(&pageSize{
@@ -123,11 +105,22 @@ func (s *UserService) ListUsers(ctx context.Context, request *v1pb.ListUsersRequ
 		Offset:      &offset.offset,
 		ShowDeleted: request.ShowDeleted,
 	}
-	filter, err := getListUserFilter(request.Filter)
-	if err != nil {
+	if err := parseListUserFilter(find, request.Filter); err != nil {
 		return nil, err
 	}
-	find.Filter = filter
+	if v := find.ProjectID; v != nil {
+		user, ok := ctx.Value(common.UserContextKey).(*store.UserMessage)
+		if !ok {
+			return nil, status.Errorf(codes.Internal, "user not found")
+		}
+		hasPermission, err := s.iamManager.CheckPermission(ctx, iam.PermissionProjectsGet, user, *v)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to check user permission")
+		}
+		if !hasPermission {
+			return nil, status.Errorf(codes.PermissionDenied, "user does not have permission %q", iam.PermissionProjectsGet)
+		}
+	}
 
 	users, err := s.store.ListUsers(ctx, find)
 	if err != nil {
@@ -151,17 +144,17 @@ func (s *UserService) ListUsers(ctx context.Context, request *v1pb.ListUsersRequ
 	return response, nil
 }
 
-func getListUserFilter(filter string) (*store.ListResourceFilter, error) {
+func parseListUserFilter(find *store.FindUserMessage, filter string) error {
 	if filter == "" {
-		return nil, nil
+		return nil
 	}
 	e, err := cel.NewEnv()
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create cel env")
+		return status.Errorf(codes.Internal, "failed to create cel env")
 	}
 	ast, iss := e.Parse(filter)
 	if iss != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "failed to parse filter %v, error: %v", filter, iss.String())
+		return status.Errorf(codes.InvalidArgument, "failed to parse filter %v, error: %v", filter, iss.String())
 	}
 
 	var getFilter func(expr celast.Expr) (string, error)
@@ -193,7 +186,13 @@ func getListUserFilter(filter string) (*store.ListResourceFilter, error) {
 			}
 			positionalArgs = append(positionalArgs, v1pb.State(v1State) == v1pb.State_DELETED)
 			return fmt.Sprintf("principal.deleted = $%d", len(positionalArgs)), nil
-		// TODO(ed): support role/project filter
+		case "project":
+			projectID, err := common.GetProjectID(value.(string))
+			if err != nil {
+				return "", status.Errorf(codes.InvalidArgument, "invalid project filter %q", value)
+			}
+			find.ProjectID = &projectID
+			return "TRUE", nil
 		default:
 			return "", status.Errorf(codes.InvalidArgument, "unsupport variable %q", variable)
 		}
@@ -274,13 +273,14 @@ func getListUserFilter(filter string) (*store.ListResourceFilter, error) {
 
 	where, err := getFilter(ast.NativeRep().Expr())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &store.ListResourceFilter{
+	find.Filter = &store.ListResourceFilter{
 		Args:  positionalArgs,
 		Where: "(" + where + ")",
-	}, nil
+	}
+	return nil
 }
 
 // CreateUser creates a user.
@@ -658,8 +658,11 @@ func (s *UserService) DeleteUser(ctx context.Context, request *v1pb.DeleteUserRe
 	if err != nil {
 		return nil, err
 	}
-	ok = hasExtraWorkspaceAdmin(policy.Policy, user.ID)
-	if !ok {
+	hasExtraWorkspaceAdmin, err := s.hasExtraWorkspaceAdmin(ctx, policy.Policy, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	if !hasExtraWorkspaceAdmin {
 		return nil, status.Errorf(codes.InvalidArgument, "workspace must have at least one admin")
 	}
 
@@ -669,21 +672,55 @@ func (s *UserService) DeleteUser(ctx context.Context, request *v1pb.DeleteUserRe
 	return &emptypb.Empty{}, nil
 }
 
-func hasExtraWorkspaceAdmin(policy *storepb.IamPolicy, userID int) bool {
+func (s *UserService) getActiveUserCount(ctx context.Context) (int, error) {
+	userStat, err := s.store.StatUsers(ctx)
+	if err != nil {
+		return 0, status.Errorf(codes.Internal, "failed to stat users with error: %v", err.Error())
+	}
+	activeEndUserCount := 0
+	for _, stat := range userStat {
+		if !stat.Deleted && stat.Type == api.EndUser {
+			activeEndUserCount = stat.Count
+			break
+		}
+	}
+	return activeEndUserCount, nil
+}
+
+func (s *UserService) hasExtraWorkspaceAdmin(ctx context.Context, policy *storepb.IamPolicy, userID int) (bool, error) {
 	workspaceAdminRole := common.FormatRole(api.WorkspaceAdmin.String())
 	userMember := common.FormatUserUID(userID)
 	systemBotMember := common.FormatUserUID(api.SystemBotID)
+
 	for _, binding := range policy.GetBindings() {
 		if binding.GetRole() != workspaceAdminRole {
 			continue
 		}
 		for _, member := range binding.GetMembers() {
-			if member != userMember && member != systemBotMember {
-				return true
+			if member == userMember || member == systemBotMember {
+				continue
+			}
+			if member == api.AllUsers {
+				activeEndUserCount, err := s.getActiveUserCount(ctx)
+				if err != nil {
+					return false, err
+				}
+				return activeEndUserCount > 1, nil
+			}
+			uID, err := common.GetUserID(member)
+			if err != nil {
+				return false, status.Errorf(codes.Internal, "failed to get id from member %v with error: %v", member, err.Error())
+			}
+			user, err := s.store.GetUserByID(ctx, uID)
+			if err != nil {
+				return false, status.Errorf(codes.Internal, "failed to get user %v with error: %v", member, err.Error())
+			}
+			if !user.MemberDeleted && user.Type == api.EndUser {
+				return true, nil
 			}
 		}
 	}
-	return false
+	return false, nil
 }
 
 // UndeleteUser undeletes a user.

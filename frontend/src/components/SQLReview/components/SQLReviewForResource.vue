@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col gap-y-2">
-    <label class="textlabel">
+    <label class="font-medium">
       {{ $t("sql-review.title") }}
     </label>
     <div>
@@ -26,7 +26,7 @@
         </span>
       </div>
       <NButton
-        v-else-if="allowEditSQLReviewPolicy"
+        v-else-if="allowEditSQLReviewTag"
         @click.prevent="showReviewSelectPanel = true"
       >
         {{ $t("sql-review.configure-policy") }}
@@ -81,6 +81,10 @@ const resetState = () => {
 watchEffect(resetState);
 
 const allowEditSQLReviewPolicy = computed(() => {
+  return props.allowEdit && hasWorkspacePermissionV2("bb.reviewConfigs.update");
+});
+
+const allowEditSQLReviewTag = computed(() => {
   return props.allowEdit && hasWorkspacePermissionV2("bb.policies.update");
 });
 

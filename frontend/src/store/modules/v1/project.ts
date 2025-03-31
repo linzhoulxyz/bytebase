@@ -12,14 +12,36 @@ import {
   DEFAULT_PROJECT_NAME,
   isValidProjectName,
 } from "@/types";
-import { State } from "@/types/proto/v1/common";
+import { State, stateToJSON } from "@/types/proto/v1/common";
 import type {
   Project,
   ListProjectsResponse,
 } from "@/types/proto/v1/project_service";
 import { hasWorkspacePermissionV2 } from "@/utils";
-import { useListCache } from "./cache";
 import { useProjectIamPolicyStore } from "./projectIamPolicy";
+
+export interface ProjectFilter {
+  query?: string;
+  excludeDefault?: boolean;
+  state?: State;
+}
+
+const getListProjectFilter = (params: ProjectFilter) => {
+  const list = [];
+  const search = params.query?.trim().toLowerCase();
+  if (search) {
+    list.push(
+      `(name.matches("${search}") || resource_id.matches("${search}"))`
+    );
+  }
+  if (params.excludeDefault) {
+    list.push("exclude_default == true");
+  }
+  if (params.state === State.DELETED) {
+    list.push(`state == "${stateToJSON(params.state)}"`);
+  }
+  return list.join(" && ");
+};
 
 export const useProjectV1Store = defineStore("project_v1", () => {
   const projectMapByName = reactive(new Map<ResourceId, ComposedProject>());
@@ -69,29 +91,11 @@ export const useProjectV1Store = defineStore("project_v1", () => {
     return project as ComposedProject;
   };
 
-  const getListProjectFilter = (params: {
-    query?: string;
-    excludeDefault?: boolean;
-  }) => {
-    const list = [];
-    if (params.query) {
-      list.push(
-        `name.matches("${params.query}") || resource_id.matches("${params.query}")`
-      );
-    }
-    if (params.excludeDefault) {
-      list.push("exclude_default == true");
-    }
-    return list.join(" && ");
-  };
-
   const fetchProjectList = async (params: {
-    showDeleted?: boolean;
     pageSize?: number;
     pageToken?: string;
-    query?: string;
     silent?: boolean;
-    excludeDefault?: boolean;
+    filter?: ProjectFilter;
   }): Promise<{
     projects: ComposedProject[];
     nextPageToken?: string;
@@ -102,7 +106,8 @@ export const useProjectV1Store = defineStore("project_v1", () => {
     const response = await request(
       {
         ...params,
-        filter: getListProjectFilter(params),
+        filter: getListProjectFilter(params.filter ?? {}),
+        showDeleted: params.filter?.state === State.DELETED ? true : false,
       },
       { silent: params.silent ?? true }
     );
@@ -174,45 +179,6 @@ export const useProjectV1Store = defineStore("project_v1", () => {
     fetchProjectList,
   };
 });
-
-// TODO(ed): deprecate it.
-export const useProjectV1List = (showDeleted: boolean = false) => {
-  const listCache = useListCache("project");
-  const store = useProjectV1Store();
-  const cacheKey = listCache.getCacheKey(showDeleted ? "" : "active");
-
-  const cache = computed(() => listCache.getCache(cacheKey));
-
-  watchEffect(async () => {
-    // Skip if request is already in progress or cache is available.
-    if (cache.value?.isFetching || cache.value) {
-      return;
-    }
-
-    listCache.cacheMap.set(cacheKey, {
-      timestamp: Date.now(),
-      isFetching: true,
-    });
-    const { projects } = await store.fetchProjectList({
-      showDeleted,
-      pageSize: 100,
-    });
-    await store.upsertProjectMap(projects);
-    listCache.cacheMap.set(cacheKey, {
-      timestamp: Date.now(),
-      isFetching: false,
-    });
-  });
-
-  const projectList = computed(() => {
-    return store.getProjectList(showDeleted);
-  });
-
-  return {
-    projectList,
-    ready: computed(() => cache.value && !cache.value.isFetching),
-  };
-};
 
 export const useProjectByName = (name: MaybeRef<string>) => {
   const store = useProjectV1Store();

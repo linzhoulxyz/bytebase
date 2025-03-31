@@ -13,10 +13,15 @@
       />
     </div>
     <div class="">
-      <ProjectV1Table
+      <PagedProjectTable
         v-if="state.selectedTab == 'PROJECT'"
-        key="archived-project-table"
-        :project-list="filteredProjectList"
+        session-key="bb.project-table.archived"
+        :filter="{
+          query: state.searchText,
+          state: State.DELETED,
+          excludeDefault: true,
+        }"
+        :bordered="true"
       />
       <InstanceV1Table
         v-else-if="state.selectedTab == 'INSTANCE'"
@@ -29,13 +34,11 @@
       <EnvironmentV1Table
         v-else-if="state.selectedTab == 'ENVIRONMENT'"
         key="archived-environment-table"
-        class="border-x"
         :environment-list="filteredEnvironmentList"
       />
       <IdentityProviderTable
         v-else-if="state.selectedTab == 'SSO'"
         key="archived-sso-table"
-        class="border-x"
         :identity-provider-list="filteredSSOList(deletedSSOList)"
       />
     </div>
@@ -48,23 +51,19 @@ import { useI18n } from "vue-i18n";
 import IdentityProviderTable from "@/components/SSO/IdentityProviderTable.vue";
 import {
   EnvironmentV1Table,
-  InstanceV1Table,
-  ProjectV1Table,
   SearchBox,
   TabFilter,
+  PagedProjectTable,
+  InstanceV1Table,
 } from "@/components/v2";
 import {
   useEnvironmentV1Store,
   useIdentityProviderStore,
   useInstanceV1List,
-  useProjectV1List,
 } from "@/store";
 import { State } from "@/types/proto/v1/common";
 import type { IdentityProvider } from "@/types/proto/v1/idp_service";
-import {
-  filterProjectV1ListByKeyword,
-  hasWorkspacePermissionV2,
-} from "@/utils";
+import { hasWorkspacePermissionV2 } from "@/utils";
 
 type LocalTabType = "PROJECT" | "INSTANCE" | "ENVIRONMENT" | "SSO";
 
@@ -81,9 +80,11 @@ const state = reactive<LocalState>({
   searchText: "",
 });
 
-const prepareList = () => {
-  environmentStore.fetchEnvironments(true /* showDeleted */);
-  identityProviderStore.fetchIdentityProviderList(true /* showDeleted */);
+const prepareList = async () => {
+  const [_1, _2] = await Promise.all([
+    environmentStore.fetchEnvironments(true /* showDeleted */),
+    identityProviderStore.fetchIdentityProviderList(true /* showDeleted */),
+  ]);
 };
 
 watchEffect(prepareList);
@@ -97,13 +98,6 @@ const environmentList = computed(() => {
 const instanceList = computed(() => {
   return useInstanceV1List(true /** showDeleted */).instanceList.value.filter(
     (instance) => instance.state === State.DELETED
-  );
-});
-
-const projectList = computed(() => {
-  // TODO(ed): support pagination.
-  return useProjectV1List(true /** showDeleted */).projectList.value.filter(
-    (project) => project.state === State.DELETED
   );
 });
 
@@ -129,10 +123,6 @@ const tabItemList = computed(() => {
   }
 
   return list;
-});
-
-const filteredProjectList = computed(() => {
-  return filterProjectV1ListByKeyword(projectList.value, state.searchText);
 });
 
 const filteredInstanceList = computed(() => {

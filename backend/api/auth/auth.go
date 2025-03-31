@@ -195,7 +195,7 @@ func (in *APIAuthInterceptor) authenticate(ctx context.Context, accessTokenStr s
 		return 0, status.Errorf(codes.Unauthenticated, "user ID %q not exists in the access token", principalID)
 	}
 	if user.MemberDeleted {
-		return 0, status.Errorf(codes.Unauthenticated, "user ID %q has been deactivated by administrators", principalID)
+		return 0, status.Errorf(codes.Unauthenticated, "user ID %q has been deactivated by administrators", user.ID)
 	}
 
 	return principalID, nil
@@ -208,7 +208,7 @@ func (in *APIAuthInterceptor) getPrincipalID(ctx context.Context, accessTokenStr
 	}
 
 	// Only update for authorized request.
-	in.profile.LastActiveTs = time.Now().Unix()
+	in.profile.LastActiveTS = time.Now().Unix()
 	return principalID, nil
 }
 

@@ -7,9 +7,8 @@
       code: 422
       title: column.maximum-varchar-length
       content: The maximum varchar length is 2560.
-      detail: ""
       startposition:
-        line: 1
+        line: 0
         column: 0
       endposition: null
 - statement: ALTER TABLE MyTable ALTER COLUMN a VARCHAR(MAX);
@@ -19,9 +18,8 @@
       code: 422
       title: column.maximum-varchar-length
       content: The maximum varchar length is 2560.
-      detail: ""
       startposition:
-        line: 1
+        line: 0
         column: 0
       endposition: null
 - statement: ALTER TABLE MyTable ALTER COLUMN a NVARCHAR(MAX);
@@ -31,8 +29,7 @@
       code: 422
       title: column.maximum-varchar-length
       content: The maximum varchar length is 2560.
-      detail: ""
       startposition:
-        line: 1
+        line: 0
         column: 0
       endposition: null

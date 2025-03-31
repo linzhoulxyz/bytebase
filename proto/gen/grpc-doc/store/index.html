@@ -1180,6 +1180,10 @@
             <ul>
               
                 <li>
+                  <a href="#bytebase.store.AISetting"><span class="badge">M</span>AISetting</a>
+                </li>
+              
+                <li>
                   <a href="#bytebase.store.AgentPluginSetting"><span class="badge">M</span>AgentPluginSetting</a>
                 </li>
               
@@ -1307,6 +1311,10 @@
                   <a href="#bytebase.store.WorkspaceProfileSetting"><span class="badge">M</span>WorkspaceProfileSetting</a>
                 </li>
               
+              
+                <li>
+                  <a href="#bytebase.store.AISetting.Provider"><span class="badge">E</span>AISetting.Provider</a>
+                </li>
               
                 <li>
                   <a href="#bytebase.store.Algorithm.InnerOuterMask.MaskType"><span class="badge">E</span>Algorithm.InnerOuterMask.MaskType</a>
@@ -1544,7 +1552,7 @@
         
       
         <h3 id="bytebase.store.Position">Position</h3>
-        <p></p>
+        <p>Position in a text expressed as zero-based line and zero-based column byte</p><p>offset.</p>
 
         
           <table class="field-table">
@@ -1557,14 +1565,14 @@
                   <td>line</td>
                   <td><a href="#int32">int32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>Line position in a text (zero-based). </p></td>
                 </tr>
               
                 <tr>
                   <td>column</td>
                   <td><a href="#int32">int32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>Column position in a text (zero-based), equivalent to byte offset. </p></td>
                 </tr>
               
             </tbody>
@@ -1777,6 +1785,12 @@
                 <td><p></p></td>
               </tr>
             
+              <tr>
+                <td>TRINO</td>
+                <td>27</td>
+                <td><p></p></td>
+              </tr>
+            
           </tbody>
         </table>
       
@@ -1951,7 +1965,8 @@
                   <td>start_position</td>
                   <td><a href="#bytebase.store.Position">Position</a></td>
                   <td></td>
-                  <td><p>1-based positions of the sql statment. </p></td>
+                  <td><p>The start_position is inclusive and the end_position is exclusive.
+TODO: use range instead. </p></td>
                 </tr>
               
                 <tr>
@@ -3343,6 +3358,14 @@ to distinguish between an empty string default value or no default. </p></td>
                 </tr>
               
                 <tr>
+                  <td>default_on_null</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>Oracle specific metadata.
+The default_on_null is the default on null of a column. </p></td>
+                </tr>
+              
+                <tr>
                   <td>on_update</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
@@ -3402,10 +3425,31 @@ classification and user_comment is parsed from the comment. </p></td>
                 </tr>
               
                 <tr>
+                  <td>is_identity</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
                   <td>identity_generation</td>
                   <td><a href="#bytebase.store.ColumnMetadata.IdentityGeneration">ColumnMetadata.IdentityGeneration</a></td>
                   <td></td>
                   <td><p>The identity_generation is for identity columns, PG only. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>identity_seed</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p>The identity_seed is for identity columns, MSSQL only. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>identity_increment</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p>The identity_increment is for identity columns, MSSQL only. </p></td>
                 </tr>
               
             </tbody>
@@ -5727,23 +5771,6 @@ TRUNCATE. </p></td>
         <p></p>
 
         
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>multitenancy</td>
-                  <td><a href="#bool">bool</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
 
         
       
@@ -10100,6 +10127,65 @@ Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task}/taskRu
       <p></p>
 
       
+        <h3 id="bytebase.store.AISetting">AISetting</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>enabled</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>provider</td>
+                  <td><a href="#bytebase.store.AISetting.Provider">AISetting.Provider</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>endpoint</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>api_key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>model</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>version</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="bytebase.store.AgentPluginSetting">AgentPluginSetting</h3>
         <p></p>
 
@@ -11424,6 +11510,47 @@ The default value is 100MB, we will use the default value if the setting not exi
       
 
       
+        <h3 id="bytebase.store.AISetting.Provider">AISetting.Provider</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>PROVIDER_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>OPEN_AI</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>CLAUDE</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>GEMINI</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>AZURE_OPENAI</td>
+                <td>4</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
         <h3 id="bytebase.store.Algorithm.InnerOuterMask.MaskType">Algorithm.InnerOuterMask.MaskType</h3>
         <p></p>
         <table class="enum-table">
@@ -12110,7 +12237,7 @@ Format: instances/{instance}/databases/{database} </p></td>
         
       
         <h3 id="bytebase.store.TaskRunResult.Position">TaskRunResult.Position</h3>
-        <p>The following fields are used for error reporting.</p>
+        <p>The following fields are used for error reporting.</p><p>TODO(zp): Use common Position instead.</p>
 
         
           <table class="field-table">

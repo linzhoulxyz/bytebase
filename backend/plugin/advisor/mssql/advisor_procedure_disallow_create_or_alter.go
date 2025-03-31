@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	advisor.Register(storepb.Engine_MSSQL, advisor.MSSQLProcedureDisallowCreateOrAlter, &FunctionDisallowCreateOrAlterAdvisor{})
+	advisor.Register(storepb.Engine_MSSQL, advisor.MSSQLProcedureDisallowCreateOrAlter, &ProcedureDisallowCreateOrAlterAdvisor{})
 }
 
 type ProcedureDisallowCreateOrAlterAdvisor struct{}
@@ -46,14 +46,12 @@ func (*ProcedureDisallowCreateOrAlterAdvisor) Check(_ context.Context, checkCtx 
 	return checker.adviceList, nil
 }
 
-func (checker *FunctionDisallowCreateOrAlterChecker) EnterCreate_or_alter_procedure(ctx *parser.Create_or_alter_procedureContext) {
+func (checker *ProcedureDisallowCreateOrAlterChecker) EnterCreate_or_alter_procedure(ctx *parser.Create_or_alter_procedureContext) {
 	checker.adviceList = append(checker.adviceList, &storepb.Advice{
-		Status:  checker.level,
-		Code:    advisor.DisallowCreateFunction.Int32(),
-		Title:   checker.title,
-		Content: "Creating or altering procedures is prohibited",
-		StartPosition: &storepb.Position{
-			Line: int32(ctx.GetStart().GetLine()),
-		},
+		Status:        checker.level,
+		Code:          advisor.DisallowCreateProcedure.Int32(),
+		Title:         checker.title,
+		Content:       "Creating or altering procedures is prohibited",
+		StartPosition: advisor.ConvertANTLRLineToPosition(ctx.GetStart().GetLine()),
 	})
 }

@@ -1,6 +1,9 @@
 <template>
   <div v-if="allowEdit" class="flex justify-end">
-    <NPopconfirm v-if="allowUpdate" @positive-click="$emit('revoke-binding')">
+    <NPopconfirm
+      v-if="allowUpdate && binding.projectRoleBindings.length > 0"
+      @positive-click="$emit('revoke-binding')"
+    >
       <template #trigger>
         <NButton quaternary circle @click.stop>
           <template #icon>
@@ -33,8 +36,7 @@
 import { PencilIcon, Trash2Icon } from "lucide-vue-next";
 import { NButton, NPopconfirm } from "naive-ui";
 import { computed } from "vue";
-import { unknownUser } from "@/types";
-import { UserType } from "@/types/proto/v1/user_service";
+import { unknownUser, SYSTEM_BOT_USER_NAME } from "@/types";
 import { State } from "@/types/proto/v1/common";
 import type { MemberBinding } from "../../types";
 
@@ -54,7 +56,8 @@ const allowUpdate = computed(() => {
   }
 
   const user = props.binding.user ?? unknownUser();
-  if (user.userType === UserType.SYSTEM_BOT) {
+  if (user.name === SYSTEM_BOT_USER_NAME) {
+    // Cannot edit the member binding for support@bytebase.com, but can edit allUsers
     return false;
   }
   return user.state === State.ACTIVE;

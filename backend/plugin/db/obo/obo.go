@@ -32,16 +32,15 @@ func init() {
 }
 
 type Driver struct {
-	db                   *sql.DB
-	databaseName         string
-	maximumSQLResultSize int64
+	db           *sql.DB
+	databaseName string
 }
 
 func newDriver(db.DriverConfig) db.Driver {
 	return &Driver{}
 }
 
-func (driver *Driver) Open(_ context.Context, _ storepb.Engine, config db.ConnectionConfig) (db.Driver, error) {
+func (d *Driver) Open(_ context.Context, _ storepb.Engine, config db.ConnectionConfig) (db.Driver, error) {
 	databaseName := func() string {
 		if config.ConnectionContext.DatabaseName != "" {
 			return config.ConnectionContext.DatabaseName
@@ -62,25 +61,24 @@ func (driver *Driver) Open(_ context.Context, _ storepb.Engine, config db.Connec
 		return nil, errors.Wrapf(err, "failed to open connection")
 	}
 
-	driver.db = db
-	driver.databaseName = databaseName
-	driver.maximumSQLResultSize = config.MaximumSQLResultSize
-	return driver, nil
+	d.db = db
+	d.databaseName = databaseName
+	return d, nil
 }
 
-func (driver *Driver) Close(context.Context) error {
-	return driver.db.Close()
+func (d *Driver) Close(context.Context) error {
+	return d.db.Close()
 }
 
-func (driver *Driver) Ping(ctx context.Context) error {
-	return driver.db.PingContext(ctx)
+func (d *Driver) Ping(ctx context.Context) error {
+	return d.db.PingContext(ctx)
 }
 
-func (driver *Driver) GetDB() *sql.DB {
-	return driver.db
+func (d *Driver) GetDB() *sql.DB {
+	return d.db
 }
 
-func (driver *Driver) Execute(ctx context.Context, statement string, opts db.ExecuteOptions) (int64, error) {
+func (d *Driver) Execute(ctx context.Context, statement string, opts db.ExecuteOptions) (int64, error) {
 	if opts.CreateDatabase {
 		return 0, errors.New("create database is not supported for OceanBase Oracle mode")
 	}
@@ -95,7 +93,7 @@ func (driver *Driver) Execute(ctx context.Context, statement string, opts db.Exe
 		return 0, nil
 	}
 
-	conn, err := driver.db.Conn(ctx)
+	conn, err := d.db.Conn(ctx)
 	if err != nil {
 		return 0, errors.Wrapf(err, "failed to get connection")
 	}
@@ -136,7 +134,7 @@ func (driver *Driver) Execute(ctx context.Context, statement string, opts db.Exe
 	return totalRowsAffected, nil
 }
 
-func (driver *Driver) QueryConn(ctx context.Context, conn *sql.Conn, statement string, queryContext db.QueryContext) ([]*v1pb.QueryResult, error) {
+func (*Driver) QueryConn(ctx context.Context, conn *sql.Conn, statement string, queryContext db.QueryContext) ([]*v1pb.QueryResult, error) {
 	singleSQLs, err := plsqlparser.SplitSQL(statement)
 	if err != nil {
 		return nil, err
@@ -179,7 +177,7 @@ func (driver *Driver) QueryConn(ctx context.Context, conn *sql.Conn, statement s
 					return nil, err
 				}
 				defer rows.Close()
-				r, err := util.RowsToQueryResult(rows, makeValueByTypeName, convertValue, driver.maximumSQLResultSize)
+				r, err := util.RowsToQueryResult(rows, makeValueByTypeName, convertValue, queryContext.MaximumSQLResultSize)
 				if err != nil {
 					return nil, err
 				}

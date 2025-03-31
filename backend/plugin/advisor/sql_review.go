@@ -1,14 +1,12 @@
 package advisor
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"regexp"
-	"strings"
 
 	"github.com/pkg/errors"
 
@@ -500,7 +498,7 @@ type SQLReviewCheckContext struct {
 	Collation             string
 	ChangeType            storepb.PlanCheckRunConfig_ChangeDatabaseType
 	DBSchema              *storepb.DatabaseSchemaMetadata
-	DbType                storepb.Engine
+	DBType                storepb.Engine
 	Catalog               catalogInterface
 	Driver                *sql.DB
 	PreUpdateBackupDetail *storepb.PreUpdateBackupDetail
@@ -527,13 +525,13 @@ func SQLReviewCheck(
 	ruleList []*storepb.SQLReviewRule,
 	checkContext SQLReviewCheckContext,
 ) ([]*storepb.Advice, error) {
-	asts, parseResult := sm.GetASTsForChecks(checkContext.DbType, statements)
+	asts, parseResult := sm.GetASTsForChecks(checkContext.DBType, statements)
 
 	builtinOnly := len(ruleList) == 0
 
 	if !checkContext.NoAppendBuiltin {
 		// Append builtin rules to the rule list.
-		ruleList = append(ruleList, GetBuiltinRules(checkContext.DbType)...)
+		ruleList = append(ruleList, GetBuiltinRules(checkContext.DBType)...)
 	}
 
 	if asts == nil || len(ruleList) == 0 {
@@ -542,17 +540,17 @@ func SQLReviewCheck(
 
 	finder := checkContext.Catalog.GetFinder()
 	if !builtinOnly {
-		switch checkContext.DbType {
+		switch checkContext.DBType {
 		case storepb.Engine_TIDB, storepb.Engine_MYSQL, storepb.Engine_MARIADB, storepb.Engine_POSTGRES, storepb.Engine_OCEANBASE:
 			if err := finder.WalkThrough(asts); err != nil {
-				return convertWalkThroughErrorToAdvice(ctx, checkContext, err)
+				return convertWalkThroughErrorToAdvice(err)
 			}
 		}
 	}
 
 	var errorAdvices, warningAdvices []*storepb.Advice
 	for _, rule := range ruleList {
-		if rule.Engine != storepb.Engine_ENGINE_UNSPECIFIED && rule.Engine != checkContext.DbType {
+		if rule.Engine != storepb.Engine_ENGINE_UNSPECIFIED && rule.Engine != checkContext.DBType {
 			continue
 		}
 		if rule.Level == storepb.SQLReviewRuleLevel_DISABLED {
@@ -564,7 +562,7 @@ func SQLReviewCheck(
 			continue
 		}
 
-		advisorType, err := getAdvisorTypeByRule(ruleType, checkContext.DbType)
+		advisorType, err := getAdvisorTypeByRule(ruleType, checkContext.DBType)
 		if err != nil {
 			if rule.Engine != storepb.Engine_ENGINE_UNSPECIFIED {
 				slog.Warn("not supported rule", "rule type", rule.Type, "engine", rule.Engine.String(), log.BBError(err))
@@ -574,7 +572,7 @@ func SQLReviewCheck(
 
 		adviceList, err := Check(
 			ctx,
-			checkContext.DbType,
+			checkContext.DBType,
 			advisorType,
 			Context{
 				DBSchema:                 checkContext.DBSchema,
@@ -622,7 +620,7 @@ func SQLReviewCheck(
 	return advices, nil
 }
 
-func convertWalkThroughErrorToAdvice(ctx context.Context, checkContext SQLReviewCheckContext, err error) ([]*storepb.Advice, error) {
+func convertWalkThroughErrorToAdvice(err error) ([]*storepb.Advice, error) {
 	walkThroughError, ok := err.(*catalog.WalkThroughError)
 	if !ok {
 		return nil, err
@@ -632,13 +630,11 @@ func convertWalkThroughErrorToAdvice(ctx context.Context, checkContext SQLReview
 	switch walkThroughError.Type {
 	case catalog.ErrorTypeUnsupported:
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    Unsupported.Int32(),
-			Title:   walkThroughError.Content,
-			Content: "",
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          Unsupported.Int32(),
+			Title:         walkThroughError.Content,
+			Content:       "",
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	case catalog.ErrorTypeParseError:
 		res = append(res, &storepb.Advice{
@@ -649,266 +645,161 @@ func convertWalkThroughErrorToAdvice(ctx context.Context, checkContext SQLReview
 		})
 	case catalog.ErrorTypeDeparseError:
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    Internal.Int32(),
-			Title:   "Internal error for walk-through",
-			Content: walkThroughError.Content,
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          Internal.Int32(),
+			Title:         "Internal error for walk-through",
+			Content:       walkThroughError.Content,
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	case catalog.ErrorTypeAccessOtherDatabase:
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    NotCurrentDatabase.Int32(),
-			Title:   "Access other database",
-			Content: walkThroughError.Content,
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          NotCurrentDatabase.Int32(),
+			Title:         "Access other database",
+			Content:       walkThroughError.Content,
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	case catalog.ErrorTypeDatabaseIsDeleted:
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    DatabaseIsDeleted.Int32(),
-			Title:   "Access deleted database",
-			Content: walkThroughError.Content,
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          DatabaseIsDeleted.Int32(),
+			Title:         "Access deleted database",
+			Content:       walkThroughError.Content,
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	case catalog.ErrorTypeTableExists:
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    TableExists.Int32(),
-			Title:   "Table already exists",
-			Content: walkThroughError.Content,
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          TableExists.Int32(),
+			Title:         "Table already exists",
+			Content:       walkThroughError.Content,
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	case catalog.ErrorTypeTableNotExists:
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    TableNotExists.Int32(),
-			Title:   "Table does not exist",
-			Content: walkThroughError.Content,
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          TableNotExists.Int32(),
+			Title:         "Table does not exist",
+			Content:       walkThroughError.Content,
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	case catalog.ErrorTypeColumnExists:
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    ColumnExists.Int32(),
-			Title:   "Column already exists",
-			Content: walkThroughError.Content,
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          ColumnExists.Int32(),
+			Title:         "Column already exists",
+			Content:       walkThroughError.Content,
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	case catalog.ErrorTypeColumnNotExists:
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    ColumnNotExists.Int32(),
-			Title:   "Column does not exist",
-			Content: walkThroughError.Content,
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          ColumnNotExists.Int32(),
+			Title:         "Column does not exist",
+			Content:       walkThroughError.Content,
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	case catalog.ErrorTypeDropAllColumns:
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    DropAllColumns.Int32(),
-			Title:   "Drop all columns",
-			Content: walkThroughError.Content,
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          DropAllColumns.Int32(),
+			Title:         "Drop all columns",
+			Content:       walkThroughError.Content,
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	case catalog.ErrorTypePrimaryKeyExists:
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    PrimaryKeyExists.Int32(),
-			Title:   "Primary key exists",
-			Content: walkThroughError.Content,
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          PrimaryKeyExists.Int32(),
+			Title:         "Primary key exists",
+			Content:       walkThroughError.Content,
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	case catalog.ErrorTypeIndexExists:
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    IndexExists.Int32(),
-			Title:   "Index exists",
-			Content: walkThroughError.Content,
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          IndexExists.Int32(),
+			Title:         "Index exists",
+			Content:       walkThroughError.Content,
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	case catalog.ErrorTypeIndexEmptyKeys:
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    IndexEmptyKeys.Int32(),
-			Title:   "Index empty keys",
-			Content: walkThroughError.Content,
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          IndexEmptyKeys.Int32(),
+			Title:         "Index empty keys",
+			Content:       walkThroughError.Content,
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	case catalog.ErrorTypePrimaryKeyNotExists:
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    PrimaryKeyNotExists.Int32(),
-			Title:   "Primary key does not exist",
-			Content: walkThroughError.Content,
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          PrimaryKeyNotExists.Int32(),
+			Title:         "Primary key does not exist",
+			Content:       walkThroughError.Content,
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	case catalog.ErrorTypeIndexNotExists:
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    IndexNotExists.Int32(),
-			Title:   "Index does not exist",
-			Content: walkThroughError.Content,
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          IndexNotExists.Int32(),
+			Title:         "Index does not exist",
+			Content:       walkThroughError.Content,
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	case catalog.ErrorTypeIncorrectIndexName:
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    IncorrectIndexName.Int32(),
-			Title:   "Incorrect index name",
-			Content: walkThroughError.Content,
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          IncorrectIndexName.Int32(),
+			Title:         "Incorrect index name",
+			Content:       walkThroughError.Content,
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	case catalog.ErrorTypeSpatialIndexKeyNullable:
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    SpatialIndexKeyNullable.Int32(),
-			Title:   "Spatial index key must be NOT NULL",
-			Content: walkThroughError.Content,
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          SpatialIndexKeyNullable.Int32(),
+			Title:         "Spatial index key must be NOT NULL",
+			Content:       walkThroughError.Content,
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	case catalog.ErrorTypeColumnIsReferencedByView:
 		details := walkThroughError.Content
-		if checkContext.DbType == storepb.Engine_POSTGRES {
-			list, yes := walkThroughError.Payload.([]string)
-			if !yes {
-				return nil, errors.Errorf("invalid payload for ColumnIsReferencedByView, expect []string but found %T", walkThroughError.Payload)
-			}
-			if definition, err := getViewDefinition(ctx, checkContext, list); err != nil {
-				slog.Warn("failed to get view definition", log.BBError(err))
-			} else {
-				details = definition
-			}
-		}
-
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    ColumnIsReferencedByView.Int32(),
-			Title:   "Column is referenced by view",
-			Content: details,
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          ColumnIsReferencedByView.Int32(),
+			Title:         "Column is referenced by view",
+			Content:       details,
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	case catalog.ErrorTypeTableIsReferencedByView:
 		details := walkThroughError.Content
-		if checkContext.DbType == storepb.Engine_POSTGRES {
-			list, yes := walkThroughError.Payload.([]string)
-			if !yes {
-				return nil, errors.Errorf("invalid payload for TableIsReferencedByView, expect []string but found %T", walkThroughError.Payload)
-			}
-			if definition, err := getViewDefinition(ctx, checkContext, list); err != nil {
-				slog.Warn("failed to get view definition", log.BBError(err))
-			} else {
-				details = definition
-			}
-		}
-
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    TableIsReferencedByView.Int32(),
-			Title:   "Table is referenced by view",
-			Content: details,
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          TableIsReferencedByView.Int32(),
+			Title:         "Table is referenced by view",
+			Content:       details,
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	case catalog.ErrorTypeInvalidColumnTypeForDefaultValue:
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    InvalidColumnDefault.Int32(),
-			Title:   "Invalid column default value",
-			Content: walkThroughError.Content,
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          InvalidColumnDefault.Int32(),
+			Title:         "Invalid column default value",
+			Content:       walkThroughError.Content,
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	default:
 		res = append(res, &storepb.Advice{
-			Status:  storepb.Advice_ERROR,
-			Code:    Internal.Int32(),
-			Title:   fmt.Sprintf("Failed to walk-through with code %d", walkThroughError.Type),
-			Content: walkThroughError.Content,
-			StartPosition: &storepb.Position{
-				Line: int32(walkThroughError.Line),
-			},
+			Status:        storepb.Advice_ERROR,
+			Code:          Internal.Int32(),
+			Title:         fmt.Sprintf("Failed to walk-through with code %d", walkThroughError.Type),
+			Content:       walkThroughError.Content,
+			StartPosition: ConvertANTLRLineToPosition(walkThroughError.Line),
 		})
 	}
 
 	return res, nil
-}
-
-func getViewDefinition(ctx context.Context, checkContext SQLReviewCheckContext, viewList []string) (string, error) {
-	var buf bytes.Buffer
-	sql := fmt.Sprintf(`
-		WITH view_list(view_name) AS (
-			VALUES ('%s')
-		)
-		SELECT view_name, pg_get_viewdef(view_name) AS view_definition
-		FROM view_list;
-	`, strings.Join(viewList, "'),('"))
-
-	rows, err := checkContext.Driver.QueryContext(ctx, sql)
-	if err != nil {
-		return "", err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var viewName, viewDefinition string
-		if err := rows.Scan(&viewName, &viewDefinition); err != nil {
-			return "", err
-		}
-		if _, err := buf.WriteString("The definition of view "); err != nil {
-			return "", err
-		}
-		if _, err := buf.WriteString(viewName); err != nil {
-			return "", err
-		}
-		if _, err := buf.WriteString(" is \n"); err != nil {
-			return "", err
-		}
-		if _, err := buf.WriteString(viewDefinition); err != nil {
-			return "", err
-		}
-		if _, err := buf.WriteString("\n\n"); err != nil {
-			return "", err
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return "", err
-	}
-
-	return buf.String(), nil
 }
 
 func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Type, error) {
@@ -1270,15 +1161,17 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLTableDisallowSetCharset, nil
 		}
 	case SchemaRuleTableDisallowDDL:
-		if engine == storepb.Engine_MYSQL {
+		switch engine {
+		case storepb.Engine_MYSQL:
 			return MySQLTableDisallowDDL, nil
-		} else if engine == storepb.Engine_MSSQL {
+		case storepb.Engine_MSSQL:
 			return MSSQLTableDisallowDDL, nil
 		}
 	case SchemaRuleTableDisallowDML:
-		if engine == storepb.Engine_MYSQL {
+		switch engine {
+		case storepb.Engine_MYSQL:
 			return MySQLTableDisallowDML, nil
-		} else if engine == storepb.Engine_MSSQL {
+		case storepb.Engine_MSSQL:
 			return MSSQLTableDisallowDML, nil
 		}
 	case SchemaRuleTableLimitSize:
@@ -1412,7 +1305,7 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 		}
 	case SchemaRuleCreateIndexConcurrently:
 		if engine == storepb.Engine_POSTGRES {
-			return PostgreSQLCreateIndexConcurrently, nil
+			return PostgreSQLIndexConcurrently, nil
 		}
 	case SchemaRuleIndexTypeAllowList:
 		if engine == storepb.Engine_MYSQL {

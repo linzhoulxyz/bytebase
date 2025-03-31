@@ -84,7 +84,7 @@ type Server struct {
 	lspServer  *lsp.Server
 	store      *store.Store
 	dbFactory  *dbfactory.DBFactory
-	startedTs  int64
+	startedTS  int64
 
 	// PG server stoppers.
 	stopper []func()
@@ -100,7 +100,7 @@ type Server struct {
 func NewServer(ctx context.Context, profile *config.Profile) (*Server, error) {
 	s := &Server{
 		profile:   profile,
-		startedTs: time.Now().Unix(),
+		startedTS: time.Now().Unix(),
 	}
 
 	// Display config
@@ -173,7 +173,7 @@ func NewServer(ctx context.Context, profile *config.Profile) (*Server, error) {
 	}
 
 	// Connect to the instance that stores bytebase's own metadata.
-	stores, err := store.New(ctx, pgURL)
+	stores, err := store.New(ctx, pgURL, !profile.HA)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to new store")
 	}
@@ -185,7 +185,7 @@ func NewServer(ctx context.Context, profile *config.Profile) (*Server, error) {
 		return nil, err
 	}
 
-	if err := s.store.BackfillIssueTsVector(ctx); err != nil {
+	if err := s.store.BackfillIssueTSVector(ctx); err != nil {
 		slog.Warn("failed to backfill issue ts vector", log.BBError(err))
 	}
 

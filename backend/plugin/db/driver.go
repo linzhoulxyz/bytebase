@@ -17,12 +17,6 @@ import (
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
-// User is the database user.
-type User struct {
-	Name  string
-	Grant string
-}
-
 // InstanceMetadata is the metadata for an instance.
 type InstanceMetadata struct {
 	Version string
@@ -57,6 +51,11 @@ type IndexKey struct {
 	Index  string
 }
 
+type ConstraintKey struct {
+	Schema     string
+	Constraint string
+}
+
 type SequenceKey struct {
 	Schema   string
 	Sequence string
@@ -69,8 +68,8 @@ var (
 
 // DriverConfig is the driver configuration.
 type DriverConfig struct {
-	// The directiory contains db specific utilites (e.g. mysqldump for MySQL, pg_dump for PostgreSQL, mongosh for MongoDB).
-	DbBinDir string
+	// The directiory contains db specific utilites, mongosh for MongoDB.
+	DBBinDir string
 }
 
 type driverFunc func(DriverConfig) Driver
@@ -136,8 +135,6 @@ type ConnectionConfig struct {
 	DataSource        *storepb.DataSource
 	ConnectionContext ConnectionContext
 	Password          string
-	// The maximum number of bytes for sql results in response body.
-	MaximumSQLResultSize int64
 }
 
 // ConnectionContext is the context for connection.
@@ -168,6 +165,8 @@ type QueryContext struct {
 	Explain       bool
 	OperatorEmail string
 	Option        *v1pb.QueryOption
+	// The maximum number of bytes for sql results in response body.
+	MaximumSQLResultSize int64
 }
 
 // Driver is the interface for database driver.

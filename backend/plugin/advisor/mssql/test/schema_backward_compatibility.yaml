@@ -5,9 +5,8 @@
       code: 102
       title: schema.backward-compatibility
       content: sp_rename may cause incompatibility with the existing data and code, and break scripts and stored procedures.
-      detail: ""
       startposition:
-        line: 1
+        line: 0
         column: 0
       endposition: null
 - statement: DROP TABLE MyTable;
@@ -17,9 +16,8 @@
       code: 112
       title: schema.backward-compatibility
       content: Drop table master.dbo.MyTable may cause incompatibility with the existing data and code
-      detail: ""
       startposition:
-        line: 1
+        line: 0
         column: 0
       endposition: null
 - statement: |-
@@ -33,9 +31,8 @@
       code: 112
       title: schema.backward-compatibility
       content: Drop schema master.myschema may cause incompatibility with the existing data and code
-      detail: ""
       startposition:
-        line: 1
+        line: 0
         column: 0
       endposition: null
 - statement: |-
@@ -49,9 +46,8 @@
       code: 112
       title: schema.backward-compatibility
       content: Drop database mydb may cause incompatibility with the existing data and code
-      detail: ""
       startposition:
-        line: 1
+        line: 0
         column: 0
       endposition: null
 - statement: |-
@@ -74,43 +70,46 @@
       code: 112
       title: schema.backward-compatibility
       content: Drop column mycolumnone, mycolumntwo may cause incompatibility with the existing data and code
-      detail: ""
       startposition:
-        line: 1
+        line: 0
         column: 0
       endposition: null
     - status: 2
       code: 111
       title: schema.backward-compatibility
       content: Alter COLUMN mycolumnone may cause incompatibility with the existing data and code
-      detail: ""
       startposition:
-        line: 2
+        line: 1
         column: 0
       endposition: null
     - status: 2
       code: 106
       title: schema.backward-compatibility
       content: Add PRIMARY KEY may cause incompatibility with the existing data and code
-      detail: ""
       startposition:
-        line: 3
+        line: 2
         column: 0
       endposition: null
     - status: 2
       code: 107
       title: schema.backward-compatibility
       content: Add UNIQUE KEY may cause incompatibility with the existing data and code
-      detail: ""
       startposition:
-        line: 4
+        line: 3
         column: 0
       endposition: null
     - status: 2
       code: 109
       title: schema.backward-compatibility
       content: Add CHECK may cause incompatibility with the existing data and code
-      detail: ""
+      startposition:
+        line: 4
+        column: 0
+      endposition: null
+    - status: 2
+      code: 108
+      title: schema.backward-compatibility
+      content: Add CHECK WITH NO CHECK may cause incompatibility with the existing data and code
       startposition:
         line: 5
         column: 0
@@ -118,19 +117,9 @@
     - status: 2
       code: 108
       title: schema.backward-compatibility
-      content: Add CHECK WITH NO CHECK may cause incompatibility with the existing data and code
-      detail: ""
-      startposition:
-        line: 6
-        column: 0
-      endposition: null
-    - status: 2
-      code: 108
-      title: schema.backward-compatibility
       content: Add FOREIGN KEY WITH NO CHECK may cause incompatibility with the existing data and code
-      detail: ""
       startposition:
-        line: 8
+        line: 7
         column: 0
       endposition: null
 - statement: EXEC sp_rename 'Sales.SalesTerritory', 'SalesTerr';
@@ -140,9 +129,8 @@
       code: 102
       title: schema.backward-compatibility
       content: sp_rename may cause incompatibility with the existing data and code, and break scripts and stored procedures.
-      detail: ""
       startposition:
-        line: 1
+        line: 0
         column: 0
       endposition: null
 - statement: EXEC sp_rename 'dbo.ErrorLog.ErrorTime', 'ErrorDateTime', 'COLUMN';
@@ -152,8 +140,7 @@
       code: 102
       title: schema.backward-compatibility
       content: sp_rename may cause incompatibility with the existing data and code, and break scripts and stored procedures.
-      detail: ""
       startposition:
-        line: 1
+        line: 0
         column: 0
       endposition: null

@@ -26,21 +26,15 @@ import { useI18n } from "vue-i18n";
 import UserIcon from "~icons/heroicons-outline/user";
 import UserAvatar from "@/components/User/UserAvatar.vue";
 import ServiceAccountTag from "@/components/misc/ServiceAccountTag.vue";
-import { useProjectV1Store, extractUserId, useUserStore } from "@/store";
-import { userNamePrefix } from "@/store/modules/v1/common";
+import { extractUserId, useUserStore, type UserFilter } from "@/store";
 import {
   SYSTEM_BOT_USER_NAME,
   UNKNOWN_USER_NAME,
   allUsersUser,
-  isValidProjectName,
-  ALL_USERS_USER_EMAIL,
+  isValidUserName,
 } from "@/types";
-import {
-  UserType,
-  userTypeToJSON,
-  type User,
-} from "@/types/proto/v1/user_service";
-import { memberMapToRolesInProjectIAM, getDefaultPagination } from "@/utils";
+import { UserType, type User } from "@/types/proto/v1/user_service";
+import { getDefaultPagination, ensureUserFullName } from "@/utils";
 import ResourceSelect from "./ResourceSelect.vue";
 
 const props = withDefaults(
@@ -53,8 +47,6 @@ const props = withDefaults(
     includeAllUsers?: boolean;
     includeSystemBot?: boolean;
     includeServiceAccount?: boolean;
-    includeArchived?: boolean;
-    allowedWorkspaceRoleList?: string[];
     autoReset?: boolean;
     filter?: (user: User, index: number) => boolean;
     size?: "tiny" | "small" | "medium" | "large";
@@ -67,7 +59,6 @@ const props = withDefaults(
     includeAllUsers: false,
     includeSystemBot: false,
     includeServiceAccount: false,
-    includeArchived: false,
     autoReset: true,
     filter: undefined,
     size: "medium",
@@ -85,14 +76,13 @@ interface LocalState {
 }
 
 const { t } = useI18n();
-const projectV1Store = useProjectV1Store();
 const userStore = useUserStore();
 const state = reactive<LocalState>({
   loading: false,
   rawUserList: [],
 });
 
-const getFilter = (search: string) => {
+const getFilter = (search: string): UserFilter => {
   const filter = [];
   if (search) {
     filter.push(`(name.matches("${search}") || email.matches("${search}"))`);
@@ -104,22 +94,30 @@ const getFilter = (search: string) => {
   if (props.includeSystemBot) {
     allowedType.push(UserType.SYSTEM_BOT);
   }
-  if (allowedType.length === 1) {
-    filter.push(`user_type == "${userTypeToJSON(allowedType[0])}"`);
-  } else {
-    filter.push(
-      `user_type in [${allowedType.map((t) => `"${userTypeToJSON(t)}"`).join(", ")}]`
-    );
-  }
 
-  return filter.join(" && ");
+  return {
+    query: search,
+    project: props.projectName,
+    types: allowedType,
+  };
+};
+
+const initSelectedUsers = async (userIds: string[]) => {
+  for (const userId of userIds) {
+    const userName = ensureUserFullName(userId);
+    if (isValidUserName(userName)) {
+      const user = await userStore.getOrFetchUserByIdentifier(userName);
+      if (!state.rawUserList.find((u) => u.name === user.name)) {
+        state.rawUserList.unshift(user);
+      }
+    }
+  }
 };
 
 const searchUsers = async (search: string) => {
   const { users } = await userStore.fetchUserList({
     filter: getFilter(search),
     pageSize: getDefaultPagination(),
-    showDeleted: props.includeArchived,
   });
   return users;
 };
@@ -129,41 +127,25 @@ const handleSearch = useDebounceFn(async (search: string) => {
   try {
     const users = await searchUsers(search);
     state.rawUserList = users;
-    if (props.projectName && isValidProjectName(props.projectName)) {
-      // TODO(ed): filter by project in the backend.
-      state.rawUserList = await filterUsersByProject(
-        state.rawUserList,
-        props.projectName
-      );
-    }
-    if (!search && props.includeAllUsers) {
-      state.rawUserList.unshift(allUsersUser());
+    if (!search) {
+      if (props.includeAllUsers) {
+        state.rawUserList.unshift(allUsersUser());
+      }
+      if (props.user) {
+        await initSelectedUsers([props.user]);
+      }
+      if (props.users) {
+        await initSelectedUsers(props.users);
+      }
     }
   } finally {
     state.loading = false;
   }
-}, 500);
+}, 200);
 
 onMounted(async () => {
   await handleSearch("");
 });
-
-const filterUsersByProject = async (
-  users: User[],
-  projectName: string
-): Promise<User[]> => {
-  const project = await projectV1Store.getOrFetchProjectByName(projectName);
-  const memberMap = memberMapToRolesInProjectIAM(project.iamPolicy);
-  if (
-    memberMap.get(`${userNamePrefix}${ALL_USERS_USER_EMAIL}`)?.size ??
-    0 > 0
-  ) {
-    return users;
-  }
-  return users.filter((user) => {
-    return memberMap.get(`${userNamePrefix}${user.email}`)?.size ?? 0 > 0;
-  });
-};
 
 const renderAvatar = (user: User) => {
   if (user.name === UNKNOWN_USER_NAME) {

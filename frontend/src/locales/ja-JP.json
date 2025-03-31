@@ -195,6 +195,7 @@
     "info": "情報",
     "minutes": "分",
     "filter-by-name": "名前でフィルタリングする",
+    "search-by-name": "名前で検索",
     "license": "ライセンス",
     "view-details": "詳細を確認する",
     "force-verb": "フォース{verb}",
@@ -210,7 +211,6 @@
     "resource": "リソース",
     "resources": "リソース",
     "closed": "閉まっている",
-    "options": "オプション",
     "refresh": "リフレッシュ",
     "rollback": "ロールバック",
     "rows": {
@@ -225,7 +225,8 @@
     "text-wrap": "テキストの折り返し",
     "catalog": "カタログ",
     "summary": "まとめ",
-    "errors": "エラー"
+    "errors": "エラー",
+    "removed": "削除されました"
   },
   "error-page": {
     "go-back-home": "ホームページに戻る"
@@ -380,12 +381,8 @@
         "workspace-domain-required": "まずワークスペースドメインを設定してください。"
       },
       "action": {
-        "deactivate": "無効にする",
         "deactivate-confirm-title": "無効にしてもOK",
         "reactivate-confirm-title": "[OK] を有効にします"
-      },
-      "tooltip": {
-        "not-allow-remove": "最後の管理者を削除できません"
       },
       "system-bot": "ロボットアシスタント",
       "service-account": "サービスアカウント",
@@ -407,7 +404,6 @@
         "reset-token": "トークンをリセット",
         "reset-token-warning": "Entra アプリケーションのプロビジョニング設定を更新する必要があります。"
       },
-      "update-user": "ユーザーを更新",
       "search-member": "メンバーを検索",
       "revoked": "取り消されました",
       "view-by-members": "メンバー別に表示",
@@ -555,20 +551,26 @@
         "failed-to-update-setting": "設定「{title}」の更新に失敗しました",
         "ai-assistant": {
           "self": "AI アシスタント",
-          "description": "OpenAPI を使用してデータベース開発タスクを支援します。",
-          "openai-key": {
-            "self": "OpenAI APIキー",
-            "description": "SQL エディターで Text2SQL を開く機能を有効にする OpenAI API キーを提供します。 {viewDoc}",
+          "enable-ai-assistant": "AIアシスタントを有効にする",
+          "description": "AI を使用してデータベース開発タスクを支援します。",
+          "provider": {
+            "self": "AIプロバイダー",
+            "open_ai": "Open AI",
+            "azure_open_ai": "Azure Open AI"
+          },
+          "api-key": {
+            "self": "APIキー",
+            "description": "読み取り専用の API キーを入力してください。{viewDoc}",
             "find-my-key": "鍵を探す",
-            "placeholder": "OpenAI API キーは通常 sk-***** で始まります"
+            "placeholder": "API キーは通常 sk-***** で始まります"
           },
-          "openai-endpoint": {
-            "self": "OpenAI API エンドポイント",
-            "description": "プライベート展開用の OpenAI API エンドポイントを提供します。"
+          "endpoint": {
+            "self": "API エンドポイント",
+            "description": "プライベート展開用の API エンドポイントを提供します。"
           },
-          "openai-model": {
-            "self": "OpenAIモデル名",
-            "description": "供給プライベートデプロイメントのOpenAIモデル名。"
+          "model": {
+            "self": "モデル名",
+            "description": "供給プライベートデプロイメントのモデル名。"
           }
         },
         "announcement": {
@@ -1049,6 +1051,9 @@
     },
     "schema": {
       "default": "デフォルト"
+    },
+    "catalog": {
+      "description": "テーブルカタログを編集してアップロードします。"
     }
   },
   "instance": {
@@ -1235,7 +1240,11 @@
           "description": "住所でフィルタリング"
         }
       }
-    }
+    },
+    "no-params-yet-add-above": "まだ構成されていません。\n上記のフォームを使用してパラメーターを追加します。",
+    "no-extra-params-configured": "追加の接続パラメーターは構成されていません",
+    "parameter-name-placeholder": "パラメーター名",
+    "parameter-value-placeholder": "パラメーター値"
   },
   "environment": {
     "select": "環境を選ぶ",
@@ -1655,6 +1664,10 @@
   },
   "data-source": {
     "snowflake-keypair-tip": "キーペア認証",
+    "extra-params": {
+      "self": "追加のパラメーター",
+      "description": "データベース接続文字列の追加パラメーター"
+    },
     "ssl": {
       "ca-cert": "CA証明書",
       "client-key": "クライアントキー",
@@ -1707,11 +1720,9 @@
     "download-as-file": "{file} 形式でダウンロード",
     "only-select-allowed": "{select} ステートメントのみが実行を許可されます",
     "enable-ddl-for-environment": "環境 {environment} に対して DDL/DML ステートメントを有効にすることができます。",
-    "want-to-action": "{want} が必要な場合は、「{action}」ボタン {reaction} をクリックしてください。",
     "and-submit-an-issue": "そしてイシューを提出してください",
     "to-enable-admin-mode": "管理者モードを有効にするには",
     "notify-empty-statement": "エディターに SQL ステートメントを入力してください",
-    "goto-edit-schema-hint": "エディタの上部からデータベース接続を選択してください",
     "can-not-execute-query": "データのロード中にクエリを実行できません",
     "rows": "記録",
     "vertical-display": "縦型表示",
@@ -1742,7 +1753,6 @@
     "format": "フォーマット",
     "sql-review-result": "SQLチェック結果",
     "visualize-explain": "視覚化の説明",
-    "sql-execute-in-production-environment": "実稼働データベースを使用していることに注意してください。",
     "rows-upper-limit": "クエリ結果の数が上限に達しました",
     "close-sheet": "ワークシートを閉じる",
     "connect": "接続する",
@@ -1830,7 +1840,13 @@
       "contact-the-admin-to-grant-access": "管理者に連絡してアクセスを許可してください。"
     },
     "upload-file": "ファイルをアップロードする",
-    "copy-selected-results": "選択したデータを{action}または{button}でコピーします"
+    "copy-selected-results": "選択したデータを{action}または{button}でコピーします",
+    "binary-format": "バイナリ形式",
+    "format-default": "デフォルト",
+    "hex-format": "16進形式",
+    "text-format": "テキスト形式",
+    "boolean-format": "ブール形式",
+    "column-display-format": "列表示形式"
   },
   "schema-editor": {
     "self": "スキーマエディタ",
@@ -2442,10 +2458,6 @@
     "edit": "データベースグループの編集",
     "matched-database": "マッチングデータベース",
     "unmatched-database": "データベースが一致しません",
-    "multitenancy": {
-      "self": "マルチテナント",
-      "description": "異なるテナント間で複数の同種データベースを 1 つのワークフローで管理できます。"
-    },
     "condition": {
       "self": "状態"
     },

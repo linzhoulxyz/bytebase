@@ -27,8 +27,6 @@ type Profile struct {
 	SaaS bool
 	// When enabled output logs in json format
 	EnableJSONLogging bool
-	// Whether the server is running in a docker container.
-	IsDocker bool
 	// Debug is the startup time debug
 	Debug bool
 	// DataDir is the directory stores the data including Bytebase's own database, backups, etc.
@@ -37,6 +35,8 @@ type Profile struct {
 	ResourceDir string
 	// Demo mode.
 	Demo bool
+	// HA replica mode.
+	HA bool
 
 	// Version is the bytebase's server version
 	Version string
@@ -47,10 +47,12 @@ type Profile struct {
 	// MetricConnectionKey is the connection key for metric.
 	MetricConnectionKey string
 
-	// LastActiveTs is the service last active timestamp, any API calls will refresh this value.
-	LastActiveTs int64
+	// LastActiveTS is the service last active timestamp, any API calls will refresh this value.
+	LastActiveTS int64
 	// Unique ID per Bytebase instance run.
 	DeployID string
+	// Whether the server is running in a docker container.
+	IsDocker bool
 
 	// can be set in runtime
 	RuntimeDebug atomic.Bool

@@ -43,32 +43,37 @@ const (
 
 // Issue object of issue.
 type Issue struct {
-	ID          int                `json:"id"`
-	Name        string             `json:"name"`
-	Status      string             `json:"status"`
-	Type        string             `json:"type"`
-	Description string             `json:"description"`
-	Creator     *store.UserMessage `json:"-"`
+	ID          int
+	Name        string
+	Status      string
+	Type        string
+	Description string
+	Creator     *store.UserMessage
+}
+
+type Rollout struct {
+	UID   int
+	Title string
 }
 
 type Stage struct {
-	Name string `json:"name"`
+	Name string
 }
 
 // TaskResult is the latest result of a task.
 // The `detail` field is only present if the status is TaskFailed.
 // The `SkippedReason` field is only present if the task is skipped.
 type TaskResult struct {
-	Name          string `json:"name"`
-	Status        string `json:"status"`
-	Detail        string `json:"detail"`
-	SkippedReason string `json:"skippedReason"`
+	Name          string
+	Status        string
+	Detail        string
+	SkippedReason string
 }
 
 // Project object of project.
 type Project struct {
-	Name  string `json:"name"`
-	Title string `json:"title"`
+	Name  string
+	Title string
 }
 
 // Context is the context of webhook.
@@ -83,8 +88,9 @@ type Context struct {
 	ActorID      int
 	ActorName    string
 	ActorEmail   string
-	CreatedTs    int64
+	CreatedTS    int64
 	Issue        *Issue
+	Rollout      *Rollout
 	Stage        *Stage
 	Project      *Project
 	TaskResult   *TaskResult
@@ -127,6 +133,13 @@ func (c *Context) GetMetaList() []Meta {
 			Name:  "Issue Description",
 			Value: common.TruncateStringWithDescription(c.Issue.Description),
 		})
+	} else if c.Rollout != nil {
+		if c.Rollout.Title != "" {
+			m = append(m, Meta{
+				Name:  "Rollout",
+				Value: c.Rollout.Title,
+			})
+		}
 	}
 
 	if c.Stage != nil {
@@ -137,10 +150,12 @@ func (c *Context) GetMetaList() []Meta {
 	}
 
 	if c.TaskResult != nil {
-		m = append(m, Meta{
-			Name:  "Task",
-			Value: c.TaskResult.Name,
-		})
+		if c.TaskResult.Name != "" {
+			m = append(m, Meta{
+				Name:  "Task",
+				Value: c.TaskResult.Name,
+			})
+		}
 		m = append(m, Meta{
 			Name:  "Status",
 			Value: c.TaskResult.Status,
@@ -188,6 +203,13 @@ func (c *Context) GetMetaListZh() []Meta {
 			Name:  "工单描述",
 			Value: common.TruncateStringWithDescription(c.Issue.Description),
 		})
+	} else if c.Rollout != nil {
+		if c.Rollout.Title != "" {
+			m = append(m, Meta{
+				Name:  "发布",
+				Value: c.Rollout.Title,
+			})
+		}
 	}
 
 	if c.Stage != nil {
@@ -198,10 +220,12 @@ func (c *Context) GetMetaListZh() []Meta {
 	}
 
 	if c.TaskResult != nil {
-		m = append(m, Meta{
-			Name:  "任务",
-			Value: c.TaskResult.Name,
-		})
+		if c.TaskResult.Name != "" {
+			m = append(m, Meta{
+				Name:  "任务",
+				Value: c.TaskResult.Name,
+			})
+		}
 		m = append(m, Meta{
 			Name:  "状态",
 			Value: c.TaskResult.Status,

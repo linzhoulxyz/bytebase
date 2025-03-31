@@ -12,6 +12,7 @@ import (
 
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	"github.com/bytebase/bytebase/backend/plugin/db/util"
+	"github.com/bytebase/bytebase/backend/plugin/parser/plsql"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
@@ -23,10 +24,10 @@ var (
 )
 
 // SyncInstance syncs the instance.
-func (driver *Driver) SyncInstance(ctx context.Context) (*db.InstanceMetadata, error) {
+func (d *Driver) SyncInstance(ctx context.Context) (*db.InstanceMetadata, error) {
 	var fullVersion string
 	queryVersion := "SELECT BANNER FROM v$version WHERE banner LIKE 'Oracle%'"
-	if err := driver.db.QueryRowContext(ctx, queryVersion).Scan(&fullVersion); err != nil {
+	if err := d.db.QueryRowContext(ctx, queryVersion).Scan(&fullVersion); err != nil {
 		return nil, util.FormatErrorWithQuery(err, queryVersion)
 	}
 	tokens := strings.Fields(fullVersion)
@@ -45,7 +46,7 @@ func (driver *Driver) SyncInstance(ctx context.Context) (*db.InstanceMetadata, e
 		version = fmt.Sprintf("%s (%s)", version, canonicalVersion)
 	}
 
-	txn, err := driver.db.BeginTx(ctx, nil)
+	txn, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +54,7 @@ func (driver *Driver) SyncInstance(ctx context.Context) (*db.InstanceMetadata, e
 
 	schemas, err := getSchemas(txn)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get schemas from database %q", driver.databaseName)
+		return nil, errors.Wrapf(err, "failed to get schemas from database %q", d.databaseName)
 	}
 	var databases []*storepb.DatabaseSchemaMetadata
 	for _, schema := range schemas {
@@ -74,36 +75,45 @@ func (driver *Driver) SyncInstance(ctx context.Context) (*db.InstanceMetadata, e
 }
 
 // SyncDBSchema syncs a single database schema.
-func (driver *Driver) SyncDBSchema(ctx context.Context) (*storepb.DatabaseSchemaMetadata, error) {
-	txn, err := driver.db.BeginTx(ctx, nil)
+func (d *Driver) SyncDBSchema(ctx context.Context) (*storepb.DatabaseSchemaMetadata, error) {
+	txn, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer txn.Rollback()
 
-	columnMap, err := getTableColumns(txn, driver.databaseName)
+	version, err := d.GetVersion()
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get table columns from database %q", driver.databaseName)
+		return nil, errors.Wrapf(err, "failed to get version")
 	}
-	tableMap, err := getTables(txn, driver.databaseName, columnMap)
+
+	columnMap, err := getTableColumns(txn, d.databaseName, version)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get tables from database %q", driver.databaseName)
+		return nil, errors.Wrapf(err, "failed to get table columns from database %q", d.databaseName)
 	}
-	viewMap, err := getViews(txn, driver.databaseName, columnMap)
+	tableTriggerMap, viewTriggerMap, err := getTriggers(txn, d.databaseName)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get views from database %q", driver.databaseName)
+		return nil, errors.Wrapf(err, "failed to get triggers from database %q", d.databaseName)
 	}
-	sequences, err := getSequences(txn, driver.databaseName)
+	tableMap, err := getTables(txn, d.databaseName, columnMap, tableTriggerMap)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get sequences from database %q", driver.databaseName)
+		return nil, errors.Wrapf(err, "failed to get tables from database %q", d.databaseName)
+	}
+	viewMap, err := getViews(txn, d.databaseName, columnMap, viewTriggerMap)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get views from database %q", d.databaseName)
+	}
+	sequences, err := getSequences(txn, d.databaseName)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get sequences from database %q", d.databaseName)
 	}
 	dbLinks, err := getDBLinks(txn)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get db links from database %q", driver.databaseName)
+		return nil, errors.Wrapf(err, "failed to get db links from database %q", d.databaseName)
 	}
-	functions, procedures, packages, err := getRoutines(txn, driver.databaseName)
+	functions, procedures, packages, err := getRoutines(txn, d.databaseName)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get routines from database %q", driver.databaseName)
+		return nil, errors.Wrapf(err, "failed to get routines from database %q", d.databaseName)
 	}
 
 	if err := txn.Commit(); err != nil {
@@ -111,14 +121,14 @@ func (driver *Driver) SyncDBSchema(ctx context.Context) (*storepb.DatabaseSchema
 	}
 
 	databaseMetadata := &storepb.DatabaseSchemaMetadata{
-		Name:            driver.databaseName,
-		ServiceName:     driver.serviceName,
+		Name:            d.databaseName,
+		ServiceName:     d.serviceName,
 		LinkedDatabases: dbLinks,
 	}
 	databaseMetadata.Schemas = append(databaseMetadata.Schemas, &storepb.SchemaMetadata{
 		Name:       "",
-		Tables:     tableMap[driver.databaseName],
-		Views:      viewMap[driver.databaseName],
+		Tables:     tableMap[d.databaseName],
+		Views:      viewMap[d.databaseName],
 		Sequences:  sequences,
 		Functions:  functions,
 		Procedures: procedures,
@@ -198,9 +208,67 @@ func getSchemas(txn *sql.Tx) ([]string, error) {
 	return result, nil
 }
 
+func getTriggers(txn *sql.Tx, schemaName string) (map[db.TableKey][]*storepb.TriggerMetadata, map[db.TableKey][]*storepb.TriggerMetadata, error) {
+	tableTriggerMap := make(map[db.TableKey][]*storepb.TriggerMetadata)
+	viewTriggerMap := make(map[db.TableKey][]*storepb.TriggerMetadata)
+
+	query := fmt.Sprintf(`
+		SELECT TRIGGER_NAME, TABLE_NAME, DESCRIPTION, TRIGGER_BODY, BASE_OBJECT_TYPE, TRIGGER_TYPE, TRIGGERING_EVENT
+		FROM sys.all_triggers
+		WHERE OWNER = '%s' AND TABLE_NAME is NOT NULL AND (BASE_OBJECT_TYPE = 'TABLE' OR BASE_OBJECT_TYPE = 'VIEW')
+		ORDER BY TRIGGER_NAME`, schemaName)
+
+	slog.Debug("running get triggers query")
+	rows, err := txn.Query(query)
+	if err != nil {
+		return nil, nil, util.FormatErrorWithQuery(err, query)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var triggerName, tableName, description, triggerBody, baseObjectType, triggerType, triggeringEvent sql.NullString
+		if err := rows.Scan(&triggerName, &tableName, &description, &triggerBody, &baseObjectType, &triggerType, &triggeringEvent); err != nil {
+			return nil, nil, err
+		}
+		if !triggerName.Valid || !tableName.Valid || !description.Valid || !triggerBody.Valid || !baseObjectType.Valid {
+			continue
+		}
+		key := db.TableKey{Schema: schemaName, Table: tableName.String}
+		trigger := &storepb.TriggerMetadata{
+			Name: triggerName.String,
+			Body: constructTriggerBody(description.String, triggerBody.String),
+		}
+		if triggerType.Valid {
+			trigger.Timing = triggerType.String
+		}
+		if triggeringEvent.Valid {
+			trigger.Event = triggeringEvent.String
+		}
+
+		if baseObjectType.String == "TABLE" {
+			tableTriggerMap[key] = append(tableTriggerMap[key], trigger)
+		} else {
+			viewTriggerMap[key] = append(viewTriggerMap[key], trigger)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, util.FormatErrorWithQuery(err, query)
+	}
+
+	return tableTriggerMap, viewTriggerMap, nil
+}
+
+func constructTriggerBody(description, triggerBody string) string {
+	var buf strings.Builder
+	_, _ = buf.WriteString("CREATE OR REPLACE TRIGGER ")
+	_, _ = buf.WriteString(description)
+	_, _ = buf.WriteString(triggerBody)
+	return buf.String()
+}
+
 // getTables gets all tables of a database.
-func getTables(txn *sql.Tx, schemaName string, columnMap map[db.TableKey][]*storepb.ColumnMetadata) (map[string][]*storepb.TableMetadata, error) {
-	indexMap, err := getIndexes(txn, schemaName)
+func getTables(txn *sql.Tx, schemaName string, columnMap map[db.TableKey][]*storepb.ColumnMetadata, triggerMap map[db.TableKey][]*storepb.TriggerMetadata) (map[string][]*storepb.TableMetadata, error) {
+	indexMap, checkConstraintMap, foreignKeyMap, err := getIndexesAndConstraints(txn, schemaName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get indices")
 	}
@@ -220,22 +288,13 @@ func getTables(txn *sql.Tx, schemaName string, columnMap map[db.TableKey][]*stor
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get table comments")
 	}
-	// TODO(d): foreign keys.
 	tableMap := make(map[string][]*storepb.TableMetadata)
-	query := ""
-	if schemaName == "" {
-		query = fmt.Sprintf(`
-		SELECT OWNER, TABLE_NAME, NUM_ROWS
-		FROM all_tables
-		WHERE OWNER NOT IN (%s) AND OWNER NOT LIKE 'APEX_%%'
-		ORDER BY OWNER, TABLE_NAME`, systemSchema)
-	} else {
-		query = fmt.Sprintf(`
+
+	query := fmt.Sprintf(`
 		SELECT OWNER, TABLE_NAME, NUM_ROWS
 		FROM all_tables
 		WHERE OWNER = '%s'
 		ORDER BY TABLE_NAME`, schemaName)
-	}
 
 	slog.Debug("running get tables query")
 	rows, err := txn.Query(query)
@@ -258,6 +317,9 @@ func getTables(txn *sql.Tx, schemaName string, columnMap map[db.TableKey][]*stor
 		key := db.TableKey{Schema: schemaName, Table: table.Name}
 		table.Columns = columnMap[key]
 		table.Indexes = indexMap[key]
+		table.CheckConstraints = checkConstraintMap[key]
+		table.ForeignKeys = foreignKeyMap[key]
+		table.Triggers = triggerMap[key]
 		if comment, ok := tableCommentMap[db.TableKey{Schema: schemaName, Table: table.Name}]; ok {
 			table.Comment = comment
 		}
@@ -358,25 +420,32 @@ func getTableColumnComments(txn *sql.Tx, schemaName string) (map[db.ColumnKey]st
 }
 
 // getTableColumns gets the columns of a table.
-func getTableColumns(txn *sql.Tx, schemaName string) (map[db.TableKey][]*storepb.ColumnMetadata, error) {
+func getTableColumns(txn *sql.Tx, schemaName string, version *plsql.Version) (map[db.TableKey][]*storepb.ColumnMetadata, error) {
 	columnsMap := make(map[db.TableKey][]*storepb.ColumnMetadata)
 
 	// https://github.com/bytebase/bytebase/issues/6663
 	// Invisible columns don't have column ID so that we need to filter out them.
 	query := ""
-	if schemaName == "" {
+	// https://docs.oracle.com/en/database/oracle/oracle-database/12.2/refrn/ALL_TAB_COLS.html#GUID-85036F42-140A-406B-BE11-0AC49A00DBA3
+	equalOrHigherThan12c2release := version.First > 12 || (version.First == 12 && version.Second >= 2)
+	if equalOrHigherThan12c2release {
 		query = fmt.Sprintf(`
 		SELECT
 			OWNER,
 			TABLE_NAME,
 			COLUMN_NAME,
 			DATA_TYPE,
+			DATA_LENGTH,
+			DATA_PRECISION,
+			DATA_SCALE,
 			COLUMN_ID,
 			DATA_DEFAULT,
-			NULLABLE
+			NULLABLE,
+			COLLATION,
+			DEFAULT_ON_NULL
 		FROM sys.all_tab_columns
-		WHERE OWNER NOT IN (%s) AND OWNER NOT LIKE 'APEX_%%' AND COLUMN_ID IS NOT NULL
-		ORDER BY OWNER, TABLE_NAME, COLUMN_ID`, systemSchema)
+		WHERE OWNER = '%s' AND COLUMN_ID IS NOT NULL
+		ORDER BY TABLE_NAME, COLUMN_ID`, schemaName)
 	} else {
 		query = fmt.Sprintf(`
 		SELECT
@@ -384,9 +453,14 @@ func getTableColumns(txn *sql.Tx, schemaName string) (map[db.TableKey][]*storepb
 			TABLE_NAME,
 			COLUMN_NAME,
 			DATA_TYPE,
+			DATA_LENGTH,
+			DATA_PRECISION,
+			DATA_SCALE,
 			COLUMN_ID,
 			DATA_DEFAULT,
-			NULLABLE
+			NULLABLE,
+			NULL,
+			NULL
 		FROM sys.all_tab_columns
 		WHERE OWNER = '%s' AND COLUMN_ID IS NOT NULL
 		ORDER BY TABLE_NAME, COLUMN_ID`, schemaName)
@@ -401,10 +475,25 @@ func getTableColumns(txn *sql.Tx, schemaName string) (map[db.TableKey][]*storepb
 	for rows.Next() {
 		column := &storepb.ColumnMetadata{}
 		var schemaName, tableName, nullable string
-		var defaultStr sql.NullString
-		if err := rows.Scan(&schemaName, &tableName, &column.Name, &column.Type, &column.Position, &defaultStr, &nullable); err != nil {
+		var defaultStr, collation, defaultOnNull sql.NullString
+		var dataLength, dataPrecision, dataScale sql.NullInt64
+		if err := rows.Scan(
+			&schemaName,
+			&tableName,
+			&column.Name,
+			&column.Type,
+			&dataLength,
+			&dataPrecision,
+			&dataScale,
+			&column.Position,
+			&defaultStr,
+			&nullable,
+			&collation,
+			&defaultOnNull,
+		); err != nil {
 			return nil, err
 		}
+		column.Type = getTypeString(column.Type, dataLength, dataPrecision, dataScale)
 		if defaultStr.Valid {
 			// TODO: use correct default type
 			column.DefaultValue = &storepb.ColumnMetadata_DefaultExpression{DefaultExpression: defaultStr.String}
@@ -414,7 +503,12 @@ func getTableColumns(txn *sql.Tx, schemaName string) (map[db.TableKey][]*storepb
 			return nil, err
 		}
 		column.Nullable = isNullBool
-		// TODO(d): add collation.
+		if collation.Valid {
+			column.Collation = collation.String
+		}
+		if defaultOnNull.Valid && defaultOnNull.String == "YES" {
+			column.DefaultOnNull = true
+		}
 
 		key := db.TableKey{Schema: schemaName, Table: tableName}
 		columnsMap[key] = append(columnsMap[key], column)
@@ -429,189 +523,329 @@ func getTableColumns(txn *sql.Tx, schemaName string) (map[db.TableKey][]*storepb
 	return columnsMap, nil
 }
 
-// getIndexes gets all indices of a database.
-func getIndexes(txn *sql.Tx, schemaName string) (map[db.TableKey][]*storepb.IndexMetadata, error) {
-	indexMap := make(map[db.TableKey][]*storepb.IndexMetadata)
+func getTypeString(dataType string, dataLength, dataPrecision, dataScale sql.NullInt64) string {
+	switch dataType {
+	case "VARCHAR2", "CHAR":
+		return fmt.Sprintf("%s(%d BYTE)", dataType, dataLength.Int64)
+	case "NVARCHAR2", "RAW", "UROWID", "NCHAR":
+		return fmt.Sprintf("%s(%d)", dataType, dataLength.Int64)
+	case "NUMBER":
+		switch {
+		case !dataPrecision.Valid || dataPrecision.Int64 == 0:
+		// do nothing
+		case dataPrecision.Valid && dataPrecision.Int64 > 0 && (!dataScale.Valid || dataScale.Int64 == 0):
+			return fmt.Sprintf("%s(%d)", dataType, dataPrecision.Int64)
+		case dataPrecision.Valid && dataPrecision.Int64 > 0 && dataScale.Valid && dataScale.Int64 > 0:
+			return fmt.Sprintf("%s(%d,%d)", dataType, dataPrecision.Int64, dataScale.Int64)
+		}
+	case "FLOAT":
+		switch {
+		case !dataPrecision.Valid || dataPrecision.Int64 == 0:
+		// do nothing
+		case dataPrecision.Valid && dataPrecision.Int64 > 0:
+			return fmt.Sprintf("%s(%d)", dataType, dataPrecision.Int64)
+		}
+	}
+	return dataType
+}
 
-	expressionsMap := make(map[db.IndexKey][]string)
-	queryColumn := ""
-	if schemaName == "" {
-		queryColumn = fmt.Sprintf(`
-		SELECT TABLE_OWNER, TABLE_NAME, INDEX_NAME, COLUMN_NAME
-		FROM sys.all_ind_columns
-		WHERE TABLE_OWNER NOT IN (%s) AND TABLE_OWNER NOT LIKE 'APEX_%%'
-		ORDER BY TABLE_OWNER, TABLE_NAME, INDEX_NAME, COLUMN_POSITION`, systemSchema)
-	} else {
-		queryColumn = fmt.Sprintf(`
-		SELECT TABLE_OWNER, TABLE_NAME, INDEX_NAME, COLUMN_NAME
+func getOuterSchemaRColumns(txn *sql.Tx, outerRTableMap map[db.ConstraintKey]string, outerRColumnMap map[db.ConstraintKey][]string, schemaName, constraintName string) (string, []string, error) {
+	queryColumns := fmt.Sprintf(`
+		SELECT
+			TABLE_NAME,
+			CONSTRAINT_NAME,
+			COLUMN_NAME
+		FROM
+			SYS.ALL_CONS_COLUMNS
+		WHERE
+			OWNER = '%s'
+		ORDER BY TABLE_NAME, CONSTRAINT_NAME, POSITION`, schemaName)
+
+	slog.Debug("running get outer schema reference columns query")
+	rows, err := txn.Query(queryColumns)
+	if err != nil {
+		return "", nil, util.FormatErrorWithQuery(err, queryColumns)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var tableName, constraintName string
+		var columnName sql.NullString
+		if err := rows.Scan(&tableName, &constraintName, &columnName); err != nil {
+			return "", nil, err
+		}
+		if !columnName.Valid {
+			continue
+		}
+		key := db.ConstraintKey{Schema: schemaName, Constraint: constraintName}
+		outerRTableMap[key] = tableName
+		outerRColumnMap[key] = append(outerRColumnMap[key], columnName.String)
+	}
+	if err := rows.Err(); err != nil {
+		return "", nil, util.FormatErrorWithQuery(err, queryColumns)
+	}
+
+	constraintKey := db.ConstraintKey{Schema: schemaName, Constraint: constraintName}
+	return outerRTableMap[constraintKey], outerRColumnMap[constraintKey], nil
+}
+
+func getConstraints(txn *sql.Tx, schemaName string) (
+	map[db.TableKey][]*storepb.IndexMetadata,
+	map[db.TableKey][]*storepb.CheckConstraintMetadata,
+	map[db.TableKey][]*storepb.ForeignKeyMetadata,
+	map[db.IndexKey]bool,
+	error,
+) {
+	queryConstraintColumns := fmt.Sprintf(`
+		SELECT
+			TABLE_NAME,
+			CONSTRAINT_NAME,
+			COLUMN_NAME
+		FROM SYS.ALL_CONS_COLUMNS
+		WHERE OWNER = '%s'
+		ORDER BY TABLE_NAME, CONSTRAINT_NAME, POSITION`, schemaName)
+
+	slog.Debug("running get constraint columns query")
+	constraintColumnRows, err := txn.Query(queryConstraintColumns)
+	if err != nil {
+		return nil, nil, nil, nil, util.FormatErrorWithQuery(err, queryConstraintColumns)
+	}
+	defer constraintColumnRows.Close()
+	constraintColumnMap := make(map[db.ConstraintKey][]string)
+	constraintTableMap := make(map[db.ConstraintKey]string)
+	for constraintColumnRows.Next() {
+		var tableName, constraintName string
+		var columnName sql.NullString
+		if err := constraintColumnRows.Scan(&tableName, &constraintName, &columnName); err != nil {
+			return nil, nil, nil, nil, err
+		}
+		key := db.ConstraintKey{Schema: schemaName, Constraint: constraintName}
+		if columnName.Valid {
+			constraintColumnMap[key] = append(constraintColumnMap[key], columnName.String)
+		}
+		constraintTableMap[key] = tableName
+	}
+	if err := constraintColumnRows.Err(); err != nil {
+		return nil, nil, nil, nil, util.FormatErrorWithQuery(err, queryConstraintColumns)
+	}
+
+	queryConstraints := fmt.Sprintf(`
+		SELECT
+			TABLE_NAME,
+			CONSTRAINT_NAME,
+			CONSTRAINT_TYPE,
+			SEARCH_CONDITION,
+			R_OWNER,
+			R_CONSTRAINT_NAME
+		FROM SYS.ALL_CONSTRAINTS
+		WHERE OWNER = '%s'
+		ORDER BY TABLE_NAME, CONSTRAINT_NAME`, schemaName)
+
+	slog.Debug("running get constraints query")
+	constraintRows, err := txn.Query(queryConstraints)
+	if err != nil {
+		return nil, nil, nil, nil, util.FormatErrorWithQuery(err, queryConstraints)
+	}
+	defer constraintRows.Close()
+	indexMap := make(map[db.TableKey][]*storepb.IndexMetadata)
+	checkConstraintMap := make(map[db.TableKey][]*storepb.CheckConstraintMetadata)
+	foreignKeyMap := make(map[db.TableKey][]*storepb.ForeignKeyMetadata)
+	isConstraint := make(map[db.IndexKey]bool)
+	outerRColumnMap := make(map[db.ConstraintKey][]string)
+	outerRTableMap := make(map[db.ConstraintKey]string)
+	for constraintRows.Next() {
+		var tableName, constraintName, constraintType string
+		var searchCondition, rOwner, rConstraintName sql.NullString
+		if err := constraintRows.Scan(&tableName, &constraintName, &constraintType, &searchCondition, &rOwner, &rConstraintName); err != nil {
+			return nil, nil, nil, nil, err
+		}
+		key := db.TableKey{Schema: schemaName, Table: tableName}
+		constraintKey := db.ConstraintKey{Schema: schemaName, Constraint: constraintName}
+		switch constraintType {
+		case "P":
+			index := &storepb.IndexMetadata{
+				Name:         constraintName,
+				Primary:      true,
+				Unique:       true,
+				IsConstraint: true,
+			}
+			if columns, ok := constraintColumnMap[constraintKey]; ok {
+				index.Expressions = columns
+			}
+			indexMap[key] = append(indexMap[key], index)
+			isConstraint[db.IndexKey{Schema: schemaName, Table: tableName, Index: constraintName}] = true
+		case "U":
+			index := &storepb.IndexMetadata{
+				Name:         constraintName,
+				Unique:       true,
+				IsConstraint: true,
+			}
+			if columns, ok := constraintColumnMap[constraintKey]; ok {
+				index.Expressions = columns
+			}
+			indexMap[key] = append(indexMap[key], index)
+			isConstraint[db.IndexKey{Schema: schemaName, Table: tableName, Index: constraintName}] = true
+		case "C":
+			constraint := &storepb.CheckConstraintMetadata{
+				Name: constraintName,
+			}
+			if searchCondition.Valid {
+				constraint.Expression = searchCondition.String
+			}
+			checkConstraintMap[key] = append(checkConstraintMap[key], constraint)
+		case "R":
+			if rOwner.Valid && rConstraintName.Valid {
+				foreignKey := &storepb.ForeignKeyMetadata{
+					Name:             constraintName,
+					Columns:          constraintColumnMap[constraintKey],
+					ReferencedSchema: rOwner.String,
+				}
+				if rOwner.String == schemaName {
+					rConstraintKey := db.ConstraintKey{Schema: rOwner.String, Constraint: rConstraintName.String}
+					foreignKey.ReferencedTable = constraintTableMap[rConstraintKey]
+					foreignKey.ReferencedColumns = constraintColumnMap[rConstraintKey]
+				} else {
+					foreignKey.ReferencedTable, foreignKey.ReferencedColumns, err = getOuterSchemaRColumns(txn, outerRTableMap, outerRColumnMap, rOwner.String, rConstraintName.String)
+					if err != nil {
+						return nil, nil, nil, nil, errors.Wrapf(err, "failed to get outer schema reference columns")
+					}
+				}
+				foreignKeyMap[key] = append(foreignKeyMap[key], foreignKey)
+			}
+		}
+	}
+	if err := constraintRows.Err(); err != nil {
+		return nil, nil, nil, nil, util.FormatErrorWithQuery(err, queryConstraints)
+	}
+
+	return indexMap, checkConstraintMap, foreignKeyMap, isConstraint, nil
+}
+
+// getIndexes gets all indices and constraints of a database.
+func getIndexesAndConstraints(txn *sql.Tx, schemaName string) (map[db.TableKey][]*storepb.IndexMetadata, map[db.TableKey][]*storepb.CheckConstraintMetadata, map[db.TableKey][]*storepb.ForeignKeyMetadata, error) {
+	indexMap, checkConstraintMap, foreignKeyMap, isConstraint, err := getConstraints(txn, schemaName)
+	if err != nil {
+		return nil, nil, nil, errors.Wrapf(err, "failed to get constraints")
+	}
+
+	queryColumn := fmt.Sprintf(`
+		SELECT TABLE_OWNER, TABLE_NAME, INDEX_NAME, COLUMN_NAME, DESCEND
 		FROM sys.all_ind_columns
 		WHERE TABLE_OWNER = '%s'
 		ORDER BY TABLE_NAME, INDEX_NAME, COLUMN_POSITION`, schemaName)
-	}
+
 	slog.Debug("running get index column query")
+	indexExpressionMap := make(map[db.IndexKey][]string)
+	indexColumnMap := make(map[db.IndexKey][]string)
+	descendingMap := make(map[db.IndexKey][]bool)
 	colRows, err := txn.Query(queryColumn)
 	if err != nil {
-		return nil, util.FormatErrorWithQuery(err, queryColumn)
+		return nil, nil, nil, util.FormatErrorWithQuery(err, queryColumn)
 	}
 	defer colRows.Close()
 	for colRows.Next() {
 		var schemaName, tableName, indexName, columnName string
-		if err := colRows.Scan(&schemaName, &tableName, &indexName, &columnName); err != nil {
-			return nil, err
+		var descend sql.NullString
+		if err := colRows.Scan(&schemaName, &tableName, &indexName, &columnName, &descend); err != nil {
+			return nil, nil, nil, err
 		}
 		key := db.IndexKey{Schema: schemaName, Table: tableName, Index: indexName}
-		expressionsMap[key] = append(expressionsMap[key], columnName)
+		indexColumnMap[key] = append(indexColumnMap[key], columnName)
+		descendingMap[key] = append(descendingMap[key], descend.String == "DESC")
 	}
 	if err := colRows.Err(); err != nil {
-		return nil, util.FormatErrorWithQuery(err, queryColumn)
+		return nil, nil, nil, util.FormatErrorWithQuery(err, queryColumn)
 	}
 	if err := colRows.Close(); err != nil {
-		return nil, errors.Wrapf(err, "failed to close rows")
+		return nil, nil, nil, errors.Wrapf(err, "failed to close rows")
 	}
 
-	queryExpression := ""
-	if schemaName == "" {
-		queryExpression = fmt.Sprintf(`
-		SELECT TABLE_OWNER, TABLE_NAME, INDEX_NAME, COLUMN_EXPRESSION, COLUMN_POSITION
-		FROM sys.all_ind_expressions
-		WHERE TABLE_OWNER NOT IN (%s) AND TABLE_OWNER NOT LIKE 'APEX_%%'
-		ORDER BY TABLE_OWNER, TABLE_NAME, INDEX_NAME, COLUMN_POSITION`, systemSchema)
-	} else {
-		queryExpression = fmt.Sprintf(`
-		SELECT TABLE_OWNER, TABLE_NAME, INDEX_NAME, COLUMN_EXPRESSION, COLUMN_POSITION
+	queryExpression := fmt.Sprintf(`
+		SELECT TABLE_OWNER, TABLE_NAME, INDEX_NAME, COLUMN_EXPRESSION
 		FROM sys.all_ind_expressions
 		WHERE TABLE_OWNER = '%s'
 		ORDER BY TABLE_NAME, INDEX_NAME, COLUMN_POSITION`, schemaName)
-	}
+
 	slog.Debug("running get index expression query")
 	expRows, err := txn.Query(queryExpression)
 	if err != nil {
-		return nil, util.FormatErrorWithQuery(err, queryExpression)
+		return nil, nil, nil, util.FormatErrorWithQuery(err, queryExpression)
 	}
 	defer expRows.Close()
 	for expRows.Next() {
 		var schemaName, tableName, indexName, columnExpression string
-		var position int
-		if err := expRows.Scan(&schemaName, &tableName, &indexName, &columnExpression, &position); err != nil {
-			return nil, err
+		if err := expRows.Scan(&schemaName, &tableName, &indexName, &columnExpression); err != nil {
+			return nil, nil, nil, err
 		}
 		key := db.IndexKey{Schema: schemaName, Table: tableName, Index: indexName}
-		// Position starts from 1.
-		expIndex := position - 1
-		if expIndex >= len(expressionsMap[key]) {
-			return nil, errors.Errorf("expression %q position %v out of range for index %q.%q.%q", columnExpression, position, schemaName, tableName, indexName)
-		}
-		expressionsMap[key][expIndex] = columnExpression
+		indexExpressionMap[key] = append(indexExpressionMap[key], columnExpression)
 	}
 	if err := expRows.Err(); err != nil {
-		return nil, util.FormatErrorWithQuery(err, queryExpression)
+		return nil, nil, nil, util.FormatErrorWithQuery(err, queryExpression)
 	}
 	if err := expRows.Close(); err != nil {
-		return nil, errors.Wrapf(err, "failed to close rows")
+		return nil, nil, nil, errors.Wrapf(err, "failed to close rows")
 	}
 
-	pkMap := make(map[db.TableKey]string)
-	queryPK := ""
-	if schemaName == "" {
-		queryPK = fmt.Sprintf(`
-		SELECT OWNER, TABLE_NAME, CONSTRAINT_NAME
-		FROM sys.all_constraints
-		WHERE OWNER NOT IN (%s) AND OWNER NOT LIKE 'APEX_%%' AND CONSTRAINT_TYPE = 'P'
-		ORDER BY OWNER, TABLE_NAME, CONSTRAINT_NAME`, systemSchema)
-	} else {
-		queryPK = fmt.Sprintf(`
-		SELECT OWNER, TABLE_NAME, CONSTRAINT_NAME
-		FROM sys.all_constraints
-		WHERE OWNER = '%s' AND CONSTRAINT_TYPE = 'P'
-		ORDER BY TABLE_NAME, CONSTRAINT_NAME`, schemaName)
-	}
-	slog.Debug("running get primary key query")
-	pkRows, err := txn.Query(queryPK)
-	if err != nil {
-		return nil, util.FormatErrorWithQuery(err, queryPK)
-	}
-	defer pkRows.Close()
-	for pkRows.Next() {
-		var schemaName, tableName, pkName string
-		if err := pkRows.Scan(&schemaName, &tableName, &pkName); err != nil {
-			return nil, err
-		}
-		key := db.TableKey{Schema: schemaName, Table: tableName}
-		pkMap[key] = pkName
-	}
-	if err := pkRows.Err(); err != nil {
-		return nil, util.FormatErrorWithQuery(err, queryPK)
-	}
-
-	query := ""
-	if schemaName == "" {
-		query = fmt.Sprintf(`
-		SELECT OWNER, TABLE_NAME, INDEX_NAME, UNIQUENESS, INDEX_TYPE
-		FROM sys.all_indexes
-		WHERE OWNER NOT IN (%s) AND OWNER NOT LIKE 'APEX_%%'
-		ORDER BY OWNER, TABLE_NAME, INDEX_NAME`, systemSchema)
-	} else {
-		query = fmt.Sprintf(`
-		SELECT OWNER, TABLE_NAME, INDEX_NAME, UNIQUENESS, INDEX_TYPE
+	query := fmt.Sprintf(`
+		SELECT OWNER, TABLE_NAME, INDEX_NAME, UNIQUENESS, INDEX_TYPE, VISIBILITY
 		FROM sys.all_indexes
 		WHERE OWNER = '%s'
 		ORDER BY TABLE_NAME, INDEX_NAME`, schemaName)
-	}
+
 	slog.Debug("running get index query")
 	rows, err := txn.Query(query)
 	if err != nil {
-		return nil, util.FormatErrorWithQuery(err, query)
+		return nil, nil, nil, util.FormatErrorWithQuery(err, query)
 	}
 	defer rows.Close()
 	for rows.Next() {
 		index := &storepb.IndexMetadata{}
 		var schemaName, tableName, unique string
+		var visibility sql.NullString
 		// INDEX_TYPE is NORMAL, or FUNCTION-BASED NORMAL.
-		if err := rows.Scan(&schemaName, &tableName, &index.Name, &unique, &index.Type); err != nil {
-			return nil, err
+		if err := rows.Scan(&schemaName, &tableName, &index.Name, &unique, &index.Type, &visibility); err != nil {
+			return nil, nil, nil, err
+		}
+		if isConstraint[db.IndexKey{Schema: schemaName, Table: tableName, Index: index.Name}] {
+			continue
 		}
 
 		index.Unique = unique == "UNIQUE"
 		indexKey := db.IndexKey{Schema: schemaName, Table: tableName, Index: index.Name}
-		index.Expressions = expressionsMap[indexKey]
-
-		if pkName, ok := pkMap[db.TableKey{Schema: schemaName, Table: tableName}]; ok && pkName == index.Name {
-			index.Primary = true
+		if index.Type == "FUNCTION-BASED" {
+			index.Expressions = indexExpressionMap[indexKey]
+		} else {
+			index.Expressions = indexColumnMap[indexKey]
+		}
+		index.Visible = true
+		if visibility.Valid && visibility.String == "INVISIBLE" {
+			index.Visible = false
 		}
 
 		key := db.TableKey{Schema: schemaName, Table: tableName}
 		indexMap[key] = append(indexMap[key], index)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, util.FormatErrorWithQuery(err, query)
+		return nil, nil, nil, util.FormatErrorWithQuery(err, query)
 	}
 	if err := rows.Close(); err != nil {
-		return nil, errors.Wrapf(err, "failed to close rows")
+		return nil, nil, nil, errors.Wrapf(err, "failed to close rows")
 	}
 
-	return indexMap, nil
+	return indexMap, checkConstraintMap, foreignKeyMap, nil
 }
 
 // getViews gets all views of a database.
-func getViews(txn *sql.Tx, schemaName string, columnMap map[db.TableKey][]*storepb.ColumnMetadata) (map[string][]*storepb.ViewMetadata, error) {
+func getViews(txn *sql.Tx, schemaName string, columnMap map[db.TableKey][]*storepb.ColumnMetadata, triggerMap map[db.TableKey][]*storepb.TriggerMetadata) (map[string][]*storepb.ViewMetadata, error) {
 	viewMap := make(map[string][]*storepb.ViewMetadata)
 
-	query := ""
-	if schemaName == "" {
-		query = fmt.Sprintf(`
-		SELECT OWNER, VIEW_NAME, TEXT
-		FROM sys.all_views
-		WHERE OWNER NOT IN (%s) AND OWNER NOT LIKE 'APEX_%%'
-		ORDER BY owner, view_name
-	`, systemSchema)
-	} else {
-		query = fmt.Sprintf(`
+	query := fmt.Sprintf(`
 		SELECT OWNER, VIEW_NAME, TEXT
 		FROM sys.all_views
 		WHERE OWNER = '%s'
 		ORDER BY view_name
 	`, schemaName)
-	}
 
 	slog.Debug("running get view query")
 	rows, err := txn.Query(query)
@@ -627,6 +861,7 @@ func getViews(txn *sql.Tx, schemaName string, columnMap map[db.TableKey][]*store
 		}
 		key := db.TableKey{Schema: schemaName, Table: view.Name}
 		view.Columns = columnMap[key]
+		view.Triggers = triggerMap[key]
 
 		viewMap[schemaName] = append(viewMap[schemaName], view)
 	}

@@ -19,6 +19,7 @@ import {
   extractEnvironmentResourceName,
   extractProjectResourceName,
   supportedEngineV1List,
+  getDefaultPagination,
 } from "@/utils";
 
 export const sourceText = (source: Risk_Source) => {
@@ -76,9 +77,10 @@ const NumberFactorList = [
 const StringFactorList = [
   "environment_id", // using `environment.resource_id`
   "project_id", // using `project.resource_id`
-  "database_name",
   "db_engine",
   "sql_type",
+  "database_name",
+  "schema_name",
   "table_name",
 ] as const;
 
@@ -113,7 +115,9 @@ export const RiskSourceFactorMap: Map<Risk_Source, string[]> = new Map([
       without(
         [...StringFactorList],
         "sql_type",
+        "schema_name",
         "table_name",
+        "table_rows",
         "expiration_days",
         "export_rows"
       )
@@ -129,9 +133,7 @@ export const RiskSourceFactorMap: Map<Risk_Source, string[]> = new Map([
         "table_rows",
         "source",
         "sql_type",
-        "table_name",
-        "expiration_days",
-        "export_rows"
+        "expiration_days"
       )
     ),
   ],
@@ -145,7 +147,6 @@ export const RiskSourceFactorMap: Map<Risk_Source, string[]> = new Map([
         "affected_rows",
         "table_rows",
         "sql_type",
-        "table_name",
         "export_rows"
       )
     ),
@@ -159,8 +160,7 @@ export const RiskSourceFactorMap: Map<Risk_Source, string[]> = new Map([
         "source",
         "affected_rows",
         "table_rows",
-        "sql_type",
-        "table_name"
+        "sql_type"
       )
     ),
   ],
@@ -271,7 +271,12 @@ export const getOptionConfigMap = (source: Risk_Source) => {
           options: getProjectIdOptions(projectStore.getProjectList()),
           search: async (keyword: string) => {
             return projectStore
-              .fetchProjectList({ query: keyword })
+              .fetchProjectList({
+                pageSize: getDefaultPagination(),
+                filter: {
+                  query: keyword,
+                },
+              })
               .then((resp) => getProjectIdOptions(resp.projects));
           },
         });

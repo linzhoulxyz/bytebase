@@ -76,7 +76,7 @@ type tableState struct {
 }
 
 func (t *tableState) toString(buf *strings.Builder) error {
-	if _, err := buf.WriteString(fmt.Sprintf("CREATE TABLE `%s` (\n  ", t.name)); err != nil {
+	if _, err := fmt.Fprintf(buf, "CREATE TABLE `%s` (\n  ", t.name); err != nil {
 		return err
 	}
 	columns := []*columnState{}
@@ -146,19 +146,19 @@ func (t *tableState) toString(buf *strings.Builder) error {
 	}
 
 	if t.engine != "" {
-		if _, err := buf.WriteString(fmt.Sprintf(" ENGINE=%s", t.engine)); err != nil {
+		if _, err := fmt.Fprintf(buf, " ENGINE=%s", t.engine); err != nil {
 			return err
 		}
 	}
 
 	if t.collation != "" {
-		if _, err := buf.WriteString(fmt.Sprintf(" COLLATE=%s", t.collation)); err != nil {
+		if _, err := fmt.Fprintf(buf, " COLLATE=%s", t.collation); err != nil {
 			return err
 		}
 	}
 
 	if t.comment != "" {
-		if _, err := buf.WriteString(fmt.Sprintf(" COMMENT '%s'", t.comment)); err != nil {
+		if _, err := fmt.Fprintf(buf, " COMMENT '%s'", t.comment); err != nil {
 			return err
 		}
 	}
@@ -311,7 +311,7 @@ func (i *indexState) toString(buf *strings.Builder) error {
 					return err
 				}
 			}
-			if _, err := buf.WriteString(fmt.Sprintf("`%s`", key)); err != nil {
+			if _, err := fmt.Fprintf(buf, "`%s`", key); err != nil {
 				return err
 			}
 		}
@@ -337,7 +337,7 @@ func (i *indexState) toString(buf *strings.Builder) error {
 			}
 		}
 
-		if _, err := buf.WriteString(fmt.Sprintf("`%s` (", i.name)); err != nil {
+		if _, err := fmt.Fprintf(buf, "`%s` (", i.name); err != nil {
 			return err
 		}
 		for j, key := range i.keys {
@@ -918,7 +918,7 @@ type columnState struct {
 
 func (c *columnState) toString(buf *strings.Builder) error {
 	columnCanonicalType := tidb.GetColumnTypeCanonicalSynonym(strings.ToLower(c.tp))
-	if _, err := buf.WriteString(fmt.Sprintf("`%s` %s", c.name, columnCanonicalType)); err != nil {
+	if _, err := fmt.Fprintf(buf, "`%s` %s", c.name, columnCanonicalType); err != nil {
 		return err
 	}
 	if !c.nullable {
@@ -937,23 +937,23 @@ func (c *columnState) toString(buf *strings.Builder) error {
 					return err
 				}
 			} else if strings.Contains(strings.ToUpper(c.defaultValue.toString()), autoRandSymbol) {
-				if _, err := buf.WriteString(fmt.Sprintf(" /*T![auto_rand] %s */", c.defaultValue.toString())); err != nil {
+				if _, err := fmt.Fprintf(buf, " /*T![auto_rand] %s */", c.defaultValue.toString()); err != nil {
 					return err
 				}
 			} else {
-				if _, err := buf.WriteString(fmt.Sprintf(" DEFAULT %s", c.defaultValue.toString())); err != nil {
+				if _, err := fmt.Fprintf(buf, " DEFAULT %s", c.defaultValue.toString()); err != nil {
 					return err
 				}
 			}
 		}
 	}
 	if c.onUpdate != "" {
-		if _, err := buf.WriteString(fmt.Sprintf(" ON UPDATE %s", c.onUpdate)); err != nil {
+		if _, err := fmt.Fprintf(buf, " ON UPDATE %s", c.onUpdate); err != nil {
 			return err
 		}
 	}
 	if c.comment != "" {
-		if _, err := buf.WriteString(fmt.Sprintf(" COMMENT '%s'", c.comment)); err != nil {
+		if _, err := fmt.Fprintf(buf, " COMMENT '%s'", c.comment); err != nil {
 			return err
 		}
 	}

@@ -11,18 +11,16 @@
       code: 402
       title: column.no-null
       content: Column [age] is nullable, which is not allowed.
-      detail: ""
       startposition:
-        line: 4
+        line: 3
         column: 0
       endposition: null
     - status: 2
       code: 402
       title: column.no-null
       content: Column [address] is nullable, which is not allowed.
-      detail: ""
       startposition:
-        line: 5
+        line: 4
         column: 0
       endposition: null
 - statement: |-
@@ -39,9 +37,8 @@
       code: 402
       title: column.no-null
       content: Column [address] is nullable, which is not allowed.
-      detail: ""
       startposition:
-        line: 5
+        line: 4
         column: 0
       endposition: null
 - statement: ALTER TABLE MyTable ALTER COLUMN Name VARCHAR(100) NULL;
@@ -51,9 +48,8 @@
       code: 402
       title: column.no-null
       content: Column [name] is nullable, which is not allowed.
-      detail: ""
       startposition:
-        line: 1
+        line: 0
         column: 0
       endposition: null
 - statement: ALTER TABLE MyTable ALTER COLUMN Name VARCHAR(100) NOT NULL;
@@ -65,9 +61,8 @@
       code: 402
       title: column.no-null
       content: Column [age] is nullable, which is not allowed.
-      detail: ""
       startposition:
-        line: 1
+        line: 0
         column: 0
       endposition: null
 - statement: ALTER TABLE MyTable ADD Age INT NULL;
@@ -77,9 +72,8 @@
       code: 402
       title: column.no-null
       content: Column [age] is nullable, which is not allowed.
-      detail: ""
       startposition:
-        line: 1
+        line: 0
         column: 0
       endposition: null
 - statement: ALTER TABLE MyTable ADD Age INT NOT NULL;

@@ -34,14 +34,10 @@ import {
   defaultProject,
   DEFAULT_PROJECT_NAME,
   UNKNOWN_PROJECT_NAME,
+  isValidProjectName,
 } from "@/types";
-import { State } from "@/types/proto/v1/common";
 import type { Project } from "@/types/proto/v1/project_service";
-import {
-  extractProjectResourceName,
-  hasWorkspacePermissionV2,
-  getDefaultPagination,
-} from "@/utils";
+import { hasWorkspacePermissionV2, getDefaultPagination } from "@/utils";
 import ResourceSelect from "./ResourceSelect.vue";
 
 const props = withDefaults(
@@ -52,7 +48,6 @@ const props = withDefaults(
     allowedProjectRoleList?: string[]; // Empty array([]) to "ALL"
     includeAll?: boolean;
     includeDefaultProject?: boolean;
-    includeArchived?: boolean;
     multiple?: boolean;
     renderSuffix?: (project: string) => string;
     filter?: (project: ComposedProject, index: number) => boolean;
@@ -65,7 +60,6 @@ const props = withDefaults(
     allowedProjectRoleList: () => [],
     includeAll: false,
     includeDefaultProject: false,
-    includeArchived: false,
     multiple: false,
     filter: () => true,
     renderSuffix: () => "",
@@ -91,23 +85,23 @@ const state = reactive<LocalState>({
   rawProjectList: [],
 });
 
-const initProjectList = () => {
-  if (
-    props.projectName &&
-    props.projectName !== DEFAULT_PROJECT_NAME &&
-    props.projectName !== UNKNOWN_PROJECT_NAME &&
-    isOrphanValue.value
-  ) {
-    // It may happen the selected id might not be in the project list.
-    // e.g. the selected project is deleted after the selection and we
-    // are unable to cleanup properly. In such case, the selected project id
-    // is orphaned and we just display the id
-    const dummyProject = {
-      ...unknownProject(),
-      name: props.projectName,
-      title: extractProjectResourceName(props.projectName),
-    };
-    state.rawProjectList.unshift(dummyProject);
+const initSelectedProjects = async (projectNames: string[]) => {
+  for (const projectName of projectNames) {
+    if (isValidProjectName(projectName)) {
+      const project = await projectStore.getOrFetchProjectByName(projectName);
+      if (!state.rawProjectList.find((p) => p.name === project.name)) {
+        state.rawProjectList.unshift(project);
+      }
+    }
+  }
+};
+
+const initProjectList = async () => {
+  if (props.projectName) {
+    await initSelectedProjects([props.projectName]);
+  }
+  if (props.projectNames) {
+    await initSelectedProjects(props.projectNames);
   }
 
   if (
@@ -134,22 +128,8 @@ const hasWorkspaceManageProjectPermission = computed(() =>
   hasWorkspacePermissionV2("bb.projects.list")
 );
 
-const isOrphanValue = computed(() => {
-  if (props.projectName === undefined) return false;
-
-  return !state.rawProjectList.find((proj) => proj.name === props.projectName);
-});
-
 const combinedProjectList = computed(() => {
-  let list = state.rawProjectList.filter((project) => {
-    if (project.name === DEFAULT_PROJECT_NAME && !props.includeDefaultProject)
-      return false;
-    if (props.includeArchived) return true;
-    if (project.state === State.ACTIVE) return true;
-    // ARCHIVED
-    if (project.name === props.projectName) return true;
-    return false;
-  });
+  let list = [...state.rawProjectList];
 
   // If the current user is not workspace admin/DBA, filter the project list by the given role list.
   if (
@@ -173,18 +153,20 @@ const handleSearch = useDebounceFn(async (search: string) => {
   state.loading = true;
   try {
     const { projects } = await projectStore.fetchProjectList({
-      query: search,
+      filter: {
+        query: search,
+        excludeDefault: !props.includeDefaultProject,
+      },
       pageSize: getDefaultPagination(),
-      showDeleted: props.includeArchived,
     });
     state.rawProjectList = projects;
     if (!search) {
-      initProjectList();
+      await initProjectList();
     }
   } finally {
     state.loading = false;
   }
-}, 500);
+}, 200);
 
 onMounted(async () => {
   await handleSearch("");

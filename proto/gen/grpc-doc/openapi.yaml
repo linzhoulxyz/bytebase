@@ -1087,8 +1087,7 @@ paths:
                 - name: pageSize
                   in: query
                   description: |-
-                    Not used.
-                     The maximum number of instances to return. The service may return fewer than
+                    The maximum number of instances to return. The service may return fewer than
                      this value.
                      If unspecified, at most 10 instances will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
@@ -1098,8 +1097,7 @@ paths:
                 - name: pageToken
                   in: query
                   description: |-
-                    Not used.
-                     A page token, received from a previous `ListInstances` call.
+                    A page token, received from a previous `ListInstances` call.
                      Provide this to retrieve the subsequent page.
 
                      When paginating, all other parameters provided to `ListInstances` must match
@@ -1111,6 +1109,38 @@ paths:
                   description: Show deleted instances if specified.
                   schema:
                     type: boolean
+                - name: filter
+                  in: query
+                  description: |-
+                    Filter the project.
+                     Supported filters:
+                     - name
+                     - resource_id
+                     - environment
+                     - state
+                     - engine
+                     - host
+                     - port
+                     - project
+
+                     For example:
+                     name == "sample instance"
+                     name.matches("sample")
+                     resource_id = "sample-instance"
+                     resource_id.matches("sample")
+                     state == "DELETED"
+                     environment == "environments/test"
+                     engine == "MYSQL"
+                     engine in ["MYSQL", "POSTGRES"]
+                     !(engine in ["MYSQL", "POSTGRES"])
+                     host == "127.0.0.1"
+                     port == "54321"
+                     project == "projects/sample-project"
+                     You can combine filter conditions like:
+                     name.matches("sample") && environment == "environments/test"
+                     host == "127.0.0.1" && port == "54321"
+                  schema:
+                    type: string
             responses:
                 "200":
                     description: OK
@@ -1307,6 +1337,8 @@ paths:
                      label == "tenant:asia,europe"
                      label == "region:asia" && label == "tenant:bytebase"
                      exclude_unassigned == true
+                     You can combine filter conditions like:
+                     environment == "environments/prod" && name.matches("employee")
                   schema:
                     type: string
                 - name: showDeleted
@@ -1673,20 +1705,19 @@ paths:
                   required: true
                   schema:
                     type: string
-                - name: view
-                  in: query
-                  description: The view to return. Defaults to DATABASE_METADATA_VIEW_BASIC.
-                  schema:
-                    enum:
-                        - DATABASE_METADATA_VIEW_UNSPECIFIED
-                        - DATABASE_METADATA_VIEW_BASIC
-                        - DATABASE_METADATA_VIEW_FULL
-                    type: string
-                    format: enum
                 - name: filter
                   in: query
                   description: |-
-                    The filter used for a specific schema object such as
+                    Filter is used to filter databases returned in the list.
+                     Supported filter:
+                     - schema
+                     - table
+
+                     For example:
+                     schema == "schema-a"
+                     table == "table-a"
+                     schema == "schema-a" && table == "table-a"
+                     The filter used for a specific schema object such as
                      "schemas/schema-a/tables/table-a".
                      The column masking level will only be returned when a table filter is used.
                   schema:
@@ -4043,6 +4074,8 @@ paths:
                      label == "tenant:asia,europe"
                      label == "region:asia" && label == "tenant:bytebase"
                      exclude_unassigned == true
+                     You can combine filter conditions like:
+                     environment == "environments/prod" && name.matches("employee")
                   schema:
                     type: string
                 - name: showDeleted
@@ -6940,6 +6973,30 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/sql/aiCompletion:
+        post:
+            tags:
+                - SQLService
+            operationId: SQLService_AICompletion
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/AICompletionRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AICompletionResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/sql/check:
         post:
             tags:
@@ -7096,6 +7153,7 @@ paths:
                      - email
                      - user_type
                      - state
+                     - project
 
                      For example:
                      name == "ed"
@@ -7106,6 +7164,10 @@ paths:
                      user_type in ["SERVICE_ACCOUNT", "USER"]
                      !(user_type in ["SERVICE_ACCOUNT", "USER"])
                      state == "DELETED"
+                     project == "projects/sample-project"
+                     You can combine filter conditions like:
+                     name.matches("ed") && project == "projects/sample-project"
+                     (name == "ed" || email == "ed@bytebase.com") && project == "projects/sample-project"
                   schema:
                     type: string
             responses:
@@ -7280,33 +7342,6 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/User'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
-    /v1/users:stat:
-        post:
-            tags:
-                - UserService
-            description: |-
-                Get user stat.
-                 Any authenticated user can get stat.
-            operationId: UserService_StatUsers
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/StatUsersRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/StatUsersResponse'
                 default:
                     description: Default error response
                     content:
@@ -7572,6 +7607,8 @@ paths:
                      label == "tenant:asia,europe"
                      label == "region:asia" && label == "tenant:bytebase"
                      exclude_unassigned == true
+                     You can combine filter conditions like:
+                     environment == "environments/prod" && name.matches("employee")
                   schema:
                     type: string
                 - name: showDeleted
@@ -7701,6 +7738,57 @@ paths:
                                 $ref: '#/components/schemas/Status'
 components:
     schemas:
+        AICompletionRequest:
+            type: object
+            properties:
+                messages:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AICompletionRequest_Message'
+        AICompletionRequest_Message:
+            type: object
+            properties:
+                role:
+                    type: string
+                content:
+                    type: string
+        AICompletionResponse:
+            type: object
+            properties:
+                candidates:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AICompletionResponse_Candidate'
+                    description: |-
+                        candidates is used for results with multiple choices and candidates. Used
+                         for OpenAI and Gemini.
+        AICompletionResponse_Candidate:
+            type: object
+            properties:
+                content:
+                    $ref: '#/components/schemas/Candidate_Content'
+        AISetting:
+            type: object
+            properties:
+                enabled:
+                    type: boolean
+                provider:
+                    enum:
+                        - PROVIDER_UNSPECIFIED
+                        - OPEN_AI
+                        - CLAUDE
+                        - GEMINI
+                        - AZURE_OPENAI
+                    type: string
+                    format: enum
+                endpoint:
+                    type: string
+                apiKey:
+                    type: string
+                model:
+                    type: string
+                version:
+                    type: string
         ActuatorInfo:
             type: object
             properties:
@@ -7772,9 +7860,40 @@ components:
                 docker:
                     type: boolean
                     description: docker flag means if the Bytebase instance is running in docker.
+                userStats:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ActuatorInfo_StatUser'
+                activatedInstanceCount:
+                    type: integer
+                    format: int32
+                totalInstanceCount:
+                    type: integer
+                    format: int32
             description: |-
                 ServerInfo is the API message for server info.
                  Actuator concept is similar to the Spring Boot Actuator.
+        ActuatorInfo_StatUser:
+            type: object
+            properties:
+                userType:
+                    enum:
+                        - USER_TYPE_UNSPECIFIED
+                        - USER
+                        - SYSTEM_BOT
+                        - SERVICE_ACCOUNT
+                    type: string
+                    format: enum
+                state:
+                    enum:
+                        - STATE_UNSPECIFIED
+                        - ACTIVE
+                        - DELETED
+                    type: string
+                    format: enum
+                count:
+                    type: integer
+                    format: int32
         AddDataSourceRequest:
             required:
                 - name
@@ -7843,7 +7962,9 @@ components:
                 startPosition:
                     allOf:
                         - $ref: '#/components/schemas/Position'
-                    description: 1-based positions of the sql statment.
+                    description: |-
+                        The start_position is inclusive and the end_position is exclusive.
+                         TODO: use range instead.
                 endPosition:
                     $ref: '#/components/schemas/Position'
         AgentPluginSetting:
@@ -8390,6 +8511,14 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/Expr'
                     description: The parsed expression of the condition.
+        Candidate_Content:
+            type: object
+            properties:
+                parts:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Content_Part'
+                    description: parts is used for a result content with multiple parts.
         ChangeDatabaseConfig_PreUpdateBackupDetail:
             type: object
             properties:
@@ -8711,6 +8840,11 @@ components:
                     type: string
                 defaultExpression:
                     type: string
+                defaultOnNull:
+                    type: boolean
+                    description: |-
+                        Oracle specific metadata.
+                         The default_on_null is the default on null of a column.
                 onUpdate:
                     type: string
                     description: |-
@@ -8741,6 +8875,8 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/GenerationMetadata'
                     description: The generation is the generation of a column.
+                isIdentity:
+                    type: boolean
                 identityGeneration:
                     enum:
                         - IDENTITY_GENERATION_UNSPECIFIED
@@ -8749,7 +8885,18 @@ components:
                     type: string
                     description: The identity_generation is for identity columns, PG only.
                     format: enum
+                identitySeed:
+                    type: string
+                    description: The identity_seed is for identity columns, MSSQL only.
+                identityIncrement:
+                    type: string
+                    description: The identity_increment is for identity columns, MSSQL only.
             description: ColumnMetadata is the metadata for columns.
+        Content_Part:
+            type: object
+            properties:
+                text:
+                    type: string
         CreateSheetRequest:
             required:
                 - parent
@@ -9149,8 +9296,6 @@ components:
                     items:
                         $ref: '#/components/schemas/DatabaseGroup_Database'
                     description: The list of databases that match the database group condition.
-                multitenancy:
-                    type: boolean
         DatabaseGroup_Database:
             type: object
             properties:
@@ -9243,12 +9388,15 @@ components:
                         - DATABRICKS
                         - COCKROACHDB
                         - COSMOSDB
+                        - TRINO
                     type: string
                     description: The database engine of the schema.
                     format: enum
                 classificationFromConfig:
                     type: boolean
-                    description: If false, we will build the raw common by classification in database config.
+                    description: |-
+                        If false, we will build the raw common by classification in database
+                         config.
         DiffMetadataResponse:
             type: object
             properties:
@@ -9795,6 +9943,7 @@ components:
                         - DATABRICKS
                         - COCKROACHDB
                         - COSMOSDB
+                        - TRINO
                     type: string
                     format: enum
                 activation:
@@ -9872,6 +10021,7 @@ components:
                         - DATABRICKS
                         - COCKROACHDB
                         - COSMOSDB
+                        - TRINO
                     type: string
                     format: enum
                 engineVersion:
@@ -11190,10 +11340,15 @@ components:
             properties:
                 line:
                     type: integer
+                    description: Line position in a text (zero-based).
                     format: int32
                 column:
                     type: integer
+                    description: Column position in a text (zero-based), equivalent to byte offset.
                     format: int32
+            description: |-
+                Position in a text expressed as zero-based line and zero-based column byte
+                 offset.
         Postgres_Session:
             type: object
             properties:
@@ -11263,6 +11418,7 @@ components:
                         - DATABRICKS
                         - COCKROACHDB
                         - COSMOSDB
+                        - TRINO
                     type: string
                     format: enum
                 currentSchema:
@@ -12215,6 +12371,7 @@ components:
                         - DATABRICKS
                         - COCKROACHDB
                         - COSMOSDB
+                        - TRINO
                     type: string
                     format: enum
                 comment:
@@ -12283,6 +12440,7 @@ components:
                         - DATABRICKS
                         - COCKROACHDB
                         - COSMOSDB
+                        - TRINO
                     type: string
                     format: enum
                 enabled:
@@ -12325,6 +12483,7 @@ components:
                         - DATABRICKS
                         - COCKROACHDB
                         - COSMOSDB
+                        - TRINO
                     type: string
                     format: enum
                 category:
@@ -12367,6 +12526,7 @@ components:
                         - DATABRICKS
                         - COCKROACHDB
                         - COSMOSDB
+                        - TRINO
                     type: string
                     format: enum
                 category:
@@ -12436,6 +12596,12 @@ components:
                     type: string
                     description: |-
                         The filter of the log. It should be a valid CEL expression.
+                         Supported filter:
+                         - method
+                         - severity
+                         - user
+                         - create_time
+
                          For example:
                           - filter = "method == '/bytebase.v1.SQLService/Query'"
                           - filter = "method == '/bytebase.v1.SQLService/Query' && severity == 'ERROR'"
@@ -12578,15 +12744,34 @@ components:
                          - name
                          - resource_id
                          - exclude_default: if not include the default project.
+                         - state
 
                          For example:
                          name = "project name"
                          name.matches("project name")
                          resource_id = "project id"
                          resource_id.matches("project id")
+                         exclude_default == true
+                         state == "DELETED"
+                         You can combine filter conditions like:
                          name = "project name" && resource_id.matches("project id")
                          name.matches("project name") || resource_id = "project id"
-                         exclude_default == true
+                pageSize:
+                    type: integer
+                    description: |-
+                        The maximum number of projects to return. The service may return fewer than
+                         this value.
+                         If unspecified, at most 10 projects will be returned.
+                         The maximum value is 1000; values above 1000 will be coerced to 1000.
+                    format: int32
+                pageToken:
+                    type: string
+                    description: |-
+                        A page token, received from a previous `SearchProjects` call.
+                         Provide this to retrieve the subsequent page.
+
+                         When paginating, all other parameters provided to `SearchProjects` must match
+                         the call that provided the page token.
         SearchProjectsResponse:
             type: object
             properties:
@@ -12595,6 +12780,11 @@ components:
                     items:
                         $ref: '#/components/schemas/Project'
                     description: The projects from the specified request.
+                nextPageToken:
+                    type: string
+                    description: |-
+                        A token, which can be sent as `page_token` to retrieve the next page.
+                         If this field is omitted, there are no subsequent pages.
         SearchQueryHistoriesRequest:
             type: object
             properties:
@@ -12817,6 +13007,7 @@ components:
                         - DATABRICKS
                         - COCKROACHDB
                         - COSMOSDB
+                        - TRINO
                     type: string
                     description: The SQL dialect.
                     format: enum
@@ -12862,37 +13053,6 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/Task'
-        StatUsersRequest:
-            type: object
-            properties: {}
-        StatUsersResponse:
-            type: object
-            properties:
-                stats:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/StatUsersResponse_StatUser'
-        StatUsersResponse_StatUser:
-            type: object
-            properties:
-                userType:
-                    enum:
-                        - USER_TYPE_UNSPECIFIED
-                        - USER
-                        - SYSTEM_BOT
-                        - SERVICE_ACCOUNT
-                    type: string
-                    format: enum
-                state:
-                    enum:
-                        - STATE_UNSPECIFIED
-                        - ACTIVE
-                        - DELETED
-                    type: string
-                    format: enum
-                count:
-                    type: integer
-                    format: int32
         Status:
             type: object
             properties:
@@ -13760,6 +13920,8 @@ components:
                     $ref: '#/components/schemas/SCIMSetting'
                 passwordRestrictionSetting:
                     $ref: '#/components/schemas/PasswordRestrictionSetting'
+                aiSetting:
+                    $ref: '#/components/schemas/AISetting'
             description: The data in setting value.
         Webhook:
             required:

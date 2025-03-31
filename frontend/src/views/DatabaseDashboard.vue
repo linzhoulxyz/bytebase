@@ -128,14 +128,16 @@ const allowToCreateDB = computed(() => {
   );
 });
 
-const scopeOptions = useCommonSearchScopeOptions(
-  computed(() => state.params),
-  [...CommonFilterScopeIdList, "project", "label", "engine"]
-);
+const scopeOptions = useCommonSearchScopeOptions([
+  ...CommonFilterScopeIdList,
+  "project",
+  "database-label",
+  "engine",
+]);
 
 const selectedLabels = computed(() => {
   return state.params.scopes
-    .filter((scope) => scope.id === "label")
+    .filter((scope) => scope.id === "database-label")
     .map((scope) => scope.value);
 });
 
@@ -196,8 +198,8 @@ onMounted(() => {
 
 const selectedDatabases = computed((): ComposedDatabase[] => {
   return [...state.selectedDatabaseNameList]
-    .map((databaseName) => databaseStore.getDatabaseByName(databaseName))
-    .filter((database) => isValidDatabaseName(database.name));
+    .filter((databaseName) => isValidDatabaseName(databaseName))
+    .map((databaseName) => databaseStore.getDatabaseByName(databaseName));
 });
 
 const handleDatabasesSelectionChanged = (
