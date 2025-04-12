@@ -2548,6 +2548,38 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /v1/instances/{instance}/databases:batchGet:
+        get:
+            tags:
+                - DatabaseService
+            operationId: DatabaseService_BatchGetDatabases
+            parameters:
+                - name: instance
+                  in: path
+                  description: The instance id.
+                  required: true
+                  schema:
+                    type: string
+                - name: names
+                  in: query
+                  description: The list of database names to retrieve.
+                  schema:
+                    type: array
+                    items:
+                        type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BatchGetDatabasesResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /v1/instances/{instance}/databases:batchUpdate:
         post:
             tags:
@@ -4090,6 +4122,38 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/ListDatabasesResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /v1/projects/{project}/databases:batchGet:
+        get:
+            tags:
+                - DatabaseService
+            operationId: DatabaseService_BatchGetDatabases
+            parameters:
+                - name: project
+                  in: path
+                  description: The project id.
+                  required: true
+                  schema:
+                    type: string
+                - name: names
+                  in: query
+                  description: The list of database names to retrieve.
+                  schema:
+                    type: array
+                    items:
+                        type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BatchGetDatabasesResponse'
                 default:
                     description: Default error response
                     content:
@@ -8340,6 +8404,14 @@ components:
                     type: array
                     items:
                         type: string
+        BatchGetDatabasesResponse:
+            type: object
+            properties:
+                databases:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Database'
+                    description: The databases from the specified request.
         BatchGetIamPolicyResponse:
             type: object
             properties:
@@ -9389,6 +9461,7 @@ components:
                         - COCKROACHDB
                         - COSMOSDB
                         - TRINO
+                        - CASSANDRA
                     type: string
                     description: The database engine of the schema.
                     format: enum
@@ -9464,6 +9537,32 @@ components:
                         - UNPROTECTED
                     type: string
                     format: enum
+                color:
+                    type: string
+        EnvironmentSetting:
+            type: object
+            properties:
+                environments:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/EnvironmentSetting_Environment'
+            description: 'TODO(p0ny): implement.'
+        EnvironmentSetting_Environment:
+            type: object
+            properties:
+                title:
+                    type: string
+                    description: The display name of the environment.
+                id:
+                    type: string
+                    description: |-
+                        The resource id of the environment.
+                         This value should be 4-63 characters, and valid characters
+                         are /[a-z][0-9]-/.
+                tags:
+                    type: object
+                    additionalProperties:
+                        type: string
                 color:
                     type: string
         ExportAuditLogsRequest:
@@ -9662,22 +9761,19 @@ components:
                     description: Identifier is the field name of the unique identifier in 3rd-party idp user info. Required.
                 displayName:
                     type: string
-                    description: DisplayName is the field name of display name in 3rd-party idp user info.
-                email:
-                    type: string
-                    description: Email is the field name of primary email in 3rd-party idp user info.
+                    description: DisplayName is the field name of display name in 3rd-party idp user info. Optional.
                 phone:
                     type: string
-                    description: Phone is the field name of primary phone in 3rd-party idp user info.
+                    description: Phone is the field name of primary phone in 3rd-party idp user info. Optional.
+                groups:
+                    type: string
+                    description: |-
+                        Groups is the field name of groups in 3rd-party idp user info. Optional.
+                         Mainly used for OIDC: https://developer.okta.com/docs/guides/customize-tokens-groups-claim/main/
             description: |-
                 FieldMapping saves the field names from user info API of identity provider.
                  As we save all raw json string of user info response data into `principal.idp_user_info`,
                  we can extract the relevant data based with `FieldMapping`.
-
-                 e.g. For GitHub authenticated user API, it will return `login`, `name` and `email` in response.
-                 Then the identifier of FieldMapping will be `login`, display_name will be `name`,
-                 and email will be `email`.
-                 reference: https://docs.github.com/en/rest/users/users?apiVersion=2022-11-28#get-the-authenticated-user
         ForeignKeyMetadata:
             type: object
             properties:
@@ -9944,6 +10040,7 @@ components:
                         - COCKROACHDB
                         - COSMOSDB
                         - TRINO
+                        - CASSANDRA
                     type: string
                     format: enum
                 activation:
@@ -10022,6 +10119,7 @@ components:
                         - COCKROACHDB
                         - COSMOSDB
                         - TRINO
+                        - CASSANDRA
                     type: string
                     format: enum
                 engineVersion:
@@ -10392,8 +10490,7 @@ components:
                     type: string
                     description: |-
                         SecurityProtocol is the security protocol to be used for establishing
-                         connections with the LDAP server. It should be either StartTLS or LDAPS, and
-                         cannot be empty.
+                         connections with the LDAP server. It must be StartTLS, LDAPS or None.
                 fieldMapping:
                     allOf:
                         - $ref: '#/components/schemas/FieldMapping'
@@ -10900,6 +10997,13 @@ components:
                     type: string
                 clientSecret:
                     type: string
+                scopes:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        The scopes that the OIDC provider supports.
+                         Should be fetched from the well-known configuration file of the OIDC provider.
                 fieldMapping:
                     $ref: '#/components/schemas/FieldMapping'
                 skipTlsVerify:
@@ -10911,14 +11015,6 @@ components:
                         - IN_HEADER
                     type: string
                     format: enum
-                scopes:
-                    readOnly: true
-                    type: array
-                    items:
-                        type: string
-                    description: |-
-                        The scopes that the OIDC provider supports.
-                         Should be fetched from the well-known configuration file of the OIDC provider.
                 authEndpoint:
                     readOnly: true
                     type: string
@@ -11419,6 +11515,7 @@ components:
                         - COCKROACHDB
                         - COSMOSDB
                         - TRINO
+                        - CASSANDRA
                     type: string
                     format: enum
                 currentSchema:
@@ -11679,9 +11776,6 @@ components:
                     items:
                         $ref: '#/components/schemas/QueryResult'
                     description: The query results.
-                allowExport:
-                    type: boolean
-                    description: The query is allowed to be exported or not.
         QueryResult:
             type: object
             properties:
@@ -11726,6 +11820,9 @@ components:
                     description: The query statement for the result.
                 postgresError:
                     $ref: '#/components/schemas/QueryResult_PostgresError'
+                allowExport:
+                    type: boolean
+                    description: The query result is allowed to be exported or not.
         QueryResult_PostgresError:
             type: object
             properties:
@@ -11880,6 +11977,7 @@ components:
                 statement:
                     type: string
                     description: The statement is used for preview or check purpose.
+                    format: bytes
                 statementSize:
                     readOnly: true
                     type: string
@@ -12372,6 +12470,7 @@ components:
                         - COCKROACHDB
                         - COSMOSDB
                         - TRINO
+                        - CASSANDRA
                     type: string
                     format: enum
                 comment:
@@ -12441,6 +12540,7 @@ components:
                         - COCKROACHDB
                         - COSMOSDB
                         - TRINO
+                        - CASSANDRA
                     type: string
                     format: enum
                 enabled:
@@ -12484,6 +12584,7 @@ components:
                         - COCKROACHDB
                         - COSMOSDB
                         - TRINO
+                        - CASSANDRA
                     type: string
                     format: enum
                 category:
@@ -12527,6 +12628,7 @@ components:
                         - COCKROACHDB
                         - COSMOSDB
                         - TRINO
+                        - CASSANDRA
                     type: string
                     format: enum
                 category:
@@ -13008,6 +13110,7 @@ components:
                         - COCKROACHDB
                         - COSMOSDB
                         - TRINO
+                        - CASSANDRA
                     type: string
                     description: The SQL dialect.
                     format: enum
@@ -13922,6 +14025,8 @@ components:
                     $ref: '#/components/schemas/PasswordRestrictionSetting'
                 aiSetting:
                     $ref: '#/components/schemas/AISetting'
+                environmentSetting:
+                    $ref: '#/components/schemas/EnvironmentSetting'
             description: The data in setting value.
         Webhook:
             required:

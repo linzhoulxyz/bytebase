@@ -1,16 +1,14 @@
-import { keyBy, orderBy } from "lodash-es";
 import { computed, unref } from "vue";
 import { t, locale } from "@/plugins/i18n";
-import { useEnvironmentV1Store, useSubscriptionV1Store } from "@/store";
-import type { ComposedInstance, MaybeRef } from "@/types";
+import { useSubscriptionV1Store } from "@/store";
+import type { MaybeRef } from "@/types";
 import {
-  emptyInstance,
   isValidInstanceName,
   languageOfEngineV1,
   unknownInstance,
+  emptyInstance,
 } from "@/types";
 import { Engine, State } from "@/types/proto/v1/common";
-import type { Environment } from "@/types/proto/v1/environment_service";
 import type {
   Instance,
   InstanceResource,
@@ -49,22 +47,6 @@ export const extractInstanceResourceName = (name: string) => {
   return matches?.[1] ?? "";
 };
 
-export const sortInstanceV1List = (
-  instanceList: (ComposedInstance | InstanceResource)[]
-) => {
-  return orderBy(
-    instanceList,
-    [
-      (instance) =>
-        useEnvironmentV1Store().getEnvironmentByName(instance.environment)
-          .order,
-      (instance) => instance.name,
-      (instance) => instance.title,
-    ],
-    ["desc", "asc", "asc"]
-  );
-};
-
 export const readableDataSourceType = (type: DataSourceType): string => {
   if (type === DataSourceType.ADMIN) {
     return t("data-source.admin");
@@ -93,21 +75,6 @@ export const hostPortOfInstanceV1 = (instance: Instance | InstanceResource) => {
   return hostPortOfDataSource(ds);
 };
 
-// Sort the list to put prod items first.
-export const sortInstanceV1ListByEnvironmentV1 = <T extends Instance>(
-  list: T[],
-  environmentList: Environment[]
-): T[] => {
-  const environmentMap = keyBy(environmentList, (env) => env.name);
-
-  return list.sort((a, b) => {
-    const aEnvOrder = environmentMap[a.environment]?.order ?? -1;
-    const bEnvOrder = environmentMap[b.environment]?.order ?? -1;
-
-    return -(aEnvOrder - bEnvOrder);
-  });
-};
-
 export const supportedEngineV1List = () => {
   const engines: Engine[] = [
     Engine.MYSQL,
@@ -133,6 +100,8 @@ export const supportedEngineV1List = () => {
     Engine.DATABRICKS,
     Engine.COCKROACHDB,
     Engine.COSMOSDB,
+    Engine.CASSANDRA,
+    Engine.TRINO,
   ];
   if (locale.value === "zh-CN") {
     engines.push(Engine.DM);
@@ -156,24 +125,32 @@ export const instanceV1HasReadonlyMode = (
   return true;
 };
 
+export const enginesSupportCreateDatabase = () => {
+  return [
+    Engine.MYSQL,
+    Engine.POSTGRES,
+    Engine.MSSQL,
+    Engine.SNOWFLAKE,
+    Engine.CLICKHOUSE,
+    Engine.MONGODB,
+    Engine.TIDB,
+    Engine.OCEANBASE,
+    Engine.OCEANBASE_ORACLE,
+    Engine.REDSHIFT,
+    Engine.MARIADB,
+    Engine.STARROCKS,
+    Engine.RISINGWAVE,
+    Engine.HIVE,
+    Engine.COCKROACHDB,
+    Engine.DORIS,
+  ];
+};
+
 export const instanceV1HasCreateDatabase = (
   instanceOrEngine: Instance | InstanceResource | Engine
 ): boolean => {
   const engine = engineOfInstanceV1(instanceOrEngine);
-
-  const excludedList: Engine[] = [
-    Engine.REDIS,
-    Engine.ORACLE,
-    Engine.DM,
-    Engine.ELASTICSEARCH,
-    Engine.SPANNER,
-    Engine.BIGQUERY,
-    Engine.DYNAMODB,
-    Engine.DATABRICKS,
-    Engine.COSMOSDB,
-  ];
-
-  return !excludedList.includes(engine);
+  return enginesSupportCreateDatabase().includes(engine);
 };
 
 export const instanceV1HasStructuredQueryResult = (
@@ -204,6 +181,7 @@ export const instanceV1HasSSL = (
     Engine.MONGODB,
     Engine.ELASTICSEARCH,
     Engine.MSSQL,
+    Engine.CASSANDRA,
   ].includes(engine);
 };
 
@@ -220,6 +198,20 @@ export const instanceV1HasSSH = (
     Engine.REDIS,
   ].includes(engine);
 };
+
+export const instanceV1HasExtraParameters = (
+  instanceOrEngine: Instance | InstanceResource | Engine
+): boolean => {
+  const engine = engineOfInstanceV1(instanceOrEngine);
+  return [
+    Engine.MYSQL,
+    Engine.MARIADB,
+    Engine.OCEANBASE,
+    Engine.POSTGRES,
+    Engine.ORACLE,
+    Engine.MSSQL,
+  ].includes(engine);
+}
 
 export const instanceV1HasCollationAndCharacterSet = (
   instanceOrEngine: Instance | InstanceResource | Engine
@@ -399,6 +391,10 @@ export const engineNameV1 = (type: Engine): string => {
       return "Databricks";
     case Engine.COSMOSDB:
       return "CosmosDB";
+    case Engine.CASSANDRA:
+      return "Cassandra"
+    case Engine.TRINO:
+      return "Trino";
   }
   return "";
 };

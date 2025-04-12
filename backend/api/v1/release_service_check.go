@@ -13,6 +13,7 @@ import (
 
 	celtypes "github.com/google/cel-go/common/types"
 
+	"github.com/bytebase/bytebase/backend/base"
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/plugin/advisor"
 	"github.com/bytebase/bytebase/backend/plugin/advisor/catalog"
@@ -119,7 +120,7 @@ func (s *ReleaseService) CheckRelease(ctx context.Context, request *v1pb.CheckRe
 			return nil, status.Errorf(codes.NotFound, "instance %q not found", database.InstanceID)
 		}
 		// Continue if the instance is not supported by SQL review.
-		if !isSQLReviewSupported(instance.Metadata.GetEngine()) {
+		if !base.EngineSupportSQLReview(instance.Metadata.GetEngine()) {
 			continue
 		}
 
@@ -151,9 +152,10 @@ func (s *ReleaseService) CheckRelease(ctx context.Context, request *v1pb.CheckRe
 				File:   file.Path,
 				Target: fmt.Sprintf("instances/%s/databases/%s", instance.ResourceID, database.DatabaseName),
 			}
+			statement := string(file.Statement)
 
 			// Check if any syntax error in the statement.
-			_, syntaxAdvices := s.sheetManager.GetASTsForChecks(instance.Metadata.GetEngine(), file.Statement)
+			_, syntaxAdvices := s.sheetManager.GetASTsForChecks(instance.Metadata.GetEngine(), statement)
 			if len(syntaxAdvices) > 0 {
 				for _, advice := range syntaxAdvices {
 					checkResult.Advices = append(checkResult.Advices, convertToV1Advice(advice))
@@ -169,7 +171,7 @@ func (s *ReleaseService) CheckRelease(ctx context.Context, request *v1pb.CheckRe
 
 				// Get SQL summary report for the statement and target database.
 				// Including affected rows.
-				summaryReport, err := plancheck.GetSQLSummaryReport(ctx, s.store, s.sheetManager, s.dbFactory, database, file.Statement)
+				summaryReport, err := plancheck.GetSQLSummaryReport(ctx, s.store, s.sheetManager, s.dbFactory, database, statement)
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "failed to get SQL summary report, error: %v", err)
 				}
@@ -183,7 +185,7 @@ func (s *ReleaseService) CheckRelease(ctx context.Context, request *v1pb.CheckRe
 						database,
 						changeType,
 						summaryReport,
-						file.Statement,
+						statement,
 					)
 					if err != nil {
 						return nil, status.Errorf(codes.Internal, "failed to calculate risk level, error: %v", err)
@@ -197,7 +199,7 @@ func (s *ReleaseService) CheckRelease(ctx context.Context, request *v1pb.CheckRe
 					}
 					checkResult.RiskLevel = riskLevelEnum
 				}
-				adviceStatus, sqlReviewAdvices, err := s.runSQLReviewCheckForFile(ctx, catalog, instance, database, changeType, file.Statement)
+				adviceStatus, sqlReviewAdvices, err := s.runSQLReviewCheckForFile(ctx, catalog, instance, database, changeType, statement)
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "failed to check SQL review: %v", err)
 				}

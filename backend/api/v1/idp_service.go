@@ -11,10 +11,10 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/bytebase/bytebase/backend/base"
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
 	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
-	api "github.com/bytebase/bytebase/backend/legacyapi"
 	"github.com/bytebase/bytebase/backend/plugin/idp/ldap"
 	"github.com/bytebase/bytebase/backend/plugin/idp/oauth2"
 	"github.com/bytebase/bytebase/backend/plugin/idp/oidc"
@@ -238,16 +238,16 @@ func (s *IdentityProviderService) UndeleteIdentityProvider(ctx context.Context, 
 }
 
 func (s *IdentityProviderService) checkFeatureAvailable(ssoType v1pb.IdentityProviderType) error {
-	if err := s.licenseService.IsFeatureEnabled(api.FeatureSSO); err != nil {
+	if err := s.licenseService.IsFeatureEnabled(base.FeatureSSO); err != nil {
 		return status.Error(codes.PermissionDenied, err.Error())
 	}
 	plan := s.licenseService.GetEffectivePlan()
 	switch plan {
-	case api.FREE:
+	case base.FREE:
 		return status.Error(codes.PermissionDenied, "feature is not available for free plan")
-	case api.ENTERPRISE:
+	case base.ENTERPRISE:
 		return nil
-	case api.TEAM:
+	case base.TEAM:
 		if ssoType != v1pb.IdentityProviderType_OAUTH2 {
 			return status.Error(codes.PermissionDenied, "only oauth type is available")
 		}
@@ -317,17 +317,8 @@ func (s *IdentityProviderService) TestIdentityProvider(ctx context.Context, requ
 		if oauth2Context == nil {
 			return nil, status.Errorf(codes.InvalidArgument, "missing OAuth2 context")
 		}
-		identityProviderConfig := convertIdentityProviderConfigToStore(identityProvider.Config).GetOidcConfig()
-		oidcIdentityProvider, err := oidc.NewIdentityProvider(
-			ctx,
-			oidc.IdentityProviderConfig{
-				Issuer:        identityProviderConfig.Issuer,
-				ClientID:      identityProviderConfig.ClientId,
-				ClientSecret:  identityProviderConfig.ClientSecret,
-				FieldMapping:  identityProviderConfig.FieldMapping,
-				SkipTLSVerify: identityProviderConfig.SkipTlsVerify,
-				AuthStyle:     identityProviderConfig.GetAuthStyle(),
-			})
+		identityProviderConfig := convertIdentityProviderConfigToStore(identityProvider.Config)
+		oidcIdentityProvider, err := oidc.NewIdentityProvider(ctx, identityProviderConfig.GetOidcConfig())
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to create new OIDC identity provider: %v", err)
 		}
@@ -421,8 +412,8 @@ func convertIdentityProviderConfigFromStore(identityProviderConfig *storepb.Iden
 		fieldMapping := v1pb.FieldMapping{
 			Identifier:  v.FieldMapping.Identifier,
 			DisplayName: v.FieldMapping.DisplayName,
-			Email:       v.FieldMapping.Email,
 			Phone:       v.FieldMapping.Phone,
+			Groups:      v.FieldMapping.Groups,
 		}
 		return &v1pb.IdentityProviderConfig{
 			Config: &v1pb.IdentityProviderConfig_Oauth2Config{
@@ -443,8 +434,8 @@ func convertIdentityProviderConfigFromStore(identityProviderConfig *storepb.Iden
 		fieldMapping := v1pb.FieldMapping{
 			Identifier:  v.FieldMapping.Identifier,
 			DisplayName: v.FieldMapping.DisplayName,
-			Email:       v.FieldMapping.Email,
 			Phone:       v.FieldMapping.Phone,
+			Groups:      v.FieldMapping.Groups,
 		}
 		oidcConfig := &v1pb.OIDCIdentityProviderConfig{
 			Issuer:        v.Issuer,
@@ -453,7 +444,7 @@ func convertIdentityProviderConfigFromStore(identityProviderConfig *storepb.Iden
 			FieldMapping:  &fieldMapping,
 			SkipTlsVerify: v.SkipTlsVerify,
 			AuthStyle:     v1pb.OAuth2AuthStyle(v.AuthStyle),
-			Scopes:        oidc.DefaultScopes,
+			Scopes:        v.Scopes,
 			AuthEndpoint:  "", // Leave it empty as it's not stored in the database.
 		}
 
@@ -476,8 +467,8 @@ func convertIdentityProviderConfigFromStore(identityProviderConfig *storepb.Iden
 		fieldMapping := v1pb.FieldMapping{
 			Identifier:  v.FieldMapping.Identifier,
 			DisplayName: v.FieldMapping.DisplayName,
-			Email:       v.FieldMapping.Email,
 			Phone:       v.FieldMapping.Phone,
+			Groups:      v.FieldMapping.Groups,
 		}
 		return &v1pb.IdentityProviderConfig{
 			Config: &v1pb.IdentityProviderConfig_LdapConfig{
@@ -503,8 +494,8 @@ func convertIdentityProviderConfigToStore(identityProviderConfig *v1pb.IdentityP
 		fieldMapping := storepb.FieldMapping{
 			Identifier:  v.FieldMapping.Identifier,
 			DisplayName: v.FieldMapping.DisplayName,
-			Email:       v.FieldMapping.Email,
 			Phone:       v.FieldMapping.Phone,
+			Groups:      v.FieldMapping.Groups,
 		}
 		return &storepb.IdentityProviderConfig{
 			Config: &storepb.IdentityProviderConfig_Oauth2Config{
@@ -525,8 +516,8 @@ func convertIdentityProviderConfigToStore(identityProviderConfig *v1pb.IdentityP
 		fieldMapping := storepb.FieldMapping{
 			Identifier:  v.FieldMapping.Identifier,
 			DisplayName: v.FieldMapping.DisplayName,
-			Email:       v.FieldMapping.Email,
 			Phone:       v.FieldMapping.Phone,
+			Groups:      v.FieldMapping.Groups,
 		}
 		return &storepb.IdentityProviderConfig{
 			Config: &storepb.IdentityProviderConfig_OidcConfig{
@@ -537,6 +528,7 @@ func convertIdentityProviderConfigToStore(identityProviderConfig *v1pb.IdentityP
 					FieldMapping:  &fieldMapping,
 					SkipTlsVerify: v.SkipTlsVerify,
 					AuthStyle:     storepb.OAuth2AuthStyle(v.AuthStyle),
+					Scopes:        v.Scopes,
 				},
 			},
 		}
@@ -544,8 +536,8 @@ func convertIdentityProviderConfigToStore(identityProviderConfig *v1pb.IdentityP
 		fieldMapping := storepb.FieldMapping{
 			Identifier:  v.FieldMapping.Identifier,
 			DisplayName: v.FieldMapping.DisplayName,
-			Email:       v.FieldMapping.Email,
 			Phone:       v.FieldMapping.Phone,
+			Groups:      v.FieldMapping.Groups,
 		}
 		return &storepb.IdentityProviderConfig{
 			Config: &storepb.IdentityProviderConfig_LdapConfig{

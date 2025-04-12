@@ -486,6 +486,14 @@
             <ul>
               
                 <li>
+                  <a href="#bytebase.v1.BatchGetDatabasesRequest"><span class="badge">M</span>BatchGetDatabasesRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.BatchGetDatabasesResponse"><span class="badge">M</span>BatchGetDatabasesResponse</a>
+                </li>
+              
+                <li>
                   <a href="#bytebase.v1.BatchUpdateDatabasesRequest"><span class="badge">M</span>BatchUpdateDatabasesRequest</a>
                 </li>
               
@@ -1096,6 +1104,18 @@
               
                 <li>
                   <a href="#bytebase.v1.DataClassificationSetting.DataClassificationConfig.Level"><span class="badge">M</span>DataClassificationSetting.DataClassificationConfig.Level</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.EnvironmentSetting"><span class="badge">M</span>EnvironmentSetting</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.EnvironmentSetting.Environment"><span class="badge">M</span>EnvironmentSetting.Environment</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.v1.EnvironmentSetting.Environment.TagsEntry"><span class="badge">M</span>EnvironmentSetting.Environment.TagsEntry</a>
                 </li>
               
                 <li>
@@ -3222,6 +3242,12 @@
               <tr>
                 <td>TRINO</td>
                 <td>27</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>CASSANDRA</td>
+                <td>28</td>
                 <td><p></p></td>
               </tr>
             
@@ -5862,6 +5888,64 @@ Format: instances/{instance} </p></td>
       </div>
       <p></p>
 
+      
+        <h3 id="bytebase.v1.BatchGetDatabasesRequest">BatchGetDatabasesRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>parent</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The parent resource shared by all databases being retrieved.
+- projects/{project}: batch get databases in a project;
+- instances/{instances}: batch get databases in a instance;
+Use &#34;-&#34; as wildcard to batch get databases across parent. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>names</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>The list of database names to retrieve. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.BatchGetDatabasesResponse">BatchGetDatabasesResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>databases</td>
+                  <td><a href="#bytebase.v1.Database">Database</a></td>
+                  <td>repeated</td>
+                  <td><p>The databases from the specified request. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
       
         <h3 id="bytebase.v1.BatchUpdateDatabasesRequest">BatchUpdateDatabasesRequest</h3>
         <p></p>
@@ -9695,6 +9779,13 @@ The API will default to the BASIC view.</p></td>
               </tr>
             
               <tr>
+                <td>BatchGetDatabases</td>
+                <td><a href="#bytebase.v1.BatchGetDatabasesRequest">BatchGetDatabasesRequest</a></td>
+                <td><a href="#bytebase.v1.BatchGetDatabasesResponse">BatchGetDatabasesResponse</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
                 <td>ListDatabases</td>
                 <td><a href="#bytebase.v1.ListDatabasesRequest">ListDatabasesRequest</a></td>
                 <td><a href="#bytebase.v1.ListDatabasesResponse">ListDatabasesResponse</a></td>
@@ -9837,6 +9928,23 @@ The API will default to the BASIC view.</p></td>
                 <td>GetDatabase</td>
                 <td>GET</td>
                 <td>/v1/{name=instances/*/databases/*}</td>
+                <td></td>
+              </tr>
+              
+            
+              
+              
+              <tr>
+                <td>BatchGetDatabases</td>
+                <td>GET</td>
+                <td>/v1/{parent=projects/*}/databases:batchGet</td>
+                <td></td>
+              </tr>
+              
+              <tr>
+                <td>BatchGetDatabases</td>
+                <td>GET</td>
+                <td>/v1/{parent=instances/*}/databases:batchGet</td>
                 <td></td>
               </tr>
               
@@ -13107,6 +13215,108 @@ and write back to the schema metadata. </p></td>
 
         
       
+        <h3 id="bytebase.v1.EnvironmentSetting">EnvironmentSetting</h3>
+        <p>TODO(p0ny): implement.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>environments</td>
+                  <td><a href="#bytebase.v1.EnvironmentSetting.Environment">EnvironmentSetting.Environment</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.EnvironmentSetting.Environment">EnvironmentSetting.Environment</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The display name of the environment. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The resource id of the environment.
+This value should be 4-63 characters, and valid characters
+are /[a-z][0-9]-/. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>tags</td>
+                  <td><a href="#bytebase.v1.EnvironmentSetting.Environment.TagsEntry">EnvironmentSetting.Environment.TagsEntry</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>color</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.v1.EnvironmentSetting.Environment.TagsEntry">EnvironmentSetting.Environment.TagsEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="bytebase.v1.GetSettingRequest">GetSettingRequest</h3>
         <p>The request message for getting a setting.</p>
 
@@ -13870,6 +14080,13 @@ server would not persist the setting value if it is true. </p></td>
                 <tr>
                   <td>ai_setting</td>
                   <td><a href="#bytebase.v1.AISetting">AISetting</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>environment_setting</td>
+                  <td><a href="#bytebase.v1.EnvironmentSetting">EnvironmentSetting</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -18718,7 +18935,7 @@ Format: idps/{identity_provider} </p></td>
         
       
         <h3 id="bytebase.v1.FieldMapping">FieldMapping</h3>
-        <p>FieldMapping saves the field names from user info API of identity provider.</p><p>As we save all raw json string of user info response data into `principal.idp_user_info`,</p><p>we can extract the relevant data based with `FieldMapping`.</p><p>e.g. For GitHub authenticated user API, it will return `login`, `name` and `email` in response.</p><p>Then the identifier of FieldMapping will be `login`, display_name will be `name`,</p><p>and email will be `email`.</p><p>reference: https://docs.github.com/en/rest/users/users?apiVersion=2022-11-28#get-the-authenticated-user</p>
+        <p>FieldMapping saves the field names from user info API of identity provider.</p><p>As we save all raw json string of user info response data into `principal.idp_user_info`,</p><p>we can extract the relevant data based with `FieldMapping`.</p>
 
         
           <table class="field-table">
@@ -18738,21 +18955,22 @@ Format: idps/{identity_provider} </p></td>
                   <td>display_name</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>DisplayName is the field name of display name in 3rd-party idp user info. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>email</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>Email is the field name of primary email in 3rd-party idp user info. </p></td>
+                  <td><p>DisplayName is the field name of display name in 3rd-party idp user info. Optional. </p></td>
                 </tr>
               
                 <tr>
                   <td>phone</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>Phone is the field name of primary phone in 3rd-party idp user info. </p></td>
+                  <td><p>Phone is the field name of primary phone in 3rd-party idp user info. Optional. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>groups</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Groups is the field name of groups in 3rd-party idp user info. Optional.
+Mainly used for OIDC: https://developer.okta.com/docs/guides/customize-tokens-groups-claim/main/ </p></td>
                 </tr>
               
             </tbody>
@@ -18952,8 +19170,7 @@ search requests. </p></td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>SecurityProtocol is the security protocol to be used for establishing
-connections with the LDAP server. It should be either StartTLS or LDAPS, and
-cannot be empty. </p></td>
+connections with the LDAP server. It must be StartTLS, LDAPS or None. </p></td>
                 </tr>
               
                 <tr>
@@ -19186,6 +19403,14 @@ If this field is omitted, there are no subsequent pages. </p></td>
                 </tr>
               
                 <tr>
+                  <td>scopes</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>The scopes that the OIDC provider supports.
+Should be fetched from the well-known configuration file of the OIDC provider. </p></td>
+                </tr>
+              
+                <tr>
                   <td>field_mapping</td>
                   <td><a href="#bytebase.v1.FieldMapping">FieldMapping</a></td>
                   <td></td>
@@ -19204,14 +19429,6 @@ If this field is omitted, there are no subsequent pages. </p></td>
                   <td><a href="#bytebase.v1.OAuth2AuthStyle">OAuth2AuthStyle</a></td>
                   <td></td>
                   <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>scopes</td>
-                  <td><a href="#string">string</a></td>
-                  <td>repeated</td>
-                  <td><p>The scopes that the OIDC provider supports.
-Should be fetched from the well-known configuration file of the OIDC provider. </p></td>
                 </tr>
               
                 <tr>
@@ -24658,13 +24875,6 @@ CosmosDB only. </p></td>
                   <td><p>The query results. </p></td>
                 </tr>
               
-                <tr>
-                  <td>allow_export</td>
-                  <td><a href="#bool">bool</a></td>
-                  <td></td>
-                  <td><p>The query is allowed to be exported or not. </p></td>
-                </tr>
-              
             </tbody>
           </table>
 
@@ -24751,6 +24961,13 @@ The types come from the Golang SQL driver. </p></td>
                   <td><a href="#bytebase.v1.QueryResult.PostgresError">QueryResult.PostgresError</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>allow_export</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>The query result is allowed to be exported or not. </p></td>
                 </tr>
               
             </tbody>
@@ -25974,7 +26191,7 @@ Format: projects/{project}/sheets/{sheet} </p></td>
               
                 <tr>
                   <td>statement</td>
-                  <td><a href="#string">string</a></td>
+                  <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>The statement is used for preview or check purpose. </p></td>
                 </tr>

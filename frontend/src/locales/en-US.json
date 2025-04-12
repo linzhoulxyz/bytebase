@@ -98,7 +98,6 @@
     "detail": "Detail",
     "type": "Type",
     "language": "Language",
-    "change": "Change",
     "sensitive-placeholder": "Sensitive - write only",
     "enabled": "enabled",
     "default": "default",
@@ -232,6 +231,7 @@
     "go-back-home": "Go back home"
   },
   "task": {
+    "current-task": "Current task",
     "checking": "Checking...",
     "check-result": {
       "title-general": "Check result"
@@ -292,7 +292,7 @@
     "status": {
       "enqueued": "Waiting for execution.",
       "enqueued-with-rollout-time": "Waiting to execute after {time}.",
-      "waiting-connection": "Waiting for available instance connections. The instance connection count has reached the limit.",
+      "waiting-connection": "Waiting for available instance connections. The instance connection count has reached the limit set on Bytebase.",
       "waiting-task": "Waiting for another task to finish."
     }
   },
@@ -364,8 +364,6 @@
         "self": "Groups",
         "add-group": "Add Group",
         "update-group": "Update Group",
-        "delete-warning": "The group \"{name}\" will be deleted. This action cannot be undone.",
-        "delete-warning-with-resources": "The group \"{name}\" is used by following resources:",
         "form": {
           "email": "Email",
           "email-tips": "The email should be unique, and it cannot be changed after creation.",
@@ -453,6 +451,7 @@
         "identifier-tips": "It should be a unique string. And if it is not in email format, it will be spliced with domain.",
         "display-name": "Bytebase user's display name",
         "phone": "Bytebase user's phone number",
+        "groups": "Bytebase user's groups",
         "auth-style": {
           "self": "Auth style",
           "in-params": {
@@ -780,6 +779,7 @@
     "advanced-search": {
       "self": "Advanced search",
       "filter": "Filter",
+      "search": "Input title or id to search",
       "scope": {
         "project": {
           "title": "Project",
@@ -827,7 +827,7 @@
         },
         "database-label": {
           "title": "Label",
-          "description": "Input the \"label key\":\"label value\" then press Enter"
+          "description": "Input the \"key:value\" pair then press Enter"
         },
         "engine": {
           "title": "Engine",
@@ -1235,9 +1235,13 @@
     },
     "advanced-search": {
       "scope": {
-        "address": {
-          "title": "Address",
-          "description": "Filter by address"
+        "host": {
+          "title": "Host",
+          "description": "Filter by instance host. Please input the value then press the Enter."
+        },
+        "port": {
+          "title": "Port",
+          "description": "Filter by instance port. Please input the value then press the Enter."
         }
       }
     },
@@ -1248,8 +1252,7 @@
   },
   "environment": {
     "select": "Select environment",
-    "archive": "Archive this environment",
-    "archive-info": "Archived environments will not be displayed.",
+    "delete": "Delete this environment",
     "create": "Create Environment",
     "restore": "Restore this environment",
     "successfully-updated-environment": "Successfully updated environment '{name}'.",
@@ -1760,6 +1763,7 @@
     "rows-upper-limit": "reached the limit of query results",
     "close-sheet": "Close sheet",
     "connect": "Connect",
+    "connected": "Connected",
     "connect-in-admin-mode": "Connect in admin mode",
     "admin-mode": {
       "self": "Admin mode",
@@ -2136,7 +2140,10 @@
     "idp": "Identity Provider",
     "database-group": "Database Group",
     "changelist": "Changelist",
-    "review-config": "Review Config"
+    "review-config": "Review Config",
+    "delete-warning": "The \"{name}\" will be deleted. This action cannot be undone.",
+    "delete-warning-with-resources": "The \"{name}\" is used by following resources:",
+    "delete-warning-retry": "Please remove it from these resources then retry again."
   },
   "resource-id": {
     "self": "{resource} ID",
@@ -2393,10 +2400,7 @@
       "add": "Add role",
       "edit": "Edit role",
       "title-placeholder": "Input role title",
-      "description-placeholder": "Input role description",
-      "delete-warning": "The role \"{name}\" will be deleted. This action cannot be undone.",
-      "delete-warning-with-resources": "The role \"{name}\" is assigned to following users:",
-      "delete-warning-retry": "Please remove the role from these users then retry again."
+      "description-placeholder": "Input role description"
     },
     "default-workspace-role": "Users will get the \"Workspace Member\" role by default",
     "title": "Title",
@@ -2455,13 +2459,13 @@
   },
   "database-group": {
     "create": "New database group",
-    "edit": "Edit database group",
     "matched-database": "Matched database",
     "unmatched-database": "Unmatched database",
     "condition": {
       "self": "Condition"
     },
-    "select": "Select database group"
+    "select": "Select database group",
+    "no-matched-databases": "No matched databases"
   },
   "export-center": {
     "self": "Export Center",
@@ -2504,7 +2508,6 @@
     "name": "Changelist name",
     "name-placeholder": "My changelist",
     "error": {
-      "project-is-required": "Project is required",
       "name-is-required": "Changelist name is required",
       "invalid-resource-id": "Invalid resource Id",
       "nothing-changed": "Nothing changed",

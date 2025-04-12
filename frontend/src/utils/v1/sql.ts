@@ -69,6 +69,10 @@ export const extractSQLRowValuePlain = (value: RowValue | undefined) => {
   if (value.timestampTzValue && value.timestampTzValue.googleTimestamp) {
     return formatTimestampWithTz(value.timestampTzValue);
   }
+  if (value.valueValue) {
+    return JSON.stringify(value.valueValue);
+  }
+
   const key = keys[0];
   return plainObject[key];
 };
@@ -118,6 +122,7 @@ export const wrapSQLIdentifier = (id: string, engine: Engine) => {
       Engine.OCEANBASE_ORACLE,
       Engine.REDSHIFT,
       Engine.COCKROACHDB,
+      Engine.CASSANDRA,
     ].includes(engine)
   ) {
     return `"${id}"`;
