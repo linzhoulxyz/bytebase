@@ -99,6 +99,7 @@ import {
   upsertScope,
   buildSearchTextBySearchParams,
   buildSearchParamsBySearchText,
+  mergeSearchParams,
 } from "@/utils";
 import ScopeMenu from "./ScopeMenu.vue";
 import ScopeTags from "./ScopeTags.vue";
@@ -612,7 +613,15 @@ onMounted(() => {
   const { qs } = route.query;
   if (typeof qs === "string" && qs.length > 0) {
     const params = buildSearchParamsBySearchText(qs);
-    emit("update:params", params);
+    const existedScopes = props.params.scopes.reduce((map, scope) => {
+      map.set(scope.id, scope.readonly ?? false);
+      return map;
+    }, new Map<SearchScopeId, boolean>());
+    params.scopes = params.scopes.map((scope) => ({
+      ...scope,
+      readonly: existedScopes.get(scope.id),
+    }));
+    emit("update:params", mergeSearchParams(cloneDeep(props.params), params));
   }
 });
 

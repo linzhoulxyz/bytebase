@@ -408,8 +408,10 @@ type DatabaseMetadata struct {
 	BackupAvailable bool                   `protobuf:"varint,3,opt,name=backup_available,json=backupAvailable,proto3" json:"backup_available,omitempty"`
 	Datashare       bool                   `protobuf:"varint,4,opt,name=datashare,proto3" json:"datashare,omitempty"`
 	Secrets         []*Secret              `protobuf:"bytes,5,rep,name=secrets,proto3" json:"secrets,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// The schema is drifted from the source of truth.
+	Drifted       bool `protobuf:"varint,6,opt,name=drifted,proto3" json:"drifted,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DatabaseMetadata) Reset() {
@@ -475,6 +477,13 @@ func (x *DatabaseMetadata) GetSecrets() []*Secret {
 		return x.Secrets
 	}
 	return nil
+}
+
+func (x *DatabaseMetadata) GetDrifted() bool {
+	if x != nil {
+		return x.Drifted
+	}
+	return false
 }
 
 // DatabaseSchemaMetadata is the schema metadata for databases.
@@ -1519,11 +1528,16 @@ type TableMetadata struct {
 	Owner            string                     `protobuf:"bytes,18,opt,name=owner,proto3" json:"owner,omitempty"`
 	// The sorting_keys is a tuple of column names or arbitrary expressions. ClickHouse specific field.
 	// Reference: https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/mergetree#order_by
-	SortingKeys   []string           `protobuf:"bytes,19,rep,name=sorting_keys,json=sortingKeys,proto3" json:"sorting_keys,omitempty"`
-	Triggers      []*TriggerMetadata `protobuf:"bytes,20,rep,name=triggers,proto3" json:"triggers,omitempty"`
-	SkipDump      bool               `protobuf:"varint,21,opt,name=skip_dump,json=skipDump,proto3" json:"skip_dump,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	SortingKeys []string           `protobuf:"bytes,19,rep,name=sorting_keys,json=sortingKeys,proto3" json:"sorting_keys,omitempty"`
+	Triggers    []*TriggerMetadata `protobuf:"bytes,20,rep,name=triggers,proto3" json:"triggers,omitempty"`
+	SkipDump    bool               `protobuf:"varint,21,opt,name=skip_dump,json=skipDump,proto3" json:"skip_dump,omitempty"`
+	// https://docs.pingcap.com/tidb/stable/information-schema-tables/
+	ShardingInfo string `protobuf:"bytes,22,opt,name=sharding_info,json=shardingInfo,proto3" json:"sharding_info,omitempty"`
+	// https://docs.pingcap.com/tidb/stable/clustered-indexes/#clustered-indexes
+	// CLUSTERED or NONCLUSTERED.
+	PrimaryKeyType string `protobuf:"bytes,23,opt,name=primary_key_type,json=primaryKeyType,proto3" json:"primary_key_type,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *TableMetadata) Reset() {
@@ -1694,6 +1708,20 @@ func (x *TableMetadata) GetSkipDump() bool {
 		return x.SkipDump
 	}
 	return false
+}
+
+func (x *TableMetadata) GetShardingInfo() string {
+	if x != nil {
+		return x.ShardingInfo
+	}
+	return ""
+}
+
+func (x *TableMetadata) GetPrimaryKeyType() string {
+	if x != nil {
+		return x.PrimaryKeyType
+	}
+	return ""
 }
 
 type CheckConstraintMetadata struct {
@@ -3779,13 +3807,14 @@ var File_store_database_proto protoreflect.FileDescriptor
 
 const file_store_database_proto_rawDesc = "" +
 	"\n" +
-	"\x14store/database.proto\x12\x0ebytebase.store\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/wrappers.proto\x1a\x12store/common.proto\"\xd0\x02\n" +
+	"\x14store/database.proto\x12\x0ebytebase.store\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/wrappers.proto\x1a\x12store/common.proto\"\xea\x02\n" +
 	"\x10DatabaseMetadata\x12D\n" +
 	"\x06labels\x18\x01 \x03(\v2,.bytebase.store.DatabaseMetadata.LabelsEntryR\x06labels\x12@\n" +
 	"\x0elast_sync_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\flastSyncTime\x12)\n" +
 	"\x10backup_available\x18\x03 \x01(\bR\x0fbackupAvailable\x12\x1c\n" +
 	"\tdatashare\x18\x04 \x01(\bR\tdatashare\x120\n" +
-	"\asecrets\x18\x05 \x03(\v2\x16.bytebase.store.SecretR\asecrets\x1a9\n" +
+	"\asecrets\x18\x05 \x03(\v2\x16.bytebase.store.SecretR\asecrets\x12\x18\n" +
+	"\adrifted\x18\x06 \x01(\bR\adrifted\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x96\x03\n" +
@@ -3906,7 +3935,7 @@ const file_store_database_proto_rawDesc = "" +
 	"\x10MODE_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fMODE_DEFAULT\x10\x01\x12\x14\n" +
 	"\x10MODE_APPEND_ONLY\x10\x02\x12\x14\n" +
-	"\x10MODE_INSERT_ONLY\x10\x03\"\xb8\x06\n" +
+	"\x10MODE_INSERT_ONLY\x10\x03\"\x87\a\n" +
 	"\rTableMetadata\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x128\n" +
 	"\acolumns\x18\x02 \x03(\v2\x1e.bytebase.store.ColumnMetadataR\acolumns\x127\n" +
@@ -3931,7 +3960,9 @@ const file_store_database_proto_rawDesc = "" +
 	"\x05owner\x18\x12 \x01(\tR\x05owner\x12!\n" +
 	"\fsorting_keys\x18\x13 \x03(\tR\vsortingKeys\x12;\n" +
 	"\btriggers\x18\x14 \x03(\v2\x1f.bytebase.store.TriggerMetadataR\btriggers\x12\x1b\n" +
-	"\tskip_dump\x18\x15 \x01(\bR\bskipDump\"M\n" +
+	"\tskip_dump\x18\x15 \x01(\bR\bskipDump\x12#\n" +
+	"\rsharding_info\x18\x16 \x01(\tR\fshardingInfo\x12(\n" +
+	"\x10primary_key_type\x18\x17 \x01(\tR\x0eprimaryKeyType\"M\n" +
 	"\x17CheckConstraintMetadata\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1e\n" +
 	"\n" +

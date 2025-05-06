@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/bytebase/bytebase/backend/base"
 	"github.com/bytebase/bytebase/backend/common"
@@ -274,6 +275,14 @@ func doMigrationWithFunc(
 
 	opts := db.ExecuteOptions{}
 
+	project, err := stores.GetProjectV2(ctx, &store.FindProjectMessage{ResourceID: &database.ProjectID})
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to get project %v for database %v", database.ProjectID, database.DatabaseName)
+	}
+	if project != nil && project.Setting != nil {
+		opts.MaximumRetries = int(project.Setting.GetExecutionRetryPolicy().GetMaximumRetries())
+	}
+
 	opts.SetConnectionID = func(id string) {
 		stateCfg.TaskRunConnectionID.Store(mc.taskRunUID, id)
 	}
@@ -323,17 +332,18 @@ func postMigration(ctx context.Context, stores *store.Store, mc *migrateContext,
 		slog.String("database", database.DatabaseName),
 	)
 
-	// Remove schema drift anomalies.
-	if err := stores.DeleteAnomalyV2(ctx, &store.DeleteAnomalyMessage{
-		InstanceID:   mc.task.InstanceID,
-		DatabaseName: *mc.task.DatabaseName,
-		Type:         base.AnomalyDatabaseSchemaDrift,
-	}); err != nil && common.ErrorCode(err) != common.NotFound {
-		slog.Error("Failed to archive anomaly",
-			slog.String("instance", instance.ResourceID),
-			slog.String("database", database.DatabaseName),
-			slog.String("type", string(base.AnomalyDatabaseSchemaDrift)),
-			log.BBError(err))
+	// Remove schema drift.
+	metadata, ok := proto.Clone(database.Metadata).(*storepb.DatabaseMetadata)
+	if !ok {
+		return false, nil, errors.Errorf("failed to convert database metadata type")
+	}
+	metadata.Drifted = false
+	if _, err := stores.UpdateDatabase(ctx, &store.UpdateDatabaseMessage{
+		InstanceID:   database.InstanceID,
+		DatabaseName: database.DatabaseName,
+		Metadata:     metadata,
+	}); err != nil {
+		return false, nil, errors.Wrapf(err, "failed to update database %q for instance %q", database.DatabaseName, database.InstanceID)
 	}
 
 	detail := fmt.Sprintf("Applied migration version %s to database %q.", mc.version, database.DatabaseName)
