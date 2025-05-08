@@ -291,9 +291,9 @@
     "status": {
       "enqueued": "処刑を待っています。",
       "enqueued-with-rollout-time": "実行を待機しています。{time} の後に実行されます。",
-      "waiting-connection": "利用可能なインスタンス接続を待っています。インスタンス接続カウントは、Bytebaseの制限設定に達しました。",
-      "waiting-task": "別のタスクが完了するのを待っています。",
-      "waiting-max-tasks-per-rollout": "他のタスクが完了するのを待っています。ロールアウトごとの最大実行タスク数制限に達しました。"
+      "waiting-connection": "利用可能なインスタンス接続を待っています。インスタンス接続カウントは、Bytebaseの制限設定に達しました。最後の報告は {time} です。",
+      "waiting-task": "別のタスクが完了するのを待っています。最後の報告は {time} です。",
+      "waiting-max-tasks-per-rollout": "他のタスクが完了するのを待っています。ロールアウトごとの最大実行タスク数制限に達しました。最後の報告は {time} です。"
     }
   },
   "banner": {
@@ -307,10 +307,6 @@
     "external-url": "Bytebase は --extern-url を設定していません"
   },
   "bbkit": {
-    "common": {
-      "back": "戻る",
-      "next": "次のステップ"
-    },
     "confirm-button": {
       "sure-to-delete": "本当に削除してもよろしいですか?",
       "sure-to-archive": "本当にアーカイブしますか?",
@@ -1725,7 +1721,6 @@
   "sql-editor": {
     "self": "SQLエディタ",
     "select-connection": "データ接続を選択してください",
-    "search-databases": "データベースを検索する",
     "search-results": "の検索結果",
     "loading-databases": "データベース情報をロードしています...",
     "show-databases-without-query-permission": "クエリ権限のないデータベースを表示します",
@@ -1803,7 +1798,6 @@
     },
     "batch-query": {
       "batch": "バッチ",
-      "select-database": "以下のデータベースを選択してください",
       "description": "{project} の下にある {count} データベースをバッチクエリします。",
       "show-or-hide-empty-query-results": "空のクエリ結果の表示/非表示"
     },
@@ -2005,8 +1999,7 @@
       "manage-license": "ライセンスの管理",
       "used-and-total-license": "割り当てられた/合計インスタンスライセンス",
       "used-and-total-user": "アクティブ/合計ユーザー制限",
-      "success-notification": "ライセンスの割り当てが正常に更新されました",
-      "missing-license-for-feature": "{feature} を有効にするためのインスタンスライセンスがありません。クリックしてライセンスを割り当てます。"
+      "success-notification": "ライセンスの割り当てが正常に更新されました"
     },
     "update": {
       "success": {

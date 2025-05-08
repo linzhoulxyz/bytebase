@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"slices"
 	"strings"
 	"syscall"
@@ -24,6 +26,7 @@ import (
 var (
 	Config struct {
 		// bytebase-action flags
+		Output               string
 		URL                  string
 		ServiceAccount       string
 		ServiceAccountSecret string
@@ -43,16 +46,20 @@ var (
 		// Rollout up to the target-stage.
 		// Format: environments/{environment}
 		TargetStage string
+		Plan        string
 	}
 	cmd = &cobra.Command{
-		Use:               "bytebase-action",
-		Short:             "Bytebase action",
-		PersistentPreRunE: validateSharedFlags,
+		Use:                "bytebase-action",
+		Short:              "Bytebase action",
+		PersistentPreRunE:  validateSharedFlags,
+		PersistentPostRunE: writeOutputJSON,
 	}
+	outputMap = map[string]string{}
 )
 
 func init() {
 	// bytebase-action flags
+	cmd.PersistentFlags().StringVar(&Config.Output, "output", "", "Output file location. The output file is a JSON file with the created resource names")
 	cmd.PersistentFlags().StringVar(&Config.URL, "url", "https://demo.bytebase.com", "Bytebase URL")
 	cmd.PersistentFlags().StringVar(&Config.ServiceAccount, "service-account", "ci@service.bytebase.com", "Bytebase Service account")
 	cmd.PersistentFlags().StringVar(&Config.ServiceAccountSecret, "service-account-secret", os.Getenv("BYTEBASE_SERVICE_ACCOUNT_SECRET"), "Bytebase Service account secret")
@@ -70,6 +77,7 @@ func init() {
 	}
 	cmd.AddCommand(cmdCheck)
 
+	// bytebase-action rollout flags
 	cmdRollout := &cobra.Command{
 		Use:               "rollout",
 		Short:             "Rollout the migrate files",
@@ -82,6 +90,7 @@ func init() {
 	cmdRollout.Flags().StringVar(&Config.RolloutTitle, "rollout-title", defaultTitle, "The title of the rollout")
 	cmdRollout.Flags().StringVar(&Config.CheckPlan, "check-plan", "SKIP", "Whether to check the plan and fail on warning/error. Valid values: SKIP, FAIL_ON_WARNING, FAIL_ON_ERROR")
 	cmdRollout.Flags().StringVar(&Config.TargetStage, "target-stage", "", "Rollout up to the target stage. Format: environments/{environment}.")
+	cmdRollout.Flags().StringVar(&Config.Plan, "plan", "", "The plan to rollout. Format: projects/{project}/plans/{plan}. Shadows file-pattern and targets.")
 	cmd.AddCommand(cmdRollout)
 }
 
@@ -126,6 +135,37 @@ func validateRolloutFlags(*cobra.Command, []string) error {
 		return errors.Errorf("invalid check-plan value: %s. Valid values: SKIP, FAIL_ON_WARNING, FAIL_ON_ERROR", Config.CheckPlan)
 	}
 
+	return nil
+}
+
+func writeOutputJSON(*cobra.Command, []string) error {
+	if Config.Output == "" {
+		return nil
+	}
+
+	slog.Info("writing output to file", "file", Config.Output)
+
+	// Create parent directory if not exists
+	if dir := filepath.Dir(Config.Output); dir != "" {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return errors.Wrapf(err, "failed to create output directory: %s", dir)
+		}
+	}
+
+	f, err := os.Create(Config.Output)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create output file: %s", Config.Output)
+	}
+	defer f.Close()
+
+	j, err := json.Marshal(outputMap)
+	if err != nil {
+		return errors.Wrapf(err, "failed to marshal output map")
+	}
+
+	if _, err := f.Write(j); err != nil {
+		return errors.Wrapf(err, "failed to write output file: %s", Config.Output)
+	}
 	return nil
 }
 
@@ -174,49 +214,62 @@ func runRollout(command *cobra.Command, _ []string) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to create client")
 	}
-	releaseFiles, err := getReleaseFiles(Config.FilePattern)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get release files")
-	}
-	createReleaseResponse, err := client.createRelease(Config.Project, &v1pb.Release{
-		Title:     Config.ReleaseTitle,
-		Files:     releaseFiles,
-		VcsSource: nil, // TODO(p0ny): impl
-	})
-	if err != nil {
-		return errors.Wrapf(err, "failed to create release")
-	}
 
-	planPreview, err := client.previewPlan(Config.Project, &v1pb.PreviewPlanRequest{
-		Release:         createReleaseResponse.Name,
-		Targets:         Config.Targets,
-		AllowOutOfOrder: true,
-	})
-	if err != nil {
-		return errors.Wrapf(err, "failed to preview plan")
-	}
+	var plan *v1pb.Plan
+	if Config.Plan != "" {
+		planP, err := client.getPlan(Config.Plan)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get plan")
+		}
+		plan = planP
+	} else {
+		releaseFiles, err := getReleaseFiles(Config.FilePattern)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get release files")
+		}
+		createReleaseResponse, err := client.createRelease(Config.Project, &v1pb.Release{
+			Title:     Config.ReleaseTitle,
+			Files:     releaseFiles,
+			VcsSource: nil, // TODO(p0ny): impl
+		})
+		if err != nil {
+			return errors.Wrapf(err, "failed to create release")
+		}
+		outputMap["release"] = createReleaseResponse.Name
 
-	specCount := 0
-	for _, step := range planPreview.GetPlan().GetSteps() {
-		specCount += len(step.GetSpecs())
-	}
-	if specCount == 0 {
-		slog.Info("no change required. exiting...")
-		return nil
-	}
+		planPreview, err := client.previewPlan(Config.Project, &v1pb.PreviewPlanRequest{
+			Release:         createReleaseResponse.Name,
+			Targets:         Config.Targets,
+			AllowOutOfOrder: true,
+		})
+		if err != nil {
+			return errors.Wrapf(err, "failed to preview plan")
+		}
 
-	planCreated, err := client.createPlan(Config.Project, planPreview.Plan)
-	if err != nil {
-		return errors.Wrapf(err, "failed to create plan")
+		specCount := 0
+		for _, step := range planPreview.GetPlan().GetSteps() {
+			specCount += len(step.GetSpecs())
+		}
+		if specCount == 0 {
+			slog.Info("no change required. exiting...")
+			return nil
+		}
+
+		planCreated, err := client.createPlan(Config.Project, planPreview.Plan)
+		if err != nil {
+			return errors.Wrapf(err, "failed to create plan")
+		}
+		plan = planCreated
 	}
+	outputMap["plan"] = plan.Name
 
-	slog.Info("plan created", "url", fmt.Sprintf("%s/%s", client.url, planCreated.Name))
+	slog.Info("plan created", "url", fmt.Sprintf("%s/%s", client.url, plan.Name))
 
-	if err := runAndWaitForPlanChecks(ctx, client, planCreated.Name); err != nil {
+	if err := runAndWaitForPlanChecks(ctx, client, plan.Name); err != nil {
 		return errors.Wrapf(err, "failed to run and wait for plan checks")
 	}
 
-	if err := runAndWaitForRollout(ctx, client, planCreated.Name); err != nil {
+	if err := runAndWaitForRollout(ctx, client, plan.Name); err != nil {
 		return errors.Wrapf(err, "failed to run and wait for rollout")
 	}
 
@@ -227,13 +280,6 @@ func runAndWaitForPlanChecks(ctx context.Context, client *Client, planName strin
 	if Config.CheckPlan == "SKIP" {
 		return nil
 	}
-	slog.Info("running plan checks")
-	_, err := client.runPlanChecks(&v1pb.RunPlanChecksRequest{
-		Name: planName,
-	})
-	if err != nil {
-		return errors.Wrapf(err, "failed to run plan checks")
-	}
 	for {
 		if ctx.Err() != nil {
 			return errors.Wrapf(ctx.Err(), "context cancelled")
@@ -242,6 +288,16 @@ func runAndWaitForPlanChecks(ctx context.Context, client *Client, planName strin
 		runs, err := client.listAllPlanCheckRuns(planName)
 		if err != nil {
 			return errors.Wrapf(err, "failed to list plan checks")
+		}
+		if len(runs.PlanCheckRuns) == 0 {
+			slog.Info("running plan checks")
+			_, err := client.runPlanChecks(&v1pb.RunPlanChecksRequest{
+				Name: planName,
+			})
+			if err != nil {
+				return errors.Wrapf(err, "failed to run plan checks")
+			}
+			continue
 		}
 		var failedCount, canceledCount, runningCount int
 		var errorCount, warningCount int
@@ -309,7 +365,8 @@ func runAndWaitForRollout(ctx context.Context, client *Client, planName string) 
 		}
 	}
 	if !targetStageFound {
-		return errors.Wrapf(err, "target-stage %v not found in stages. the stages are %v", Config.TargetStage, stages)
+		slog.Info("the target stage is not found in the rollout preview. exiting...", "targetStage", Config.TargetStage, "rolloutStages", stages)
+		return nil
 	}
 
 	// create rollout with no stages to obtain the rollout name
@@ -326,6 +383,7 @@ func runAndWaitForRollout(ctx context.Context, client *Client, planName string) 
 	if err != nil {
 		return errors.Wrapf(err, "failed to preview rollout")
 	}
+	outputMap["rollout"] = rolloutEmpty.Name
 
 	slog.Info("rollout created", "url", fmt.Sprintf("%s/%s", client.url, rolloutEmpty.Name))
 
@@ -451,6 +509,7 @@ func waitForRollout(ctx context.Context, client *Client, rolloutPreview *v1pb.Ro
 
 		// run stage tasks
 		if len(notStartedTasks) > 0 {
+			slog.Info("running stage tasks", "stage", stage.Environment, "taskCount", len(notStartedTasks))
 			if _, err := client.batchRunTasks(&v1pb.BatchRunTasksRequest{
 				Parent: stage.Name,
 				Tasks:  notStartedTasks,
