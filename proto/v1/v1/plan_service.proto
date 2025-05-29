@@ -221,14 +221,18 @@ message Plan {
   // Format: projects/{project}/plans/{plan}
   string name = 1;
 
-  // The resource name of the issue associated with this plan.
+  // The issue associated with the plan.
+  // Can be empty.
   // Format: projects/{project}/issues/{issue}
   string issue = 3;
 
   string title = 4;
   string description = 5;
 
+  // Deprecated: use specs instead.
   repeated Step steps = 6;
+
+  repeated Spec specs = 14;
 
   message Step {
     string title = 2;
@@ -236,12 +240,8 @@ message Plan {
   }
 
   message Spec {
-    // earliest_allowed_time the earliest execution time of the change.
-    google.protobuf.Timestamp earliest_allowed_time = 4;
     // A UUID4 string that uniquely identifies the Spec.
     string id = 5;
-
-    SpecReleaseSource spec_release_source = 8;
 
     oneof config {
       CreateDatabaseConfig create_database_config = 1;
@@ -263,8 +263,6 @@ message Plan {
   // - WARNING
   // - ERROR
   map<string, int32> plan_check_run_status_count = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  ReleaseSource release_source = 12;
 
   Deployment deployment = 13;
 
@@ -300,13 +298,14 @@ message Plan {
     // The resource name of the sheet.
     // Format: projects/{project}/sheets/{sheet}
     string sheet = 2;
+
+    // The resource name of the release.
+    // Format: projects/{project}/releases/{release}
+    string release = 9 [(google.api.resource_reference) = {type: "bytebase.com/Release"}];
+
     // Type is the database change type.
     enum Type {
       TYPE_UNSPECIFIED = 0;
-      // Used for establishing schema baseline, this is used when
-      // 1. Onboard the database into Bytebase since Bytebase needs to know the current database schema.
-      // 2. Had schema drift and need to re-establish the baseline.
-      BASELINE = 1;
       // Used for DDL changes including CREATE DATABASE.
       MIGRATE = 2;
       // Used for schema changes via state-based schema migration including CREATE DATABASE.
@@ -317,9 +316,6 @@ message Plan {
       DATA = 6;
     }
     Type type = 3;
-    // schema_version is parsed from file name.
-    // It is automatically generated in the UI workflow.
-    string schema_version = 4;
 
     map<string, string> ghost_flags = 7;
 
@@ -358,18 +354,6 @@ message Plan {
       // Format: instances/{instance-id}/databases/{database-name}.
       repeated string databases = 2;
     }
-  }
-
-  message ReleaseSource {
-    // The release.
-    // Format: projects/{project}/releases/{release}
-    string release = 1 [(google.api.resource_reference) = {type: "bytebase.com/Release"}];
-  }
-
-  message SpecReleaseSource {
-    // Format: projects/{project}/releases/{release}/files/{file}
-    // {file} is URL path escaped.
-    string file = 1;
   }
 }
 

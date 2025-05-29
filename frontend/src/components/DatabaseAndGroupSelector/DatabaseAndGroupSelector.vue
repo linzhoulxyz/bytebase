@@ -1,5 +1,9 @@
 <template>
-  <NTabs v-model:value="databaseSelectState.changeSource" type="card">
+  <NTabs
+    v-model:value="databaseSelectState.changeSource"
+    type="card"
+    size="small"
+  >
     <NTabPane name="DATABASE" :tab="$t('common.databases')">
       <AdvancedSearch
         v-model:params="searchParams"
@@ -14,12 +18,13 @@
         :custom-click="true"
         :parent="project.name"
         :filter="filter"
+        :size="'small'"
         v-model:selected-database-names="
           databaseSelectState.selectedDatabaseNameList
         "
       />
     </NTabPane>
-    <NTabPane name="GROUP" :tab="$t('common.database-groups')">
+    <NTabPane name="GROUP" :tab="$t('common.database-group')">
       <DatabaseGroupDataTable
         :database-group-list="dbGroupList"
         :show-selection="true"
@@ -29,8 +34,8 @@
             ? [databaseSelectState.selectedDatabaseGroup]
             : []
         "
-        @update:selected-database-groups="
-          databaseSelectState.selectedDatabaseGroup = head(Array.from($event))
+        @update:selected-database-group-names="
+          databaseSelectState.selectedDatabaseGroup = head($event)
         "
       />
     </NTabPane>

@@ -183,7 +183,7 @@
     "expiration": "Hết hạn",
     "configure": "Cấu hình",
     "groups": "Nhóm",
-    "database-groups": "Nhóm cơ sở dữ liệu",
+    "database-group": "Nhóm cơ sở dữ liệu | Nhóm cơ sở dữ liệu",
     "members": "Thành viên",
     "warehouse": "Kho",
     "schedule": "Lịch trình",
@@ -224,10 +224,16 @@
     "catalog": "Danh mục",
     "summary": "Tóm tắt",
     "errors": "Lỗi",
-    "removed": "LOẠI BỎ"
+    "removed": "LOẠI BỎ",
+    "options": "Tùy chọn",
+    "submit": "Nộp"
   },
   "error-page": {
     "go-back-home": "Về trang chủ"
+  },
+  "refresh-remind": {
+    "title": "Đã phát hiện phiên bản lỗi thời",
+    "description": "Đã phát hiện phiên bản lỗi thời. Vui lòng làm mới trang."
   },
   "task": {
     "current-task": "Nhiệm vụ hiện tại",
@@ -246,9 +252,6 @@
       },
       "summary-report": "Báo cáo tổng hợp"
     },
-    "earliest-allowed-time": "Thời gian triển khai sớm nhất",
-    "earliest-allowed-time-hint": "@:{'task.earliest-allowed-time'} là thời gian sớm nhất để triển khai sự cố, bạn không thể triển khai trước thời gian này; nếu không được chỉ định, sự cố sẽ chạy khi đáp ứng tất cả các tiêu chí.",
-    "earliest-allowed-time-unset": "Không đặt",
     "comment": "Bình luận",
     "started": "Bắt đầu",
     "view-change": "Xem thay đổi",
@@ -270,13 +273,18 @@
     "action-all-tasks-in-current-stage": "{action} tất cả các tác vụ trong giai đoạn hiện tại",
     "cancel-task": "Hủy tác vụ | Hủy các tác vụ",
     "created": "Đã tạo",
+    "run-immediately": "Chạy nhiệm vụ ngay lập tức",
+    "scheduled-time": "Thời gian đã lên lịch",
+    "select-scheduled-time": "Chọn thời gian đã lên lịch",
+    "error": {
+      "scheduled-time-must-be-in-the-future": "Thời gian dự kiến phải ở trong tương lai"
+    },
     "online-migration": {
       "self": "Di chuyển trực tuyến",
       "configure-ghost-parameters": "Cấu hình tham số gh-ost",
       "ghost-parameters": "Tham số gh-ost",
       "configure": "Cấu hình",
       "error": {
-        "x-status-task-is-not-editable": "Tác vụ trạng thái {status} không thể chỉnh sửa",
         "nothing-changed": "Không có gì thay đổi",
         "not-applicable": {
           "task-doesnt-meet-ghost-requirement": "Nhiệm vụ không đáp ứng được yêu cầu của gh-ost",
@@ -348,7 +356,8 @@
       "subscription": "(Nâng cấp để kích hoạt quản lý vai trò)"
     },
     "members": {
-      "inactive": "Thành viên không hoạt động",
+      "inactive": "Không hoạt động",
+      "inactive-users": "Người dùng không hoạt động",
       "table": {
         "account": "Tài khoản",
         "role": "Vai trò",
@@ -383,7 +392,7 @@
       "reset-service-key": "Đặt lại Khóa Dịch vụ",
       "reset-service-key-alert": "Hành động này không thể hoàn tác. Khóa cũ sẽ ngừng hoạt động ngay lập tức. Bạn có chắc chắn muốn đặt lại khóa dịch vụ này?",
       "service-key-copied": "Khóa Dịch vụ đã được sao chép vào khay nhớ tạm, vui lòng giữ bí mật.",
-      "show-inactive": "Hiển thị thành viên không hoạt động",
+      "show-inactive": "Hiển thị người dùng không hoạt động",
       "view-by-roles": "Xem theo vai trò",
       "add-member": "Thêm thành viên",
       "add-user": "Thêm người dùng",
@@ -506,7 +515,7 @@
         },
         "maximum-role-expiration": {
           "self": "Thời gian hết hạn vai trò tối đa",
-          "description": "Thời gian hết hạn vai trò tối đa là khoảng thời gian tối đa một vai trò có thể được cấp cho người dùng. (Chỉ dành cho vai trò người truy vấn và người xuất)",
+          "description": "Thời hạn vai trò tối đa là thời hạn tối đa mà một vai trò có thể được cấp cho người dùng, sẽ áp dụng cho tất cả các vai trò trong dự án ngoại trừ chủ sở hữu dự án.",
           "days": "Ngày",
           "never-expires": "Không bao giờ hết hạn"
         },
@@ -888,6 +897,7 @@
     "issue-name": "Tên vấn đề",
     "grant-request": {
       "export-rows": "Số dòng xuất tối đa",
+      "select-export-rows": "Chọn số hàng xuất tối đa",
       "expired-at": "Hết hạn vào",
       "all-databases": "Tất cả",
       "all-databases-tip": "Tất cả cơ sở dữ liệu hiện tại và tương lai trong dự án này.",
@@ -906,15 +916,7 @@
       "current-change-will-apply-to-all-tasks-in-batch-mode": "Trong chế độ hàng loạt, thay đổi hiện tại sẽ được áp dụng cho tất cả các tác vụ.",
       "current-change-will-apply-to-all-tasks": "Thay đổi hiện tại sẽ được áp dụng cho tất cả các tác vụ."
     },
-    "not-editable-legacy-issue": "Vấn đề này không thể chỉnh sửa vì nó được tạo trong phiên bản cũ của Bytebase",
     "action-anyway": "{action} bằng mọi cách",
-    "disallow-edit-reasons": {
-      "issue-is-done": "Vấn đề đã hoàn tất",
-      "issue-is-canceled": "Vấn đề đã bị hủy",
-      "task-is-x-status": "Tác vụ là {status}",
-      "task-is-running-cancel-first": "Tác vụ đang chạy, hãy hủy tác vụ trước khi thay đổi giá trị này"
-    },
-    "you-are-not-allowed-to-change-this-value": "Bạn không được phép thay đổi giá trị này",
     "sql-check": {
       "sql-checks": "Kiểm tra SQL",
       "not-executed-yet": "Chưa được thực hiện",
@@ -938,9 +940,6 @@
       "format": "Định dạng",
       "encrypt": "Mã hóa",
       "file-downloaded": "Tệp đã tải xuống"
-    },
-    "update-rollout-time": {
-      "self": "Cập nhật thời gian triển khai"
     },
     "task-run": {
       "logs": "Nhật ký",
@@ -983,8 +982,8 @@
       "change-data": "Thay đổi dữ liệu",
       "export-data": "Xuất dữ liệu",
       "create-database": "Tạo cơ sở dữ liệu",
-      "request-querier-role": "Yêu cầu vai trò người truy vấn",
-      "request-exporter-role": "Yêu cầu vai trò người xuất"
+      "request-role": "Yêu cầu vai trò",
+      "request-specific-role": "Yêu cầu vai trò \"{role}\""
     },
     "schema-drift-detected": {
       "self": "Đã phát hiện sự trôi dạt của sơ đồ",
@@ -1261,9 +1260,9 @@
       "title": "Kiểm soát truy cập",
       "disable-copy-data-from-sql-editor": "Hạn chế sao chép dữ liệu trong Trình soạn thảo SQL (Quản trị viên/DBA được phép)",
       "restrict-admin-connection": {
-        "self": "Không cho phép truy vấn nguồn dữ liệu quản trị",
+        "self": "Hạn chế truy vấn nguồn dữ liệu quản trị",
         "disallow": "Không cho phép truy vấn dữ liệu từ nguồn dữ liệu quản trị",
-        "fallback": "Quay lại kết nối quản trị nếu không có kết nối chỉ đọc"
+        "fallback": "Cho phép truy vấn nguồn dữ liệu quản trị nếu không có kết nối chỉ đọc nào khả dụng"
       }
     },
     "statement-execution": {
@@ -1381,7 +1380,6 @@
     "successfully-transferred-databases": "Đã chuyển thành công cơ sở dữ liệu",
     "nullable": "Có thể null",
     "expression": "Biểu thức",
-    "position": "Vị trí",
     "unique": "Duy nhất",
     "visible": "Hiển thị",
     "comment": "Bình luận",
@@ -1482,6 +1480,7 @@
     "foreign-key": {
       "reference": "Tham chiếu"
     },
+    "checks": "Kiểm tra",
     "create-target-database-or-schema-for-backup": "Vui lòng tạo cơ sở dữ liệu hoặc lược đồ đích cho bản sao lưu trước",
     "revision": {
       "self": "Bản sửa đổi",
@@ -1734,6 +1733,10 @@
     "to-enable-admin-mode": "để bật chế độ quản trị",
     "notify-empty-statement": "Vui lòng nhập câu lệnh SQL của bạn vào trình soạn thảo",
     "can-not-execute-query": "Không thể thực hiện truy vấn khi đang tải dữ liệu.",
+    "invalid-database": "Cơ sở dữ liệu không hợp lệ {database}",
+    "request-cancelled": "Yêu cầu đã bị hủy",
+    "request-aborted": "Người dùng đã hủy yêu cầu",
+    "no-data-source": "Không có nguồn dữ liệu có thể truy vấn. Vui lòng kiểm tra chính sách truy vấn nguồn dữ liệu trên môi trường hoặc dự án.",
     "rows": "dòng | dòng",
     "vertical-display": "Hiển thị dọc",
     "no-history-found": "Không tìm thấy lịch sử",
@@ -1798,9 +1801,19 @@
     },
     "batch-query": {
       "batch": "Hàng loạt",
-      "description": "Truy vấn hàng loạt {count} cơ sở dữ liệu bổ sung trong {project}.",
-      "show-or-hide-empty-query-results": "Hiển thị / ẩn kết quả truy vấn trống"
+      "select-database-group": "Bạn có thể {select-database-group} để truy vấn hàng loạt",
+      "description": "Truy vấn hàng loạt {database} cơ sở dữ liệu bổ sung và {group} nhóm cơ sở dữ liệu trong {project}.",
+      "show-or-hide-empty-query-results": "Hiển thị / ẩn kết quả truy vấn trống",
+      "select-data-source": {
+        "self": "Chọn nguồn dữ liệu cho lô",
+        "tooltip": "Sẽ tìm các nguồn dữ liệu có sẵn với chính sách hạn chế, sau đó áp dụng lựa chọn.",
+        "admin": "Quản trị viên",
+        "readonly": "Chỉ đọc",
+        "not-match": "Nguồn dữ liệu không khớp, mong đợi {expect} nhưng lại nhận được {actual}."
+      }
     },
+    "execute-query": "Thực hiện truy vấn",
+    "pending-query": "Đang chờ truy vấn",
     "executing-query": "Đang thực hiện truy vấn",
     "request-query": "Yêu cầu truy vấn",
     "copy-success": "Sao chép thành công",
@@ -2264,8 +2277,7 @@
           "ddl": "DDL",
           "create_database": "Tạo cơ sở dữ liệu",
           "data_export": "Xuất dữ liệu",
-          "request_query": "Yêu cầu vai trò Người truy vấn",
-          "request_export": "Yêu cầu vai trò Người xuất"
+          "request-role": "Yêu cầu vai trò"
         }
       },
       "template": {
@@ -2536,9 +2548,6 @@
     "allow-out-of-order": "Cho phép không theo thứ tự",
     "archive-this-release": "Lưu trữ bản phát hành này",
     "total-files": "Tổng số {count} tệp",
-    "no-tasks-to-apply": {
-      "self": "Không có tác vụ nào để áp dụng"
-    },
     "actions": {
       "new-file": "Tệp mới",
       "import-from-release": "Nhập từ bản phát hành"

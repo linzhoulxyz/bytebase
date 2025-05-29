@@ -47,6 +47,14 @@ export interface CreateRiskRequest {
   risk: Risk | undefined;
 }
 
+export interface GetRiskRequest {
+  /**
+   * The name of the risk to retrieve.
+   * Format: risks/{risk}
+   */
+  name: string;
+}
+
 export interface UpdateRiskRequest {
   /**
    * The risk to update.
@@ -95,6 +103,7 @@ export interface Risk {
    * sql_statement: the SQL statement, support "contains()", "matches()", "startsWith()", "endsWith()" operations.
    * export_rows: export data count, support "==", "!=", "<", "<=", ">", ">=" operations.
    * expiration_days: the role expiration days for the request, support "==", "!=", "<", "<=", ">", ">=" operations.
+   * role: the request role full name, support "==", "!=", "in [xx]", "!(in [xx])", "contains()", "matches()", "startsWith()", "endsWith()" operations.
    *
    * When the risk source is DDL/DML, support following variables:
    * affected_rows
@@ -141,6 +150,11 @@ export interface Risk {
    * table_name
    * expiration_days
    * export_rows
+   *
+   * When the risk source is REQUEST_ROLE, support following variables:
+   * project_id
+   * expiration_days
+   * role
    */
   condition: Expr | undefined;
 }
@@ -150,9 +164,8 @@ export enum Risk_Source {
   DDL = "DDL",
   DML = "DML",
   CREATE_DATABASE = "CREATE_DATABASE",
-  REQUEST_QUERY = "REQUEST_QUERY",
-  REQUEST_EXPORT = "REQUEST_EXPORT",
   DATA_EXPORT = "DATA_EXPORT",
+  REQUEST_ROLE = "REQUEST_ROLE",
   UNRECOGNIZED = "UNRECOGNIZED",
 }
 
@@ -170,15 +183,12 @@ export function risk_SourceFromJSON(object: any): Risk_Source {
     case 3:
     case "CREATE_DATABASE":
       return Risk_Source.CREATE_DATABASE;
-    case 4:
-    case "REQUEST_QUERY":
-      return Risk_Source.REQUEST_QUERY;
-    case 5:
-    case "REQUEST_EXPORT":
-      return Risk_Source.REQUEST_EXPORT;
     case 6:
     case "DATA_EXPORT":
       return Risk_Source.DATA_EXPORT;
+    case 7:
+    case "REQUEST_ROLE":
+      return Risk_Source.REQUEST_ROLE;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -196,12 +206,10 @@ export function risk_SourceToJSON(object: Risk_Source): string {
       return "DML";
     case Risk_Source.CREATE_DATABASE:
       return "CREATE_DATABASE";
-    case Risk_Source.REQUEST_QUERY:
-      return "REQUEST_QUERY";
-    case Risk_Source.REQUEST_EXPORT:
-      return "REQUEST_EXPORT";
     case Risk_Source.DATA_EXPORT:
       return "DATA_EXPORT";
+    case Risk_Source.REQUEST_ROLE:
+      return "REQUEST_ROLE";
     case Risk_Source.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -218,12 +226,10 @@ export function risk_SourceToNumber(object: Risk_Source): number {
       return 2;
     case Risk_Source.CREATE_DATABASE:
       return 3;
-    case Risk_Source.REQUEST_QUERY:
-      return 4;
-    case Risk_Source.REQUEST_EXPORT:
-      return 5;
     case Risk_Source.DATA_EXPORT:
       return 6;
+    case Risk_Source.REQUEST_ROLE:
+      return 7;
     case Risk_Source.UNRECOGNIZED:
     default:
       return -1;
@@ -275,13 +281,6 @@ export const ListRisksRequest: MessageFns<ListRisksRequest> = {
       reader.skip(tag & 7);
     }
     return message;
-  },
-
-  fromJSON(object: any): ListRisksRequest {
-    return {
-      pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
-      pageToken: isSet(object.pageToken) ? globalThis.String(object.pageToken) : "",
-    };
   },
 
   toJSON(message: ListRisksRequest): unknown {
@@ -353,13 +352,6 @@ export const ListRisksResponse: MessageFns<ListRisksResponse> = {
     return message;
   },
 
-  fromJSON(object: any): ListRisksResponse {
-    return {
-      risks: globalThis.Array.isArray(object?.risks) ? object.risks.map((e: any) => Risk.fromJSON(e)) : [],
-      nextPageToken: isSet(object.nextPageToken) ? globalThis.String(object.nextPageToken) : "",
-    };
-  },
-
   toJSON(message: ListRisksResponse): unknown {
     const obj: any = {};
     if (message.risks?.length) {
@@ -418,10 +410,6 @@ export const CreateRiskRequest: MessageFns<CreateRiskRequest> = {
     return message;
   },
 
-  fromJSON(object: any): CreateRiskRequest {
-    return { risk: isSet(object.risk) ? Risk.fromJSON(object.risk) : undefined };
-  },
-
   toJSON(message: CreateRiskRequest): unknown {
     const obj: any = {};
     if (message.risk !== undefined) {
@@ -436,6 +424,60 @@ export const CreateRiskRequest: MessageFns<CreateRiskRequest> = {
   fromPartial(object: DeepPartial<CreateRiskRequest>): CreateRiskRequest {
     const message = createBaseCreateRiskRequest();
     message.risk = (object.risk !== undefined && object.risk !== null) ? Risk.fromPartial(object.risk) : undefined;
+    return message;
+  },
+};
+
+function createBaseGetRiskRequest(): GetRiskRequest {
+  return { name: "" };
+}
+
+export const GetRiskRequest: MessageFns<GetRiskRequest> = {
+  encode(message: GetRiskRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.name !== "") {
+      writer.uint32(10).string(message.name);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetRiskRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetRiskRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  toJSON(message: GetRiskRequest): unknown {
+    const obj: any = {};
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetRiskRequest>): GetRiskRequest {
+    return GetRiskRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetRiskRequest>): GetRiskRequest {
+    const message = createBaseGetRiskRequest();
+    message.name = object.name ?? "";
     return message;
   },
 };
@@ -485,13 +527,6 @@ export const UpdateRiskRequest: MessageFns<UpdateRiskRequest> = {
       reader.skip(tag & 7);
     }
     return message;
-  },
-
-  fromJSON(object: any): UpdateRiskRequest {
-    return {
-      risk: isSet(object.risk) ? Risk.fromJSON(object.risk) : undefined,
-      updateMask: isSet(object.updateMask) ? FieldMask.unwrap(FieldMask.fromJSON(object.updateMask)) : undefined,
-    };
   },
 
   toJSON(message: UpdateRiskRequest): unknown {
@@ -550,10 +585,6 @@ export const DeleteRiskRequest: MessageFns<DeleteRiskRequest> = {
       reader.skip(tag & 7);
     }
     return message;
-  },
-
-  fromJSON(object: any): DeleteRiskRequest {
-    return { name: isSet(object.name) ? globalThis.String(object.name) : "" };
   },
 
   toJSON(message: DeleteRiskRequest): unknown {
@@ -665,17 +696,6 @@ export const Risk: MessageFns<Risk> = {
     return message;
   },
 
-  fromJSON(object: any): Risk {
-    return {
-      name: isSet(object.name) ? globalThis.String(object.name) : "",
-      source: isSet(object.source) ? risk_SourceFromJSON(object.source) : Risk_Source.SOURCE_UNSPECIFIED,
-      title: isSet(object.title) ? globalThis.String(object.title) : "",
-      level: isSet(object.level) ? globalThis.Number(object.level) : 0,
-      active: isSet(object.active) ? globalThis.Boolean(object.active) : false,
-      condition: isSet(object.condition) ? Expr.fromJSON(object.condition) : undefined,
-    };
-  },
-
   toJSON(message: Risk): unknown {
     const obj: any = {};
     if (message.name !== "") {
@@ -749,6 +769,45 @@ export const RiskServiceDefinition = {
           800016: [new Uint8Array([1])],
           800024: [new Uint8Array([1])],
           578365826: [new Uint8Array([17, 58, 4, 114, 105, 115, 107, 34, 9, 47, 118, 49, 47, 114, 105, 115, 107, 115])],
+        },
+      },
+    },
+    getRisk: {
+      name: "GetRisk",
+      requestType: GetRiskRequest,
+      requestStream: false,
+      responseType: Risk,
+      responseStream: false,
+      options: {
+        _unknownFields: {
+          8410: [new Uint8Array([4, 110, 97, 109, 101])],
+          800010: [new Uint8Array([13, 98, 98, 46, 114, 105, 115, 107, 115, 46, 108, 105, 115, 116])],
+          800016: [new Uint8Array([1])],
+          578365826: [
+            new Uint8Array([
+              20,
+              18,
+              18,
+              47,
+              118,
+              49,
+              47,
+              123,
+              110,
+              97,
+              109,
+              101,
+              61,
+              114,
+              105,
+              115,
+              107,
+              115,
+              47,
+              42,
+              125,
+            ]),
+          ],
         },
       },
     },
@@ -853,14 +912,9 @@ export type DeepPartial<T> = T extends Builtin ? T
   : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
   : Partial<T>;
 
-function isSet(value: any): boolean {
-  return value !== null && value !== undefined;
-}
-
 export interface MessageFns<T> {
   encode(message: T, writer?: BinaryWriter): BinaryWriter;
   decode(input: BinaryReader | Uint8Array, length?: number): T;
-  fromJSON(object: any): T;
   toJSON(message: T): unknown;
   create(base?: DeepPartial<T>): T;
   fromPartial(object: DeepPartial<T>): T;

@@ -21,10 +21,7 @@
       "
       class="flex flex-row items-center text-main"
     >
-      <NPopover
-        v-if="(currentTab.batchQueryContext?.databases.length ?? 0) > 1"
-        placement="bottom"
-      >
+      <NPopover v-if="isInBatchMode" placement="bottom">
         <template #trigger>
           <SquareStackIcon class="w-4 h-4 mr-1 text-accent" />
         </template>
@@ -71,7 +68,7 @@ import {
 import { isValidDatabaseName, isValidInstanceName } from "@/types";
 import { useSQLEditorContext } from "../context";
 
-const { currentTab } = storeToRefs(useSQLEditorTabStore());
+const { currentTab, isInBatchMode } = storeToRefs(useSQLEditorTabStore());
 const { showConnectionPanel } = useSQLEditorContext();
 const { projectContextReady } = storeToRefs(useSQLEditorStore());
 

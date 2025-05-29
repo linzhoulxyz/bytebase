@@ -183,7 +183,7 @@
     "expiration": "有効期限",
     "configure": "設定",
     "groups": "グループ",
-    "database-groups": "データベースのグループ化",
+    "database-group": "データベースグループ | データベースグループ",
     "members": "メンバー",
     "warehouse": "倉庫",
     "schedule": "プラン",
@@ -224,10 +224,16 @@
     "catalog": "カタログ",
     "summary": "まとめ",
     "errors": "エラー",
-    "removed": "削除されました"
+    "removed": "削除されました",
+    "options": "オプション",
+    "submit": "提出する"
   },
   "error-page": {
     "go-back-home": "ホームページに戻る"
+  },
+  "refresh-remind": {
+    "title": "古いバージョンが検出されました",
+    "description": "古いバージョンが検出されました。ページを更新してください。"
   },
   "task": {
     "current-task": "現在のタスク",
@@ -246,9 +252,6 @@
       },
       "summary-report": "概略報告"
     },
-    "earliest-allowed-time": "最も早い展開時期",
-    "earliest-allowed-time-hint": "@:{'task.earliest-allowed-time'} は問題をロールアウトする最も早い時間です。この時間より前にロールアウトすることはできません。指定されていない場合は、すべての条件が満たされたときに実行されます。",
-    "earliest-allowed-time-unset": "設定されていません",
     "comment": "コメント",
     "started": "から始まりました",
     "view-change": "変更を表示する",
@@ -270,13 +273,18 @@
     "action-all-tasks-in-current-stage": "{action}現在のステージのすべてのタスク",
     "cancel-task": "タスクをキャンセルする",
     "created": "内蔵",
+    "run-immediately": "すぐに実行",
+    "scheduled-time": "予定時刻",
+    "select-scheduled-time": "予定時刻を選択してください",
+    "error": {
+      "scheduled-time-must-be-in-the-future": "スケジュール時間は将来の時間である必要があります"
+    },
     "online-migration": {
       "self": "オンラインでの大規模なテーブル変更",
       "configure-ghost-parameters": "gh-ost パラメータを設定する",
       "ghost-parameters": "gh-ostパラメータ",
       "configure": "設定",
       "error": {
-        "x-status-task-is-not-editable": "{status} のタスクは編集できません",
         "nothing-changed": "変化なし",
         "not-applicable": {
           "task-doesnt-meet-ghost-requirement": "タスクは gh-ost の要件を満たしていません",
@@ -348,7 +356,8 @@
       "subscription": "(有料プランにアップグレードするとキャラクター管理が可能になります)"
     },
     "members": {
-      "inactive": "不活性化された",
+      "inactive": "非アクティブ",
+      "inactive-users": "非アクティブユーザー",
       "table": {
         "account": "アカウント",
         "role": "役割",
@@ -383,7 +392,7 @@
       "reset-service-key": "サービスキーのリセット",
       "reset-service-key-alert": "古いサービス キーはすぐにリセットされ、この操作は元に戻すことはできません。サービス キーをリセットしてもよろしいですか?",
       "service-key-copied": "サービスキーはコピーされています。公開しないでください",
-      "show-inactive": "非アクティブなメンバーを表示する",
+      "show-inactive": "非アクティブなユーザーを表示",
       "view-by-roles": "役割ごとに表示",
       "add-member": "メンバーを追加",
       "add-user": "ユーザーを追加",
@@ -506,7 +515,7 @@
         },
         "maximum-role-expiration": {
           "self": "最大ロール有効期限",
-          "description": "最大ロール有効期限は、ユーザーにロールを付与できる最大期間です。",
+          "description": "最大ロール有効期限は、ロールをユーザーに付与できる最大期間であり、プロジェクト所有者を除くすべてのプロジェクト ロールに適用されます。",
           "days": "日",
           "never-expires": "期限切れなし"
         },
@@ -888,6 +897,7 @@
     "issue-name": "イシュー名",
     "grant-request": {
       "export-rows": "エクスポート行の最大数",
+      "select-export-rows": "最大エクスポート行数を選択",
       "expired-at": "有効期限",
       "all-databases": "すべてのデータベース",
       "all-databases-tip": "このプロジェクトに属する現在および将来のすべてのデータベース。",
@@ -906,15 +916,7 @@
       "current-change-will-apply-to-all-tasks-in-batch-mode": "バッチ モードでは、現在の変更がすべてのタスクに適用されます。",
       "current-change-will-apply-to-all-tasks": "現在の変更はすべてのタスクに適用されます。"
     },
-    "not-editable-legacy-issue": "このイシューは古いバージョンの Bytebase で作成されたため編集できません。",
     "action-anyway": "まだ {action} が必要です",
-    "disallow-edit-reasons": {
-      "issue-is-done": "イシューが完了しました",
-      "issue-is-canceled": "イシューがキャンセルされました",
-      "task-is-x-status": "タスクのステータスは {status} です",
-      "task-is-running-cancel-first": "タスクが実行中です。この値を変更するには、タスクをキャンセルする必要があります。"
-    },
-    "you-are-not-allowed-to-change-this-value": "この値を変更する権限がありません",
     "sql-check": {
       "sql-checks": "SQLチェック項目",
       "not-executed-yet": "まだ実行されていません",
@@ -938,9 +940,6 @@
       "format": "エクスポート形式",
       "encrypt": "暗号化",
       "file-downloaded": "ダウンロードされたファイル"
-    },
-    "update-rollout-time": {
-      "self": "更新のロールアウト時間"
     },
     "task-run": {
       "logs": "ログ",
@@ -983,8 +982,8 @@
       "change-data": "データの変更",
       "export-data": "データをエクスポート",
       "create-database": "データベースを作成する",
-      "request-querier-role": "リクエストクエリーロール",
-      "request-exporter-role": "エクスポートロールのリクエスト"
+      "request-role": "役割をリクエストする",
+      "request-specific-role": "「{role}」ロールをリクエスト"
     },
     "schema-drift-detected": {
       "self": "スキーマドリフトが検出されました",
@@ -1261,9 +1260,9 @@
       "title": "アクセス制御",
       "disable-copy-data-from-sql-editor": "SQL エディタにおけるデータコピーの制限 (管理者/DBA はコピー可能)",
       "restrict-admin-connection": {
-        "self": "管理データソースへのクエリを禁止します",
-        "disallow": "管理データソースからのデータクエリを禁止します",
-        "fallback": "読み取り専用接続が利用できない場合、管理者接続にフォールバックする"
+        "self": "管理データソースのクエリを制限する",
+        "disallow": "管理データソースからのデータのクエリを禁止する",
+        "fallback": "読み取り専用接続が利用できない場合は、管理データソースへのクエリを許可する"
       }
     },
     "statement-execution": {
@@ -1381,7 +1380,6 @@
     "successfully-transferred-databases": "データベースの移行が完了しました",
     "nullable": "null も可能",
     "expression": "表現",
-    "position": "位置",
     "unique": "個性的",
     "visible": "見える",
     "comment": "コメント",
@@ -1482,6 +1480,7 @@
     "foreign-key": {
       "reference": "参照"
     },
+    "checks": "チェック",
     "create-target-database-or-schema-for-backup": "まずバックアップのターゲットデータベースまたはスキーマを作成してください",
     "revision": {
       "self": "リビジョン",
@@ -1734,6 +1733,10 @@
     "to-enable-admin-mode": "管理者モードを有効にするには",
     "notify-empty-statement": "エディターに SQL ステートメントを入力してください",
     "can-not-execute-query": "データのロード中にクエリを実行できません",
+    "invalid-database": "無効なデータベース {database}",
+    "request-cancelled": "リクエストはキャンセルされました",
+    "request-aborted": "ユーザーがリクエストを中止しました",
+    "no-data-source": "クエリ可能なデータソースがありません。環境またはプロジェクトのデータソースクエリポリシーを確認してください。",
     "rows": "記録",
     "vertical-display": "縦型表示",
     "no-history-found": "まだ履歴がありません",
@@ -1798,9 +1801,19 @@
     },
     "batch-query": {
       "batch": "バッチ",
-      "description": "{project} の下にある {count} データベースをバッチクエリします。",
-      "show-or-hide-empty-query-results": "空のクエリ結果の表示/非表示"
+      "select-database-group": "バッチクエリを実行するには{select-database-group}を使用します",
+      "description": "{project} の下の {database} 個の追加データベースと {group} 個のデータベース グループに対してバッチ クエリを実行します。",
+      "show-or-hide-empty-query-results": "空のクエリ結果の表示/非表示",
+      "select-data-source": {
+        "self": "バッチのデータソースを選択",
+        "tooltip": "制限ポリシーが設定された利用可能なデータ ソースを見つけて、選択を適用します。",
+        "admin": "管理者",
+        "readonly": "読み取り専用",
+        "not-match": "データ ソースが一致しません。{expect} を期待しましたが、{actual} を取得しました。"
+      }
     },
+    "execute-query": "クエリを実行する",
+    "pending-query": "保留中のクエリ",
     "executing-query": "クエリの実行",
     "request-query": "リクエストクエリ",
     "copy-success": "正常にコピーされました",
@@ -2264,8 +2277,7 @@
           "ddl": "DDL",
           "create_database": "データベースの作成",
           "data_export": "データのエクスポート",
-          "request_query": "クエリ権限を申請する",
-          "request_export": "出力権限を申請する"
+          "request-role": "ロールのリクエスト"
         }
       },
       "template": {
@@ -2536,9 +2548,6 @@
     "allow-out-of-order": "順序外を許可する",
     "archive-this-release": "このリリースをアーカイブする",
     "total-files": "合計 {count} ファイル",
-    "no-tasks-to-apply": {
-      "self": "適用するタスクはありません"
-    },
     "actions": {
       "new-file": "新しいファイル",
       "import-from-release": "リリースからのインポート"

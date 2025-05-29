@@ -144,12 +144,8 @@ const stepList = computed(() => [
   { title: t("common.preview") },
 ]);
 
-const flattenSpecList = computed((): Plan_Spec[] => {
-  return (
-    state.previewPlanResult?.plan?.steps.flatMap((step) => {
-      return step.specs;
-    }) || []
-  );
+const specList = computed((): Plan_Spec[] => {
+  return state.previewPlanResult?.plan?.specs || [];
 });
 
 const nextButtonErrors = computed(() => {
@@ -168,7 +164,7 @@ const nextButtonErrors = computed(() => {
     if (!state.previewPlanResult) {
       errors.push("Failed to preview plan");
     }
-    if (flattenSpecList.value.length === 0) {
+    if (specList.value.length === 0) {
       errors.push("No plan to apply");
     }
   }
@@ -214,7 +210,7 @@ const handleClickNext = async () => {
         "bb.issue.database.schema.update",
         state.targetSelectState.changeSource === "DATABASE"
           ? databaseList.map((db) => db.databaseName)
-          : [databaseGroup?.databasePlaceholder]
+          : [databaseGroup?.title]
       ),
       description: `Apply release "${release.value.title}"`,
     });

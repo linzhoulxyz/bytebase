@@ -16,7 +16,6 @@ import (
 	"github.com/bytebase/bytebase/backend/component/dbfactory"
 	"github.com/bytebase/bytebase/backend/component/ghost"
 	"github.com/bytebase/bytebase/backend/component/sheet"
-	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	"github.com/bytebase/bytebase/backend/store"
 	"github.com/bytebase/bytebase/backend/utils"
@@ -113,13 +112,7 @@ func transformDatabaseGroupTargetToSpecs(ctx context.Context, s *store.Store, sp
 	return specs, nil
 }
 
-func getTaskCreatesFromSpec(ctx context.Context, s *store.Store, sheetManager *sheet.Manager, licenseService enterprise.LicenseService, dbFactory *dbfactory.DBFactory, spec *storepb.PlanConfig_Spec, project *store.ProjectMessage) ([]*store.TaskMessage, error) {
-	if licenseService.IsFeatureEnabled(base.FeatureTaskScheduleTime) != nil {
-		if spec.EarliestAllowedTime != nil && !spec.EarliestAllowedTime.AsTime().IsZero() {
-			return nil, errors.New(base.FeatureTaskScheduleTime.AccessErrorMessage())
-		}
-	}
-
+func getTaskCreatesFromSpec(ctx context.Context, s *store.Store, sheetManager *sheet.Manager, dbFactory *dbfactory.DBFactory, spec *storepb.PlanConfig_Spec, project *store.ProjectMessage) ([]*store.TaskMessage, error) {
 	switch config := spec.Config.(type) {
 	case *storepb.PlanConfig_Spec_CreateDatabaseConfig:
 		return getTaskCreatesFromCreateDatabaseConfig(ctx, s, sheetManager, dbFactory, spec, config.CreateDatabaseConfig, project)
@@ -245,10 +238,6 @@ func getTaskCreatesFromCreateDatabaseConfig(ctx context.Context, s *store.Store,
 				SheetId:       int32(sheet.UID),
 			},
 		}
-		if spec.EarliestAllowedTime.GetSeconds() > 0 {
-			t := spec.EarliestAllowedTime.AsTime()
-			v.EarliestAllowedAt = &t
-		}
 		return []*store.TaskMessage{
 			v,
 		}, nil
@@ -261,6 +250,11 @@ func getTaskCreatesFromCreateDatabaseConfig(ctx context.Context, s *store.Store,
 }
 
 func getTaskCreatesFromChangeDatabaseConfig(ctx context.Context, s *store.Store, spec *storepb.PlanConfig_Spec, c *storepb.PlanConfig_ChangeDatabaseConfig, project *store.ProjectMessage) ([]*store.TaskMessage, error) {
+	// If a release is specified, we need to expand it into individual tasks for each release file
+	if c.Release != "" {
+		return getTaskCreatesFromChangeDatabaseConfigWithRelease(ctx, s, spec, c, project)
+	}
+
 	// possible target:
 	// 1. instances/{instance}/databases/{database}
 	// 2. projects/{project}/databaseGroups/{databaseGroup}
@@ -320,10 +314,6 @@ func getTaskCreatesFromExportDataConfig(ctx context.Context, s *store.Store, spe
 		Type:          base.TaskDatabaseDataExport,
 		Payload:       payload,
 	}
-	if spec.EarliestAllowedTime.GetSeconds() > 0 {
-		t := spec.EarliestAllowedTime.AsTime()
-		taskCreate.EarliestAllowedAt = &t
-	}
 	return []*store.TaskMessage{taskCreate}, nil
 }
 
@@ -355,26 +345,6 @@ func getTaskCreatesFromChangeDatabaseConfigDatabaseTarget(ctx context.Context, s
 	}
 
 	switch c.Type {
-	case storepb.PlanConfig_ChangeDatabaseConfig_BASELINE:
-		taskCreate := &store.TaskMessage{
-			InstanceID:    database.InstanceID,
-			DatabaseName:  &database.DatabaseName,
-			EnvironmentID: database.EffectiveEnvironmentID,
-			Type:          base.TaskDatabaseSchemaBaseline,
-			Payload: &storepb.TaskPayload{
-				SpecId:        spec.Id,
-				SchemaVersion: c.SchemaVersion,
-				TaskReleaseSource: &storepb.TaskReleaseSource{
-					File: spec.SpecReleaseSource.GetFile(),
-				},
-			},
-		}
-		if spec.EarliestAllowedTime.GetSeconds() > 0 {
-			t := spec.EarliestAllowedTime.AsTime()
-			taskCreate.EarliestAllowedAt = &t
-		}
-		return []*store.TaskMessage{taskCreate}, nil
-
 	case storepb.PlanConfig_ChangeDatabaseConfig_MIGRATE:
 		_, sheetUID, err := common.GetProjectResourceIDSheetUID(c.Sheet)
 		if err != nil {
@@ -386,17 +356,9 @@ func getTaskCreatesFromChangeDatabaseConfigDatabaseTarget(ctx context.Context, s
 			EnvironmentID: database.EffectiveEnvironmentID,
 			Type:          base.TaskDatabaseSchemaUpdate,
 			Payload: &storepb.TaskPayload{
-				SpecId:        spec.Id,
-				SheetId:       int32(sheetUID),
-				SchemaVersion: c.SchemaVersion,
-				TaskReleaseSource: &storepb.TaskReleaseSource{
-					File: spec.SpecReleaseSource.GetFile(),
-				},
+				SpecId:  spec.Id,
+				SheetId: int32(sheetUID),
 			},
-		}
-		if spec.EarliestAllowedTime.GetSeconds() > 0 {
-			t := spec.EarliestAllowedTime.AsTime()
-			taskCreate.EarliestAllowedAt = &t
 		}
 		return []*store.TaskMessage{taskCreate}, nil
 
@@ -414,18 +376,10 @@ func getTaskCreatesFromChangeDatabaseConfigDatabaseTarget(ctx context.Context, s
 			EnvironmentID: database.EffectiveEnvironmentID,
 			Type:          base.TaskDatabaseSchemaUpdateGhost,
 			Payload: &storepb.TaskPayload{
-				SpecId:        spec.Id,
-				SheetId:       int32(sheetUID),
-				SchemaVersion: c.SchemaVersion,
-				Flags:         c.GhostFlags,
-				TaskReleaseSource: &storepb.TaskReleaseSource{
-					File: spec.SpecReleaseSource.GetFile(),
-				},
+				SpecId:  spec.Id,
+				SheetId: int32(sheetUID),
+				Flags:   c.GhostFlags,
 			},
-		}
-		if spec.EarliestAllowedTime.GetSeconds() > 0 {
-			t := spec.EarliestAllowedTime.AsTime()
-			taskCreate.EarliestAllowedAt = &t
 		}
 		return []*store.TaskMessage{taskCreate}, nil
 
@@ -446,21 +400,136 @@ func getTaskCreatesFromChangeDatabaseConfigDatabaseTarget(ctx context.Context, s
 			Payload: &storepb.TaskPayload{
 				SpecId:                spec.Id,
 				SheetId:               int32(sheetUID),
-				SchemaVersion:         c.SchemaVersion,
 				PreUpdateBackupDetail: preUpdateBackupDetail,
-				TaskReleaseSource: &storepb.TaskReleaseSource{
-					File: spec.SpecReleaseSource.GetFile(),
-				},
 			},
-		}
-		if spec.EarliestAllowedTime.GetSeconds() > 0 {
-			t := spec.EarliestAllowedTime.AsTime()
-			taskCreate.EarliestAllowedAt = &t
 		}
 		return []*store.TaskMessage{taskCreate}, nil
 	default:
 		return nil, errors.Errorf("unsupported change database config type %q", c.Type)
 	}
+}
+
+func getTaskCreatesFromChangeDatabaseConfigWithRelease(ctx context.Context, s *store.Store, spec *storepb.PlanConfig_Spec, c *storepb.PlanConfig_ChangeDatabaseConfig, _ *store.ProjectMessage) ([]*store.TaskMessage, error) {
+	// Parse release name to get project ID and release UID
+	_, releaseUID, err := common.GetProjectReleaseUID(c.Release)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to parse release name %q", c.Release)
+	}
+
+	// Fetch the release
+	release, err := s.GetRelease(ctx, releaseUID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get release %d", releaseUID)
+	}
+	if release == nil {
+		return nil, errors.Errorf("release %d not found", releaseUID)
+	}
+
+	// Parse target to get instance and database
+	instanceID, databaseName, err := common.GetInstanceDatabaseID(c.Target)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get instance and database from target %q", c.Target)
+	}
+
+	instance, err := s.GetInstanceV2(ctx, &store.FindInstanceMessage{
+		ResourceID: &instanceID,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get instance %q", instanceID)
+	}
+	if instance == nil {
+		return nil, errors.Errorf("instance %q not found", instanceID)
+	}
+
+	database, err := s.GetDatabaseV2(ctx, &store.FindDatabaseMessage{
+		InstanceID:      &instanceID,
+		DatabaseName:    &databaseName,
+		IsCaseSensitive: store.IsObjectCaseSensitive(instance),
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get database %q", databaseName)
+	}
+	if database == nil {
+		return nil, errors.Errorf("database %q not found", databaseName)
+	}
+
+	// Get existing revisions for the database to check which files have already been applied
+	revisions, err := s.ListRevisions(ctx, &store.FindRevisionMessage{
+		InstanceID:   &database.InstanceID,
+		DatabaseName: &database.DatabaseName,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list revisions for database %q", database.DatabaseName)
+	}
+
+	// Create a map of applied versions
+	appliedVersions := make(map[string]string) // version -> sha256
+	for _, revision := range revisions {
+		appliedVersions[revision.Version] = revision.Payload.SheetSha256
+	}
+
+	// Create tasks for each release file that hasn't been applied
+	var taskCreates []*store.TaskMessage
+	for _, file := range release.Payload.Files {
+		// Skip if this version has already been applied
+		if appliedSha256, exists := appliedVersions[file.Version]; exists {
+			// Skip files that have been applied with the same content
+			if appliedSha256 == file.SheetSha256 {
+				continue
+			}
+			// If SHA256 differs, it means the file has been modified after being applied
+			// We still skip it but could potentially log a warning
+			continue
+		}
+
+		// Parse sheet ID from the file's sheet reference
+		_, sheetUID, err := common.GetProjectResourceIDSheetUID(file.Sheet)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get sheet id from sheet %q in release file %q", file.Sheet, file.Id)
+		}
+
+		// Determine task type based on file change type
+		var taskType base.TaskType
+		switch file.ChangeType {
+		case storepb.ReleasePayload_File_DDL, storepb.ReleasePayload_File_CHANGE_TYPE_UNSPECIFIED:
+			taskType = base.TaskDatabaseSchemaUpdate
+		case storepb.ReleasePayload_File_DDL_GHOST:
+			taskType = base.TaskDatabaseSchemaUpdateGhost
+		case storepb.ReleasePayload_File_DML:
+			taskType = base.TaskDatabaseDataUpdate
+		default:
+			return nil, errors.Errorf("unsupported release file change type %q", file.ChangeType)
+		}
+
+		// Create task payload
+		payload := &storepb.TaskPayload{
+			SpecId:  spec.Id,
+			SheetId: int32(sheetUID),
+		}
+
+		// Add ghost flags if this is a ghost migration
+		if taskType == base.TaskDatabaseSchemaUpdateGhost && c.GhostFlags != nil {
+			payload.Flags = c.GhostFlags
+		}
+
+		// Add pre-update backup detail for DML
+		if taskType == base.TaskDatabaseDataUpdate && c.GetPreUpdateBackupDetail().GetDatabase() != "" {
+			payload.PreUpdateBackupDetail = &storepb.PreUpdateBackupDetail{
+				Database: c.GetPreUpdateBackupDetail().GetDatabase(),
+			}
+		}
+
+		taskCreate := &store.TaskMessage{
+			InstanceID:    database.InstanceID,
+			DatabaseName:  &database.DatabaseName,
+			EnvironmentID: database.EffectiveEnvironmentID,
+			Type:          taskType,
+			Payload:       payload,
+		}
+		taskCreates = append(taskCreates, taskCreate)
+	}
+
+	return taskCreates, nil
 }
 
 // checkCharacterSetCollationOwner checks if the character set, collation and owner are legal according to the dbType.

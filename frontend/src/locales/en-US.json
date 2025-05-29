@@ -183,7 +183,7 @@
     "expiration": "Expiration",
     "configure": "Configure",
     "groups": "Groups",
-    "database-groups": "Database Groups",
+    "database-group": "Database Group | Database Groups",
     "members": "Members",
     "warehouse": "Warehouse",
     "schedule": "Schedule",
@@ -224,10 +224,16 @@
     "catalog": "Catalog",
     "summary": "Summary",
     "errors": "Errors",
-    "removed": "Removed"
+    "removed": "Removed",
+    "options": "Options",
+    "submit": "Submit"
   },
   "error-page": {
     "go-back-home": "Go back home"
+  },
+  "refresh-remind": {
+    "title": "Outdated version detected",
+    "description": "Detect outdated version. Please refresh the page."
   },
   "task": {
     "current-task": "Current task",
@@ -246,9 +252,6 @@
       },
       "summary-report": "Summary report"
     },
-    "earliest-allowed-time": "Earliest rollout time",
-    "earliest-allowed-time-hint": "@:{'task.earliest-allowed-time'} is the earliest time to rollout the issue, you cannot rollout before this time; if unspecified, it runs when all criteria are met.",
-    "earliest-allowed-time-unset": "Unset",
     "comment": "Comment",
     "started": "Started",
     "view-change": "View change",
@@ -270,13 +273,18 @@
     "action-all-tasks-in-current-stage": "{action} all tasks in current stage",
     "cancel-task": "Cancel task | Cancel tasks",
     "created": "Created",
+    "run-immediately": "Run task immediately | Run tasks immediately",
+    "scheduled-time": "Scheduled time",
+    "select-scheduled-time": "Select scheduled time",
+    "error": {
+      "scheduled-time-must-be-in-the-future": "Scheduled time must be in the future"
+    },
     "online-migration": {
       "self": "Online migration",
       "configure-ghost-parameters": "Configure gh-ost parameters",
       "ghost-parameters": "gh-ost parameters",
       "configure": "Configure",
       "error": {
-        "x-status-task-is-not-editable": "{status} task is not editable",
         "nothing-changed": "Nothing changed",
         "not-applicable": {
           "task-doesnt-meet-ghost-requirement": "Task doesn't meet gh-ost's requirement",
@@ -348,7 +356,8 @@
       "subscription": "(Upgrade to enable role management)"
     },
     "members": {
-      "inactive": "Inactive members",
+      "inactive": "Inactive",
+      "inactive-users": "Inactive users",
       "table": {
         "account": "Account",
         "role": "Role",
@@ -383,7 +392,7 @@
       "reset-service-key": "Reset Service Key",
       "reset-service-key-alert": "This action cannot be undone. The old key will stop working immediately. Are you sure you want to reset this service key?",
       "service-key-copied": "Service Key copied to clipboard, please keep it in secret.",
-      "show-inactive": "Show inactive members",
+      "show-inactive": "Show inactive users",
       "view-by-roles": "View by roles",
       "add-member": "Add member",
       "add-user": "Add user",
@@ -506,7 +515,7 @@
         },
         "maximum-role-expiration": {
           "self": "Maximum role expiration",
-          "description": "Maximum role expiration is the maximum period a role can be granted to a user. (Only for querier and exporter roles)",
+          "description": "Maximum role expiration is the maximum period a role can be granted to a user, will apply on all project roles expect the project owner.",
           "days": "Day(s)",
           "never-expires": "Never expires"
         },
@@ -888,6 +897,7 @@
     "issue-name": "Issue name",
     "grant-request": {
       "export-rows": "Max export rows",
+      "select-export-rows": "Select maximum export rows",
       "expired-at": "Expired at",
       "all-databases": "All",
       "all-databases-tip": "All current and future databases in this project.",
@@ -906,17 +916,9 @@
       "current-change-will-apply-to-all-tasks-in-batch-mode": "In batch mode, current change will be applied to all tasks.",
       "current-change-will-apply-to-all-tasks": "Current change will be applied to all tasks."
     },
-    "not-editable-legacy-issue": "This issue is not editable because it was created in an old version of Bytebase",
     "action-anyway": "{action} anyway",
-    "disallow-edit-reasons": {
-      "issue-is-done": "The issue is done",
-      "issue-is-canceled": "The issue is canceled",
-      "task-is-x-status": "The task is {status}",
-      "task-is-running-cancel-first": "The task is running, cancel task before changing this value"
-    },
-    "you-are-not-allowed-to-change-this-value": "You are not allowed to change this value",
     "sql-check": {
-      "sql-checks": "SQL Checks",
+      "sql-checks": "SQL checks",
       "not-executed-yet": "Not executed yet",
       "statement-is-required": "SQL statement is required",
       "statement-is-too-large": "As the current statement size exceeds 2MB, the SQL check will be skipped.",
@@ -938,9 +940,6 @@
       "format": "Format",
       "encrypt": "Encrypt",
       "file-downloaded": "File Downloaded"
-    },
-    "update-rollout-time": {
-      "self": "Update rollout time"
     },
     "task-run": {
       "logs": "Logs",
@@ -983,8 +982,8 @@
       "change-data": "Change data",
       "export-data": "Export data",
       "create-database": "Create database",
-      "request-querier-role": "Request querier role",
-      "request-exporter-role": "Request exporter role"
+      "request-role": "Request role",
+      "request-specific-role": "Request \"{role}\" role"
     },
     "schema-drift-detected": {
       "self": "Schema drift detected",
@@ -1261,9 +1260,9 @@
       "title": "Access Control",
       "disable-copy-data-from-sql-editor": "Restrict data copying in SQL Editor (Admins/DBAs allowed)",
       "restrict-admin-connection": {
-        "self": "Disallow querying admin data source",
+        "self": "Restrict querying admin data sources",
         "disallow": "Disallow querying data from the admin data source",
-        "fallback": "Fallback to the admin data source if no read-only connection is available"
+        "fallback": "Allow querying the admin data source if no read-only connection is available"
       }
     },
     "statement-execution": {
@@ -1381,7 +1380,6 @@
     "successfully-transferred-databases": "Successfully transferred databases",
     "nullable": "Nullable",
     "expression": "Expression",
-    "position": "Position",
     "unique": "Unique",
     "visible": "Visible",
     "comment": "Comment",
@@ -1482,6 +1480,7 @@
     "foreign-key": {
       "reference": "Reference"
     },
+    "checks": "Checks",
     "create-target-database-or-schema-for-backup": "Please create the target database or schema for the backup first",
     "revision": {
       "self": "Revision",
@@ -1734,6 +1733,10 @@
     "to-enable-admin-mode": "to enable the admin mode",
     "notify-empty-statement": "Please input your SQL statements in the editor",
     "can-not-execute-query": "Cannot execute query when loading data.",
+    "invalid-database": "Invalid database {database}",
+    "request-cancelled": "Request cancelled",
+    "request-aborted": "User aborted the request",
+    "no-data-source": "No queriable data source. Please check the data source query policy on environment or project.",
     "rows": "row | rows",
     "vertical-display": "Vertical display",
     "no-history-found": "No history found",
@@ -1798,9 +1801,19 @@
     },
     "batch-query": {
       "batch": "Batch",
-      "description": "Batch query {count} additional databases under {project}.",
-      "show-or-hide-empty-query-results": "Show / hide empty query results"
+      "select-database-group": "You can {select-database-group} to batch query",
+      "description": "Batch query {database} additional databases and {group} database groups under {project}.",
+      "show-or-hide-empty-query-results": "Show / hide empty query results",
+      "select-data-source": {
+        "self": "Select data source for batch",
+        "tooltip": "Will find available data sources with restriction policy, then apply the selection.",
+        "admin": "Admin",
+        "readonly": "Read-only",
+        "not-match": "Data source not match, expect {expect} but got {actual}."
+      }
     },
+    "execute-query": "Execute query",
+    "pending-query": "Pending query",
     "executing-query": "Executing query",
     "request-query": "Request query",
     "copy-success": "Copy success",
@@ -2264,8 +2277,7 @@
           "ddl": "DDL",
           "create_database": "Create Database",
           "data_export": "Export Data",
-          "request_query": "Request Querier Role",
-          "request_export": "Request Exporter Role"
+          "request-role": "Request Role"
         }
       },
       "template": {
@@ -2536,9 +2548,6 @@
     "allow-out-of-order": "Allow out of order",
     "archive-this-release": "Archive this release",
     "total-files": "Total {count} files",
-    "no-tasks-to-apply": {
-      "self": "No tasks to apply"
-    },
     "actions": {
       "new-file": "New file",
       "import-from-release": "Import from release"

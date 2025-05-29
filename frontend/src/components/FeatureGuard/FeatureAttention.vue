@@ -2,7 +2,7 @@
   <BBAttention
     v-if="show"
     v-bind="$attrs"
-    :type="hasFeature ? 'info' : 'warning'"
+    :type="hasFeature ? type : 'warning'"
     :title="$t(`dynamic.subscription.features.${featureKey}.title`)"
     :description="descriptionText"
     :action-text="actionText"
@@ -47,9 +47,11 @@ const props = withDefaults(
   defineProps<{
     feature: FeatureType;
     description?: string;
+    type?: "info" | "warning" | "error";
     instance?: Instance | InstanceResource;
   }>(),
   {
+    type: "info",
     description: "",
     instance: undefined,
   }
@@ -97,8 +99,11 @@ const show = computed(() => {
     // show missing feature attention.
     return true;
   }
-  if (instanceMissingLicense.value || existInstanceWithoutLicense.value) {
+  if (instanceMissingLicense.value) {
     // show missing instance license attention.
+    return true;
+  }
+  if (!props.instance && existInstanceWithoutLicense.value) {
     return true;
   }
   return false;

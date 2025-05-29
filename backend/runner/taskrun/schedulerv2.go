@@ -250,7 +250,7 @@ func (s *SchedulerV2) scheduleAutoRolloutTask(ctx context.Context, taskUID int) 
 	}
 	s.webhookManager.CreateEvent(ctx, &webhook.Event{
 		Actor:   s.store.GetSystemBotUser(ctx),
-		Type:    webhook.EventTypeTaskRunStatusUpdate,
+		Type:    base.EventTypeTaskRunStatusUpdate,
 		Comment: "",
 		Issue:   webhook.NewIssue(issue),
 		Rollout: webhook.NewRollout(pipeline),
@@ -283,14 +283,14 @@ func (s *SchedulerV2) schedulePendingTaskRuns(ctx context.Context) error {
 func (s *SchedulerV2) schedulePendingTaskRun(ctx context.Context, taskRun *store.TaskRunMessage) error {
 	// here, we move pending taskruns to running taskruns which means they are ready to be executed.
 	// pending taskruns remain pending if
-	// 1. earliestAllowedTs not met.
+	// 1. taskRun.RunAt not met.
 	// 2. for versioned tasks, there are other versioned tasks on the same database with
 	// a smaller version not finished yet. we need to wait for those first.
 	task, err := s.store.GetTaskV2ByID(ctx, taskRun.TaskUID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get task")
 	}
-	if task.EarliestAllowedAt != nil && time.Now().Before(*task.EarliestAllowedAt) {
+	if taskRun.RunAt != nil && time.Now().Before(*taskRun.RunAt) {
 		return nil
 	}
 
@@ -304,16 +304,16 @@ func (s *SchedulerV2) schedulePendingTaskRun(ctx context.Context, taskRun *store
 			return true, nil
 		}
 
-		taskIDs, err := s.store.FindBlockingTasksByVersion(ctx, task.InstanceID, *task.DatabaseName, schemaVersion)
+		maybeTaskID, err := s.store.FindBlockingTaskByVersion(ctx, task.PipelineID, task.InstanceID, *task.DatabaseName, schemaVersion)
 		if err != nil {
 			return false, errors.Wrapf(err, "failed to find blocking versioned tasks")
 		}
-		if len(taskIDs) > 0 {
+		if maybeTaskID != nil {
 			s.stateCfg.TaskRunSchedulerInfo.Store(taskRun.ID, &storepb.SchedulerInfo{
 				ReportTime: timestamppb.Now(),
 				WaitingCause: &storepb.SchedulerInfo_WaitingCause{
 					Cause: &storepb.SchedulerInfo_WaitingCause_TaskUid{
-						TaskUid: int32(taskIDs[0]),
+						TaskUid: int32(*maybeTaskID),
 					},
 				},
 			})
@@ -353,9 +353,11 @@ func (s *SchedulerV2) scheduleRunningTaskRuns(ctx context.Context) error {
 		return errors.Wrapf(err, "failed to list pending tasks")
 	}
 
-	// TODO(p0ny): remove these because we will follow the version order
 	// Find the minimum task ID for each database.
 	// We only run the first (i.e. which has the minimum task ID) task for each database.
+	// 1. For ddl tasks, we run them one by one to get a sane schema dump and thus diff.
+	// 2. For versioned tasks, this is our last resort to determine the order for tasks with the same version. We don't want to run them in parallel.
+	// 2.1. Rollout 1 tasks will be run before rollout 2 tasks. Where, rollout 1 tasks are created before rollout 2 tasks.
 	minTaskIDForDatabase := map[string]int{}
 	for _, taskRun := range taskRuns {
 		task, err := s.store.GetTaskV2ByID(ctx, taskRun.TaskUID)
@@ -481,7 +483,7 @@ func (s *SchedulerV2) scheduleRunningTaskRun(ctx context.Context, taskRun *store
 	if maxRunningTaskRunsPerRollout <= 0 {
 		maxRunningTaskRunsPerRollout = defaultRolloutMaxRunningTaskRuns
 	}
-	if s.stateCfg.RolloutOutstandingTasks.Increment(rolloutID, maxRunningTaskRunsPerRollout) {
+	if s.stateCfg.RolloutOutstandingTasks.Increment(rolloutID+"/"+task.InstanceID, maxRunningTaskRunsPerRollout) {
 		s.stateCfg.TaskRunSchedulerInfo.Store(taskRun.ID, &storepb.SchedulerInfo{
 			ReportTime: timestamppb.Now(),
 			WaitingCause: &storepb.SchedulerInfo_WaitingCause{
@@ -497,7 +499,7 @@ func (s *SchedulerV2) scheduleRunningTaskRun(ctx context.Context, taskRun *store
 	revertRolloutConnectionsIncrement := true
 	defer func() {
 		if revertRolloutConnectionsIncrement {
-			s.stateCfg.RolloutOutstandingTasks.Decrement(rolloutID)
+			s.stateCfg.RolloutOutstandingTasks.Decrement(rolloutID + "/" + task.InstanceID)
 		}
 	}()
 
@@ -508,6 +510,11 @@ func (s *SchedulerV2) scheduleRunningTaskRun(ctx context.Context, taskRun *store
 		s.stateCfg.RunningDatabaseMigration.Store(getDatabaseKey(task.InstanceID, *task.DatabaseName), task.ID)
 	}
 
+	// Set taskrun StartAt when it's about to run.
+	// So that the waiting time is not taken into account of the actual execution time.
+	if err := s.store.UpdateTaskRunStartAt(ctx, taskRun.ID); err != nil {
+		return errors.Wrapf(err, "failed to update task run start at")
+	}
 	s.store.CreateTaskRunLogS(ctx, taskRun.ID, time.Now(), s.profile.DeployID, &storepb.TaskRunLog{
 		Type: storepb.TaskRunLog_TASK_RUN_STATUS_UPDATE,
 		TaskRunStatusUpdate: &storepb.TaskRunLog_TaskRunStatusUpdate{
@@ -540,7 +547,7 @@ func (s *SchedulerV2) runTaskRunOnce(ctx context.Context, taskRun *store.TaskRun
 			s.stateCfg.RunningDatabaseMigration.Delete(getDatabaseKey(task.InstanceID, *task.DatabaseName))
 		}
 		s.stateCfg.InstanceOutstandingConnections.Decrement(task.InstanceID)
-		s.stateCfg.RolloutOutstandingTasks.Decrement(strconv.Itoa(task.PipelineID))
+		s.stateCfg.RolloutOutstandingTasks.Decrement(strconv.Itoa(task.PipelineID) + "/" + task.InstanceID)
 	}()
 
 	driverCtx, cancel := context.WithCancel(ctx)
@@ -804,7 +811,7 @@ func (s *SchedulerV2) ListenTaskSkippedOrDone(ctx context.Context) {
 					}
 					s.webhookManager.CreateEvent(ctx, &webhook.Event{
 						Actor:   s.store.GetSystemBotUser(ctx),
-						Type:    webhook.EventTypeStageStatusUpdate,
+						Type:    base.EventTypeStageStatusUpdate,
 						Comment: "",
 						// Issue:   webhook.NewIssue(issue),
 						Rollout: webhook.NewRollout(pipeline),
@@ -847,7 +854,7 @@ func (s *SchedulerV2) ListenTaskSkippedOrDone(ctx context.Context) {
 					}
 					s.webhookManager.CreateEvent(ctx, &webhook.Event{
 						Actor:   s.store.GetSystemBotUser(ctx),
-						Type:    webhook.EventTypeIssueRolloutReady,
+						Type:    base.EventTypeIssueRolloutReady,
 						Comment: "",
 						Issue:   webhook.NewIssue(issue),
 						Project: webhook.NewProject(issue.Project),
@@ -893,7 +900,7 @@ func (s *SchedulerV2) ListenTaskSkippedOrDone(ctx context.Context) {
 
 						s.webhookManager.CreateEvent(ctx, &webhook.Event{
 							Actor:   s.store.GetSystemBotUser(ctx),
-							Type:    webhook.EventTypeIssueStatusUpdate,
+							Type:    base.EventTypeIssueStatusUpdate,
 							Comment: "",
 							Issue:   webhook.NewIssue(updatedIssue),
 							Project: webhook.NewProject(updatedIssue.Project),
@@ -938,7 +945,7 @@ func (s *SchedulerV2) createActivityForTaskRunStatusUpdate(ctx context.Context, 
 		}
 		s.webhookManager.CreateEvent(ctx, &webhook.Event{
 			Actor:   s.store.GetSystemBotUser(ctx),
-			Type:    webhook.EventTypeTaskRunStatusUpdate,
+			Type:    base.EventTypeTaskRunStatusUpdate,
 			Comment: "",
 			Issue:   webhook.NewIssue(issue),
 			Rollout: webhook.NewRollout(rollout),

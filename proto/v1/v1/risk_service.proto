@@ -32,6 +32,13 @@ service RiskService {
     option (bytebase.v1.audit) = true;
   }
 
+  rpc GetRisk(GetRiskRequest) returns (Risk) {
+    option (google.api.http) = {get: "/v1/{name=risks/*}"};
+    option (google.api.method_signature) = "name";
+    option (bytebase.v1.permission) = "bb.risks.list";
+    option (bytebase.v1.auth_method) = IAM;
+  }
+
   rpc UpdateRisk(UpdateRiskRequest) returns (Risk) {
     option (google.api.http) = {
       patch: "/v1/{risk.name=risks/*}"
@@ -81,6 +88,15 @@ message CreateRiskRequest {
   Risk risk = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
+message GetRiskRequest {
+  // The name of the risk to retrieve.
+  // Format: risks/{risk}
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.resource_reference) = {type: "bytebase.com/Risk"}
+  ];
+}
+
 message UpdateRiskRequest {
   // The risk to update.
   //
@@ -117,9 +133,8 @@ message Risk {
     DDL = 1;
     DML = 2;
     CREATE_DATABASE = 3;
-    REQUEST_QUERY = 4;
-    REQUEST_EXPORT = 5;
     DATA_EXPORT = 6;
+    REQUEST_ROLE = 7;
   }
   Source source = 3;
 
@@ -145,6 +160,7 @@ message Risk {
   // sql_statement: the SQL statement, support "contains()", "matches()", "startsWith()", "endsWith()" operations.
   // export_rows: export data count, support "==", "!=", "<", "<=", ">", ">=" operations.
   // expiration_days: the role expiration days for the request, support "==", "!=", "<", "<=", ">", ">=" operations.
+  // role: the request role full name, support "==", "!=", "in [xx]", "!(in [xx])", "contains()", "matches()", "startsWith()", "endsWith()" operations.
   //
   // When the risk source is DDL/DML, support following variables:
   // affected_rows
@@ -191,5 +207,10 @@ message Risk {
   // table_name
   // expiration_days
   // export_rows
+  //
+  // When the risk source is REQUEST_ROLE, support following variables:
+  // project_id
+  // expiration_days
+  // role
   google.type.Expr condition = 8;
 }

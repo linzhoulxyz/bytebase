@@ -4,17 +4,24 @@ import { defineStore } from "pinia";
 import type { WatchCallback } from "vue";
 import { ref, watch } from "vue";
 import { issueServiceClient } from "@/grpcweb";
-import type { ComposedIssue, IssueFilter } from "@/types";
+import {
+  SYSTEM_BOT_EMAIL,
+  type ComposedIssue,
+  type IssueFilter,
+} from "@/types";
 import type { ApprovalStep } from "@/types/proto/v1/issue_service";
 import {
   issueStatusToJSON,
   ApprovalNode_Type,
 } from "@/types/proto/v1/issue_service";
 import { memberMapToRolesInProjectIAM } from "@/utils";
+import { useUserStore } from "../user";
+import { userNamePrefix } from "./common";
 import {
   shallowComposeIssue,
   type ComposeIssueConfig,
 } from "./experimental-issue";
+import { useProjectV1Store } from "./project";
 
 export type ListIssueParams = {
   find: IssueFilter;
@@ -91,6 +98,9 @@ export const useIssueV1Store = defineStore("issue_v1", () => {
     const composedIssues = await Promise.all(
       resp.issues.map((issue) => shallowComposeIssue(issue, composeIssueConfig))
     );
+    // Preprare creator for the issues.
+    const users = uniq(composedIssues.map((issue) => issue.creator));
+    await useUserStore().batchGetUsers(users);
     return {
       nextPageToken: resp.nextPageToken,
       issues: composedIssues,
@@ -119,7 +129,7 @@ export const candidatesOfApprovalStepV1 = (
   issue: ComposedIssue,
   step: ApprovalStep
 ) => {
-  const project = issue.projectEntity;
+  const project = useProjectV1Store().getProjectByName(issue.project);
 
   const candidates = step.nodes.flatMap((node) => {
     const { type, role } = node;
@@ -137,8 +147,14 @@ export const candidatesOfApprovalStepV1 = (
 
   return uniq(
     candidates.filter((user) => {
-      if (!issue.projectEntity.allowSelfApproval) {
-        return user !== issue.creator;
+      // Exclude system bot user.
+      if (user === `${userNamePrefix}${SYSTEM_BOT_EMAIL}`) {
+        return false;
+      }
+      // If the project does not allow self-approval, exclude the creator.
+      const project = useProjectV1Store().getProjectByName(issue.project);
+      if (!project.allowSelfApproval && user === issue.creator) {
+        return false;
       }
       return true;
     })

@@ -482,7 +482,8 @@ func (s *DatabaseService) UpdateDatabase(ctx context.Context, request *v1pb.Upda
 				PrevSyncHistoryUID: &syncHistory,
 				SyncHistoryUID:     &syncHistory,
 				Payload: &storepb.ChangelogPayload{
-					Type: storepb.ChangelogPayload_BASELINE,
+					Type:      storepb.ChangelogPayload_BASELINE,
+					GitCommit: s.profile.GitCommit,
 				}}); err != nil {
 				return nil, errors.Wrapf(err, "failed to create changelog")
 			}
@@ -1137,7 +1138,7 @@ func (s *DatabaseService) convertToDatabase(ctx context.Context, database *store
 		Project:              common.FormatProject(database.ProjectID),
 		Environment:          environment,
 		EffectiveEnvironment: effectiveEnvironment,
-		SchemaVersion:        database.SchemaVersion,
+		SchemaVersion:        database.Metadata.GetVersion(),
 		Labels:               database.Metadata.Labels,
 		InstanceResource:     instanceResource,
 		BackupAvailable:      database.Metadata.GetBackupAvailable(),

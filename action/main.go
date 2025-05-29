@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/multierr"
 
+	"github.com/bytebase/bytebase/action/args"
 	"github.com/bytebase/bytebase/action/github"
 	"github.com/bytebase/bytebase/backend/common/log"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
@@ -187,6 +188,9 @@ func runCheck(*cobra.Command, []string) error {
 	if err != nil {
 		return err
 	}
+
+	slog.Info("check release response", "resultCount", len(checkReleaseResponse.Results))
+
 	switch platform {
 	case GitHub:
 		if err := github.CreateCommentAndAnnotation(checkReleaseResponse); err != nil {
@@ -526,6 +530,7 @@ func waitForRollout(ctx context.Context, client *Client, rolloutPreview *v1pb.Ro
 }
 
 func main() {
+	slog.Info("bytebase-action built at commit " + args.Gitcommit)
 	ctx, cancel := context.WithCancel(context.Background())
 	c := make(chan os.Signal, 1)
 	// Trigger graceful shutdown on SIGINT or SIGTERM.
