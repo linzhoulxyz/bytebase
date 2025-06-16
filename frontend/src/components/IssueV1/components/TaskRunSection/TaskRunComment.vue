@@ -30,6 +30,7 @@ import { NEllipsis } from "naive-ui";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { databaseForTask } from "@/components/Rollout/RolloutDetail";
+import { useCurrentProjectV1 } from "@/store";
 import { getProjectIdRolloutUidStageUidTaskUid } from "@/store/modules/v1/common";
 import {
   unknownTask,
@@ -42,7 +43,6 @@ import { TaskRun_Status, Task_Type } from "@/types/proto/v1/rollout_service";
 import { databaseV1Url, extractTaskUID, flattenTaskV1List } from "@/utils";
 import { extractChangelogUID } from "@/utils/v1/changelog";
 import { useIssueContext } from "../../logic";
-import { useCurrentProjectV1 } from "@/store";
 import { displayTaskRunLogEntryType } from "./TaskRunLogTable/common";
 
 export type CommentLink = {
@@ -69,7 +69,7 @@ const comment = computed(() => {
   if (taskRun.status === TaskRun_Status.PENDING) {
     if (earliestAllowedTime.value) {
       return t("task-run.status.enqueued-with-rollout-time", {
-        time: new Date(earliestAllowedTime.value).toISOString(),
+        time: new Date(earliestAllowedTime.value).toLocaleString(),
       });
     }
     if (taskRun.schedulerInfo) {
@@ -78,7 +78,7 @@ const comment = computed(() => {
         return t("task-run.status.waiting-task", {
           time: getDateForPbTimestamp(
             taskRun.schedulerInfo.reportTime
-          )?.toISOString(),
+          )?.toLocaleString(),
         });
       }
     }
@@ -90,21 +90,21 @@ const comment = computed(() => {
         return t("task-run.status.waiting-connection", {
           time: getDateForPbTimestamp(
             taskRun.schedulerInfo.reportTime
-          )?.toISOString(),
+          )?.toLocaleString(),
         });
       }
       if (cause?.task) {
         return t("task-run.status.waiting-task", {
           time: getDateForPbTimestamp(
             taskRun.schedulerInfo.reportTime
-          )?.toISOString(),
+          )?.toLocaleString(),
         });
       }
       if (cause?.parallelTasksLimit) {
         return t("task-run.status.waiting-max-tasks-per-rollout", {
           time: getDateForPbTimestamp(
             taskRun.schedulerInfo.reportTime
-          )?.toISOString(),
+          )?.toLocaleString(),
         });
       }
     }
@@ -170,12 +170,12 @@ const commentLink = computed((): CommentLink => {
     if (comment.value.includes("version")) {
       return {
         title: t("common.troubleshoot"),
-        link: "https://www.bytebase.com/docs/change-database/troubleshoot/?source=console#duplicate-version",
+        link: "https://docs.bytebase.com/change-database/troubleshoot/?source=console#duplicate-version",
       };
     } else if (isPostgresFamily(db.instanceResource.engine)) {
       return {
         title: t("common.troubleshoot"),
-        link: "https://www.bytebase.com/docs/change-database/troubleshoot/?source=console#postgresql",
+        link: "https://docs.bytebase.com/change-database/troubleshoot/?source=console#postgresql",
       };
     }
   }

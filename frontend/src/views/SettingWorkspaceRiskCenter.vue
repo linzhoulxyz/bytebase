@@ -1,11 +1,14 @@
 <template>
-  <FeatureAttention feature="bb.feature.custom-approval" class="mb-4" />
+  <FeatureAttention
+    :feature="PlanFeature.FEATURE_RISK_ASSESSMENT"
+    class="mb-4"
+  />
 
   <div class="w-full space-y-4 text-sm">
     <div class="textinfolabel">
       {{ $t("custom-approval.risk.description") }}
       <a
-        href="https://www.bytebase.com/docs/administration/risk-center"
+        href="https://docs.bytebase.com/administration/risk-center"
         target="_blank"
         class="normal-link inline-flex flex-row items-center"
       >
@@ -22,7 +25,7 @@
   <RiskDialog />
 
   <FeatureModal
-    feature="bb.feature.custom-approval"
+    :feature="PlanFeature.FEATURE_RISK_ASSESSMENT"
     :open="state.showFeatureModal"
     @cancel="state.showFeatureModal = false"
   />
@@ -39,6 +42,7 @@ import {
 import { provideRiskFilter } from "@/components/CustomApproval/Settings/components/common";
 import { FeatureAttention, FeatureModal } from "@/components/FeatureGuard";
 import { featureToRef, useRiskStore } from "@/store";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import { hasWorkspacePermissionV2 } from "@/utils";
 
 interface LocalState {
@@ -50,7 +54,9 @@ const state = reactive<LocalState>({
   ready: false,
   showFeatureModal: false,
 });
-const hasCustomApprovalFeature = featureToRef("bb.feature.custom-approval");
+const hasRiskAssessmentFeature = featureToRef(
+  PlanFeature.FEATURE_RISK_ASSESSMENT
+);
 
 const allowAdmin = computed(() => {
   return hasWorkspacePermissionV2("bb.risks.update");
@@ -58,7 +64,7 @@ const allowAdmin = computed(() => {
 
 provideRiskFilter();
 provideRiskCenterContext({
-  hasFeature: hasCustomApprovalFeature,
+  hasFeature: hasRiskAssessmentFeature,
   showFeatureModal: toRef(state, "showFeatureModal"),
   allowAdmin,
   ready: toRef(state, "ready"),

@@ -91,7 +91,6 @@
           <DataExportButton
             v-if="result.allowExport"
             size="small"
-            :file-type="'zip'"
             :disabled="props.result === null || isEmpty(props.result)"
             :support-formats="[
               ExportFormat.CSV,
@@ -99,9 +98,16 @@
               ExportFormat.SQL,
               ExportFormat.XLSX,
             ]"
-            :allow-specify-row-count="true"
+            :view-mode="'DRAWER'"
+            :support-password="true"
             @export="handleExportBtnClick"
-          />
+          >
+            <template #form>
+              <NFormItem :label="$t('common.database')">
+                <DatabaseInfo :database="database" />
+              </NFormItem>
+            </template>
+          </DataExportButton>
           <NButton
             v-else-if="allowToRequestExportData"
             size="small"
@@ -131,16 +137,23 @@
         :offset="pageIndex * pageSize"
         :is-sensitive-column="isSensitiveColumn"
         :is-column-missing-sensitive="isColumnMissingSensitive"
-        :column-type-names="props.result.columnTypeNames"
       />
     </div>
 
     <div
       class="w-full flex items-center justify-between text-xs mt-1 gap-x-4 text-control-light"
     >
-      <div class="flex-1 truncate">
-        {{ result.statement }}
-      </div>
+      <NTooltip :disabled="!isSupported">
+        <template #trigger>
+          <div
+            class="truncate cursor-pointer hover:bg-gray-200"
+            @click="copyStatement"
+          >
+            {{ result.statement }}
+          </div>
+        </template>
+        {{ $t("common.click-to-copy") }}
+      </NTooltip>
       <div class="shrink-0 space-x-2">
         <NButton
           v-if="showVisualizeButton"
@@ -177,39 +190,43 @@ import {
   getSortedRowModel,
   useVueTable,
 } from "@tanstack/vue-table";
+import { useClipboard } from "@vueuse/core";
 import { useDebounceFn, useLocalStorage } from "@vueuse/core";
 import dayjs from "dayjs";
 import { isEmpty } from "lodash-es";
 import { ExternalLinkIcon } from "lucide-vue-next";
 import {
   NButton,
+  NFormItem,
   NInput,
-  NSwitch,
   NPagination,
+  NSelect,
+  NSwitch,
   NTooltip,
   type SelectOption,
-  NSelect,
 } from "naive-ui";
-import type { BinaryLike } from "node:crypto";
 import { v4 as uuidv4 } from "uuid";
 import { computed, reactive } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { BBAttention } from "@/bbkit";
-import type { ExportOption } from "@/components/DataExportButton.vue";
+import type {
+  DownloadContent,
+  ExportOption,
+} from "@/components/DataExportButton.vue";
 import DataExportButton from "@/components/DataExportButton.vue";
+import DatabaseInfo from "@/components/DatabaseInfo.vue";
 import { DISMISS_PLACEHOLDER } from "@/plugins/ai/components/state";
 import { PROJECT_V1_ROUTE_ISSUE_DETAIL } from "@/router/dashboard/projectV1";
 import {
-  useSQLEditorTabStore,
-  featureToRef,
-  useConnectionOfCurrentSQLEditorTab,
-  useSQLEditorStore,
   useAppFeature,
-  pushNotification,
+  useConnectionOfCurrentSQLEditorTab,
   usePolicyByParentAndType,
-  useStorageStore,
+  useSQLEditorStore,
+  useSQLEditorTabStore,
   useSQLStore,
+  useStorageStore,
+  pushNotification,
 } from "@/store";
 import type { ComposedDatabase, SQLEditorQueryParams } from "@/types";
 import {
@@ -217,8 +234,7 @@ import {
   isValidDatabaseName,
   isValidInstanceName,
 } from "@/types";
-import { ExportFormat } from "@/types/proto/v1/common";
-import { Engine } from "@/types/proto/v1/common";
+import { Engine, ExportFormat } from "@/types/proto/v1/common";
 import { PolicyType } from "@/types/proto/v1/org_policy_service";
 import { DatabaseChangeMode } from "@/types/proto/v1/setting_service";
 import type {
@@ -267,6 +283,23 @@ const state = reactive<LocalState>({
   search: "",
   vertical: false,
 });
+
+const { copy: copyTextToClipboard, isSupported } = useClipboard({
+  legacy: true,
+});
+
+const copyStatement = () => {
+  if (!isSupported.value) {
+    return;
+  }
+  copyTextToClipboard(props.result.statement).then(() => {
+    pushNotification({
+      module: "bytebase",
+      style: "SUCCESS",
+      title: t("common.copied"),
+    });
+  });
+};
 
 const { t } = useI18n();
 const router = useRouter();
@@ -322,12 +355,6 @@ const allowToRequestExportData = computed(() => {
     return false;
   }
 
-  // The current plan doesn't have access control feature.
-  // Developers can not self-helped to request export.
-  if (!featureToRef("bb.feature.access-control").value) {
-    return false;
-  }
-
   // SQL Editor Mode has no issues
   // So we cannot self-helped to request export either.
   if (databaseChangeMode.value === DatabaseChangeMode.EDITOR) {
@@ -362,7 +389,7 @@ const columns = computed(() => {
         header: columnName,
         meta: {
           // Store column type in meta for easy access by other components
-          columnType: columnType,
+          columnType,
         },
         sortingFn: (rowA, rowB) => {
           return compareQueryRowValues(
@@ -377,11 +404,10 @@ const columns = computed(() => {
 });
 
 const data = computed(() => {
-  const data = props.result.rows;
+  let temp = props.result.rows;
   const search = keyword.value.trim().toLowerCase();
-  let temp = data;
   if (search) {
-    temp = data.filter((item) => {
+    temp = temp.filter((item) => {
       return item.values.some((col) => {
         const value = extractSQLRowValuePlain(col);
         if (isNullOrUndefined(value)) {
@@ -440,18 +466,15 @@ const pageSizeOptions = computed(() => {
   }));
 });
 
-const handleExportBtnClick = async (
-  options: ExportOption,
-  callback: (content: BinaryLike | Blob, filename: string) => void
-) => {
-  // If props.database is specified and it's not unknown database
-  // the query is executed on database level
-  // otherwise the query is executed on instance level, we should use the
-  // `instanceId` from the tab's connection attributes
-  const databaseName =
-    props.database && isValidDatabaseName(props.database.name)
-      ? props.database.name
-      : "";
+const handleExportBtnClick = async ({
+  options,
+  resolve,
+  reject,
+}: {
+  options: ExportOption;
+  reject: (reason?: any) => void;
+  resolve: (content: DownloadContent) => void;
+}) => {
   // use props.params.statement which is the "snapshot" of the query statement
   // not using props.result.statement because it might be rewritten by Query() API
   const statement = props.params.statement;
@@ -460,7 +483,7 @@ const handleExportBtnClick = async (
 
   try {
     const content = await useSQLStore().exportData({
-      name: databaseName,
+      name: props.database.name,
       dataSourceId: props.params.connection.dataSourceId ?? "",
       format: options.format,
       statement,
@@ -469,17 +492,14 @@ const handleExportBtnClick = async (
       password: options.password,
     });
 
-    callback(
-      content,
-      `export-data.${dayjs(new Date()).format("YYYY-MM-DDTHH-mm-ss")}`
-    );
+    resolve([
+      {
+        content,
+        filename: `${props.database.databaseName}.${dayjs(new Date()).format("YYYY-MM-DDTHH-mm-ss")}`,
+      },
+    ]);
   } catch (e) {
-    pushNotification({
-      module: "bytebase",
-      style: "CRITICAL",
-      title: t("common.error"),
-      description: String(e),
-    });
+    reject(e);
   }
 };
 

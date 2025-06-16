@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"connectrpc.com/connect"
 	"github.com/google/cel-go/cel"
 	celast "github.com/google/cel-go/common/ast"
 	celoperators "github.com/google/cel-go/common/operators"
@@ -19,12 +20,11 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/bytebase/bytebase/backend/base"
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/component/config"
 	"github.com/bytebase/bytebase/backend/component/iam"
 	"github.com/bytebase/bytebase/backend/component/state"
-	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
+	"github.com/bytebase/bytebase/backend/enterprise"
 	metricapi "github.com/bytebase/bytebase/backend/metric"
 	"github.com/bytebase/bytebase/backend/plugin/metric"
 	"github.com/bytebase/bytebase/backend/runner/metricreport"
@@ -32,14 +32,15 @@ import (
 	"github.com/bytebase/bytebase/backend/utils"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
+	"github.com/bytebase/bytebase/proto/generated-go/v1/v1connect"
 )
 
 // UserService implements the user service.
 type UserService struct {
-	v1pb.UnimplementedUserServiceServer
+	v1connect.UnimplementedUserServiceHandler
 	store          *store.Store
 	secret         string
-	licenseService enterprise.LicenseService
+	licenseService *enterprise.LicenseService
 	metricReporter *metricreport.Reporter
 	profile        *config.Profile
 	stateCfg       *state.State
@@ -47,7 +48,7 @@ type UserService struct {
 }
 
 // NewUserService creates a new UserService.
-func NewUserService(store *store.Store, secret string, licenseService enterprise.LicenseService, metricReporter *metricreport.Reporter, profile *config.Profile, stateCfg *state.State, iamManager *iam.Manager) *UserService {
+func NewUserService(store *store.Store, secret string, licenseService *enterprise.LicenseService, metricReporter *metricreport.Reporter, profile *config.Profile, stateCfg *state.State, iamManager *iam.Manager) *UserService {
 	return &UserService{
 		store:          store,
 		secret:         secret,
@@ -60,11 +61,11 @@ func NewUserService(store *store.Store, secret string, licenseService enterprise
 }
 
 // GetUser gets a user.
-func (s *UserService) GetUser(ctx context.Context, request *v1pb.GetUserRequest) (*v1pb.User, error) {
-	userID, err := common.GetUserID(request.Name)
+func (s *UserService) GetUser(ctx context.Context, request *connect.Request[v1pb.GetUserRequest]) (*connect.Response[v1pb.User], error) {
+	userID, err := common.GetUserID(request.Msg.Name)
 	var user *store.UserMessage
 	if err != nil {
-		email, err := common.GetUserEmail(request.Name)
+		email, err := common.GetUserEmail(request.Msg.Name)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
@@ -83,36 +84,36 @@ func (s *UserService) GetUser(ctx context.Context, request *v1pb.GetUserRequest)
 	if user == nil {
 		return nil, status.Errorf(codes.NotFound, "user %d not found", userID)
 	}
-	return convertToUser(user), nil
+	return connect.NewResponse(convertToUser(user)), nil
 }
 
 // BatchGetUsers get users in batch.
-func (s *UserService) BatchGetUsers(ctx context.Context, request *v1pb.BatchGetUsersRequest) (*v1pb.BatchGetUsersResponse, error) {
+func (s *UserService) BatchGetUsers(ctx context.Context, request *connect.Request[v1pb.BatchGetUsersRequest]) (*connect.Response[v1pb.BatchGetUsersResponse], error) {
 	response := &v1pb.BatchGetUsersResponse{}
-	for _, name := range request.Names {
-		user, err := s.GetUser(ctx, &v1pb.GetUserRequest{Name: name})
+	for _, name := range request.Msg.Names {
+		user, err := s.GetUser(ctx, connect.NewRequest(&v1pb.GetUserRequest{Name: name}))
 		if err != nil {
 			return nil, err
 		}
-		response.Users = append(response.Users, user)
+		response.Users = append(response.Users, user.Msg)
 	}
-	return response, nil
+	return connect.NewResponse(response), nil
 }
 
 // GetCurrentUser gets the current authenticated user.
-func (*UserService) GetCurrentUser(ctx context.Context, _ *emptypb.Empty) (*v1pb.User, error) {
+func (*UserService) GetCurrentUser(ctx context.Context, _ *connect.Request[emptypb.Empty]) (*connect.Response[v1pb.User], error) {
 	user, ok := ctx.Value(common.UserContextKey).(*store.UserMessage)
 	if !ok || user == nil {
 		return nil, status.Errorf(codes.Unauthenticated, "authenticated user not found")
 	}
-	return convertToUser(user), nil
+	return connect.NewResponse(convertToUser(user)), nil
 }
 
 // ListUsers lists all users.
-func (s *UserService) ListUsers(ctx context.Context, request *v1pb.ListUsersRequest) (*v1pb.ListUsersResponse, error) {
+func (s *UserService) ListUsers(ctx context.Context, request *connect.Request[v1pb.ListUsersRequest]) (*connect.Response[v1pb.ListUsersResponse], error) {
 	offset, err := parseLimitAndOffset(&pageSize{
-		token:   request.PageToken,
-		limit:   int(request.PageSize),
+		token:   request.Msg.PageToken,
+		limit:   int(request.Msg.PageSize),
 		maximum: 1000,
 	})
 	if err != nil {
@@ -123,9 +124,9 @@ func (s *UserService) ListUsers(ctx context.Context, request *v1pb.ListUsersRequ
 	find := &store.FindUserMessage{
 		Limit:       &limitPlusOne,
 		Offset:      &offset.offset,
-		ShowDeleted: request.ShowDeleted,
+		ShowDeleted: request.Msg.ShowDeleted,
 	}
-	if err := parseListUserFilter(find, request.Filter); err != nil {
+	if err := parseListUserFilter(find, request.Msg.Filter); err != nil {
 		return nil, err
 	}
 	if v := find.ProjectID; v != nil {
@@ -161,7 +162,7 @@ func (s *UserService) ListUsers(ctx context.Context, request *v1pb.ListUsersRequ
 	for _, user := range users {
 		response.Users = append(response.Users, convertToUser(user))
 	}
-	return response, nil
+	return connect.NewResponse(response), nil
 }
 
 func parseListUserFilter(find *store.FindUserMessage, filter string) error {
@@ -304,7 +305,7 @@ func parseListUserFilter(find *store.FindUserMessage, filter string) error {
 }
 
 // CreateUser creates a user.
-func (s *UserService) CreateUser(ctx context.Context, request *v1pb.CreateUserRequest) (*v1pb.User, error) {
+func (s *UserService) CreateUser(ctx context.Context, request *connect.Request[v1pb.CreateUserRequest]) (*connect.Response[v1pb.User], error) {
 	if err := s.userCountGuard(ctx); err != nil {
 		return nil, err
 	}
@@ -314,7 +315,7 @@ func (s *UserService) CreateUser(ctx context.Context, request *v1pb.CreateUserRe
 		return nil, status.Errorf(codes.Internal, "failed to find workspace setting, error: %v", err)
 	}
 
-	if setting.DisallowSignup {
+	if err := s.licenseService.IsFeatureEnabled(v1pb.PlanFeature_FEATURE_DISALLOW_SELF_SERVICE_SIGNUP); err == nil && setting.DisallowSignup {
 		callerUser, ok := ctx.Value(common.UserContextKey).(*store.UserMessage)
 		if !ok {
 			return nil, status.Errorf(codes.PermissionDenied, "sign up is disallowed")
@@ -327,54 +328,54 @@ func (s *UserService) CreateUser(ctx context.Context, request *v1pb.CreateUserRe
 			return nil, status.Errorf(codes.PermissionDenied, "user does not have permission %q", iam.PermissionUsersCreate)
 		}
 	}
-	if request.User == nil {
+	if request.Msg.User == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "user must be set")
 	}
-	if request.User.Email == "" {
+	if request.Msg.User.Email == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "email must be set")
 	}
-	if request.User.Title == "" {
+	if request.Msg.User.Title == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "user title must be set")
 	}
 
-	principalType, err := convertToPrincipalType(request.User.UserType)
+	principalType, err := convertToPrincipalType(request.Msg.User.UserType)
 	if err != nil {
 		return nil, err
 	}
-	if request.User.UserType != v1pb.UserType_SERVICE_ACCOUNT && request.User.UserType != v1pb.UserType_USER {
+	if request.Msg.User.UserType != v1pb.UserType_SERVICE_ACCOUNT && request.Msg.User.UserType != v1pb.UserType_USER {
 		return nil, status.Errorf(codes.InvalidArgument, "support user and service account only")
 	}
 
-	count, err := s.store.CountUsers(ctx, base.EndUser)
+	count, err := s.store.CountUsers(ctx, storepb.PrincipalType_END_USER)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to count users, error: %v", err)
 	}
 	firstEndUser := count == 0
 
-	if request.User.Phone != "" {
-		if err := common.ValidatePhone(request.User.Phone); err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid phone %q, error: %v", request.User.Phone, err)
+	if request.Msg.User.Phone != "" {
+		if err := common.ValidatePhone(request.Msg.User.Phone); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid phone %q, error: %v", request.Msg.User.Phone, err)
 		}
 	}
 
-	if err := validateEmailWithDomains(ctx, s.licenseService, s.store, request.User.Email, principalType == base.ServiceAccount, false); err != nil {
+	if err := validateEmailWithDomains(ctx, s.licenseService, s.store, request.Msg.User.Email, principalType == storepb.PrincipalType_SERVICE_ACCOUNT, false); err != nil {
 		return nil, err
 	}
-	existingUser, err := s.store.GetUserByEmail(ctx, request.User.Email)
+	existingUser, err := s.store.GetUserByEmail(ctx, request.Msg.User.Email)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to find user by email, error: %v", err)
 	}
 	if existingUser != nil {
-		return nil, status.Errorf(codes.AlreadyExists, "email %s is already existed", request.User.Email)
+		return nil, status.Errorf(codes.AlreadyExists, "email %s is already existed", request.Msg.User.Email)
 	}
 
-	password := request.User.Password
-	if request.User.UserType == v1pb.UserType_SERVICE_ACCOUNT {
+	password := request.Msg.User.Password
+	if request.Msg.User.UserType == v1pb.UserType_SERVICE_ACCOUNT {
 		pwd, err := common.RandomString(20)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to generate access key for service account.")
 		}
-		password = fmt.Sprintf("%s%s", base.ServiceAccountAccessKeyPrefix, pwd)
+		password = fmt.Sprintf("%s%s", common.ServiceAccountAccessKeyPrefix, pwd)
 	} else {
 		if password != "" {
 			if err := s.validatePassword(ctx, password); err != nil {
@@ -393,9 +394,9 @@ func (s *UserService) CreateUser(ctx context.Context, request *v1pb.CreateUserRe
 		return nil, status.Errorf(codes.Internal, "failed to generate password hash, error: %v", err)
 	}
 	userMessage := &store.UserMessage{
-		Email:        request.User.Email,
-		Name:         request.User.Title,
-		Phone:        request.User.Phone,
+		Email:        request.Msg.User.Email,
+		Name:         request.Msg.User.Title,
+		Phone:        request.Msg.User.Phone,
 		Type:         principalType,
 		PasswordHash: string(passwordHash),
 	}
@@ -409,14 +410,14 @@ func (s *UserService) CreateUser(ctx context.Context, request *v1pb.CreateUserRe
 		// The first end user should be workspace admin.
 		updateRole := &store.PatchIamPolicyMessage{
 			Member: common.FormatUserUID(user.ID),
-			Roles:  []string{common.FormatRole(base.WorkspaceAdmin.String())},
+			Roles:  []string{common.FormatRole(common.WorkspaceAdmin)},
 		}
 		if _, err := s.store.PatchWorkspaceIamPolicy(ctx, updateRole); err != nil {
-			return nil, err
+			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
 
-	isFirstUser := user.ID == base.PrincipalIDForFirstUser
+	isFirstUser := user.ID == common.PrincipalIDForFirstUser
 	s.metricReporter.Report(ctx, &metric.Metric{
 		Name:  metricapi.PrincipalRegistrationMetricName,
 		Value: 1,
@@ -431,10 +432,10 @@ func (s *UserService) CreateUser(ctx context.Context, request *v1pb.CreateUserRe
 	})
 
 	userResponse := convertToUser(user)
-	if request.User.UserType == v1pb.UserType_SERVICE_ACCOUNT {
+	if request.Msg.User.UserType == v1pb.UserType_SERVICE_ACCOUNT {
 		userResponse.ServiceKey = password
 	}
-	return userResponse, nil
+	return connect.NewResponse(userResponse), nil
 }
 
 func (s *UserService) validatePassword(ctx context.Context, password string) error {
@@ -461,19 +462,19 @@ func (s *UserService) validatePassword(ctx context.Context, password string) err
 }
 
 // UpdateUser updates a user.
-func (s *UserService) UpdateUser(ctx context.Context, request *v1pb.UpdateUserRequest) (*v1pb.User, error) {
+func (s *UserService) UpdateUser(ctx context.Context, request *connect.Request[v1pb.UpdateUserRequest]) (*connect.Response[v1pb.User], error) {
 	callerUser, ok := ctx.Value(common.UserContextKey).(*store.UserMessage)
 	if !ok {
 		return nil, status.Errorf(codes.PermissionDenied, "failed to get caller user")
 	}
-	if request.User == nil {
+	if request.Msg.User == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "user must be set")
 	}
-	if request.UpdateMask == nil {
+	if request.Msg.UpdateMask == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "update_mask must be set")
 	}
 
-	userID, err := common.GetUserID(request.User.Name)
+	userID, err := common.GetUserID(request.Msg.User.Name)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -500,42 +501,42 @@ func (s *UserService) UpdateUser(ctx context.Context, request *v1pb.UpdateUserRe
 
 	var passwordPatch *string
 	patch := &store.UpdateUserMessage{}
-	for _, path := range request.UpdateMask.Paths {
+	for _, path := range request.Msg.UpdateMask.Paths {
 		switch path {
 		case "email":
-			if err := validateEmailWithDomains(ctx, s.licenseService, s.store, request.User.Email, user.Type == base.ServiceAccount, false); err != nil {
+			if err := validateEmailWithDomains(ctx, s.licenseService, s.store, request.Msg.User.Email, user.Type == storepb.PrincipalType_SERVICE_ACCOUNT, false); err != nil {
 				return nil, err
 			}
-			existedUser, err := s.store.GetUserByEmail(ctx, request.User.Email)
+			existedUser, err := s.store.GetUserByEmail(ctx, request.Msg.User.Email)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "failed to find user list, error: %v", err)
 			}
 			if existedUser != nil && existedUser.ID != user.ID {
-				return nil, status.Errorf(codes.AlreadyExists, "email %s is already existed", request.User.Email)
+				return nil, status.Errorf(codes.AlreadyExists, "email %s is already existed", request.Msg.User.Email)
 			}
-			patch.Email = &request.User.Email
+			patch.Email = &request.Msg.User.Email
 		case "title":
-			patch.Name = &request.User.Title
+			patch.Name = &request.Msg.User.Title
 		case "password":
-			if user.Type != base.EndUser {
+			if user.Type != storepb.PrincipalType_END_USER {
 				return nil, status.Errorf(codes.InvalidArgument, "password can be mutated for end users only")
 			}
-			if err := s.validatePassword(ctx, request.User.Password); err != nil {
+			if err := s.validatePassword(ctx, request.Msg.User.Password); err != nil {
 				return nil, err
 			}
-			passwordPatch = &request.User.Password
+			passwordPatch = &request.Msg.User.Password
 		case "service_key":
-			if user.Type != base.ServiceAccount {
+			if user.Type != storepb.PrincipalType_SERVICE_ACCOUNT {
 				return nil, status.Errorf(codes.InvalidArgument, "service key can be mutated for service accounts only")
 			}
 			val, err := common.RandomString(20)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "failed to generate access key for service account.")
 			}
-			password := fmt.Sprintf("%s%s", base.ServiceAccountAccessKeyPrefix, val)
+			password := fmt.Sprintf("%s%s", common.ServiceAccountAccessKeyPrefix, val)
 			passwordPatch = &password
 		case "mfa_enabled":
-			if request.User.MfaEnabled {
+			if request.Msg.User.MfaEnabled {
 				if user.MFAConfig.TempOtpSecret == "" || len(user.MFAConfig.TempRecoveryCodes) == 0 {
 					return nil, status.Errorf(codes.InvalidArgument, "MFA is not setup yet")
 				}
@@ -561,12 +562,12 @@ func (s *UserService) UpdateUser(ctx context.Context, request *v1pb.UpdateUserRe
 				patch.MFAConfig = &storepb.MFAConfig{}
 			}
 		case "phone":
-			if request.User.Phone != "" {
-				if err := common.ValidatePhone(request.User.Phone); err != nil {
-					return nil, status.Errorf(codes.InvalidArgument, "invalid phone number %q, error: %v", request.User.Phone, err)
+			if request.Msg.User.Phone != "" {
+				if err := common.ValidatePhone(request.Msg.User.Phone); err != nil {
+					return nil, status.Errorf(codes.InvalidArgument, "invalid phone number %q, error: %v", request.Msg.User.Phone, err)
 				}
 			}
-			patch.Phone = &request.User.Phone
+			patch.Phone = &request.Msg.User.Phone
 		}
 	}
 	if passwordPatch != nil {
@@ -584,15 +585,15 @@ func (s *UserService) UpdateUser(ctx context.Context, request *v1pb.UpdateUserRe
 	}
 	// This flag is mainly used for validating OTP code when user setup MFA.
 	// We only validate OTP code but not update user.
-	if request.OtpCode != nil {
-		isValid := validateWithCodeAndSecret(*request.OtpCode, user.MFAConfig.TempOtpSecret)
+	if request.Msg.OtpCode != nil {
+		isValid := validateWithCodeAndSecret(*request.Msg.OtpCode, user.MFAConfig.TempOtpSecret)
 		if !isValid {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid OTP code")
 		}
 	}
 	// This flag will regenerate temp secret and temp recovery codes.
 	// It will be used when user setup MFA and regenerating recovery codes.
-	if request.RegenerateTempMfaSecret {
+	if request.Msg.RegenerateTempMfaSecret {
 		tempSecret, err := generateRandSecret(user.Email)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to generate MFA secret, error: %v", err)
@@ -612,7 +613,7 @@ func (s *UserService) UpdateUser(ctx context.Context, request *v1pb.UpdateUserRe
 	}
 	// This flag will update user's recovery codes with temp recovery codes.
 	// It will be used when user regenerate recovery codes after two phase commit.
-	if request.RegenerateRecoveryCodes {
+	if request.Msg.RegenerateRecoveryCodes {
 		if user.MFAConfig.OtpSecret == "" {
 			return nil, status.Errorf(codes.InvalidArgument, "MFA is not enabled")
 		}
@@ -631,14 +632,14 @@ func (s *UserService) UpdateUser(ctx context.Context, request *v1pb.UpdateUserRe
 	}
 
 	userResponse := convertToUser(user)
-	if request.User.UserType == v1pb.UserType_SERVICE_ACCOUNT && passwordPatch != nil {
+	if request.Msg.User.UserType == v1pb.UserType_SERVICE_ACCOUNT && passwordPatch != nil {
 		userResponse.ServiceKey = *passwordPatch
 	}
-	return userResponse, nil
+	return connect.NewResponse(userResponse), nil
 }
 
 // DeleteUser deletes a user.
-func (s *UserService) DeleteUser(ctx context.Context, request *v1pb.DeleteUserRequest) (*emptypb.Empty, error) {
+func (s *UserService) DeleteUser(ctx context.Context, request *connect.Request[v1pb.DeleteUserRequest]) (*connect.Response[emptypb.Empty], error) {
 	callerUser, ok := ctx.Value(common.UserContextKey).(*store.UserMessage)
 	if !ok {
 		return nil, status.Errorf(codes.PermissionDenied, "failed to get caller user")
@@ -651,7 +652,7 @@ func (s *UserService) DeleteUser(ctx context.Context, request *v1pb.DeleteUserRe
 		return nil, status.Errorf(codes.PermissionDenied, "user does not have permission %q", iam.PermissionUsersDelete)
 	}
 
-	userID, err := common.GetUserID(request.Name)
+	userID, err := common.GetUserID(request.Msg.Name)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -682,7 +683,7 @@ func (s *UserService) DeleteUser(ctx context.Context, request *v1pb.DeleteUserRe
 	if _, err := s.store.UpdateUser(ctx, user, &store.UpdateUserMessage{Delete: &deletePatch}); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &emptypb.Empty{}, nil
+	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
 func (s *UserService) getActiveUserCount(ctx context.Context) (int, error) {
@@ -692,7 +693,7 @@ func (s *UserService) getActiveUserCount(ctx context.Context) (int, error) {
 	}
 	activeEndUserCount := 0
 	for _, stat := range userStat {
-		if !stat.Deleted && stat.Type == base.EndUser {
+		if !stat.Deleted && stat.Type == storepb.PrincipalType_END_USER {
 			activeEndUserCount = stat.Count
 			break
 		}
@@ -701,7 +702,7 @@ func (s *UserService) getActiveUserCount(ctx context.Context) (int, error) {
 }
 
 func (s *UserService) hasExtraWorkspaceAdmin(ctx context.Context, policy *storepb.IamPolicy, userID int) (bool, error) {
-	workspaceAdminRole := common.FormatRole(base.WorkspaceAdmin.String())
+	workspaceAdminRole := common.FormatRole(common.WorkspaceAdmin)
 	userMember := common.FormatUserUID(userID)
 
 	for _, binding := range policy.GetBindings() {
@@ -712,7 +713,7 @@ func (s *UserService) hasExtraWorkspaceAdmin(ctx context.Context, policy *storep
 			if member == userMember {
 				continue
 			}
-			if member == base.AllUsers {
+			if member == common.AllUsers {
 				activeEndUserCount, err := s.getActiveUserCount(ctx)
 				if err != nil {
 					return false, err
@@ -721,7 +722,7 @@ func (s *UserService) hasExtraWorkspaceAdmin(ctx context.Context, policy *storep
 			}
 			users := utils.GetUsersByMember(ctx, s.store, member)
 			for _, user := range users {
-				if !user.MemberDeleted && user.Type == base.EndUser {
+				if !user.MemberDeleted && user.Type == storepb.PrincipalType_END_USER {
 					return true, nil
 				}
 			}
@@ -731,7 +732,7 @@ func (s *UserService) hasExtraWorkspaceAdmin(ctx context.Context, policy *storep
 }
 
 // UndeleteUser undeletes a user.
-func (s *UserService) UndeleteUser(ctx context.Context, request *v1pb.UndeleteUserRequest) (*v1pb.User, error) {
+func (s *UserService) UndeleteUser(ctx context.Context, request *connect.Request[v1pb.UndeleteUserRequest]) (*connect.Response[v1pb.User], error) {
 	if err := s.userCountGuard(ctx); err != nil {
 		return nil, err
 	}
@@ -748,7 +749,7 @@ func (s *UserService) UndeleteUser(ctx context.Context, request *v1pb.UndeleteUs
 		return nil, status.Errorf(codes.PermissionDenied, "user does not have permission %q", iam.PermissionUsersUndelete)
 	}
 
-	userID, err := common.GetUserID(request.Name)
+	userID, err := common.GetUserID(request.Msg.Name)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -767,16 +768,16 @@ func (s *UserService) UndeleteUser(ctx context.Context, request *v1pb.UndeleteUs
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return convertToUser(user), nil
+	return connect.NewResponse(convertToUser(user)), nil
 }
 
-func convertToV1UserType(userType base.PrincipalType) v1pb.UserType {
+func convertToV1UserType(userType storepb.PrincipalType) v1pb.UserType {
 	switch userType {
-	case base.EndUser:
+	case storepb.PrincipalType_END_USER:
 		return v1pb.UserType_USER
-	case base.SystemBot:
+	case storepb.PrincipalType_SYSTEM_BOT:
 		return v1pb.UserType_SYSTEM_BOT
-	case base.ServiceAccount:
+	case storepb.PrincipalType_SERVICE_ACCOUNT:
 		return v1pb.UserType_SERVICE_ACCOUNT
 	default:
 		return v1pb.UserType_USER_TYPE_UNSPECIFIED
@@ -806,23 +807,23 @@ func convertToUser(user *store.UserMessage) *v1pb.User {
 	return convertedUser
 }
 
-func convertToPrincipalType(userType v1pb.UserType) (base.PrincipalType, error) {
-	var t base.PrincipalType
+func convertToPrincipalType(userType v1pb.UserType) (storepb.PrincipalType, error) {
+	var t storepb.PrincipalType
 	switch userType {
 	case v1pb.UserType_USER:
-		t = base.EndUser
+		t = storepb.PrincipalType_END_USER
 	case v1pb.UserType_SYSTEM_BOT:
-		t = base.SystemBot
+		t = storepb.PrincipalType_SYSTEM_BOT
 	case v1pb.UserType_SERVICE_ACCOUNT:
-		t = base.ServiceAccount
+		t = storepb.PrincipalType_SERVICE_ACCOUNT
 	default:
 		return t, status.Errorf(codes.InvalidArgument, "invalid user type %s", userType)
 	}
 	return t, nil
 }
 
-func validateEmailWithDomains(ctx context.Context, licenseService enterprise.LicenseService, stores *store.Store, email string, isServiceAccount bool, checkDomainSetting bool) error {
-	if licenseService.IsFeatureEnabled(base.FeatureDomainRestriction) != nil {
+func validateEmailWithDomains(ctx context.Context, licenseService *enterprise.LicenseService, stores *store.Store, email string, isServiceAccount bool, checkDomainSetting bool) error {
+	if licenseService.IsFeatureEnabled(v1pb.PlanFeature_FEATURE_USER_EMAIL_DOMAIN_RESTRICTION) != nil {
 		// nolint:nilerr
 		// feature not enabled, only validate email and skip domain restriction.
 		if err := validateEmail(email); err != nil {
@@ -922,7 +923,7 @@ func generateRecoveryCodes(n int) ([]string, error) {
 }
 
 func (s *UserService) userCountGuard(ctx context.Context) error {
-	userLimit := s.licenseService.GetPlanLimitValue(ctx, enterprise.PlanLimitMaximumUser)
+	userLimit := s.licenseService.GetUserLimit(ctx)
 
 	count, err := s.store.CountActiveUsers(ctx)
 	if err != nil {
@@ -940,5 +941,5 @@ func isUserWorkspaceAdmin(ctx context.Context, stores *store.Store, user *store.
 		return false, err
 	}
 	roles := utils.GetUserFormattedRolesMap(ctx, stores, user, workspacePolicy.Policy)
-	return roles[common.FormatRole(base.WorkspaceAdmin.String())], nil
+	return roles[common.FormatRole(common.WorkspaceAdmin)], nil
 }

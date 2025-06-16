@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -37,10 +37,10 @@ func TestCompletion(t *testing.T) {
 	tests := []candidatesTest{}
 
 	const (
-		record = true
+		record = false
 	)
 	var (
-		filepath = "test-data/completion/t_cc.yaml"
+		filepath = "test-data/completion/test_completion.yaml"
 	)
 
 	a := require.New(t)
@@ -52,8 +52,8 @@ func TestCompletion(t *testing.T) {
 	a.NoError(err)
 	a.NoError(yaml.Unmarshal(byteValue, &tests))
 
-	for i, t := range tests {
-		statement, caretLine, caretPosition := getCaretPosition(t.Input)
+	for i, test := range tests {
+		statement, caretLine, caretPosition := getCaretPosition(test.Input)
 		getter, lister := buildMockDatabaseMetadataGetterLister()
 		results, err := Completion(context.Background(), base.CompletionContext{
 			Scene:             base.SceneTypeAll,
@@ -61,7 +61,7 @@ func TestCompletion(t *testing.T) {
 			Metadata:          getter,
 			ListDatabaseNames: lister,
 		}, statement, caretLine, caretPosition)
-		a.NoErrorf(err, "Case %02d: %s", i, t.Description)
+		a.NoErrorf(err, "Case %02d: %s", i, test.Description)
 		var filteredResult []base.Candidate
 		for _, r := range results {
 			switch r.Type {
@@ -71,20 +71,35 @@ func TestCompletion(t *testing.T) {
 				filteredResult = append(filteredResult, r)
 			}
 		}
-		sort.Slice(filteredResult, func(i, j int) bool {
-			if filteredResult[i].Type != filteredResult[j].Type {
-				return filteredResult[i].Type < filteredResult[j].Type
+		if filteredResult == nil {
+			filteredResult = []base.Candidate{}
+		}
+		slices.SortFunc(filteredResult, func(i, j base.Candidate) int {
+			if i.Type != j.Type {
+				if i.Type < j.Type {
+					return -1
+				}
+				return 1
 			}
-			if filteredResult[i].Text != filteredResult[j].Text {
-				return filteredResult[i].Text < filteredResult[j].Text
+			if i.Text != j.Text {
+				if i.Text < j.Text {
+					return -1
+				}
+				return 1
 			}
-			return filteredResult[i].Definition < filteredResult[j].Definition
+			if i.Definition < j.Definition {
+				return -1
+			}
+			if i.Definition > j.Definition {
+				return 1
+			}
+			return 0
 		})
 
 		if record {
 			tests[i].Want = filteredResult
 		} else {
-			a.Equalf(t.Want, filteredResult, t.Input, "Case %02d: %s", i, t.Description)
+			a.Equalf(test.Want, filteredResult, "Case %02d: %s\nInput: %s", i, test.Description, test.Input)
 		}
 	}
 

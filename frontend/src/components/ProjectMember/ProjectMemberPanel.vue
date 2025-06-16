@@ -3,7 +3,7 @@
     <div class="textinfolabel">
       {{ $t("project.members.description") }}
       <a
-        href="https://www.bytebase.com/docs/concepts/roles-and-permissions/?source=console#project-roles"
+        href="https://docs.bytebase.com/concepts/roles-and-permissions/?source=console#project-roles"
         target="_blank"
         class="normal-link inline-flex flex-row items-center"
       >
@@ -11,8 +11,6 @@
         <heroicons-outline:external-link class="w-4 h-4" />
       </a>
     </div>
-
-    <FeatureAttention feature="bb.feature.rbac" />
 
     <NTabs v-model:value="state.selectedTab" type="bar" animated>
       <template #suffix>
@@ -94,15 +92,15 @@
 <script lang="ts" setup>
 import { computedAsync } from "@vueuse/core";
 import { cloneDeep } from "lodash-es";
-import { NButton, NTabs, NTabPane, useDialog } from "naive-ui";
+import { NButton, NTabPane, NTabs, useDialog } from "naive-ui";
 import { computed, reactive } from "vue";
 import { useI18n } from "vue-i18n";
 import MemberDataTable from "@/components/Member/MemberDataTable/index.vue";
 import MemberDataTableByRole from "@/components/Member/MemberDataTableByRole.vue";
 import type { MemberBinding } from "@/components/Member/types";
 import {
-  getMemberBindingsByRole,
   getMemberBindings,
+  getMemberBindingsByRole,
 } from "@/components/Member/utils";
 import {
   extractUserId,
@@ -115,7 +113,6 @@ import {
 import type { ComposedProject } from "@/types";
 import { PRESET_WORKSPACE_ROLES, groupBindingPrefix } from "@/types";
 import { hasProjectPermissionV2 } from "@/utils";
-import { FeatureAttention } from "../FeatureGuard";
 import { SearchBox } from "../v2";
 import AddProjectMembersPanel from "./AddProjectMember/AddProjectMembersPanel.vue";
 import ProjectMemberRolePanel from "./ProjectMemberRolePanel/index.vue";

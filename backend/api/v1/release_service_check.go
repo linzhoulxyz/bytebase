@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"connectrpc.com/connect"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/pkg/errors"
 
-	"github.com/bytebase/bytebase/backend/base"
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/plugin/advisor"
 	"github.com/bytebase/bytebase/backend/plugin/advisor/catalog"
@@ -21,7 +21,8 @@ import (
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
-func (s *ReleaseService) CheckRelease(ctx context.Context, request *v1pb.CheckReleaseRequest) (*v1pb.CheckReleaseResponse, error) {
+func (s *ReleaseService) CheckRelease(ctx context.Context, req *connect.Request[v1pb.CheckReleaseRequest]) (*connect.Response[v1pb.CheckReleaseResponse], error) {
+	request := req.Msg
 	if len(request.Targets) == 0 {
 		return nil, status.Errorf(codes.InvalidArgument, "targets cannot be empty")
 	}
@@ -44,25 +45,13 @@ func (s *ReleaseService) CheckRelease(ctx context.Context, request *v1pb.CheckRe
 	var targetDatabases []*store.DatabaseMessage
 	for _, target := range request.Targets {
 		// Handle database target.
-		if instanceID, databaseName, err := common.GetInstanceDatabaseID(target); err == nil {
-			instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{
-				ResourceID: &instanceID,
-			})
+		if _, _, err := common.GetInstanceDatabaseID(target); err == nil {
+			database, err := getDatabaseMessage(ctx, s.store, target)
 			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to get instance, error: %v", err)
+				return nil, status.Errorf(codes.Internal, "failed to found database %v", target)
 			}
-			if instance == nil {
-				return nil, status.Errorf(codes.NotFound, "instance %q not found", instanceID)
-			}
-			database, err := s.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{
-				InstanceID:   &instanceID,
-				DatabaseName: &databaseName,
-			})
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to get database, error: %v", err)
-			}
-			if database == nil {
-				return nil, status.Errorf(codes.NotFound, "database %q not found", target)
+			if database == nil || database.Deleted {
+				return nil, status.Errorf(codes.NotFound, "database %v not found", target)
 			}
 			targetDatabases = append(targetDatabases, database)
 		}
@@ -111,7 +100,7 @@ func (s *ReleaseService) CheckRelease(ctx context.Context, request *v1pb.CheckRe
 	}
 
 	// Validate and sanitize release files.
-	request.Release.Files, err = validateAndSanitizeReleaseFiles(request.Release.Files)
+	request.Release.Files, err = validateAndSanitizeReleaseFiles(ctx, s.store, request.Release.Files)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid release files, err: %v", err)
 	}
@@ -134,7 +123,8 @@ func (s *ReleaseService) CheckRelease(ctx context.Context, request *v1pb.CheckRe
 			return nil, status.Errorf(codes.NotFound, "instance %q not found", database.InstanceID)
 		}
 
-		catalog, err := catalog.NewCatalog(ctx, s.store, database.InstanceID, database.DatabaseName, instance.Metadata.GetEngine(), store.IsObjectCaseSensitive(instance), nil)
+		engine := instance.Metadata.GetEngine()
+		catalog, err := catalog.NewCatalog(ctx, s.store, database.InstanceID, database.DatabaseName, engine, store.IsObjectCaseSensitive(instance), nil)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to create catalog: %v", err)
 		}
@@ -142,24 +132,38 @@ func (s *ReleaseService) CheckRelease(ctx context.Context, request *v1pb.CheckRe
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to list risks: %v", err)
 		}
+
+		// Collect all versions for batch fetching
+		versions := make([]string, 0, len(request.Release.Files))
+		for _, file := range request.Release.Files {
+			versions = append(versions, file.Version)
+		}
+
+		// Batch fetch all revisions for this database
+		revisions, err := s.store.ListRevisions(ctx, &store.FindRevisionMessage{
+			InstanceID:   &database.InstanceID,
+			DatabaseName: &database.DatabaseName,
+			Versions:     &versions,
+			ShowDeleted:  false,
+		})
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to list revisions: %v", err)
+		}
+
+		// Create a map for quick lookup
+		revisionMap := make(map[string]*store.RevisionMessage)
+		for _, revision := range revisions {
+			revisionMap[revision.Version] = revision
+		}
+
 		for _, file := range request.Release.Files {
 			if stopChecking {
 				break
 			}
 
 			// Check if file has been applied to database.
-			revisions, err := s.store.ListRevisions(ctx, &store.FindRevisionMessage{
-				InstanceID:   &database.InstanceID,
-				DatabaseName: &database.DatabaseName,
-				Version:      &file.Version,
-				ShowDeleted:  false,
-			})
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to list revisions: %v", err)
-			}
-			if len(revisions) > 0 {
+			if appliedRevision, ok := revisionMap[file.Version]; ok {
 				// Check if the SHA256 matches
-				appliedRevision := revisions[0]
 				if appliedRevision.Payload.SheetSha256 != file.SheetSha256 {
 					// Add a warning advice if SHA256 mismatch
 					checkResult := &v1pb.CheckReleaseResponse_CheckResult{
@@ -186,63 +190,65 @@ func (s *ReleaseService) CheckRelease(ctx context.Context, request *v1pb.CheckRe
 					File:   file.Path,
 					Target: fmt.Sprintf("instances/%s/databases/%s", instance.ResourceID, database.DatabaseName),
 				}
+				// statement is guaranteed to be populated by validateAndSanitizeReleaseFiles
 				statement := string(file.Statement)
-
 				// Check if any syntax error in the statement.
-				_, syntaxAdvices := s.sheetManager.GetASTsForChecks(instance.Metadata.GetEngine(), statement)
-				if len(syntaxAdvices) > 0 {
-					for _, advice := range syntaxAdvices {
-						checkResult.Advices = append(checkResult.Advices, convertToV1Advice(advice))
+				if common.EngineSupportSyntaxCheck(engine) {
+					_, syntaxAdvices := s.sheetManager.GetASTsForChecks(engine, statement)
+					if len(syntaxAdvices) > 0 {
+						for _, advice := range syntaxAdvices {
+							checkResult.Advices = append(checkResult.Advices, convertToV1Advice(advice))
+						}
+						return checkResult, nil
 					}
-				} else {
-					changeType := storepb.PlanCheckRunConfig_DDL
-					switch file.ChangeType {
-					case v1pb.Release_File_DDL_GHOST:
-						changeType = storepb.PlanCheckRunConfig_DDL_GHOST
-					case v1pb.Release_File_DML:
-						changeType = storepb.PlanCheckRunConfig_DML
-					}
+				}
 
-					// Get SQL summary report for the statement and target database.
-					// Including affected rows.
-					summaryReport, err := plancheck.GetSQLSummaryReport(ctx, s.store, s.sheetManager, s.dbFactory, database, statement)
+				changeType := storepb.PlanCheckRunConfig_DDL
+				switch file.ChangeType {
+				case v1pb.Release_File_DDL_GHOST:
+					changeType = storepb.PlanCheckRunConfig_DDL_GHOST
+				case v1pb.Release_File_DML:
+					changeType = storepb.PlanCheckRunConfig_DML
+				}
+				// Get SQL summary report for the statement and target database.
+				// Including affected rows.
+				summaryReport, err := plancheck.GetSQLSummaryReport(ctx, s.store, s.sheetManager, s.dbFactory, database, statement)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "failed to get SQL summary report, error: %v", err)
+				}
+				if summaryReport != nil {
+					checkResult.AffectedRows = summaryReport.AffectedRows
+					response.AffectedRows += summaryReport.AffectedRows
+
+					commonArgs := map[string]any{
+						"environment_id": database.EffectiveEnvironmentID,
+						"project_id":     database.ProjectID,
+						"database_name":  database.DatabaseName,
+						// convert to string type otherwise cel-go will complain that storepb.Engine is not string type.
+						"db_engine":     engine.String(),
+						"sql_statement": statement,
+					}
+					riskLevel, err := CalculateRiskLevelWithSummaryReport(ctx, risks, commonArgs, getRiskSourceFromChangeType(changeType), summaryReport)
 					if err != nil {
-						return nil, status.Errorf(codes.Internal, "failed to get SQL summary report, error: %v", err)
+						return nil, status.Errorf(codes.Internal, "failed to calculate risk level, error: %v", err)
 					}
-					if summaryReport != nil {
-						checkResult.AffectedRows = summaryReport.AffectedRows
-						response.AffectedRows += summaryReport.AffectedRows
-
-						commonArgs := map[string]any{
-							"environment_id": database.EffectiveEnvironmentID,
-							"project_id":     database.ProjectID,
-							"database_name":  database.DatabaseName,
-							// convert to string type otherwise cel-go will complain that storepb.Engine is not string type.
-							"db_engine":     instance.Metadata.GetEngine().String(),
-							"sql_statement": statement,
-						}
-						riskLevel, err := CalculateRiskLevelWithSummaryReport(ctx, risks, commonArgs, getRiskSourceFromChangeType(changeType), summaryReport)
-						if err != nil {
-							return nil, status.Errorf(codes.Internal, "failed to calculate risk level, error: %v", err)
-						}
-						if riskLevel > maxRiskLevel {
-							maxRiskLevel = riskLevel
-						}
-						riskLevelEnum, err := convertRiskLevel(riskLevel)
-						if err != nil {
-							return nil, status.Errorf(codes.Internal, "failed to convert risk level, error: %v", err)
-						}
-						checkResult.RiskLevel = riskLevelEnum
+					if riskLevel > maxRiskLevel {
+						maxRiskLevel = riskLevel
 					}
-					if base.EngineSupportSQLReview(instance.Metadata.GetEngine()) {
-						adviceStatus, sqlReviewAdvices, err := s.runSQLReviewCheckForFile(ctx, catalog, instance, database, changeType, statement)
-						if err != nil {
-							return nil, status.Errorf(codes.Internal, "failed to check SQL review: %v", err)
-						}
-						// If the advice status is not SUCCESS, we will add the file and advices to the response.
-						if adviceStatus != storepb.Advice_SUCCESS {
-							checkResult.Advices = sqlReviewAdvices
-						}
+					riskLevelEnum, err := convertRiskLevel(riskLevel)
+					if err != nil {
+						return nil, status.Errorf(codes.Internal, "failed to convert risk level, error: %v", err)
+					}
+					checkResult.RiskLevel = riskLevelEnum
+				}
+				if common.EngineSupportSQLReview(engine) {
+					adviceStatus, sqlReviewAdvices, err := s.runSQLReviewCheckForFile(ctx, catalog, instance, database, changeType, statement)
+					if err != nil {
+						return nil, status.Errorf(codes.Internal, "failed to check SQL review: %v", err)
+					}
+					// If the advice status is not SUCCESS, we will add the file and advices to the response.
+					if adviceStatus != storepb.Advice_SUCCESS {
+						checkResult.Advices = sqlReviewAdvices
 					}
 				}
 				return checkResult, nil
@@ -290,7 +296,7 @@ func (s *ReleaseService) CheckRelease(ctx context.Context, request *v1pb.CheckRe
 		return nil, status.Errorf(codes.Internal, "failed to convert risk level, error: %v", err)
 	}
 	response.RiskLevel = riskLevelEnum
-	return response, nil
+	return connect.NewResponse(response), nil
 }
 
 func (s *ReleaseService) runSQLReviewCheckForFile(

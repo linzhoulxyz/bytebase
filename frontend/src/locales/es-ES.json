@@ -132,6 +132,7 @@
     "loading": "Cargando",
     "copy": "Copiar",
     "copied": "Copiado",
+    "click-to-copy": "Haga clic para copiar",
     "manage": "Administrar",
     "table": "Tabla",
     "search": "Buscar",
@@ -150,6 +151,7 @@
     "view-doc": "Ver doc",
     "write-only": "solo escritura",
     "sync": "Sincronizar",
+    "succeed": "Tener éxito",
     "success": "Éxito",
     "failed": "Falló",
     "load-more": "Cargar más",
@@ -178,8 +180,13 @@
     "optional": "Opcional",
     "reason": "Razón",
     "date": {
-      "days": "{days} días"
+      "days": "{days} días",
+      "week": "1 semana",
+      "month": "1 mes",
+      "months": "{months} meses",
+      "year": "1 año"
     },
+    "access-expires": "El acceso expira",
     "expiration": "Expiración",
     "configure": "Configurar",
     "groups": "Grupos",
@@ -225,7 +232,6 @@
     "summary": "Resumen",
     "errors": "Errores",
     "removed": "Remoto",
-    "options": "Opciones",
     "submit": "Entregar"
   },
   "error-page": {
@@ -287,13 +293,16 @@
       "error": {
         "nothing-changed": "nada ha cambiado",
         "not-applicable": {
-          "task-doesnt-meet-ghost-requirement": "La tarea no cumple con el requisito de gh-ost",
-          "needs-database-for-saving-temp-data": "Necesita la base de datos ({database}) para guardar tablas temporales."
+          "database-doesnt-meet-ghost-requirement": "La base de datos {database} no cumple con el requisito de gh-ost"
         }
       },
       "advice-split-statement-to-single-online-migration-issue": "Se recomienda dividir esta declaración en un único problema de migración en línea."
     },
-    "prior-backup-tips": "Haga una copia de seguridad de los datos afectados con anticipación"
+    "prior-backup-tips": "La copia de seguridad de los datos afectados con anticipación",
+    "database-create": {
+      "created": "Creado",
+      "pending": "Pendiente"
+    }
   },
   "task-run": {
     "status": {
@@ -308,7 +317,6 @@
     "license-expired": "Su licencia para {plan} ha expirado el {expireAt}.",
     "license-expires": "Su licencia para {plan} ha caducado el {expireAt}.",
     "trial-expires": "Su prueba gratuita para {plan} caducará en {days} días el {expireAt}.",
-    "trial-expired": "Su prueba gratuita de {plan} ha caducado.",
     "deploy": "Auto Hospedaje",
     "cloud": "Cloud",
     "request-demo": "Reserva una demo de producto de 30 minutos.",
@@ -340,8 +348,7 @@
       "data-classification": "Clasificación de datos",
       "data-access": "Acceso a datos",
       "audit-log": "Registros de auditoría",
-      "custom-roles": "Roles personalizados",
-      "mail-delivery": "Entrega de Correo"
+      "custom-roles": "Roles personalizados"
     },
     "profile": {
       "email": "Correo electrónico",
@@ -429,26 +436,24 @@
       "delete": "Eliminar este SSO",
       "form": {
         "type": "Tipo",
-        "learn-more-with-user-doc": "Obtenga más información sobre la configuración",
+        "type-description": "Elija el tipo de proveedor de identidad que desea configurar",
+        "oauth2-description": "Conéctese con proveedores de OAuth 2.0 como Google, GitHub, GitLab",
+        "oidc-description": "Conéctese con proveedores de OpenID Connect como Microsoft Entra ID (Azure AD), Okta, Auth0",
+        "ldap-description": "Conéctese con proveedores LDAP como Microsoft Active Directory, OpenLDAP",
         "redirect-url": "URL de redireccionamiento de autorización",
         "redirect-url-description": "Se utilizará para completar el campo correspondiente en el formulario de la aplicación del proveedor de identidad.",
         "use-template": "Usar plantilla",
-        "basic-information": "Información básica",
+        "template-description": "Elija una plantilla preconfigurada o configure un proveedor OAuth 2.0 personalizado",
         "name": "Nombre",
         "name-description": "El nombre de visualización que se mostrará a los usuarios",
-        "resource-id": "ID de recurso",
         "domain": "Dominio",
         "domain-description": "El nombre de dominio del proveedor de identidad",
-        "identity-provider-information": "Información del proveedor de identidad",
-        "identity-provider-information-description": "La información es proporcionada por su proveedor de identidad.",
         "identity-provider-needed-information": "Cree su aplicación SSO con la siguiente información.",
         "auth-url-description": "El enlace a la página de inicio de sesión de OAuth",
         "scopes-description": "Una lista separada por espacios de ámbitos que se llevarán al acceder a la URL de autenticación",
         "token-url-description": "La dirección API para obtener el token de acceso",
         "user-info-url-description": "La dirección API para obtener la información del usuario mediante el token de acceso",
         "security-protocol": "Protocolo de seguridad",
-        "connection-security": "Seguridad de la conexión",
-        "connection-security-skip-tls-verify": "Omitir verificación TLS",
         "user-information-mapping": "Mapeo de información del usuario",
         "user-information-mapping-description": "Mapea los nombres de campo de la API de información del usuario al usuario Bytebase.",
         "identifier": "Correo electrónico de usuario de Bytebase",
@@ -456,15 +461,58 @@
         "display-name": "Nombre para mostrar de usuario de Bytebase",
         "phone": "Número de teléfono de usuario de Bytebase",
         "groups": "Grupos de usuarios de Bytebase",
-        "auth-style": {
-          "self": "Estilo de autenticación",
-          "in-params": {
-            "self": "En parámetros"
-          },
-          "in-header": {
-            "self": "En encabezado"
-          }
-        }
+        "general-setting-description": "Proporcione información básica sobre su proveedor de identidad.",
+        "configuration": "Configuración",
+        "configuration-description": "Configure los ajustes de conexión para su proveedor de identidad",
+        "auth-url": "URL de autorización",
+        "auth-url-placeholder": "p.ej. https://github.com/login/oauth/authorize",
+        "token-url": "URL del token",
+        "token-url-placeholder": "p.ej. https://github.com/login/oauth/access_token",
+        "user-info-url": "URL de información del usuario",
+        "user-info-url-placeholder": "p.ej. https://api.github.com/user",
+        "scopes": "Ámbitos",
+        "scopes-placeholder": "p. ej. perfil de correo electrónico del usuario",
+        "scopes-placeholder-oidc": "p. ej. correo electrónico del perfil de OpenID",
+        "authentication-style": "Estilo de autenticación",
+        "in-parameters": "En parámetros",
+        "in-parameters-description": "Enviar credenciales en el cuerpo del POST (recomendado)",
+        "in-header": "En el encabezado",
+        "in-header-description": "Enviar credenciales mediante la autorización básica HTTP",
+        "security-options": "Opciones de seguridad",
+        "skip-tls-verification": "Omitir la verificación del certificado TLS",
+        "skip-tls-warning": "Habilite esto solo para fines de desarrollo o prueba",
+        "issuer-url-placeholder": "p. ej. https://acme.okta.com",
+        "issuer-url-description": "La URL del emisor de OIDC (la configuración conocida se descubrirá automáticamente)",
+        "openid-scopes-description": "Lista separada por espacios de ámbitos OIDC (se requiere openid)",
+        "host-placeholder": "p. ej. ldap.example.com",
+        "bind-dn": "Vincular DN",
+        "bind-dn-placeholder": "p.ej. uid=sistema,ou=Usuarios,dc=ejemplo,dc=com",
+        "bind-dn-description": "El DN del usuario al que se vinculará para las solicitudes de búsqueda",
+        "bind-password": "Vincular contraseña",
+        "base-dn": "DN base",
+        "base-dn-placeholder": "p.ej. ou=usuarios,dc=ejemplo,dc=com",
+        "base-dn-description": "El DN base para buscar usuarios",
+        "user-filter": "Filtro de usuario",
+        "user-filter-placeholder": "p. ej. (uid=%s)",
+        "user-filter-description": "El filtro para buscar usuarios (%s será reemplazado por el nombre de usuario)",
+        "starttls": "StartTLS",
+        "starttls-description": "Actualizar la conexión a TLS (recomendado)",
+        "ldaps": "LDAPS",
+        "ldaps-description": "Utilice TLS desde el principio (puerto 636)",
+        "none": "Ninguno",
+        "none-description": "Sin cifrado (no recomendado para producción)",
+        "domain-optional-hint": "Opcional: Úselo para concatenar con el identificador si no está en formato de correo electrónico",
+        "provider-type-readonly-hint": "El tipo de proveedor no se puede cambiar después de la creación",
+        "identifier-placeholder": "p. ej. inicio de sesión, correo electrónico",
+        "display-name-placeholder": "p. ej. nombre, nombre para mostrar",
+        "phone-placeholder": "p. ej. teléfono, móvil",
+        "groups-placeholder": "p. ej. grupos",
+        "groups-description": "Se utiliza para el control de acceso basado en grupos (solo proveedores de OIDC)",
+        "google-template-description": "Iniciar sesión con cuentas de Google",
+        "github-template-description": "Iniciar sesión con cuentas de GitHub",
+        "gitlab-template-description": "Iniciar sesión con cuentas de GitLab",
+        "microsoft-entra-template-description": "Iniciar sesión con el ID de Microsoft Entra",
+        "custom-template-description": "Configurar un proveedor OAuth 2.0 personalizado"
       },
       "copy-redirect-url": "URL de redireccionamiento copiada al portapapeles."
     },
@@ -700,27 +748,19 @@
       },
       "json-format-example": "Ejemplo de formato JSON",
       "view-example": "Ver ejemplo"
-    },
+    }
+  },
+  "remind": {
     "release": {
       "new-version-available": "Nueva versión disponible",
       "new-version-available-with-tag": "La nueva versión {tag} está disponible",
       "new-version-content": "¡La nueva versión {tag} está disponible ahora! Consulte nuestra documentación para la instalación."
     },
-    "mail-delivery": {
-      "description": "Habilita la entrega de correo para recibir notificaciones por correo electrónico configurando la información del servidor SMTP.",
-      "field": {
-        "smtp-server-host": "Servidor SMTP",
-        "smtp-server-port": "Puerto del servidor SMTP",
-        "from": "De",
-        "smtp-username": "Usuario SMTP",
-        "smtp-password": "Contraseña SMTP",
-        "send-test-email-to": "Enviar correo de prueba a",
-        "send": "Enviar",
-        "authentication-method": "Método de Autenticación",
-        "encryption": "Encriptación"
-      },
-      "updated-tip": "Se ha actualizado correctamente la configuración de entrega de correo",
-      "tested-tip": "Envío realizado con éxito, por favor revise la bandeja de entrada de {address}."
+    "role-expire": {
+      "title": "Recordatorio de expiración del rol",
+      "content": "Tus siguientes roles expirarán",
+      "checkbox": "No recordar hasta que haya actualizaciones",
+      "go-to-project": "Ir a la página del proyecto"
     }
   },
   "activity": {
@@ -875,12 +915,6 @@
       "closed": "cerrado",
       "close": "Cerca"
     },
-    "sdl": {
-      "schema-change": "Cambio de esquema",
-      "generated-ddl-statements": "Declaraciones DDL generadas",
-      "full-schema": "Esquema completo",
-      "left-schema-may-change": "El esquema del lado izquierdo puede cambiar antes de que se aplique la incidencia."
-    },
     "approval-flow": {
       "self": "Flujo de aprobación",
       "tooltip": "Los aprobadores revisarán y aprobarán el problema en el orden especificado en el flujo. \nLa emisión solo se puede aplicar después de que se hayan aprobado todos los pasos del flujo. \nPuede configurar un flujo de aprobación personalizado para cada riesgo.",
@@ -902,7 +936,8 @@
       "all-databases": "todas las bases de datos",
       "all-databases-tip": "Todas las bases de datos actuales y futuras de este proyecto.",
       "manually-select": "selección manual",
-      "custom": "personalice"
+      "custom-date": "Fecha personalizada",
+      "custom-date-placeholder": "Seleccione la fecha y hora de vencimiento"
     },
     "review-sent-back": "Revisión devuelta",
     "update-statement": {
@@ -913,8 +948,7 @@
         "selected-stage": "Etapa seleccionada",
         "all-tasks": "Todas las tareas"
       },
-      "current-change-will-apply-to-all-tasks-in-batch-mode": "En el modo por lotes, el cambio actual se aplicará a todas las tareas.",
-      "current-change-will-apply-to-all-tasks": "El cambio actual se aplicará a todas las tareas."
+      "current-change-will-apply-to-all-tasks-in-batch-mode": "En el modo por lotes, el cambio actual se aplicará a todas las tareas."
     },
     "action-anyway": "{action} de todos modos",
     "sql-check": {
@@ -988,6 +1022,77 @@
     "schema-drift-detected": {
       "self": "Se detectó una desviación del esquema",
       "description": "Las bases de datos seleccionadas presentan una desviación de esquema. Asegúrese de que la desviación sea la esperada y de que sea segura para su aplicación."
+    }
+  },
+  "plan": {
+    "new-plan": "Nuevo plan",
+    "add-spec": "Agregar especificación",
+    "change-type": "Cambiar tipo",
+    "schema-migration": "Migración de esquemas",
+    "schema-migration-description": "Cambios estructurales de la base de datos (DDL), incluidas tablas, columnas, índices, restricciones y modificaciones del esquema",
+    "data-change": "Cambio de datos",
+    "data-change-description": "Modificaciones del contenido de la base de datos (DML), incluidas inserciones, actualizaciones, eliminaciones y transformaciones de datos",
+    "select-targets": "Seleccionar objetivos",
+    "overview": {
+      "description": "Ver y administrar todas las especificaciones de este plan",
+      "total-specs": "Especificaciones totales",
+      "total-targets": "Objetivos totales",
+      "check-status": "Verificar estado",
+      "no-checks": "Sin controles",
+      "affected-resources": "Recursos afectados"
+    },
+    "navigator": {
+      "specifications": "Presupuesto",
+      "checks": "Cheques",
+      "statement-empty": "La declaración está vacía"
+    },
+    "spec": {
+      "type": {
+        "create-database": "Crear base de datos",
+        "schema-change": "Cambio de esquema",
+        "data-change": "Cambio de datos",
+        "ghost-migration": "Migración fantasma",
+        "database-change": "Cambio de base de datos",
+        "export-data": "Exportar datos",
+        "unknown": "Desconocido"
+      }
+    },
+    "targets": {
+      "title": "Objetivos",
+      "no-targets-found": "No se encontraron objetivos",
+      "one-database": "1 base de datos",
+      "multiple-databases": "{count} bases de datos",
+      "database-group": "Grupo de bases de datos",
+      "database-not-found": "Base de datos no encontrada",
+      "type": {
+        "instance": "Instancia",
+        "database": "Base de datos",
+        "database-group": "Grupo de bases de datos"
+      },
+      "view-all": "Ver todo ({count})"
+    },
+    "options": {
+      "self": "Opciones",
+      "applies-to-all-tasks": "Se aplica a todas las tareas.",
+      "applies-to-some-tasks": "Se aplica a algunas tareas {count}/{total}",
+      "split-into-multiple-issues-tip": "Si desea configurar diferentes opciones para cada tarea, divídala en varios problemas."
+    },
+    "pre-backup": {
+      "only-some-databases-checked": "Sólo se comprueban algunas bases de datos",
+      "some-databases-not-meeting-requirements": "Algunas bases de datos ({databases}) no cumplen los requisitos",
+      "some-databases-have-issues": "{count} la base de datos tiene problemas | {count} las bases de datos tienen problemas",
+      "configuration-has-issues": "La configuración tiene {count} problemas | La configuración tiene {count} problemas"
+    },
+    "ghost": {
+      "only-some-databases-checked": "Sólo se comprueban algunas bases de datos",
+      "some-databases-not-meeting-requirements": "Algunas bases de datos ({databases}) no cumplen los requisitos",
+      "some-databases-have-issues": "{count} la base de datos tiene problemas | {count} las bases de datos tienen problemas",
+      "configuration-has-issues": "La configuración tiene {count} problemas | La configuración tiene {count} problemas"
+    },
+    "checks": {
+      "self": "Cheques",
+      "no-checks": "No hay resultados de verificación disponibles",
+      "click-to-run-checks": "Haga clic en \"Ejecutar comprobaciones\" para validar esta especificación"
     }
   },
   "quick-action": {
@@ -1069,7 +1174,8 @@
     },
     "selected-n-instances": "{n} instancia seleccionada | {n} instancias seleccionadas",
     "users": "Usuarios",
-    "successfully-archived-instance-updatedinstance-name": "Instancia '{0}' archivada con éxito.",
+    "successfully-restored-instance": "Se restauró exitosamente la instancia '{0}'.",
+    "successfully-archived-instance": "Se archivó exitosamente la instancia '{0}'.",
     "successfully-synced-schema-for-instance-instance-value-name": "Esquema sincronizado con éxito para la instancia '{0}'.",
     "archive-this-instance": "Archivar esta instancia",
     "archive-instance-instance-name": "¿Archivar la instancia '{0}'?",
@@ -1396,7 +1502,6 @@
     "unassigned-databases": "Bases de datos no asignadas",
     "selected-n-databases": "{n} base de datos seleccionada | {n} bases de datos seleccionadas",
     "n-databases": "{n} base de datos | {n} bases de datos",
-    "select-databases-from-same-project": "Por favor seleccione bases de datos del mismo proyecto",
     "sync-schema": {
       "title": "Sincronizar esquema",
       "description": "Bytebase admite la sincronización de un esquema con una o varias bases de datos de destino. (Solo MySQL, PostgreSQL, Oracle, MSSQL, TiDB)",
@@ -1481,7 +1586,8 @@
       "reference": "Referencia"
     },
     "checks": "Cheques",
-    "create-target-database-or-schema-for-backup": "Primero cree la base de datos o el esquema de destino para la copia de seguridad",
+    "backup-unavailable-for-databases": "La copia de seguridad no está disponible para las bases de datos: {databases}",
+    "engine-not-supported-for-backup": "No se admite la copia de seguridad previa para: {databases}",
     "revision": {
       "self": "Revisión",
       "applied-at": "Aplicado en",
@@ -1655,7 +1761,6 @@
       "view-by-roles": "Ver por roles",
       "cannot-remove-last-owner": "No se puede eliminar el último propietario de un proyecto",
       "revoke-role-from-user": "Revocar '{role}' de '{user}'",
-      "assign-reason": "(Opcional) Razón",
       "never-expires": "Nunca caduca",
       "role-description": "El rol de un miembro determina qué puede hacer en el proyecto.",
       "role-never-expires": "Este rol nunca expira.",
@@ -1670,6 +1775,21 @@
       "self": "Exenciones de Enmascaramiento",
       "grant-exemption": "Conceder Exención",
       "revoke-exemption-title": "Eliminar tanto las exenciones de exportación como de consulta de enmascaramiento para {member}?"
+    },
+    "batch": {
+      "selected": "{count} proyecto seleccionado | {count} proyectos seleccionados",
+      "archive": {
+        "title": "¿Archivar {count} Proyecto? | ¿Archivar {count} Proyectos?",
+        "description": "Esto archivará los proyectos seleccionados. Podrás restaurarlos más tarde si lo necesitas.",
+        "success": "Proyecto {count} archivado correctamente | Proyectos {count} archivados correctamente",
+        "error": "No se pudieron archivar los proyectos"
+      },
+      "force-archive-description": "Forzar el archivo incluso si los proyectos tienen bases de datos (las bases de datos se moverán al proyecto predeterminado)",
+      "projects-to-archive": "Proyectos para archivar",
+      "resource-warning": {
+        "title": "Proyectos con recursos",
+        "description": "Los siguientes proyectos contienen bases de datos o problemas abiertos:"
+      }
     }
   },
   "data-source": {
@@ -1684,7 +1804,6 @@
       "client-cert": "Certificado del cliente"
     },
     "ssh-type": {
-      "tunnel": "@:{'data-source.ssh.tunnel'}",
       "tunnel-and-private-key": "@:{'data-source.ssh.tunnel'} + @:{'data-source.ssh.private-key'}",
       "none": "Ninguno"
     },
@@ -1812,6 +1931,11 @@
         "not-match": "La fuente de datos no coincide, se esperaba {expect} pero se obtuvo {actual}."
       }
     },
+    "batch-export": {
+      "self": "Exportación por lotes",
+      "tooltip": "Seleccione como máximo {max} bases de datos para exportar por lotes los resultados de las últimas consultas",
+      "failed-for-db": "No se pudieron exportar los datos de {db}"
+    },
     "execute-query": "Ejecutar consulta",
     "pending-query": "Consulta pendiente",
     "executing-query": "Ejecutando consulta",
@@ -1866,6 +1990,7 @@
     },
     "upload-file": "Subir archivo",
     "copy-selected-results": "Copiar datos seleccionados por {action} o {button}",
+    "cancel-selection": "Cancelar selección",
     "format-default": "Por defecto",
     "column-display-format": "Formato de visualización de columna",
     "next-row": "siguiente fila",
@@ -1993,16 +2118,28 @@
     },
     "description": "Puedes subir tu licencia Bytebase para desbloquear funciones de edición/empresa.",
     "upload-license": "Subir licencia",
-    "upgrade-trial-button": "Actualizar prueba",
     "request-n-days-trial": "Solicite una prueba de {days} días (no se requiere tarjeta de crédito)",
     "request-with-qr": "Escanear código QR",
     "require-subscription": "Esta función requiere una suscripción a {requiredPlan}. Compre una licencia de Bytebase para desbloquearla.",
     "required-plan-with-trial": "Esta función requiere {requiredPlan}. {startTrial}",
     "trial-for-plan": "Puedes iniciar una prueba gratuita de {plan} por {days} días - no se requiere tarjeta de crédito.",
     "trial-for-days": "Puedes iniciar una prueba gratuita por {days} días - no se requiere tarjeta de crédito.",
-    "upgrade-trial": "Puedes actualizar tu prueba gratuita a este plan.",
     "contact-to-upgrade": "Contacta al administrador de tu espacio de trabajo para actualizar el plan.",
     "upgrade-now": "Actualizar ahora",
+    "usage": {
+      "instance-count": {
+        "title": "Límite de cantidad de instancias",
+        "remaining": "Tu cuota total de instancias es de {total}, sólo te quedan {count} instancias.",
+        "runoutof": "Te has quedado sin tu cuota de instancias {total}.",
+        "upgrade": "@:{'subscription.upgrade'} para obtener más cuota de instancias."
+      },
+      "user-count": {
+        "title": "Límite de conteo de usuarios",
+        "remaining": "Su cuota total de usuarios es {total}, solo quedan {count} usuarios.",
+        "runoutof": "Se ha quedado sin su cuota de usuario {total}.",
+        "upgrade": "@:{'subscription.upgrade'} para obtener una cuota de usuario ilimitada."
+      }
+    },
     "instance-assignment": {
       "license": "Licencia",
       "assign-license": "Asignar licencia",
@@ -2028,6 +2165,28 @@
     "overuse-warning": "{neededPlan} puede estar restringido en {currentPlan}, actualice ahora para asegurar un uso adecuado.",
     "overuse-modal": {
       "description": "Está utilizando una función que actualmente no está incluida en {plan}. Actualice ahora para evitar interrupciones:"
+    },
+    "disabled-feature": "Función deshabilitada",
+    "upgrade": "Actualizar",
+    "contact-us": "Contáctanos",
+    "current": "Actual",
+    "expired": "Expirado",
+    "expires-at": "Expira el",
+    "plan-compare": "Comparar planes",
+    "trialing": "En período de prueba",
+    "unlimited": "Ilimitado",
+    "max-instance-count": "Cantidad máxima de instancias",
+    "plan": {
+      "free": {
+        "title": "Gratis"
+      },
+      "team": {
+        "title": "Equipo"
+      },
+      "enterprise": {
+        "title": "Empresa"
+      },
+      "try": "Pruébalo gratis."
     }
   },
   "sheet": {
@@ -2068,7 +2227,6 @@
     "delete": "Eliminar política de revisión SQL",
     "input-then-press-enter": "Ingrese el valor y luego presione enter para agregar",
     "not-available-for-free": "La regla no está disponible para {plan}",
-    "unlock-full-feature": "Desbloquear más de 100 reglas de validación de SQL",
     "search-by-name": "Buscar por nombre",
     "attach-resource": {
       "no-linked-resources": "Sin recursos adjuntos",
@@ -2102,7 +2260,16 @@
     "enabled-rules": "Reglas habilitadas",
     "rule-detail": "Detalle de la regla",
     "view-definition": "Ver definición",
-    "all-checks-passed": "Todos los controles pasaron."
+    "all-checks-passed": "Todas las comprobaciones pasaron",
+    "category": {
+      "builtin": "Integrado"
+    },
+    "level": {
+      "name": "Nivel",
+      "error": "Error",
+      "warning": "Advertencia",
+      "disabled": "Deshabilitado"
+    }
   },
   "audit-log": {
     "export-finished": "Exportación finalizada",
@@ -2139,7 +2306,16 @@
     "fit-content-with-view": "Ajustar contenido dentro de la vista"
   },
   "identity-provider": {
-    "test-connection": "Probar conexión"
+    "test-connection": "Probar conexión",
+    "test-connection-success": "Conexión de prueba exitosa",
+    "claims-description": "El proveedor de identidad devolvió las siguientes notificaciones. Esta información puede ayudarle a configurar las asignaciones de campos.",
+    "no-claims": "El proveedor de identidad no devolvió ninguna reclamación.",
+    "identity-provider-created": "Proveedor de identidad creado exitosamente",
+    "identity-provider-deleted": "Proveedor de identidad eliminado exitosamente",
+    "identity-provider-update-failed": "No se pudo actualizar el proveedor de identidad",
+    "identity-provider-create-failed": "No se pudo crear el proveedor de identidad",
+    "identity-provider-delete-failed": "No se pudo eliminar el proveedor de identidad",
+    "identity-provider-permission-denied": "Permiso denegado"
   },
   "sensitive-data": {
     "self": "Datos Sensibles"
@@ -2470,8 +2646,7 @@
     "permission-denied": "Permiso denegado"
   },
   "review-center": {
-    "self": "Centro de revisión",
-    "review-sql": "Revisar SQL"
+    "self": "Centro de revisión"
   },
   "schema-designer": {
     "use-tips": "Selecciona las tablas a diseñar"
@@ -2538,16 +2713,31 @@
     "change-type": "Cambiar tipo"
   },
   "release": {
+    "title": "Liberar",
     "releases": "Lanzamientos",
     "files": "Archivos",
     "create": "Crear lanzamiento",
     "select": "Seleccionar versión",
-    "tasks-to-apply": "Tareas a aplicar",
-    "out-of-order-files": "Archivos fuera de servicio",
-    "applied-but-modifed-files": "Archivos aplicados pero modificados",
-    "allow-out-of-order": "Permitir fuera de servicio",
     "archive-this-release": "Archivar este comunicado",
     "total-files": "Total de {count} archivos",
+    "plan-tip": "Este plan está configurado para usar una versión. Los cambios en la base de datos se ejecutarán mediante las sentencias SQL de los archivos de la versión seleccionada.",
+    "not-found": "Extraviado",
+    "vcs-source": "Fuente VCS",
+    "view-all-files": "Ver todos los archivos",
+    "and-n-more-files": "y {n} archivos más",
+    "change-type": {
+      "ddl": "DDL",
+      "ddl-ghost": "Fantasma DDL",
+      "dml": "DML",
+      "unspecified": "No especificado"
+    },
+    "file-type": {
+      "versioned": "Versión",
+      "unspecified": "No especificado"
+    },
+    "vcs-type": {
+      "unspecified": "No especificado"
+    },
     "actions": {
       "new-file": "Nuevo archivo",
       "import-from-release": "Importar desde la versión"
@@ -2555,8 +2745,7 @@
     "messages": {
       "succeed-to-create-release": "Tener éxito en crear el lanzamiento",
       "files-will-always-be-sorted-and-executed-in-version-order": "Los archivos siempre se ordenarán y ejecutarán en orden de versión.",
-      "cannot-modify-files-after-created": "No es posible modificar archivos una vez creada la versión.",
-      "bytebase-will-skip-those-files-has-been-applied-on-target-database": "Bytebase omitirá automáticamente aquellos archivos que ya se hayan ejecutado en la base de datos de destino."
+      "cannot-modify-files-after-created": "No es posible modificar archivos una vez creada la versión."
     },
     "usage-description": "El lanzamiento solo se utiliza en GitOps personalizado con integración de API."
   },

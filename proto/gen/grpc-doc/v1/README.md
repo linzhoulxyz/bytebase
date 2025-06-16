@@ -50,6 +50,8 @@
     - [AddDataSourceRequest](#bytebase-v1-AddDataSourceRequest)
     - [BatchSyncInstancesRequest](#bytebase-v1-BatchSyncInstancesRequest)
     - [BatchSyncInstancesResponse](#bytebase-v1-BatchSyncInstancesResponse)
+    - [BatchUpdateInstancesRequest](#bytebase-v1-BatchUpdateInstancesRequest)
+    - [BatchUpdateInstancesResponse](#bytebase-v1-BatchUpdateInstancesResponse)
     - [CreateInstanceRequest](#bytebase-v1-CreateInstanceRequest)
     - [DataSource](#bytebase-v1-DataSource)
     - [DataSource.Address](#bytebase-v1-DataSource-Address)
@@ -203,20 +205,6 @@
   
     - [IssueService](#bytebase-v1-IssueService)
   
-- [v1/subscription_service.proto](#v1_subscription_service-proto)
-    - [Feature](#bytebase-v1-Feature)
-    - [Feature.MatrixEntry](#bytebase-v1-Feature-MatrixEntry)
-    - [FeatureMatrix](#bytebase-v1-FeatureMatrix)
-    - [GetFeatureMatrixRequest](#bytebase-v1-GetFeatureMatrixRequest)
-    - [GetSubscriptionRequest](#bytebase-v1-GetSubscriptionRequest)
-    - [PatchSubscription](#bytebase-v1-PatchSubscription)
-    - [Subscription](#bytebase-v1-Subscription)
-    - [UpdateSubscriptionRequest](#bytebase-v1-UpdateSubscriptionRequest)
-  
-    - [PlanType](#bytebase-v1-PlanType)
-  
-    - [SubscriptionService](#bytebase-v1-SubscriptionService)
-  
 - [v1/setting_service.proto](#v1_setting_service-proto)
     - [AISetting](#bytebase-v1-AISetting)
     - [AgentPluginSetting](#bytebase-v1-AgentPluginSetting)
@@ -248,7 +236,6 @@
     - [MaximumSQLResultSizeSetting](#bytebase-v1-MaximumSQLResultSizeSetting)
     - [PasswordRestrictionSetting](#bytebase-v1-PasswordRestrictionSetting)
     - [SCIMSetting](#bytebase-v1-SCIMSetting)
-    - [SMTPMailDeliverySettingValue](#bytebase-v1-SMTPMailDeliverySettingValue)
     - [SchemaTemplateSetting](#bytebase-v1-SchemaTemplateSetting)
     - [SchemaTemplateSetting.ColumnType](#bytebase-v1-SchemaTemplateSetting-ColumnType)
     - [SchemaTemplateSetting.FieldTemplate](#bytebase-v1-SchemaTemplateSetting-FieldTemplate)
@@ -261,14 +248,12 @@
     - [WorkspaceApprovalSetting](#bytebase-v1-WorkspaceApprovalSetting)
     - [WorkspaceApprovalSetting.Rule](#bytebase-v1-WorkspaceApprovalSetting-Rule)
     - [WorkspaceProfileSetting](#bytebase-v1-WorkspaceProfileSetting)
-    - [WorkspaceTrialSetting](#bytebase-v1-WorkspaceTrialSetting)
   
     - [AISetting.Provider](#bytebase-v1-AISetting-Provider)
     - [Algorithm.InnerOuterMask.MaskType](#bytebase-v1-Algorithm-InnerOuterMask-MaskType)
     - [Announcement.AlertLevel](#bytebase-v1-Announcement-AlertLevel)
     - [DatabaseChangeMode](#bytebase-v1-DatabaseChangeMode)
-    - [SMTPMailDeliverySettingValue.Authentication](#bytebase-v1-SMTPMailDeliverySettingValue-Authentication)
-    - [SMTPMailDeliverySettingValue.Encryption](#bytebase-v1-SMTPMailDeliverySettingValue-Encryption)
+    - [Setting.SettingName](#bytebase-v1-Setting-SettingName)
   
     - [SettingService](#bytebase-v1-SettingService)
   
@@ -397,9 +382,11 @@
     - [OIDCIdentityProviderConfig](#bytebase-v1-OIDCIdentityProviderConfig)
     - [TestIdentityProviderRequest](#bytebase-v1-TestIdentityProviderRequest)
     - [TestIdentityProviderResponse](#bytebase-v1-TestIdentityProviderResponse)
+    - [TestIdentityProviderResponse.ClaimsEntry](#bytebase-v1-TestIdentityProviderResponse-ClaimsEntry)
     - [UpdateIdentityProviderRequest](#bytebase-v1-UpdateIdentityProviderRequest)
   
     - [IdentityProviderType](#bytebase-v1-IdentityProviderType)
+    - [LDAPIdentityProviderConfig.SecurityProtocol](#bytebase-v1-LDAPIdentityProviderConfig-SecurityProtocol)
     - [OAuth2AuthStyle](#bytebase-v1-OAuth2AuthStyle)
   
     - [IdentityProviderService](#bytebase-v1-IdentityProviderService)
@@ -446,21 +433,16 @@
     - [Plan](#bytebase-v1-Plan)
     - [Plan.ChangeDatabaseConfig](#bytebase-v1-Plan-ChangeDatabaseConfig)
     - [Plan.ChangeDatabaseConfig.GhostFlagsEntry](#bytebase-v1-Plan-ChangeDatabaseConfig-GhostFlagsEntry)
-    - [Plan.ChangeDatabaseConfig.PreUpdateBackupDetail](#bytebase-v1-Plan-ChangeDatabaseConfig-PreUpdateBackupDetail)
     - [Plan.CreateDatabaseConfig](#bytebase-v1-Plan-CreateDatabaseConfig)
     - [Plan.Deployment](#bytebase-v1-Plan-Deployment)
     - [Plan.Deployment.DatabaseGroupMapping](#bytebase-v1-Plan-Deployment-DatabaseGroupMapping)
     - [Plan.ExportDataConfig](#bytebase-v1-Plan-ExportDataConfig)
     - [Plan.PlanCheckRunStatusCountEntry](#bytebase-v1-Plan-PlanCheckRunStatusCountEntry)
     - [Plan.Spec](#bytebase-v1-Plan-Spec)
-    - [Plan.Step](#bytebase-v1-Plan-Step)
     - [PlanCheckRun](#bytebase-v1-PlanCheckRun)
     - [PlanCheckRun.Result](#bytebase-v1-PlanCheckRun-Result)
     - [PlanCheckRun.Result.SqlReviewReport](#bytebase-v1-PlanCheckRun-Result-SqlReviewReport)
     - [PlanCheckRun.Result.SqlSummaryReport](#bytebase-v1-PlanCheckRun-Result-SqlSummaryReport)
-    - [PreviewPlanRequest](#bytebase-v1-PreviewPlanRequest)
-    - [PreviewPlanResponse](#bytebase-v1-PreviewPlanResponse)
-    - [PreviewPlanResponse.DatabaseFiles](#bytebase-v1-PreviewPlanResponse-DatabaseFiles)
     - [RunPlanChecksRequest](#bytebase-v1-RunPlanChecksRequest)
     - [RunPlanChecksResponse](#bytebase-v1-RunPlanChecksResponse)
     - [SearchPlansRequest](#bytebase-v1-SearchPlansRequest)
@@ -477,6 +459,7 @@
 - [v1/project_service.proto](#v1_project_service-proto)
     - [Activity](#bytebase-v1-Activity)
     - [AddWebhookRequest](#bytebase-v1-AddWebhookRequest)
+    - [BatchDeleteProjectsRequest](#bytebase-v1-BatchDeleteProjectsRequest)
     - [BatchGetIamPolicyRequest](#bytebase-v1-BatchGetIamPolicyRequest)
     - [BatchGetIamPolicyResponse](#bytebase-v1-BatchGetIamPolicyResponse)
     - [BatchGetIamPolicyResponse.PolicyResult](#bytebase-v1-BatchGetIamPolicyResponse-PolicyResult)
@@ -685,6 +668,18 @@
     - [SheetPayload.Type](#bytebase-v1-SheetPayload-Type)
   
     - [SheetService](#bytebase-v1-SheetService)
+  
+- [v1/subscription_service.proto](#v1_subscription_service-proto)
+    - [GetSubscriptionRequest](#bytebase-v1-GetSubscriptionRequest)
+    - [PlanConfig](#bytebase-v1-PlanConfig)
+    - [PlanLimitConfig](#bytebase-v1-PlanLimitConfig)
+    - [Subscription](#bytebase-v1-Subscription)
+    - [UpdateSubscriptionRequest](#bytebase-v1-UpdateSubscriptionRequest)
+  
+    - [PlanFeature](#bytebase-v1-PlanFeature)
+    - [PlanType](#bytebase-v1-PlanType)
+  
+    - [SubscriptionService](#bytebase-v1-SubscriptionService)
   
 - [v1/worksheet_service.proto](#v1_worksheet_service-proto)
     - [CreateWorksheetRequest](#bytebase-v1-CreateWorksheetRequest)
@@ -1265,6 +1260,36 @@ When paginating, all other parameters provided to `ListInstanceRoles` must match
 
 
 
+<a name="bytebase-v1-BatchUpdateInstancesRequest"></a>
+
+### BatchUpdateInstancesRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| requests | [UpdateInstanceRequest](#bytebase-v1-UpdateInstanceRequest) | repeated | The request message specifying the resources to update. |
+
+
+
+
+
+
+<a name="bytebase-v1-BatchUpdateInstancesResponse"></a>
+
+### BatchUpdateInstancesResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| instances | [Instance](#bytebase-v1-Instance) | repeated |  |
+
+
+
+
+
+
 <a name="bytebase-v1-CreateInstanceRequest"></a>
 
 ### CreateInstanceRequest
@@ -1811,6 +1836,7 @@ The instance&#39;s `name` field is used to identify the instance to update. Form
 | SyncInstance | [SyncInstanceRequest](#bytebase-v1-SyncInstanceRequest) | [SyncInstanceResponse](#bytebase-v1-SyncInstanceResponse) |  |
 | ListInstanceDatabase | [ListInstanceDatabaseRequest](#bytebase-v1-ListInstanceDatabaseRequest) | [ListInstanceDatabaseResponse](#bytebase-v1-ListInstanceDatabaseResponse) |  |
 | BatchSyncInstances | [BatchSyncInstancesRequest](#bytebase-v1-BatchSyncInstancesRequest) | [BatchSyncInstancesResponse](#bytebase-v1-BatchSyncInstancesResponse) |  |
+| BatchUpdateInstances | [BatchUpdateInstancesRequest](#bytebase-v1-BatchUpdateInstancesRequest) | [BatchUpdateInstancesResponse](#bytebase-v1-BatchUpdateInstancesResponse) |  |
 | AddDataSource | [AddDataSourceRequest](#bytebase-v1-AddDataSourceRequest) | [Instance](#bytebase-v1-Instance) |  |
 | RemoveDataSource | [RemoveDataSourceRequest](#bytebase-v1-RemoveDataSourceRequest) | [Instance](#bytebase-v1-Instance) |  |
 | UpdateDataSource | [UpdateDataSourceRequest](#bytebase-v1-UpdateDataSourceRequest) | [Instance](#bytebase-v1-Instance) |  |
@@ -3808,7 +3834,7 @@ ANY means approving any node will proceed.
 | TYPE_UNSPECIFIED | 0 |  |
 | DATABASE_CHANGE | 1 |  |
 | GRANT_REQUEST | 2 |  |
-| DATABASE_DATA_EXPORT | 3 |  |
+| DATABASE_EXPORT | 3 |  |
 
 
 
@@ -3880,167 +3906,6 @@ ANY means approving any node will proceed.
 | ApproveIssue | [ApproveIssueRequest](#bytebase-v1-ApproveIssueRequest) | [Issue](#bytebase-v1-Issue) | ApproveIssue approves the issue. The access is based on approval flow. |
 | RejectIssue | [RejectIssueRequest](#bytebase-v1-RejectIssueRequest) | [Issue](#bytebase-v1-Issue) | RejectIssue rejects the issue. The access is based on approval flow. |
 | RequestIssue | [RequestIssueRequest](#bytebase-v1-RequestIssueRequest) | [Issue](#bytebase-v1-Issue) | RequestIssue requests the issue. The access is based on approval flow. |
-
- 
-
-
-
-<a name="v1_subscription_service-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## v1/subscription_service.proto
-
-
-
-<a name="bytebase-v1-Feature"></a>
-
-### Feature
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | Name is the feature name. |
-| matrix | [Feature.MatrixEntry](#bytebase-v1-Feature-MatrixEntry) | repeated | Matrix is the feature matrix for different plan. The key is the plan enum in string value. |
-
-
-
-
-
-
-<a name="bytebase-v1-Feature-MatrixEntry"></a>
-
-### Feature.MatrixEntry
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| key | [string](#string) |  |  |
-| value | [bool](#bool) |  |  |
-
-
-
-
-
-
-<a name="bytebase-v1-FeatureMatrix"></a>
-
-### FeatureMatrix
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| features | [Feature](#bytebase-v1-Feature) | repeated |  |
-
-
-
-
-
-
-<a name="bytebase-v1-GetFeatureMatrixRequest"></a>
-
-### GetFeatureMatrixRequest
-
-
-
-
-
-
-
-<a name="bytebase-v1-GetSubscriptionRequest"></a>
-
-### GetSubscriptionRequest
-
-
-
-
-
-
-
-<a name="bytebase-v1-PatchSubscription"></a>
-
-### PatchSubscription
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| license | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="bytebase-v1-Subscription"></a>
-
-### Subscription
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| seat_count | [int32](#int32) |  |  |
-| instance_count | [int32](#int32) |  |  |
-| expires_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
-| started_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
-| plan | [PlanType](#bytebase-v1-PlanType) |  |  |
-| trialing | [bool](#bool) |  |  |
-| org_id | [string](#string) |  |  |
-| org_name | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="bytebase-v1-UpdateSubscriptionRequest"></a>
-
-### UpdateSubscriptionRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| patch | [PatchSubscription](#bytebase-v1-PatchSubscription) |  |  |
-
-
-
-
-
- 
-
-
-<a name="bytebase-v1-PlanType"></a>
-
-### PlanType
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| PLAN_TYPE_UNSPECIFIED | 0 |  |
-| FREE | 1 |  |
-| TEAM | 2 |  |
-| ENTERPRISE | 3 |  |
-
-
- 
-
- 
-
-
-<a name="bytebase-v1-SubscriptionService"></a>
-
-### SubscriptionService
-
-
-| Method Name | Request Type | Response Type | Description |
-| ----------- | ------------ | ------------- | ------------|
-| GetSubscription | [GetSubscriptionRequest](#bytebase-v1-GetSubscriptionRequest) | [Subscription](#bytebase-v1-Subscription) |  |
-| GetFeatureMatrix | [GetFeatureMatrixRequest](#bytebase-v1-GetFeatureMatrixRequest) | [FeatureMatrix](#bytebase-v1-FeatureMatrix) |  |
-| UpdateSubscription | [UpdateSubscriptionRequest](#bytebase-v1-UpdateSubscriptionRequest) | [Subscription](#bytebase-v1-Subscription) |  |
 
  
 
@@ -4559,31 +4424,6 @@ When paginating, all other parameters provided to `ListSettings` must match the 
 
 
 
-<a name="bytebase-v1-SMTPMailDeliverySettingValue"></a>
-
-### SMTPMailDeliverySettingValue
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| server | [string](#string) |  | The SMTP server address. |
-| port | [int32](#int32) |  | The SMTP server port. |
-| encryption | [SMTPMailDeliverySettingValue.Encryption](#bytebase-v1-SMTPMailDeliverySettingValue-Encryption) |  | The SMTP server encryption. |
-| ca | [string](#string) | optional | The CA, KEY, and CERT for the SMTP server. Not used. |
-| key | [string](#string) | optional |  |
-| cert | [string](#string) | optional |  |
-| authentication | [SMTPMailDeliverySettingValue.Authentication](#bytebase-v1-SMTPMailDeliverySettingValue-Authentication) |  |  |
-| username | [string](#string) |  |  |
-| password | [string](#string) | optional | If not specified, server will use the existed password. |
-| from | [string](#string) |  | The sender email address. |
-| to | [string](#string) |  | The recipient email address, used with validate_only to send test email. |
-
-
-
-
-
-
 <a name="bytebase-v1-SchemaTemplateSetting"></a>
 
 ### SchemaTemplateSetting
@@ -4734,12 +4574,10 @@ The data in setting value.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | string_value | [string](#string) |  | Defines this value as being a string value. |
-| smtp_mail_delivery_setting_value | [SMTPMailDeliverySettingValue](#bytebase-v1-SMTPMailDeliverySettingValue) |  |  |
 | app_im_setting_value | [AppIMSetting](#bytebase-v1-AppIMSetting) |  |  |
 | agent_plugin_setting_value | [AgentPluginSetting](#bytebase-v1-AgentPluginSetting) |  |  |
 | workspace_profile_setting_value | [WorkspaceProfileSetting](#bytebase-v1-WorkspaceProfileSetting) |  |  |
 | workspace_approval_setting_value | [WorkspaceApprovalSetting](#bytebase-v1-WorkspaceApprovalSetting) |  |  |
-| workspace_trial_setting_value | [WorkspaceTrialSetting](#bytebase-v1-WorkspaceTrialSetting) |  |  |
 | schema_template_setting_value | [SchemaTemplateSetting](#bytebase-v1-SchemaTemplateSetting) |  |  |
 | data_classification_setting_value | [DataClassificationSetting](#bytebase-v1-DataClassificationSetting) |  |  |
 | semantic_type_setting_value | [SemanticTypeSetting](#bytebase-v1-SemanticTypeSetting) |  |  |
@@ -4813,26 +4651,6 @@ For examples: (source == &#34;DML&#34; &amp;&amp; level == 200) || (source == &#
 
 
 
-
-<a name="bytebase-v1-WorkspaceTrialSetting"></a>
-
-### WorkspaceTrialSetting
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| instance_count | [int32](#int32) |  |  |
-| expire_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
-| issued_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
-| subject | [string](#string) |  |  |
-| org_name | [string](#string) |  |  |
-| plan | [PlanType](#bytebase-v1-PlanType) |  |  |
-
-
-
-
-
  
 
 
@@ -4891,32 +4709,32 @@ We support three levels of AlertLevel: INFO, WARNING, and ERROR.
 
 
 
-<a name="bytebase-v1-SMTPMailDeliverySettingValue-Authentication"></a>
+<a name="bytebase-v1-Setting-SettingName"></a>
 
-### SMTPMailDeliverySettingValue.Authentication
-We support four types of SMTP authentication: NONE, PLAIN, LOGIN, and CRAM-MD5.
+### Setting.SettingName
+
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
-| AUTHENTICATION_UNSPECIFIED | 0 |  |
-| AUTHENTICATION_NONE | 1 |  |
-| AUTHENTICATION_PLAIN | 2 |  |
-| AUTHENTICATION_LOGIN | 3 |  |
-| AUTHENTICATION_CRAM_MD5 | 4 |  |
-
-
-
-<a name="bytebase-v1-SMTPMailDeliverySettingValue-Encryption"></a>
-
-### SMTPMailDeliverySettingValue.Encryption
-We support three types of SMTP encryption: NONE, STARTTLS, and SSL/TLS.
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| ENCRYPTION_UNSPECIFIED | 0 |  |
-| ENCRYPTION_NONE | 1 |  |
-| ENCRYPTION_STARTTLS | 2 |  |
-| ENCRYPTION_SSL_TLS | 3 |  |
+| SETTING_NAME_UNSPECIFIED | 0 |  |
+| AUTH_SECRET | 1 |  |
+| BRANDING_LOGO | 2 |  |
+| WORKSPACE_ID | 3 |  |
+| WORKSPACE_PROFILE | 4 |  |
+| WORKSPACE_APPROVAL | 5 |  |
+| WORKSPACE_EXTERNAL_APPROVAL | 6 |  |
+| ENTERPRISE_LICENSE | 7 |  |
+| APP_IM | 8 |  |
+| WATERMARK | 9 |  |
+| AI | 10 |  |
+| PLUGIN_AGENT | 11 |  |
+| SCHEMA_TEMPLATE | 13 |  |
+| DATA_CLASSIFICATION | 14 |  |
+| SEMANTIC_TYPES | 15 |  |
+| SQL_RESULT_SIZE_LIMIT | 16 |  |
+| SCIM | 17 |  |
+| PASSWORD_RESTRICTION | 18 |  |
+| ENVIRONMENT | 19 |  |
 
 
  
@@ -6509,7 +6327,7 @@ LDAPIdentityProviderConfig is the structure for LDAP identity provider config.
 | bind_password | [string](#string) |  | BindPassword is the password of the user to bind as a service account. |
 | base_dn | [string](#string) |  | BaseDN is the base DN to search for users, e.g. &#34;ou=users,dc=example,dc=com&#34;. |
 | user_filter | [string](#string) |  | UserFilter is the filter to search for users, e.g. &#34;(uid=%s)&#34;. |
-| security_protocol | [string](#string) |  | SecurityProtocol is the security protocol to be used for establishing connections with the LDAP server. It must be StartTLS, LDAPS or None. |
+| security_protocol | [LDAPIdentityProviderConfig.SecurityProtocol](#bytebase-v1-LDAPIdentityProviderConfig-SecurityProtocol) |  | SecurityProtocol is the security protocol to be used for establishing connections with the LDAP server. |
 | field_mapping | [FieldMapping](#bytebase-v1-FieldMapping) |  | FieldMapping is the mapping of the user attributes returned by the LDAP server. |
 
 
@@ -6633,6 +6451,27 @@ OIDCIdentityProviderConfig is the structure for OIDC identity provider config.
 
 
 
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| claims | [TestIdentityProviderResponse.ClaimsEntry](#bytebase-v1-TestIdentityProviderResponse-ClaimsEntry) | repeated | The map of claims returned by the identity provider. |
+
+
+
+
+
+
+<a name="bytebase-v1-TestIdentityProviderResponse-ClaimsEntry"></a>
+
+### TestIdentityProviderResponse.ClaimsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
 
 
 
@@ -6668,6 +6507,19 @@ The identity provider&#39;s `name` field is used to identify the identity provid
 | OAUTH2 | 1 |  |
 | OIDC | 2 |  |
 | LDAP | 3 |  |
+
+
+
+<a name="bytebase-v1-LDAPIdentityProviderConfig-SecurityProtocol"></a>
+
+### LDAPIdentityProviderConfig.SecurityProtocol
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| SECURITY_PROTOCOL_UNSPECIFIED | 0 |  |
+| START_TLS | 1 | StartTLS is the security protocol that starts with an unencrypted connection and then upgrades to TLS. |
+| LDAPS | 2 | LDAPS is the security protocol that uses TLS from the beginning. |
 
 
 
@@ -6998,14 +6850,14 @@ QueryDataPolicy is the policy configuration for querying data.
 <a name="bytebase-v1-SQLReviewRule"></a>
 
 ### SQLReviewRule
-
+The SQL review rules. Check the SQL_REVIEW_RULES_DOCUMENTATION.md for details.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | type | [string](#string) |  |  |
 | level | [SQLReviewRuleLevel](#bytebase-v1-SQLReviewRuleLevel) |  |  |
-| payload | [string](#string) |  |  |
+| payload | [string](#string) |  | The payload is a JSON string that varies by rule type. |
 | engine | [Engine](#bytebase-v1-Engine) |  |  |
 | comment | [string](#string) |  |  |
 
@@ -7103,8 +6955,6 @@ The policy&#39;s `name` field is used to identify the instance to update. Format
 | WORKSPACE | 1 |  |
 | ENVIRONMENT | 2 |  |
 | PROJECT | 3 |  |
-| INSTANCE | 4 |  |
-| DATABASE | 5 |  |
 
 
 
@@ -7241,6 +7091,11 @@ The policy&#39;s `name` field is used to identify the instance to update. Format
 
 When paginating, all other parameters provided to `ListPlanCheckRuns` must match the call that provided the page token. |
 | latest_only | [bool](#bool) |  | If set to true, only the latest plan check run will be returned. |
+| filter | [string](#string) |  | Filter is used to filter plan check runs returned in the list. The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+
+Supported filters: - status: the plan check run status, support &#34;==&#34; and &#34;in&#34; operator, check the Status enum in the PlanCheckRun message for the values. - result_status: the plan check run result status, support &#34;==&#34; and &#34;in&#34; operator, check the Result.Status enum in the PlanCheckRun message for the values.
+
+For example: status in [&#34;DONE&#34;, &#34;FAILED&#34;] status == &#34;RUNNING&#34; result_status in [&#34;SUCCESS&#34;, &#34;ERROR&#34;] result_status == &#34;WARNING&#34; |
 
 
 
@@ -7308,9 +7163,9 @@ When paginating, all other parameters provided to `ListPlans` must match the cal
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | The name of the plan. `plan` is a system generated ID. Format: projects/{project}/plans/{plan} |
 | issue | [string](#string) |  | The issue associated with the plan. Can be empty. Format: projects/{project}/issues/{issue} |
+| rollout | [string](#string) |  | The rollout associated with the plan. Can be empty. Format: projects/{project}/rollouts/{rollout} |
 | title | [string](#string) |  |  |
 | description | [string](#string) |  |  |
-| steps | [Plan.Step](#bytebase-v1-Plan-Step) | repeated | Deprecated: use specs instead. |
 | specs | [Plan.Spec](#bytebase-v1-Plan-Spec) | repeated |  |
 | creator | [string](#string) |  | Format: users/hello@world.com |
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
@@ -7331,12 +7186,12 @@ When paginating, all other parameters provided to `ListPlans` must match the cal
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| target | [string](#string) |  | The resource name of the target. Format: instances/{instance-id}/databases/{database-name}. Format: projects/{project}/databaseGroups/{databaseGroup}. |
+| targets | [string](#string) | repeated | The list of targets. Multi-database format: [instances/{instance-id}/databases/{database-name}]. Single database group format: [projects/{project}/databaseGroups/{databaseGroup}]. |
 | sheet | [string](#string) |  | The resource name of the sheet. Format: projects/{project}/sheets/{sheet} |
 | release | [string](#string) |  | The resource name of the release. Format: projects/{project}/releases/{release} |
 | type | [Plan.ChangeDatabaseConfig.Type](#bytebase-v1-Plan-ChangeDatabaseConfig-Type) |  |  |
 | ghost_flags | [Plan.ChangeDatabaseConfig.GhostFlagsEntry](#bytebase-v1-Plan-ChangeDatabaseConfig-GhostFlagsEntry) | repeated |  |
-| pre_update_backup_detail | [Plan.ChangeDatabaseConfig.PreUpdateBackupDetail](#bytebase-v1-Plan-ChangeDatabaseConfig-PreUpdateBackupDetail) | optional | If set, a backup of the modified data will be created automatically before any changes are applied. |
+| enable_prior_backup | [bool](#bool) |  | If set, a backup of the modified data will be created automatically before any changes are applied. |
 
 
 
@@ -7353,21 +7208,6 @@ When paginating, all other parameters provided to `ListPlans` must match the cal
 | ----- | ---- | ----- | ----------- |
 | key | [string](#string) |  |  |
 | value | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="bytebase-v1-Plan-ChangeDatabaseConfig-PreUpdateBackupDetail"></a>
-
-### Plan.ChangeDatabaseConfig.PreUpdateBackupDetail
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| database | [string](#string) |  | The database for keeping the backup data. Format: instances/{instance}/databases/{database} |
 
 
 
@@ -7436,7 +7276,7 @@ When paginating, all other parameters provided to `ListPlans` must match the cal
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| target | [string](#string) |  | The resource name of the target. Format: instances/{instance-id}/databases/{database-name} |
+| targets | [string](#string) | repeated | The list of targets. Multi-database format: [instances/{instance-id}/databases/{database-name}]. Single database group format: [projects/{project}/databaseGroups/{databaseGroup}]. |
 | sheet | [string](#string) |  | The resource name of the sheet. Format: projects/{project}/sheets/{sheet} |
 | format | [ExportFormat](#bytebase-v1-ExportFormat) |  | The format of the exported file. |
 | password | [string](#string) | optional | The zip password provide by users. Leave it empty if no needs to encrypt the zip file. |
@@ -7474,22 +7314,6 @@ When paginating, all other parameters provided to `ListPlans` must match the cal
 | create_database_config | [Plan.CreateDatabaseConfig](#bytebase-v1-Plan-CreateDatabaseConfig) |  |  |
 | change_database_config | [Plan.ChangeDatabaseConfig](#bytebase-v1-Plan-ChangeDatabaseConfig) |  |  |
 | export_data_config | [Plan.ExportDataConfig](#bytebase-v1-Plan-ExportDataConfig) |  |  |
-
-
-
-
-
-
-<a name="bytebase-v1-Plan-Step"></a>
-
-### Plan.Step
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| title | [string](#string) |  |  |
-| specs | [Plan.Spec](#bytebase-v1-Plan-Spec) | repeated |  |
 
 
 
@@ -7573,57 +7397,6 @@ When paginating, all other parameters provided to `ListPlans` must match the cal
 
 
 
-<a name="bytebase-v1-PreviewPlanRequest"></a>
-
-### PreviewPlanRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| project | [string](#string) |  | The name of the project. Format: projects/{project} |
-| release | [string](#string) |  | The release used for preview. |
-| targets | [string](#string) | repeated | The targets to deploy. Can be database or databaseGroup. Format: projects/{project}/databaseGroups/{databaseGroup} instances/{instance}/databases/{database} |
-| allow_out_of_order | [bool](#bool) |  |  |
-
-
-
-
-
-
-<a name="bytebase-v1-PreviewPlanResponse"></a>
-
-### PreviewPlanResponse
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| plan | [Plan](#bytebase-v1-Plan) |  |  |
-| out_of_order_files | [PreviewPlanResponse.DatabaseFiles](#bytebase-v1-PreviewPlanResponse-DatabaseFiles) | repeated | The out of order files of each database. |
-| applied_but_modified_files | [PreviewPlanResponse.DatabaseFiles](#bytebase-v1-PreviewPlanResponse-DatabaseFiles) | repeated | The applied but modified files of each database. |
-
-
-
-
-
-
-<a name="bytebase-v1-PreviewPlanResponse-DatabaseFiles"></a>
-
-### PreviewPlanResponse.DatabaseFiles
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| database | [string](#string) |  |  |
-| files | [string](#string) | repeated | Format: projects/{project}/releases/{release}/files/{file_id} |
-
-
-
-
-
-
 <a name="bytebase-v1-RunPlanChecksRequest"></a>
 
 ### RunPlanChecksRequest
@@ -7633,6 +7406,7 @@ When paginating, all other parameters provided to `ListPlans` must match the cal
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | The plan to run plan checks. Format: projects/{project}/plans/{plan} |
+| spec_id | [string](#string) | optional | The UUID of the specific spec to run plan checks for. This should match the spec.id field in Plan.Spec. If not set, all specs in the plan will be used. |
 
 
 
@@ -7788,7 +7562,6 @@ Type is the database change type.
 | ListPlanCheckRuns | [ListPlanCheckRunsRequest](#bytebase-v1-ListPlanCheckRunsRequest) | [ListPlanCheckRunsResponse](#bytebase-v1-ListPlanCheckRunsResponse) |  |
 | RunPlanChecks | [RunPlanChecksRequest](#bytebase-v1-RunPlanChecksRequest) | [RunPlanChecksResponse](#bytebase-v1-RunPlanChecksResponse) |  |
 | BatchCancelPlanCheckRuns | [BatchCancelPlanCheckRunsRequest](#bytebase-v1-BatchCancelPlanCheckRunsRequest) | [BatchCancelPlanCheckRunsResponse](#bytebase-v1-BatchCancelPlanCheckRunsResponse) |  |
-| PreviewPlan | [PreviewPlanRequest](#bytebase-v1-PreviewPlanRequest) | [PreviewPlanResponse](#bytebase-v1-PreviewPlanResponse) |  |
 
  
 
@@ -7821,6 +7594,22 @@ TODO(zp): move to activity later.
 | ----- | ---- | ----- | ----------- |
 | project | [string](#string) |  | The name of the project to add the webhook to. Format: projects/{project} |
 | webhook | [Webhook](#bytebase-v1-Webhook) |  | The webhook to add. |
+
+
+
+
+
+
+<a name="bytebase-v1-BatchDeleteProjectsRequest"></a>
+
+### BatchDeleteProjectsRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| names | [string](#string) | repeated | The names of the projects to delete. Format: projects/{project} |
+| force | [bool](#bool) |  | If set to true, any databases from this project will be moved to default project. Sheets are not moved since BYTEBASE_ARTIFACT sheets belong to the issue and issue project. Open issues will remain open but associated with the deleted project. If set to false, the operation will fail if the project has databases or open issues. |
 
 
 
@@ -7901,7 +7690,7 @@ This value should be 4-63 characters, and valid characters are /[a-z][0-9]-/. |
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | The name of the project to delete. Format: projects/{project} |
-| force | [bool](#bool) |  | If set to true, any databases and sheets from this project will also be moved to default project, and all open issues will be closed. |
+| force | [bool](#bool) |  | If set to true, any databases from this project will be moved to default project. Sheets are not moved since BYTEBASE_ARTIFACT sheets belong to the issue and issue project. Open issues will remain open but associated with the deleted project. If set to false, the operation will fail if the project has databases or open issues. |
 
 
 
@@ -8232,13 +8021,14 @@ TYPE_ISSUE_CREATE represents creating an issue. |
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| GetProject | [GetProjectRequest](#bytebase-v1-GetProjectRequest) | [Project](#bytebase-v1-Project) |  |
+| GetProject | [GetProjectRequest](#bytebase-v1-GetProjectRequest) | [Project](#bytebase-v1-Project) | GetProject retrieves a project by name. Users with &#34;bb.projects.get&#34; permission on the workspace or the project owner can access this method. |
 | ListProjects | [ListProjectsRequest](#bytebase-v1-ListProjectsRequest) | [ListProjectsResponse](#bytebase-v1-ListProjectsResponse) |  |
 | SearchProjects | [SearchProjectsRequest](#bytebase-v1-SearchProjectsRequest) | [SearchProjectsResponse](#bytebase-v1-SearchProjectsResponse) |  |
 | CreateProject | [CreateProjectRequest](#bytebase-v1-CreateProjectRequest) | [Project](#bytebase-v1-Project) |  |
 | UpdateProject | [UpdateProjectRequest](#bytebase-v1-UpdateProjectRequest) | [Project](#bytebase-v1-Project) |  |
 | DeleteProject | [DeleteProjectRequest](#bytebase-v1-DeleteProjectRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
 | UndeleteProject | [UndeleteProjectRequest](#bytebase-v1-UndeleteProjectRequest) | [Project](#bytebase-v1-Project) |  |
+| BatchDeleteProjects | [BatchDeleteProjectsRequest](#bytebase-v1-BatchDeleteProjectsRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) |  |
 | GetIamPolicy | [GetIamPolicyRequest](#bytebase-v1-GetIamPolicyRequest) | [IamPolicy](#bytebase-v1-IamPolicy) |  |
 | BatchGetIamPolicy | [BatchGetIamPolicyRequest](#bytebase-v1-BatchGetIamPolicyRequest) | [BatchGetIamPolicyResponse](#bytebase-v1-BatchGetIamPolicyResponse) | Deprecated. |
 | SetIamPolicy | [SetIamPolicyRequest](#bytebase-v1-SetIamPolicyRequest) | [IamPolicy](#bytebase-v1-IamPolicy) |  |
@@ -8921,7 +8711,6 @@ For example: project == &#34;projects/{project}&#34; database == &#34;instances/
 | SearchQueryHistories | [SearchQueryHistoriesRequest](#bytebase-v1-SearchQueryHistoriesRequest) | [SearchQueryHistoriesResponse](#bytebase-v1-SearchQueryHistoriesResponse) | SearchQueryHistories searches query histories for the caller. |
 | Export | [ExportRequest](#bytebase-v1-ExportRequest) | [ExportResponse](#bytebase-v1-ExportResponse) |  |
 | Check | [CheckRequest](#bytebase-v1-CheckRequest) | [CheckResponse](#bytebase-v1-CheckResponse) |  |
-| ParseMyBatisMapper | [ParseMyBatisMapperRequest](#bytebase-v1-ParseMyBatisMapperRequest) | [ParseMyBatisMapperResponse](#bytebase-v1-ParseMyBatisMapperResponse) |  |
 | Pretty | [PrettyRequest](#bytebase-v1-PrettyRequest) | [PrettyResponse](#bytebase-v1-PrettyResponse) |  |
 | DiffMetadata | [DiffMetadataRequest](#bytebase-v1-DiffMetadataRequest) | [DiffMetadataResponse](#bytebase-v1-DiffMetadataResponse) |  |
 | AICompletion | [AICompletionRequest](#bytebase-v1-AICompletionRequest) | [AICompletionResponse](#bytebase-v1-AICompletionResponse) |  |
@@ -9103,13 +8892,15 @@ When paginating, all other parameters provided to `ListReleases` must match the 
 | ----- | ---- | ----- | ----------- |
 | id | [string](#string) |  | The unique identifier for the file. |
 | path | [string](#string) |  | The path of the file. e.g. `2.2/V0001_create_table.sql`. |
-| sheet | [string](#string) |  | The sheet that holds the content. Format: projects/{project}/sheets/{sheet} |
-| sheet_sha256 | [string](#string) |  | The SHA256 hash value of the sheet. |
 | type | [ReleaseFileType](#bytebase-v1-ReleaseFileType) |  |  |
 | version | [string](#string) |  |  |
 | change_type | [Release.File.ChangeType](#bytebase-v1-Release-File-ChangeType) |  |  |
-| statement | [bytes](#bytes) |  | The statement is used for preview or check purpose. |
-| statement_size | [int64](#int64) |  |  |
+| sheet | [string](#string) |  | For inputs, we must either use `sheet` or `statement`. For outputs, we always use `sheet`. `statement` is the preview of the sheet content.
+
+The sheet that holds the content. Format: projects/{project}/sheets/{sheet} |
+| statement | [bytes](#bytes) |  | The raw SQL statement content. |
+| sheet_sha256 | [string](#string) |  | The SHA256 hash value of the sheet content or the statement. |
+| statement_size | [int64](#int64) |  | The size of the statement in bytes. |
 
 
 
@@ -10196,8 +9987,8 @@ When paginating, all other parameters provided to `ListTaskRuns` must match the 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | Format: projects/{project}/rollouts/{rollout}/stages/{stage} |
-| id | [string](#string) |  | The id comes from the deployment config. Format: UUID Empty for legacy stages. |
-| environment | [string](#string) |  |  |
+| id | [string](#string) |  | id is the environment id of the stage. e.g. &#34;prod&#34;. |
+| environment | [string](#string) |  | environment is the environment of the stage. Format: environments/{environment}. |
 | tasks | [Task](#bytebase-v1-Task) | repeated |  |
 
 
@@ -10697,7 +10488,7 @@ Read from `pg_stat_activity`
 | DATABASE_SCHEMA_UPDATE_SDL | 5 | use payload DatabaseSchemaUpdate |
 | DATABASE_SCHEMA_UPDATE_GHOST | 9 | use payload DatabaseSchemaUpdate |
 | DATABASE_DATA_UPDATE | 8 | use payload DatabaseDataUpdate |
-| DATABASE_DATA_EXPORT | 12 | use payload DatabaseDataExport |
+| DATABASE_EXPORT | 12 | use payload DatabaseDataExport |
 
 
 
@@ -10974,6 +10765,210 @@ Type of the SheetPayload.
 | BatchCreateSheets | [BatchCreateSheetsRequest](#bytebase-v1-BatchCreateSheetsRequest) | [BatchCreateSheetsResponse](#bytebase-v1-BatchCreateSheetsResponse) |  |
 | GetSheet | [GetSheetRequest](#bytebase-v1-GetSheetRequest) | [Sheet](#bytebase-v1-Sheet) |  |
 | UpdateSheet | [UpdateSheetRequest](#bytebase-v1-UpdateSheetRequest) | [Sheet](#bytebase-v1-Sheet) |  |
+
+ 
+
+
+
+<a name="v1_subscription_service-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## v1/subscription_service.proto
+
+
+
+<a name="bytebase-v1-GetSubscriptionRequest"></a>
+
+### GetSubscriptionRequest
+
+
+
+
+
+
+
+<a name="bytebase-v1-PlanConfig"></a>
+
+### PlanConfig
+PlanConfig represents the configuration for all plans loaded from plan.yaml
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| plans | [PlanLimitConfig](#bytebase-v1-PlanLimitConfig) | repeated |  |
+| instance_features | [PlanFeature](#bytebase-v1-PlanFeature) | repeated |  |
+
+
+
+
+
+
+<a name="bytebase-v1-PlanLimitConfig"></a>
+
+### PlanLimitConfig
+PlanLimitConfig represents a single plan&#39;s configuration
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| type | [PlanType](#bytebase-v1-PlanType) |  |  |
+| maximum_instance_count | [int32](#int32) |  |  |
+| maximum_seat_count | [int32](#int32) |  |  |
+| features | [PlanFeature](#bytebase-v1-PlanFeature) | repeated |  |
+
+
+
+
+
+
+<a name="bytebase-v1-Subscription"></a>
+
+### Subscription
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| seat_count | [int32](#int32) |  |  |
+| instance_count | [int32](#int32) |  |  |
+| expires_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| plan | [PlanType](#bytebase-v1-PlanType) |  |  |
+| trialing | [bool](#bool) |  |  |
+| org_name | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-UpdateSubscriptionRequest"></a>
+
+### UpdateSubscriptionRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| license | [string](#string) |  |  |
+
+
+
+
+
+ 
+
+
+<a name="bytebase-v1-PlanFeature"></a>
+
+### PlanFeature
+PlanFeature represents the available features in Bytebase
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| FEATURE_UNSPECIFIED | 0 |  |
+| FEATURE_DATABASE_CHANGE | 1 | Database Change Management |
+| FEATURE_GIT_BASED_SCHEMA_VERSION_CONTROL | 2 |  |
+| FEATURE_DECLARATIVE_SCHEMA_MIGRATION | 3 |  |
+| FEATURE_COMPARE_AND_SYNC_SCHEMA | 4 |  |
+| FEATURE_ONLINE_SCHEMA_CHANGE | 5 |  |
+| FEATURE_PRE_DEPLOYMENT_SQL_REVIEW | 6 |  |
+| FEATURE_AUTOMATIC_BACKUP_BEFORE_DATA_CHANGES | 7 |  |
+| FEATURE_ONE_CLICK_DATA_ROLLBACK | 8 |  |
+| FEATURE_MULTI_DATABASE_BATCH_CHANGES | 9 |  |
+| FEATURE_PROGRESSIVE_ENVIRONMENT_DEPLOYMENT | 10 |  |
+| FEATURE_SCHEDULED_ROLLOUT_TIME | 11 |  |
+| FEATURE_DATABASE_CHANGELOG | 12 |  |
+| FEATURE_SCHEMA_DRIFT_DETECTION | 13 |  |
+| FEATURE_CHANGELIST | 14 |  |
+| FEATURE_SCHEMA_TEMPLATE | 15 |  |
+| FEATURE_ROLLOUT_POLICY | 16 |  |
+| FEATURE_WEB_BASED_SQL_EDITOR | 17 | SQL Editor &amp; Development |
+| FEATURE_SQL_EDITOR_ADMIN_MODE | 18 |  |
+| FEATURE_NATURAL_LANGUAGE_TO_SQL | 19 |  |
+| FEATURE_AI_QUERY_EXPLANATION | 20 |  |
+| FEATURE_AI_QUERY_SUGGESTIONS | 21 |  |
+| FEATURE_AUTO_COMPLETE | 22 |  |
+| FEATURE_SCHEMA_DIAGRAM | 23 |  |
+| FEATURE_SCHEMA_EDITOR | 24 |  |
+| FEATURE_DATA_EXPORT | 25 |  |
+| FEATURE_DATA_OFFLINE_EXPORT | 26 |  |
+| FEATURE_QUERY_HISTORY | 27 |  |
+| FEATURE_SAVED_AND_SHARED_SQL_SCRIPTS | 28 |  |
+| FEATURE_BATCH_QUERY | 29 |  |
+| FEATURE_INSTANCE_READ_ONLY_CONNECTION | 30 |  |
+| FEATURE_QUERY_POLICY | 31 |  |
+| FEATURE_RESTRICT_COPYING_DATA | 32 |  |
+| FEATURE_IAM | 33 | Security &amp; Compliance |
+| FEATURE_INSTANCE_SSL_CONNECTION | 34 |  |
+| FEATURE_INSTANCE_CONNECTION_OVER_SSH_TUNNEL | 35 |  |
+| FEATURE_INSTANCE_CONNECTION_IAM_AUTHENTICATION | 36 |  |
+| FEATURE_GOOGLE_AND_GITHUB_SSO | 37 |  |
+| FEATURE_USER_GROUPS | 38 |  |
+| FEATURE_DISALLOW_SELF_SERVICE_SIGNUP | 39 |  |
+| FEATURE_DATABASE_SECRET_VARIABLES | 40 |  |
+| FEATURE_CUSTOM_INSTANCE_SYNC_TIME | 41 |  |
+| FEATURE_CUSTOM_INSTANCE_CONNECTION_LIMIT | 42 |  |
+| FEATURE_RISK_ASSESSMENT | 43 |  |
+| FEATURE_APPROVAL_WORKFLOW | 44 |  |
+| FEATURE_AUDIT_LOG | 45 |  |
+| FEATURE_ENTERPRISE_SSO | 46 |  |
+| FEATURE_TWO_FA | 47 |  |
+| FEATURE_PASSWORD_RESTRICTIONS | 48 |  |
+| FEATURE_DISALLOW_PASSWORD_SIGNIN | 49 |  |
+| FEATURE_CUSTOM_ROLES | 50 |  |
+| FEATURE_REQUEST_ROLE_WORKFLOW | 51 |  |
+| FEATURE_DATA_MASKING | 52 |  |
+| FEATURE_DATA_CLASSIFICATION | 53 |  |
+| FEATURE_SCIM | 54 |  |
+| FEATURE_DIRECTORY_SYNC | 55 |  |
+| FEATURE_SIGN_IN_FREQUENCY_CONTROL | 56 |  |
+| FEATURE_EXTERNAL_SECRET_MANAGER | 57 |  |
+| FEATURE_USER_EMAIL_DOMAIN_RESTRICTION | 58 |  |
+| FEATURE_PROJECT_MANAGEMENT | 59 | Administration &amp; Support |
+| FEATURE_ENVIRONMENT_MANAGEMENT | 60 |  |
+| FEATURE_IM_NOTIFICATIONS | 61 |  |
+| FEATURE_TERRAFORM_PROVIDER | 62 |  |
+| FEATURE_DATABASE_GROUPS | 63 |  |
+| FEATURE_ENVIRONMENT_TIERS | 64 |  |
+| FEATURE_DASHBOARD_ANNOUNCEMENT | 65 |  |
+| FEATURE_API_INTEGRATION_GUIDANCE | 66 |  |
+| FEATURE_CUSTOM_LOGO | 67 |  |
+| FEATURE_WATERMARK | 68 |  |
+| FEATURE_ROADMAP_PRIORITIZATION | 69 |  |
+| FEATURE_CUSTOM_MSA | 70 |  |
+| FEATURE_COMMUNITY_SUPPORT | 71 |  |
+| FEATURE_EMAIL_SUPPORT | 72 |  |
+| FEATURE_DEDICATED_SUPPORT_WITH_SLA | 73 |  |
+
+
+
+<a name="bytebase-v1-PlanType"></a>
+
+### PlanType
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| PLAN_TYPE_UNSPECIFIED | 0 |  |
+| FREE | 1 |  |
+| TEAM | 2 |  |
+| ENTERPRISE | 3 |  |
+
+
+ 
+
+ 
+
+
+<a name="bytebase-v1-SubscriptionService"></a>
+
+### SubscriptionService
+
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetSubscription | [GetSubscriptionRequest](#bytebase-v1-GetSubscriptionRequest) | [Subscription](#bytebase-v1-Subscription) | GetSubscription returns the current subscription. If there is no license, we will return a free plan subscription without expiration time. If there is expired license, we will return a free plan subscription with the expiration time of the expired license. |
+| UpdateSubscription | [UpdateSubscriptionRequest](#bytebase-v1-UpdateSubscriptionRequest) | [Subscription](#bytebase-v1-Subscription) |  |
 
  
 

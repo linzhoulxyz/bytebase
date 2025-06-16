@@ -11,7 +11,6 @@ import (
 	"github.com/gosimple/slug"
 	"github.com/nyaruka/phonenumbers"
 
-	"github.com/bytebase/bytebase/backend/base"
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
 	"github.com/bytebase/bytebase/backend/component/iam"
@@ -67,7 +66,7 @@ func (m *Manager) CreateEvent(ctx context.Context, e *Event) {
 	go m.postWebhookList(ctx, webhookCtx, webhookList)
 }
 
-func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, eventType base.EventType) (*webhook.Context, error) {
+func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, eventType common.EventType) (*webhook.Context, error) {
 	var webhookCtx webhook.Context
 	var mentions []string
 	var mentionUsers []*store.UserMessage
@@ -87,11 +86,11 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, even
 		link = fmt.Sprintf("%s/projects/%s/rollouts/%d", setting.ExternalUrl, e.Project.ResourceID, e.Rollout.UID)
 	}
 	switch e.Type {
-	case base.EventTypeIssueCreate:
+	case common.EventTypeIssueCreate:
 		title = "Issue created"
 		titleZh = "创建工单"
 
-	case base.EventTypeIssueStatusUpdate:
+	case common.EventTypeIssueStatusUpdate:
 		switch e.Issue.Status {
 		case "OPEN":
 			title = "Issue reopened"
@@ -105,11 +104,11 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, even
 			titleZh = "工单取消"
 		}
 
-	case base.EventTypeIssueCommentCreate:
+	case common.EventTypeIssueCommentCreate:
 		title = "Comment created"
 		titleZh = "工单新评论"
 
-	case base.EventTypeIssueUpdate:
+	case common.EventTypeIssueUpdate:
 		update := e.IssueUpdate
 		switch update.Path {
 		case "description":
@@ -123,35 +122,35 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, even
 			titleZh = "工单信息变更"
 		}
 
-	case base.EventTypeStageStatusUpdate:
+	case common.EventTypeStageStatusUpdate:
 		u := e.StageStatusUpdate
 		if e.Issue != nil {
-			link = fmt.Sprintf("%s/projects/%s/issues/%s-%d?stage=%d", setting.ExternalUrl, e.Project.ResourceID, slug.Make(e.Issue.Title), e.Issue.UID, u.StageUID)
+			link = fmt.Sprintf("%s/projects/%s/issues/%s-%d?stage=%s", setting.ExternalUrl, e.Project.ResourceID, slug.Make(e.Issue.Title), e.Issue.UID, u.StageID)
 		}
 		title = "Stage ends"
 		titleZh = "阶段结束"
 
-	case base.EventTypeTaskRunStatusUpdate:
+	case common.EventTypeTaskRunStatusUpdate:
 		u := e.TaskRunStatusUpdate
 		switch u.Status {
-		case base.TaskRunPending.String():
+		case storepb.TaskRun_PENDING.String():
 			title = "Task run started"
 			titleZh = "任务开始"
-		case base.TaskRunRunning.String():
+		case storepb.TaskRun_RUNNING.String():
 			title = "Task run is running"
 			titleZh = "任务运行中"
-		case base.TaskRunDone.String():
+		case storepb.TaskRun_DONE.String():
 			level = webhook.WebhookSuccess
 			title = "Task run completed"
 			titleZh = "任务完成"
-		case base.TaskRunFailed.String():
+		case storepb.TaskRun_FAILED.String():
 			level = webhook.WebhookError
 			title = "Task run failed"
 			titleZh = "任务失败"
-		case base.TaskRunCanceled.String():
+		case storepb.TaskRun_CANCELED.String():
 			title = "Task run is canceled"
 			titleZh = "任务取消"
-		case base.TaskRunSkipped.String():
+		case storepb.TaskRun_SKIPPED.String():
 			title = "Task is skipped"
 			titleZh = "任务跳过"
 		default:
@@ -159,7 +158,7 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, even
 			titleZh = "任务状态变更"
 		}
 
-	case base.EventTypeIssueApprovalPass:
+	case common.EventTypeIssueApprovalPass:
 		title = "Issue approved"
 		titleZh = "工单审批通过"
 
@@ -171,7 +170,7 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, even
 			mentions = append(mentions, phone)
 		}
 
-	case base.EventTypeIssueRolloutReady:
+	case common.EventTypeIssueRolloutReady:
 		u := e.IssueRolloutReady
 		title = "Issue is waiting for rollout"
 		titleZh = "工单待发布"
@@ -180,7 +179,7 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, even
 			usersGetters = append(usersGetters, getUsersFromUsers(e.Issue.Creator))
 		} else {
 			for _, role := range u.RolloutPolicy.GetRoles() {
-				role := base.Role(strings.TrimPrefix(role, "roles/"))
+				role := strings.TrimPrefix(role, "roles/")
 				usersGetters = append(usersGetters, getUsersFromRole(m.store, role, e.Project.ResourceID))
 			}
 			for _, issueRole := range u.RolloutPolicy.GetIssueRoles() {
@@ -223,7 +222,7 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, even
 			}
 		}
 
-	case base.EventTypeIssueApprovalCreate:
+	case common.EventTypeIssueApprovalCreate:
 		pendingStep := e.IssueApprovalCreate.ApprovalStep
 
 		title = "Issue approval needed"
@@ -238,7 +237,7 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, even
 
 		var usersGetter func(ctx context.Context) ([]*store.UserMessage, error)
 
-		role := base.Role(strings.TrimPrefix(node.Role, "roles/"))
+		role := strings.TrimPrefix(node.Role, "roles/")
 		usersGetter = getUsersFromRole(m.store, role, e.Project.ResourceID)
 
 		users, err := usersGetter(ctx)
@@ -265,7 +264,7 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, even
 
 	var mentionEndUsers []*store.UserMessage
 	for _, u := range mentionUsers {
-		if u.Type == base.EndUser {
+		if u.Type == storepb.PrincipalType_END_USER {
 			mentionEndUsers = append(mentionEndUsers, u)
 		}
 	}
@@ -355,7 +354,7 @@ func (m *Manager) postWebhookList(ctx context.Context, webhookCtx *webhook.Conte
 	}
 }
 
-func getUsersFromRole(s *store.Store, role base.Role, projectID string) func(context.Context) ([]*store.UserMessage, error) {
+func getUsersFromRole(s *store.Store, role string, projectID string) func(context.Context) ([]*store.UserMessage, error) {
 	return func(ctx context.Context) ([]*store.UserMessage, error) {
 		projectIAM, err := s.GetProjectIamPolicy(ctx, projectID)
 		if err != nil {
@@ -414,7 +413,7 @@ func maybeGetPhoneFromUser(user *store.UserMessage) (string, error) {
 }
 
 // ChangeIssueStatus changes the status of an issue.
-func ChangeIssueStatus(ctx context.Context, stores *store.Store, webhookManager *Manager, issue *store.IssueMessage, newStatus base.IssueStatus, updater *store.UserMessage, comment string) error {
+func ChangeIssueStatus(ctx context.Context, stores *store.Store, webhookManager *Manager, issue *store.IssueMessage, newStatus storepb.Issue_Status, updater *store.UserMessage, comment string) error {
 	updateIssueMessage := &store.UpdateIssueMessage{Status: &newStatus}
 	updatedIssue, err := stores.UpdateIssueV2(ctx, issue.UID, updateIssueMessage)
 	if err != nil {
@@ -424,7 +423,7 @@ func ChangeIssueStatus(ctx context.Context, stores *store.Store, webhookManager 
 	// In the ChangeIssueStatus function
 	webhookManager.CreateEvent(ctx, &Event{
 		Actor:   updater,
-		Type:    base.EventTypeIssueStatusUpdate,
+		Type:    common.EventTypeIssueStatusUpdate,
 		Comment: comment,
 		Issue:   NewIssue(updatedIssue),
 		Project: NewProject(updatedIssue.Project),

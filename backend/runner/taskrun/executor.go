@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/bytebase/bytebase/backend/base"
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
 	"github.com/bytebase/bytebase/backend/component/config"
@@ -123,7 +122,7 @@ func getMigrationInfo(ctx context.Context, stores *store.Store, profile *config.
 		database:    database,
 		task:        task,
 		version:     schemaVersion,
-		taskRunName: common.FormatTaskRun(pipeline.ProjectID, task.PipelineID, task.StageID, task.ID, taskRunUID),
+		taskRunName: common.FormatTaskRun(pipeline.ProjectID, task.PipelineID, task.Environment, task.ID, taskRunUID),
 		taskRunUID:  taskRunUID,
 		migrateType: migrationType,
 	}
@@ -140,7 +139,7 @@ func getMigrationInfo(ctx context.Context, stores *store.Store, profile *config.
 		mc.sheetName = common.FormatSheet(pipeline.ProjectID, sheet.UID)
 	}
 
-	if task.Type.ChangeDatabasePayload() {
+	if isChangeDatabaseTask(task.Type) {
 		if f := task.Payload.GetTaskReleaseSource().GetFile(); f != "" {
 			project, release, _, err := common.GetProjectReleaseUIDFile(f)
 			if err != nil {
@@ -166,8 +165,13 @@ func getMigrationInfo(ctx context.Context, stores *store.Store, profile *config.
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to list plan check runs")
 		}
-		sort.Slice(runs, func(i, j int) bool {
-			return runs[i].UID > runs[j].UID
+		slices.SortFunc(runs, func(a, b *store.PlanCheckRunMessage) int {
+			if a.UID > b.UID {
+				return -1
+			} else if a.UID < b.UID {
+				return 1
+			}
+			return 0
 		})
 		foundChangedResources := false
 		for _, run := range runs {
@@ -293,7 +297,7 @@ func doMigrationWithFunc(
 
 	if stateCfg != nil {
 		switch mc.task.Type {
-		case base.TaskDatabaseSchemaUpdate, base.TaskDatabaseDataUpdate:
+		case storepb.Task_DATABASE_SCHEMA_UPDATE, storepb.Task_DATABASE_DATA_UPDATE:
 			switch instance.Metadata.GetEngine() {
 			case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_OCEANBASE,
 				storepb.Engine_STARROCKS, storepb.Engine_DORIS, storepb.Engine_POSTGRES,
@@ -570,17 +574,32 @@ func shouldUpdateVersion(currentVersion, newVersion string) bool {
 	return current.LessThan(nv)
 }
 
-func convertTaskType(t base.TaskType) storepb.ChangelogPayload_Type {
+func convertTaskType(t storepb.Task_Type) storepb.ChangelogPayload_Type {
 	switch t {
-	case base.TaskDatabaseDataUpdate:
+	case storepb.Task_DATABASE_DATA_UPDATE:
 		return storepb.ChangelogPayload_DATA
-	case base.TaskDatabaseSchemaUpdate:
+	case storepb.Task_DATABASE_SCHEMA_UPDATE:
 		return storepb.ChangelogPayload_MIGRATE
-	case base.TaskDatabaseSchemaUpdateGhost:
+	case storepb.Task_DATABASE_SCHEMA_UPDATE_GHOST:
 		return storepb.ChangelogPayload_MIGRATE_GHOST
 
-	case base.TaskDatabaseCreate:
-	case base.TaskDatabaseDataExport:
+	case storepb.Task_DATABASE_CREATE:
+	case storepb.Task_DATABASE_EXPORT:
 	}
 	return storepb.ChangelogPayload_TYPE_UNSPECIFIED
+}
+
+// isChangeDatabaseTask returns whether the task involves changing a database.
+func isChangeDatabaseTask(taskType storepb.Task_Type) bool {
+	switch taskType {
+	case storepb.Task_DATABASE_DATA_UPDATE,
+		storepb.Task_DATABASE_SCHEMA_UPDATE,
+		storepb.Task_DATABASE_SCHEMA_UPDATE_GHOST:
+		return true
+	case storepb.Task_DATABASE_CREATE,
+		storepb.Task_DATABASE_EXPORT:
+		return false
+	default:
+		return false
+	}
 }

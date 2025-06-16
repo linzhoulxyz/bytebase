@@ -219,6 +219,13 @@ export interface OAuth2IdentityProviderTestRequestContext {
 }
 
 export interface TestIdentityProviderResponse {
+  /** The map of claims returned by the identity provider. */
+  claims: { [key: string]: string };
+}
+
+export interface TestIdentityProviderResponse_ClaimsEntry {
+  key: string;
+  value: string;
 }
 
 export interface IdentityProvider {
@@ -300,14 +307,75 @@ export interface LDAPIdentityProviderConfig {
   userFilter: string;
   /**
    * SecurityProtocol is the security protocol to be used for establishing
-   * connections with the LDAP server. It must be StartTLS, LDAPS or None.
+   * connections with the LDAP server.
    */
-  securityProtocol: string;
+  securityProtocol: LDAPIdentityProviderConfig_SecurityProtocol;
   /**
    * FieldMapping is the mapping of the user attributes returned by the LDAP
    * server.
    */
   fieldMapping: FieldMapping | undefined;
+}
+
+export enum LDAPIdentityProviderConfig_SecurityProtocol {
+  SECURITY_PROTOCOL_UNSPECIFIED = "SECURITY_PROTOCOL_UNSPECIFIED",
+  /** START_TLS - StartTLS is the security protocol that starts with an unencrypted connection and then upgrades to TLS. */
+  START_TLS = "START_TLS",
+  /** LDAPS - LDAPS is the security protocol that uses TLS from the beginning. */
+  LDAPS = "LDAPS",
+  UNRECOGNIZED = "UNRECOGNIZED",
+}
+
+export function lDAPIdentityProviderConfig_SecurityProtocolFromJSON(
+  object: any,
+): LDAPIdentityProviderConfig_SecurityProtocol {
+  switch (object) {
+    case 0:
+    case "SECURITY_PROTOCOL_UNSPECIFIED":
+      return LDAPIdentityProviderConfig_SecurityProtocol.SECURITY_PROTOCOL_UNSPECIFIED;
+    case 1:
+    case "START_TLS":
+      return LDAPIdentityProviderConfig_SecurityProtocol.START_TLS;
+    case 2:
+    case "LDAPS":
+      return LDAPIdentityProviderConfig_SecurityProtocol.LDAPS;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return LDAPIdentityProviderConfig_SecurityProtocol.UNRECOGNIZED;
+  }
+}
+
+export function lDAPIdentityProviderConfig_SecurityProtocolToJSON(
+  object: LDAPIdentityProviderConfig_SecurityProtocol,
+): string {
+  switch (object) {
+    case LDAPIdentityProviderConfig_SecurityProtocol.SECURITY_PROTOCOL_UNSPECIFIED:
+      return "SECURITY_PROTOCOL_UNSPECIFIED";
+    case LDAPIdentityProviderConfig_SecurityProtocol.START_TLS:
+      return "START_TLS";
+    case LDAPIdentityProviderConfig_SecurityProtocol.LDAPS:
+      return "LDAPS";
+    case LDAPIdentityProviderConfig_SecurityProtocol.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export function lDAPIdentityProviderConfig_SecurityProtocolToNumber(
+  object: LDAPIdentityProviderConfig_SecurityProtocol,
+): number {
+  switch (object) {
+    case LDAPIdentityProviderConfig_SecurityProtocol.SECURITY_PROTOCOL_UNSPECIFIED:
+      return 0;
+    case LDAPIdentityProviderConfig_SecurityProtocol.START_TLS:
+      return 1;
+    case LDAPIdentityProviderConfig_SecurityProtocol.LDAPS:
+      return 2;
+    case LDAPIdentityProviderConfig_SecurityProtocol.UNRECOGNIZED:
+    default:
+      return -1;
+  }
 }
 
 /**
@@ -363,6 +431,10 @@ export const GetIdentityProviderRequest: MessageFns<GetIdentityProviderRequest> 
       reader.skip(tag & 7);
     }
     return message;
+  },
+
+  fromJSON(object: any): GetIdentityProviderRequest {
+    return { name: isSet(object.name) ? globalThis.String(object.name) : "" };
   },
 
   toJSON(message: GetIdentityProviderRequest): unknown {
@@ -428,6 +500,13 @@ export const ListIdentityProvidersRequest: MessageFns<ListIdentityProvidersReque
       reader.skip(tag & 7);
     }
     return message;
+  },
+
+  fromJSON(object: any): ListIdentityProvidersRequest {
+    return {
+      pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
+      pageToken: isSet(object.pageToken) ? globalThis.String(object.pageToken) : "",
+    };
   },
 
   toJSON(message: ListIdentityProvidersRequest): unknown {
@@ -497,6 +576,15 @@ export const ListIdentityProvidersResponse: MessageFns<ListIdentityProvidersResp
       reader.skip(tag & 7);
     }
     return message;
+  },
+
+  fromJSON(object: any): ListIdentityProvidersResponse {
+    return {
+      identityProviders: globalThis.Array.isArray(object?.identityProviders)
+        ? object.identityProviders.map((e: any) => IdentityProvider.fromJSON(e))
+        : [],
+      nextPageToken: isSet(object.nextPageToken) ? globalThis.String(object.nextPageToken) : "",
+    };
   },
 
   toJSON(message: ListIdentityProvidersResponse): unknown {
@@ -579,6 +667,14 @@ export const CreateIdentityProviderRequest: MessageFns<CreateIdentityProviderReq
     return message;
   },
 
+  fromJSON(object: any): CreateIdentityProviderRequest {
+    return {
+      identityProvider: isSet(object.identityProvider) ? IdentityProvider.fromJSON(object.identityProvider) : undefined,
+      identityProviderId: isSet(object.identityProviderId) ? globalThis.String(object.identityProviderId) : "",
+      validateOnly: isSet(object.validateOnly) ? globalThis.Boolean(object.validateOnly) : false,
+    };
+  },
+
   toJSON(message: CreateIdentityProviderRequest): unknown {
     const obj: any = {};
     if (message.identityProvider !== undefined) {
@@ -654,6 +750,13 @@ export const UpdateIdentityProviderRequest: MessageFns<UpdateIdentityProviderReq
     return message;
   },
 
+  fromJSON(object: any): UpdateIdentityProviderRequest {
+    return {
+      identityProvider: isSet(object.identityProvider) ? IdentityProvider.fromJSON(object.identityProvider) : undefined,
+      updateMask: isSet(object.updateMask) ? FieldMask.unwrap(FieldMask.fromJSON(object.updateMask)) : undefined,
+    };
+  },
+
   toJSON(message: UpdateIdentityProviderRequest): unknown {
     const obj: any = {};
     if (message.identityProvider !== undefined) {
@@ -712,6 +815,10 @@ export const DeleteIdentityProviderRequest: MessageFns<DeleteIdentityProviderReq
       reader.skip(tag & 7);
     }
     return message;
+  },
+
+  fromJSON(object: any): DeleteIdentityProviderRequest {
+    return { name: isSet(object.name) ? globalThis.String(object.name) : "" };
   },
 
   toJSON(message: DeleteIdentityProviderRequest): unknown {
@@ -779,6 +886,15 @@ export const TestIdentityProviderRequest: MessageFns<TestIdentityProviderRequest
     return message;
   },
 
+  fromJSON(object: any): TestIdentityProviderRequest {
+    return {
+      identityProvider: isSet(object.identityProvider) ? IdentityProvider.fromJSON(object.identityProvider) : undefined,
+      oauth2Context: isSet(object.oauth2Context)
+        ? OAuth2IdentityProviderTestRequestContext.fromJSON(object.oauth2Context)
+        : undefined,
+    };
+  },
+
   toJSON(message: TestIdentityProviderRequest): unknown {
     const obj: any = {};
     if (message.identityProvider !== undefined) {
@@ -841,6 +957,10 @@ export const OAuth2IdentityProviderTestRequestContext: MessageFns<OAuth2Identity
     return message;
   },
 
+  fromJSON(object: any): OAuth2IdentityProviderTestRequestContext {
+    return { code: isSet(object.code) ? globalThis.String(object.code) : "" };
+  },
+
   toJSON(message: OAuth2IdentityProviderTestRequestContext): unknown {
     const obj: any = {};
     if (message.code !== "") {
@@ -860,11 +980,14 @@ export const OAuth2IdentityProviderTestRequestContext: MessageFns<OAuth2Identity
 };
 
 function createBaseTestIdentityProviderResponse(): TestIdentityProviderResponse {
-  return {};
+  return { claims: {} };
 }
 
 export const TestIdentityProviderResponse: MessageFns<TestIdentityProviderResponse> = {
-  encode(_: TestIdentityProviderResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(message: TestIdentityProviderResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    Object.entries(message.claims).forEach(([key, value]) => {
+      TestIdentityProviderResponse_ClaimsEntry.encode({ key: key as any, value }, writer.uint32(10).fork()).join();
+    });
     return writer;
   },
 
@@ -875,6 +998,17 @@ export const TestIdentityProviderResponse: MessageFns<TestIdentityProviderRespon
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          const entry1 = TestIdentityProviderResponse_ClaimsEntry.decode(reader, reader.uint32());
+          if (entry1.value !== undefined) {
+            message.claims[entry1.key] = entry1.value;
+          }
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -884,16 +1018,118 @@ export const TestIdentityProviderResponse: MessageFns<TestIdentityProviderRespon
     return message;
   },
 
-  toJSON(_: TestIdentityProviderResponse): unknown {
+  fromJSON(object: any): TestIdentityProviderResponse {
+    return {
+      claims: isObject(object.claims)
+        ? Object.entries(object.claims).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+          acc[key] = String(value);
+          return acc;
+        }, {})
+        : {},
+    };
+  },
+
+  toJSON(message: TestIdentityProviderResponse): unknown {
     const obj: any = {};
+    if (message.claims) {
+      const entries = Object.entries(message.claims);
+      if (entries.length > 0) {
+        obj.claims = {};
+        entries.forEach(([k, v]) => {
+          obj.claims[k] = v;
+        });
+      }
+    }
     return obj;
   },
 
   create(base?: DeepPartial<TestIdentityProviderResponse>): TestIdentityProviderResponse {
     return TestIdentityProviderResponse.fromPartial(base ?? {});
   },
-  fromPartial(_: DeepPartial<TestIdentityProviderResponse>): TestIdentityProviderResponse {
+  fromPartial(object: DeepPartial<TestIdentityProviderResponse>): TestIdentityProviderResponse {
     const message = createBaseTestIdentityProviderResponse();
+    message.claims = Object.entries(object.claims ?? {}).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = globalThis.String(value);
+      }
+      return acc;
+    }, {});
+    return message;
+  },
+};
+
+function createBaseTestIdentityProviderResponse_ClaimsEntry(): TestIdentityProviderResponse_ClaimsEntry {
+  return { key: "", value: "" };
+}
+
+export const TestIdentityProviderResponse_ClaimsEntry: MessageFns<TestIdentityProviderResponse_ClaimsEntry> = {
+  encode(message: TestIdentityProviderResponse_ClaimsEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TestIdentityProviderResponse_ClaimsEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTestIdentityProviderResponse_ClaimsEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TestIdentityProviderResponse_ClaimsEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
+  },
+
+  toJSON(message: TestIdentityProviderResponse_ClaimsEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TestIdentityProviderResponse_ClaimsEntry>): TestIdentityProviderResponse_ClaimsEntry {
+    return TestIdentityProviderResponse_ClaimsEntry.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TestIdentityProviderResponse_ClaimsEntry>): TestIdentityProviderResponse_ClaimsEntry {
+    const message = createBaseTestIdentityProviderResponse_ClaimsEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? "";
     return message;
   },
 };
@@ -982,6 +1218,18 @@ export const IdentityProvider: MessageFns<IdentityProvider> = {
       reader.skip(tag & 7);
     }
     return message;
+  },
+
+  fromJSON(object: any): IdentityProvider {
+    return {
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      title: isSet(object.title) ? globalThis.String(object.title) : "",
+      domain: isSet(object.domain) ? globalThis.String(object.domain) : "",
+      type: isSet(object.type)
+        ? identityProviderTypeFromJSON(object.type)
+        : IdentityProviderType.IDENTITY_PROVIDER_TYPE_UNSPECIFIED,
+      config: isSet(object.config) ? IdentityProviderConfig.fromJSON(object.config) : undefined,
+    };
   },
 
   toJSON(message: IdentityProvider): unknown {
@@ -1076,6 +1324,14 @@ export const IdentityProviderConfig: MessageFns<IdentityProviderConfig> = {
       reader.skip(tag & 7);
     }
     return message;
+  },
+
+  fromJSON(object: any): IdentityProviderConfig {
+    return {
+      oauth2Config: isSet(object.oauth2Config) ? OAuth2IdentityProviderConfig.fromJSON(object.oauth2Config) : undefined,
+      oidcConfig: isSet(object.oidcConfig) ? OIDCIdentityProviderConfig.fromJSON(object.oidcConfig) : undefined,
+      ldapConfig: isSet(object.ldapConfig) ? LDAPIdentityProviderConfig.fromJSON(object.ldapConfig) : undefined,
+    };
   },
 
   toJSON(message: IdentityProviderConfig): unknown {
@@ -1242,6 +1498,22 @@ export const OAuth2IdentityProviderConfig: MessageFns<OAuth2IdentityProviderConf
       reader.skip(tag & 7);
     }
     return message;
+  },
+
+  fromJSON(object: any): OAuth2IdentityProviderConfig {
+    return {
+      authUrl: isSet(object.authUrl) ? globalThis.String(object.authUrl) : "",
+      tokenUrl: isSet(object.tokenUrl) ? globalThis.String(object.tokenUrl) : "",
+      userInfoUrl: isSet(object.userInfoUrl) ? globalThis.String(object.userInfoUrl) : "",
+      clientId: isSet(object.clientId) ? globalThis.String(object.clientId) : "",
+      clientSecret: isSet(object.clientSecret) ? globalThis.String(object.clientSecret) : "",
+      scopes: globalThis.Array.isArray(object?.scopes) ? object.scopes.map((e: any) => globalThis.String(e)) : [],
+      fieldMapping: isSet(object.fieldMapping) ? FieldMapping.fromJSON(object.fieldMapping) : undefined,
+      skipTlsVerify: isSet(object.skipTlsVerify) ? globalThis.Boolean(object.skipTlsVerify) : false,
+      authStyle: isSet(object.authStyle)
+        ? oAuth2AuthStyleFromJSON(object.authStyle)
+        : OAuth2AuthStyle.OAUTH2_AUTH_STYLE_UNSPECIFIED,
+    };
   },
 
   toJSON(message: OAuth2IdentityProviderConfig): unknown {
@@ -1418,6 +1690,21 @@ export const OIDCIdentityProviderConfig: MessageFns<OIDCIdentityProviderConfig> 
     return message;
   },
 
+  fromJSON(object: any): OIDCIdentityProviderConfig {
+    return {
+      issuer: isSet(object.issuer) ? globalThis.String(object.issuer) : "",
+      clientId: isSet(object.clientId) ? globalThis.String(object.clientId) : "",
+      clientSecret: isSet(object.clientSecret) ? globalThis.String(object.clientSecret) : "",
+      scopes: globalThis.Array.isArray(object?.scopes) ? object.scopes.map((e: any) => globalThis.String(e)) : [],
+      fieldMapping: isSet(object.fieldMapping) ? FieldMapping.fromJSON(object.fieldMapping) : undefined,
+      skipTlsVerify: isSet(object.skipTlsVerify) ? globalThis.Boolean(object.skipTlsVerify) : false,
+      authStyle: isSet(object.authStyle)
+        ? oAuth2AuthStyleFromJSON(object.authStyle)
+        : OAuth2AuthStyle.OAUTH2_AUTH_STYLE_UNSPECIFIED,
+      authEndpoint: isSet(object.authEndpoint) ? globalThis.String(object.authEndpoint) : "",
+    };
+  },
+
   toJSON(message: OIDCIdentityProviderConfig): unknown {
     const obj: any = {};
     if (message.issuer !== "") {
@@ -1475,7 +1762,7 @@ function createBaseLDAPIdentityProviderConfig(): LDAPIdentityProviderConfig {
     bindPassword: "",
     baseDn: "",
     userFilter: "",
-    securityProtocol: "",
+    securityProtocol: LDAPIdentityProviderConfig_SecurityProtocol.SECURITY_PROTOCOL_UNSPECIFIED,
     fieldMapping: undefined,
   };
 }
@@ -1503,8 +1790,8 @@ export const LDAPIdentityProviderConfig: MessageFns<LDAPIdentityProviderConfig> 
     if (message.userFilter !== "") {
       writer.uint32(58).string(message.userFilter);
     }
-    if (message.securityProtocol !== "") {
-      writer.uint32(66).string(message.securityProtocol);
+    if (message.securityProtocol !== LDAPIdentityProviderConfig_SecurityProtocol.SECURITY_PROTOCOL_UNSPECIFIED) {
+      writer.uint32(64).int32(lDAPIdentityProviderConfig_SecurityProtocolToNumber(message.securityProtocol));
     }
     if (message.fieldMapping !== undefined) {
       FieldMapping.encode(message.fieldMapping, writer.uint32(74).fork()).join();
@@ -1576,11 +1863,11 @@ export const LDAPIdentityProviderConfig: MessageFns<LDAPIdentityProviderConfig> 
           continue;
         }
         case 8: {
-          if (tag !== 66) {
+          if (tag !== 64) {
             break;
           }
 
-          message.securityProtocol = reader.string();
+          message.securityProtocol = lDAPIdentityProviderConfig_SecurityProtocolFromJSON(reader.int32());
           continue;
         }
         case 9: {
@@ -1598,6 +1885,22 @@ export const LDAPIdentityProviderConfig: MessageFns<LDAPIdentityProviderConfig> 
       reader.skip(tag & 7);
     }
     return message;
+  },
+
+  fromJSON(object: any): LDAPIdentityProviderConfig {
+    return {
+      host: isSet(object.host) ? globalThis.String(object.host) : "",
+      port: isSet(object.port) ? globalThis.Number(object.port) : 0,
+      skipTlsVerify: isSet(object.skipTlsVerify) ? globalThis.Boolean(object.skipTlsVerify) : false,
+      bindDn: isSet(object.bindDn) ? globalThis.String(object.bindDn) : "",
+      bindPassword: isSet(object.bindPassword) ? globalThis.String(object.bindPassword) : "",
+      baseDn: isSet(object.baseDn) ? globalThis.String(object.baseDn) : "",
+      userFilter: isSet(object.userFilter) ? globalThis.String(object.userFilter) : "",
+      securityProtocol: isSet(object.securityProtocol)
+        ? lDAPIdentityProviderConfig_SecurityProtocolFromJSON(object.securityProtocol)
+        : LDAPIdentityProviderConfig_SecurityProtocol.SECURITY_PROTOCOL_UNSPECIFIED,
+      fieldMapping: isSet(object.fieldMapping) ? FieldMapping.fromJSON(object.fieldMapping) : undefined,
+    };
   },
 
   toJSON(message: LDAPIdentityProviderConfig): unknown {
@@ -1623,8 +1926,8 @@ export const LDAPIdentityProviderConfig: MessageFns<LDAPIdentityProviderConfig> 
     if (message.userFilter !== "") {
       obj.userFilter = message.userFilter;
     }
-    if (message.securityProtocol !== "") {
-      obj.securityProtocol = message.securityProtocol;
+    if (message.securityProtocol !== LDAPIdentityProviderConfig_SecurityProtocol.SECURITY_PROTOCOL_UNSPECIFIED) {
+      obj.securityProtocol = lDAPIdentityProviderConfig_SecurityProtocolToJSON(message.securityProtocol);
     }
     if (message.fieldMapping !== undefined) {
       obj.fieldMapping = FieldMapping.toJSON(message.fieldMapping);
@@ -1644,7 +1947,8 @@ export const LDAPIdentityProviderConfig: MessageFns<LDAPIdentityProviderConfig> 
     message.bindPassword = object.bindPassword ?? "";
     message.baseDn = object.baseDn ?? "";
     message.userFilter = object.userFilter ?? "";
-    message.securityProtocol = object.securityProtocol ?? "";
+    message.securityProtocol = object.securityProtocol ??
+      LDAPIdentityProviderConfig_SecurityProtocol.SECURITY_PROTOCOL_UNSPECIFIED;
     message.fieldMapping = (object.fieldMapping !== undefined && object.fieldMapping !== null)
       ? FieldMapping.fromPartial(object.fieldMapping)
       : undefined;
@@ -1719,6 +2023,15 @@ export const FieldMapping: MessageFns<FieldMapping> = {
       reader.skip(tag & 7);
     }
     return message;
+  },
+
+  fromJSON(object: any): FieldMapping {
+    return {
+      identifier: isSet(object.identifier) ? globalThis.String(object.identifier) : "",
+      displayName: isSet(object.displayName) ? globalThis.String(object.displayName) : "",
+      phone: isSet(object.phone) ? globalThis.String(object.phone) : "",
+      groups: isSet(object.groups) ? globalThis.String(object.groups) : "",
+    };
   },
 
   toJSON(message: FieldMapping): unknown {
@@ -2164,9 +2477,18 @@ export type DeepPartial<T> = T extends Builtin ? T
   : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
   : Partial<T>;
 
+function isObject(value: any): boolean {
+  return typeof value === "object" && value !== null;
+}
+
+function isSet(value: any): boolean {
+  return value !== null && value !== undefined;
+}
+
 export interface MessageFns<T> {
   encode(message: T, writer?: BinaryWriter): BinaryWriter;
   decode(input: BinaryReader | Uint8Array, length?: number): T;
+  fromJSON(object: any): T;
   toJSON(message: T): unknown;
   create(base?: DeepPartial<T>): T;
   fromPartial(object: DeepPartial<T>): T;

@@ -57,9 +57,8 @@
     @apply="onLabelsApply($event)"
   />
 
-  <DatabaseEditEnvironmentDrawer
+  <EditEnvironmentDrawer
     :show="state.showEditEnvironmentDrawer"
-    :databases="databases"
     @dismiss="state.showEditEnvironmentDrawer = false"
     @update="onEnvironmentUpdate($event)"
   />
@@ -101,38 +100,21 @@
 </template>
 
 <script lang="ts" setup>
-import { computedAsync } from "@vueuse/core";
-import {
-  UnlinkIcon,
-  RefreshCcwIcon,
-  TagIcon,
-  PencilIcon,
-  PenSquareIcon,
-  ArrowRightLeftIcon,
-  DownloadIcon,
-  ChevronsDownIcon,
-  SquareStackIcon,
-} from "lucide-vue-next";
-import { NButton, NTooltip, useDialog, NScrollbar } from "naive-ui";
-import type { VNode } from "vue";
-import { computed, h, reactive } from "vue";
-import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
 import { BBAlert } from "@/bbkit";
 import SchemaEditorModal from "@/components/AlterSchemaPrepForm/SchemaEditorModal.vue";
-import DatabaseEditEnvironmentDrawer from "@/components/DatabaseEditEnvironmentDrawer.vue";
+import EditEnvironmentDrawer from "@/components/EditEnvironmentDrawer.vue";
 import LabelEditorDrawer from "@/components/LabelEditorDrawer.vue";
 import { TransferDatabaseForm } from "@/components/TransferDatabaseForm";
 import TransferOutDatabaseForm from "@/components/TransferOutDatabaseForm";
 import { Drawer } from "@/components/v2";
 import { PROJECT_V1_ROUTE_ISSUE_DETAIL } from "@/router/dashboard/projectV1";
 import {
-  useProjectV1Store,
-  useDatabaseV1Store,
-  useGracefulRequest,
-  useDBSchemaV1Store,
   pushNotification,
   useAppFeature,
+  useDatabaseV1Store,
+  useDBSchemaV1Store,
+  useGracefulRequest,
+  useProjectV1Store,
 } from "@/store";
 import type { ComposedDatabase } from "@/types";
 import { DEFAULT_PROJECT_NAME } from "@/types";
@@ -141,15 +123,31 @@ import {
   UpdateDatabaseRequest,
 } from "@/types/proto/v1/database_service";
 import {
-  isArchivedDatabaseV1,
-  instanceV1HasAlterSchema,
   allowUsingSchemaEditor,
-  generateIssueTitle,
-  hasProjectPermissionV2,
   extractProjectResourceName,
+  generateIssueTitle,
   hasPermissionToCreateChangeDatabaseIssue,
   hasPermissionToCreateDataExportIssue,
+  hasProjectPermissionV2,
+  instanceV1HasAlterSchema
 } from "@/utils";
+import { computedAsync } from "@vueuse/core";
+import {
+  ArrowRightLeftIcon,
+  ChevronsDownIcon,
+  DownloadIcon,
+  PencilIcon,
+  PenSquareIcon,
+  RefreshCcwIcon,
+  SquareStackIcon,
+  TagIcon,
+  UnlinkIcon,
+} from "lucide-vue-next";
+import { NButton, NScrollbar, NTooltip, useDialog } from "naive-ui";
+import type { VNode } from "vue";
+import { computed, h, reactive } from "vue";
+import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 
 interface DatabaseAction {
   icon: VNode;
@@ -187,7 +185,7 @@ const state = reactive<LocalState>({
 
 const emit = defineEmits<{
   (event: "refresh"): void;
-  (event: "update-cache", databases: ComposedDatabase[]): void;
+  (event: "update", databases: ComposedDatabase[]): void;
 }>();
 
 const { t } = useI18n();
@@ -253,7 +251,6 @@ const allowChangeData = computed(() => {
 const allowTransferOutProject = computed(() => {
   return props.databases.every(
     (db) =>
-      !isArchivedDatabaseV1(db) &&
       hasProjectPermissionV2(db.projectEntity, "bb.projects.update")
   );
 });
@@ -443,7 +440,7 @@ const actions = computed((): DatabaseAction[] => {
         resp.push({
           icon: h(DownloadIcon),
           text: t("custom-approval.risk-rule.risk.namespace.data_export"),
-          disabled: !allowExportData.value || props.databases.length !== 1,
+          disabled: !allowExportData.value,
           click: () => generateMultiDb("bb.issue.database.data.export"),
           tooltip: (action) => {
             if (!allowExportData.value) {
@@ -623,7 +620,7 @@ const onLabelsApply = async (labelsList: { [key: string]: string }[]) => {
       });
     })
   );
-  emit("update-cache", updatedDatabases);
+  emit("update", updatedDatabases);
 
   pushNotification({
     module: "bytebase",
@@ -645,7 +642,7 @@ const onEnvironmentUpdate = async (environment: string) => {
       });
     }),
   });
-  emit("update-cache", updatedDatabases);
+  emit("update", updatedDatabases);
 
   pushNotification({
     module: "bytebase",

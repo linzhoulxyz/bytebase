@@ -12,6 +12,7 @@ import type {
 } from "@/types";
 import { DEFAULT_SQL_EDITOR_TAB_MODE, isValidDatabaseName } from "@/types";
 import { DataSourceType } from "@/types/proto/v1/instance_service";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import {
   WebStorageHelper,
   defaultSQLEditorTab,
@@ -205,7 +206,7 @@ export const useSQLEditorTabStore = defineStore("sqlEditorTab", () => {
     if (!currentTab.value) {
       return false;
     }
-    if (!hasFeature("bb.feature.batch-query")) {
+    if (!hasFeature(PlanFeature.FEATURE_BATCH_QUERY)) {
       return false;
     }
     const { batchQueryContext } = currentTab.value;
@@ -213,7 +214,7 @@ export const useSQLEditorTabStore = defineStore("sqlEditorTab", () => {
       return false;
     }
     const { databaseGroups = [], databases = [] } = batchQueryContext;
-    if (!hasFeature("bb.feature.database-grouping")) {
+    if (!hasFeature(PlanFeature.FEATURE_DATABASE_GROUPS)) {
       return databases.length > 1;
     }
     return databaseGroups.length > 0 || databases.length > 1;
@@ -282,6 +283,30 @@ export const useSQLEditorTabStore = defineStore("sqlEditorTab", () => {
         ...payload,
       },
     });
+  };
+
+  // removeDatabaseQueryContext remove the context by id, and returns the next context.
+  const removeDatabaseQueryContext = ({
+    database,
+    contextId,
+  }: {
+    database: string;
+    contextId: string;
+  }): SQLEditorDatabaseQueryContext | undefined => {
+    const tab = tabById(currentTabId.value);
+    if (!tab || !tab.databaseQueryContexts) {
+      return;
+    }
+    if (!tab.databaseQueryContexts.has(database)) {
+      return;
+    }
+    const contexts = tab.databaseQueryContexts.get(database)!;
+    const index = contexts.findIndex((context) => context.id === contextId);
+    if (index < 0) {
+      return;
+    }
+    contexts.splice(index, 1);
+    return contexts[index] || contexts[index - 1];
   };
 
   const updateDatabaseQueryContext = ({
@@ -447,6 +472,7 @@ export const useSQLEditorTabStore = defineStore("sqlEditorTab", () => {
     updateCurrentTab,
     updateBatchQueryContext,
     updateDatabaseQueryContext,
+    removeDatabaseQueryContext,
     setCurrentTabId,
     selectOrAddSimilarNewTab,
     maybeInitProject,

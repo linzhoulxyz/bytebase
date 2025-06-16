@@ -7,8 +7,6 @@
     :bordered="true"
     :striped="true"
     :checked-row-keys="selectedBindings"
-    :max-height="'calc(100vh - 15rem)'"
-    virtual-scroll
     @update:checked-row-keys="handleMemberSelection"
   />
 </template>
@@ -51,6 +49,7 @@ const columns = computed(
     return [
       {
         type: "selection",
+        hide: !props.allowEdit,
         disabled: (memberBinding: MemberBinding) => {
           return props.selectDisabled(memberBinding);
         },

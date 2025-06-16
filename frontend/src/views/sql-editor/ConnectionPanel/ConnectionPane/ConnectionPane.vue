@@ -2,10 +2,10 @@
   <div class="sql-editor-tree gap-y-1 h-full flex flex-col relative">
     <div class="w-full px-4 mt-4">
       <div
-        class="textinfolabel mb-2 w-full leading-4 flex flex-col lg:flex-row items-start lg:items-center gap-x-1"
+        class="textinfolabel mb-2 w-full leading-4 flex flex-col items-start gap-x-1"
       >
         <div class="flex items-center gap-x-1">
-          <FeatureBadge feature="bb.feature.batch-query" />
+          <FeatureBadge :feature="PlanFeature.FEATURE_BATCH_QUERY" />
           {{
             $t("sql-editor.batch-query.description", {
               database: state.selectedDatabases.size,
@@ -109,8 +109,8 @@
           :data="treeStore.tree"
           :show-irrelevant-nodes="false"
           :selected-keys="selectedKeys"
-          :default-expand-all="true"
           :expand-on-click="true"
+          v-model:expanded-keys="expandedState.expandedKeys"
           :node-props="nodeProps"
           :theme-overrides="{ nodeHeight: '21px' }"
           :render-label="renderLabel"
@@ -158,7 +158,7 @@
   </div>
 
   <FeatureModal
-    feature="bb.feature.batch-query"
+    :feature="PlanFeature.FEATURE_BATCH_QUERY"
     :open="state.showFeatureModal"
     @cancel="state.showFeatureModal = false"
   />
@@ -166,7 +166,7 @@
 
 <script lang="ts" setup>
 import { useElementSize } from "@vueuse/core";
-import { head, isEqual } from "lodash-es";
+import { isEqual } from "lodash-es";
 import { InfoIcon } from "lucide-vue-next";
 import {
   NTag,
@@ -194,6 +194,7 @@ import {
   useProjectV1Store,
   useDatabaseV1Store,
   useSQLEditorTabStore,
+  useCurrentUserV1,
   resolveOpeningDatabaseListFromSQLEditorTabList,
   useSQLEditorTreeStore,
   useSQLEditorStore,
@@ -217,6 +218,7 @@ import {
 } from "@/types";
 import { engineFromJSON } from "@/types/proto/v1/common";
 import { DataSourceType } from "@/types/proto/v1/instance_service";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import {
   findAncestor,
   isDescendantOf,
@@ -225,6 +227,7 @@ import {
   extractProjectResourceName,
   emptySQLEditorConnection,
   tryConnectToCoreSQLEditorTab,
+  useDynamicLocalStorage,
 } from "@/utils";
 import type { SearchParams } from "@/utils";
 import { useSQLEditorContext } from "../../context";
@@ -250,9 +253,34 @@ const tabStore = useSQLEditorTabStore();
 const editorStore = useSQLEditorStore();
 const databaseStore = useDatabaseV1Store();
 const projectStore = useProjectV1Store();
+const currentUser = useCurrentUserV1();
 
-const hasBatchQueryFeature = featureToRef("bb.feature.batch-query");
-const hasDatabaseGroupFeature = featureToRef("bb.feature.database-grouping");
+const expandedState = useDynamicLocalStorage<{
+  initialized: boolean;
+  expandedKeys: string[];
+}>(
+  computed(
+    () =>
+      `bb.sql-editor.connection-pane.expanded-keys.${currentUser.value.name}`
+  ),
+  {
+    initialized: false,
+    expandedKeys: [],
+  }
+);
+
+watch(
+  () => expandedState.value.expandedKeys,
+  () => {
+    expandedState.value.initialized = true;
+  },
+  { deep: true }
+);
+
+const hasBatchQueryFeature = featureToRef(PlanFeature.FEATURE_BATCH_QUERY);
+const hasDatabaseGroupFeature = featureToRef(
+  PlanFeature.FEATURE_DATABASE_GROUPS
+);
 
 const state = reactive<LocalState>({
   selectedDatabases: new Set(),
@@ -377,13 +405,10 @@ const getSelectedKeys = async () => {
     const database = await databaseStore.getOrFetchDatabaseByName(
       connection.database
     );
-    const node = head(treeStore.nodesByTarget("database", database));
-    if (!node) return [];
-    return [node.key];
+    return treeStore.nodeKeysByTarget("database", database);
   } else if (connection.instance) {
     const { instance } = useInstanceResourceByName(connection.instance);
-    const nodes = treeStore.nodesByTarget("instance", instance.value);
-    return nodes.map((node) => node.key);
+    return treeStore.nodeKeysByTarget("instance", instance.value);
   }
   return [];
 };
@@ -427,7 +452,6 @@ const renderLabel = ({ option }: { option: TreeOption }) => {
     factors: treeStore.filteredFactorList,
     keyword: state.params.query,
     connected: connectedDatabases.value.has(databaseName),
-    connectedDatabases: connectedDatabases.value,
     "onUpdate:checked": (checked: boolean) => {
       if (node.meta.type !== "database") {
         return;
@@ -524,6 +548,10 @@ watch(
 
 useEmitteryEventListener(editorEvents, "tree-ready", async () => {
   selectedKeys.value = await getSelectedKeys();
+  if (!expandedState.value.initialized) {
+    // default expand all nodes.
+    expandedState.value.expandedKeys = [...treeStore.allNodeKeys];
+  }
 });
 
 const selectedLabels = computed(() => {

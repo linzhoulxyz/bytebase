@@ -29,12 +29,15 @@
       />
     </div>
     <div class="w-full space-y-2">
-      <span>{{ $t("common.reason") }}</span>
+      <div class="flex items-center gap-x-1">
+        <span>{{ $t("common.reason") }}</span>
+        <RequiredStar v-if="requireReason" />
+      </div>
       <NInput
         v-model:value="state.reason"
         type="textarea"
         rows="2"
-        :placeholder="$t('project.members.assign-reason')"
+        :placeholder="`${$t('common.reason')} ${requireReason ? '' : `(${$t('common.optional')})`}`"
       />
     </div>
     <div
@@ -55,7 +58,7 @@
       <QuerierDatabaseResourceForm
         v-model:database-resources="state.databaseResources"
         :project-name="projectName"
-        :required-feature="'bb.feature.access-control'"
+        :required-feature="PlanFeature.FEATURE_IAM"
         :include-cloumn="false"
       />
     </div>
@@ -85,9 +88,6 @@
 
 <script lang="ts" setup>
 /* eslint-disable vue/no-mutating-props */
-import { isUndefined } from "lodash-es";
-import { NInput, NButton } from "naive-ui";
-import { computed, reactive, watch } from "vue";
 import ExpirationSelector from "@/components/ExpirationSelector.vue";
 import QuerierDatabaseResourceForm from "@/components/GrantRequestPanel/DatabaseResourceForm/index.vue";
 import MaxRowCountSelect from "@/components/GrantRequestPanel/MaxRowCountSelect.vue";
@@ -96,20 +96,26 @@ import RequiredStar from "@/components/RequiredStar.vue";
 import { RoleSelect } from "@/components/v2/Select";
 import { PresetRoleType, type DatabaseResource } from "@/types";
 import type { Binding } from "@/types/proto/v1/iam_policy";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import { checkRoleContainsAnyPermission } from "@/utils";
 import { buildConditionExpr } from "@/utils/issue/cel";
+import { isUndefined } from "lodash-es";
+import { NButton, NInput } from "naive-ui";
+import { computed, reactive, watch } from "vue";
 
 const props = withDefaults(
   defineProps<{
     projectName: string;
     binding: Binding;
     allowRemove: boolean;
+    requireReason?: boolean;
     disableMemberChange?: boolean;
     supportRoles?: string[];
     databaseResource?: DatabaseResource;
   }>(),
   {
     disableMemberChange: false,
+    requireReason: false,
     supportRoles: () => [],
     databaseResource: undefined,
   }
@@ -151,7 +157,9 @@ const state = reactive<LocalState>(getInitialState());
 watch(
   () => state.role,
   () => {
-    state.databaseResources = undefined;
+    state.databaseResources = props.databaseResource
+      ? [{ ...props.databaseResource }]
+      : undefined;
     state.maxRowCount = undefined;
   },
   {
@@ -186,6 +194,7 @@ watch(
 );
 
 defineExpose({
+  reason: computed(() => state.reason),
   databaseResources: computed(() => state.databaseResources),
   expirationTimestampInMS: computed(() => state.expirationTimestampInMS),
   allowConfirm: computed(() => {
@@ -211,6 +220,9 @@ defineExpose({
       !isUndefined(state.databaseResources) &&
       state.databaseResources.length === 0
     ) {
+      return false;
+    }
+    if (props.requireReason && !state.reason.trim()) {
       return false;
     }
     return true;

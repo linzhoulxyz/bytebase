@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"connectrpc.com/connect"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -14,24 +15,24 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/bytebase/bytebase/backend/api/auth"
-	"github.com/bytebase/bytebase/backend/base"
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
 	"github.com/bytebase/bytebase/backend/component/config"
-	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
+	"github.com/bytebase/bytebase/backend/enterprise"
 	"github.com/bytebase/bytebase/backend/resources/postgres"
 	"github.com/bytebase/bytebase/backend/runner/schemasync"
 	"github.com/bytebase/bytebase/backend/store"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
+	"github.com/bytebase/bytebase/proto/generated-go/v1/v1connect"
 )
 
-// ActuatorService implements the actuator service.
+// ActuatorService implements the Connect RPC interface for ActuatorService.
 type ActuatorService struct {
-	v1pb.UnimplementedActuatorServiceServer
+	v1connect.UnimplementedActuatorServiceHandler
 	store          *store.Store
 	profile        *config.Profile
-	licenseService enterprise.LicenseService
+	licenseService *enterprise.LicenseService
 	schemaSyncer   *schemasync.Syncer
 }
 
@@ -40,7 +41,7 @@ func NewActuatorService(
 	store *store.Store,
 	profile *config.Profile,
 	schemaSyncer *schemasync.Syncer,
-	licenseService enterprise.LicenseService,
+	licenseService *enterprise.LicenseService,
 ) *ActuatorService {
 	return &ActuatorService{
 		store:          store,
@@ -51,12 +52,23 @@ func NewActuatorService(
 }
 
 // GetActuatorInfo gets the actuator info.
-func (s *ActuatorService) GetActuatorInfo(ctx context.Context, _ *v1pb.GetActuatorInfoRequest) (*v1pb.ActuatorInfo, error) {
-	return s.getServerInfo(ctx)
+func (s *ActuatorService) GetActuatorInfo(
+	ctx context.Context,
+	_ *connect.Request[v1pb.GetActuatorInfoRequest],
+) (*connect.Response[v1pb.ActuatorInfo], error) {
+	info, err := s.getServerInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(info), nil
 }
 
 // UpdateActuatorInfo updates the actuator info.
-func (s *ActuatorService) UpdateActuatorInfo(ctx context.Context, request *v1pb.UpdateActuatorInfoRequest) (*v1pb.ActuatorInfo, error) {
+func (s *ActuatorService) UpdateActuatorInfo(
+	ctx context.Context,
+	req *connect.Request[v1pb.UpdateActuatorInfoRequest],
+) (*connect.Response[v1pb.ActuatorInfo], error) {
+	request := req.Msg
 	for _, path := range request.UpdateMask.Paths {
 		if path == "debug" {
 			debug := request.GetActuator().GetDebug()
@@ -70,32 +82,46 @@ func (s *ActuatorService) UpdateActuatorInfo(ctx context.Context, request *v1pb.
 		}
 	}
 
-	return s.getServerInfo(ctx)
+	info, err := s.getServerInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(info), nil
 }
 
 // DeleteCache deletes the cache.
-func (s *ActuatorService) DeleteCache(_ context.Context, _ *v1pb.DeleteCacheRequest) (*emptypb.Empty, error) {
+func (s *ActuatorService) DeleteCache(
+	_ context.Context,
+	_ *connect.Request[v1pb.DeleteCacheRequest],
+) (*connect.Response[emptypb.Empty], error) {
 	s.store.DeleteCache()
-	return &emptypb.Empty{}, nil
+	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
 // GetResourcePackage gets the theme resources.
-func (s *ActuatorService) GetResourcePackage(ctx context.Context, _ *v1pb.GetResourcePackageRequest) (*v1pb.ResourcePackage, error) {
-	brandingSetting, err := s.store.GetSettingV2(ctx, base.SettingBrandingLogo)
+func (s *ActuatorService) GetResourcePackage(
+	ctx context.Context,
+	_ *connect.Request[v1pb.GetResourcePackageRequest],
+) (*connect.Response[v1pb.ResourcePackage], error) {
+	brandingSetting, err := s.store.GetSettingV2(ctx, storepb.SettingName_BRANDING_LOGO)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to find workspace branding: %v", err)
 	}
 	if brandingSetting == nil {
-		return nil, errors.Errorf("cannot find setting %v", base.SettingBrandingLogo)
+		return nil, errors.Errorf("cannot find setting %v", storepb.SettingName_BRANDING_LOGO)
 	}
 
-	return &v1pb.ResourcePackage{
+	pkg := &v1pb.ResourcePackage{
 		Logo: []byte(brandingSetting.Value),
-	}, nil
+	}
+	return connect.NewResponse(pkg), nil
 }
 
-// SetupSample set up the sample project and instance.
-func (s *ActuatorService) SetupSample(ctx context.Context, _ *v1pb.SetupSampleRequest) (*emptypb.Empty, error) {
+// SetupSample sets up the sample project and instance.
+func (s *ActuatorService) SetupSample(
+	ctx context.Context,
+	_ *connect.Request[v1pb.SetupSampleRequest],
+) (*connect.Response[emptypb.Empty], error) {
 	user, ok := ctx.Value(common.UserContextKey).(*store.UserMessage)
 	if !ok || user == nil {
 		return nil, status.Errorf(codes.Internal, "user not found")
@@ -108,7 +134,7 @@ func (s *ActuatorService) SetupSample(ctx context.Context, _ *v1pb.SetupSampleRe
 			slog.Error("failed to prepare onboarding data", log.BBError(err))
 		}
 	}
-	return &emptypb.Empty{}, nil
+	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
 // generateOnboardingData generates onboarding data including project and instance.
@@ -141,7 +167,7 @@ func (s *ActuatorService) generateOnboardingData(ctx context.Context, user *stor
 	instanceMessages := []*store.InstanceMessage{
 		{
 			ResourceID:    "test-sample-instance",
-			EnvironmentID: base.DefaultTestEnvironmentID,
+			EnvironmentID: common.DefaultTestEnvironmentID,
 			Metadata: &storepb.Instance{
 				Title: "Test Sample Instance",
 				DataSources: []*storepb.DataSource{
@@ -154,7 +180,7 @@ func (s *ActuatorService) generateOnboardingData(ctx context.Context, user *stor
 		},
 		{
 			ResourceID:    "prod-sample-instance",
-			EnvironmentID: base.DefaultProdEnvironmentID,
+			EnvironmentID: common.DefaultProdEnvironmentID,
 			Metadata: &storepb.Instance{
 				Title: "Prod Sample Instance",
 				DataSources: []*storepb.DataSource{
@@ -253,7 +279,7 @@ func (s *ActuatorService) generateInstance(
 }
 
 func (s *ActuatorService) getServerInfo(ctx context.Context) (*v1pb.ActuatorInfo, error) {
-	count, err := s.store.CountUsers(ctx, base.EndUser)
+	count, err := s.store.CountUsers(ctx, storepb.PrincipalType_END_USER)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -333,41 +359,34 @@ func (s *ActuatorService) getServerInfo(ctx context.Context) (*v1pb.ActuatorInfo
 	return &serverInfo, nil
 }
 
-func (s *ActuatorService) getUsedFeatures(ctx context.Context) ([]base.FeatureType, error) {
-	var features []base.FeatureType
+func (s *ActuatorService) getUsedFeatures(ctx context.Context) ([]v1pb.PlanFeature, error) {
+	var features []v1pb.PlanFeature
 
 	// idp
 	idps, err := s.store.ListIdentityProviders(ctx, &store.FindIdentityProviderMessage{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to list identity providers")
 	}
+	// TODO(d): use fine-grained feature control for SSO.
 	if len(idps) > 0 {
-		features = append(features, base.FeatureSSO)
+		features = append(features, v1pb.PlanFeature_FEATURE_ENTERPRISE_SSO)
 	}
 
 	// setting
-	brandingLogo, err := s.store.GetSettingV2(ctx, base.SettingBrandingLogo)
+	brandingLogo, err := s.store.GetSettingV2(ctx, storepb.SettingName_BRANDING_LOGO)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get branding logo setting")
 	}
 	if brandingLogo != nil && brandingLogo.Value != "" {
-		features = append(features, base.FeatureBranding)
+		features = append(features, v1pb.PlanFeature_FEATURE_CUSTOM_LOGO)
 	}
 
-	watermark, err := s.store.GetSettingV2(ctx, base.SettingWatermark)
+	watermark, err := s.store.GetSettingV2(ctx, storepb.SettingName_WATERMARK)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get watermark setting")
 	}
 	if watermark != nil && watermark.Value == "1" {
-		features = append(features, base.FeatureWatermark)
-	}
-
-	aiSetting, err := s.store.GetAISetting(ctx)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get ai setting")
-	}
-	if aiSetting.ApiKey != "" {
-		features = append(features, base.FeatureAIAssistant)
+		features = append(features, v1pb.PlanFeature_FEATURE_WATERMARK)
 	}
 
 	setting, err := s.store.GetWorkspaceGeneralSetting(ctx)
@@ -375,16 +394,16 @@ func (s *ActuatorService) getUsedFeatures(ctx context.Context) ([]base.FeatureTy
 		return nil, errors.Wrapf(err, "failed to get workspace general setting")
 	}
 	if setting.DisallowSignup && !s.profile.SaaS {
-		features = append(features, base.FeatureDisallowSignup)
+		features = append(features, v1pb.PlanFeature_FEATURE_DISALLOW_SELF_SERVICE_SIGNUP)
 	}
 	if setting.Require_2Fa {
-		features = append(features, base.Feature2FA)
+		features = append(features, v1pb.PlanFeature_FEATURE_TWO_FA)
 	}
 	if setting.GetTokenDuration().GetSeconds() > 0 && float64(setting.GetTokenDuration().GetSeconds()) != auth.DefaultTokenDuration.Seconds() {
-		features = append(features, base.FeatureSecureToken)
+		features = append(features, v1pb.PlanFeature_FEATURE_SIGN_IN_FREQUENCY_CONTROL)
 	}
 	if setting.GetAnnouncement().GetText() != "" {
-		features = append(features, base.FeatureAnnouncement)
+		features = append(features, v1pb.PlanFeature_FEATURE_DASHBOARD_ANNOUNCEMENT)
 	}
 
 	// environment tier
@@ -394,7 +413,7 @@ func (s *ActuatorService) getUsedFeatures(ctx context.Context) ([]base.FeatureTy
 	}
 	for _, env := range environments.GetEnvironments() {
 		if v, ok := env.Tags["protected"]; ok && v == "protected" {
-			features = append(features, base.FeatureEnvironmentTierPolicy)
+			features = append(features, v1pb.PlanFeature_FEATURE_ENVIRONMENT_TIERS)
 			break
 		}
 	}
@@ -405,13 +424,13 @@ func (s *ActuatorService) getUsedFeatures(ctx context.Context) ([]base.FeatureTy
 		return nil, errors.Wrapf(err, "failed to list database groups")
 	}
 	if len(databaseGroups) > 0 {
-		features = append(features, base.FeatureDatabaseGrouping)
+		features = append(features, v1pb.PlanFeature_FEATURE_DATABASE_GROUPS)
 	}
 	return features, nil
 }
 
-func (s *ActuatorService) getUnlicensedFeatures(features []base.FeatureType) []base.FeatureType {
-	var unlicensedFeatures []base.FeatureType
+func (s *ActuatorService) getUnlicensedFeatures(features []v1pb.PlanFeature) []v1pb.PlanFeature {
+	var unlicensedFeatures []v1pb.PlanFeature
 	for _, feature := range features {
 		if err := s.licenseService.IsFeatureEnabled(feature); err != nil {
 			unlicensedFeatures = append(unlicensedFeatures, feature)

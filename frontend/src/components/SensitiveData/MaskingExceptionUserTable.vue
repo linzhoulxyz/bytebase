@@ -159,7 +159,7 @@ const getDatabaseAccessResource = (access: AccessUser): VNodeChild => {
               <NTooltip>
                 {{
                   trigger: () => <InfoIcon class="w-4 text-red-600" />,
-                  default: t("database.not-found"),
+                  default: () => t("database.not-found"),
                 }}
               </NTooltip>
             )}
@@ -230,12 +230,13 @@ const getMemberBinding = (access: AccessUser): string => {
 
 const updateAccessUserList = async () => {
   if (!ready.value) {
-    return [];
+    return;
   }
 
   if (!policy.value || !policy.value.maskingExceptionPolicy) {
+    state.rawAccessList = [];
     state.loading = false;
-    return [];
+    return;
   }
 
   // Exec data merge, we will merge data with same expiration time and level.

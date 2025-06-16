@@ -7,6 +7,7 @@ import (
 
 	"log/slog"
 
+	"connectrpc.com/connect"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -21,11 +22,12 @@ import (
 	"github.com/bytebase/bytebase/backend/component/iam"
 	"github.com/bytebase/bytebase/backend/store"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
+	"github.com/bytebase/bytebase/proto/generated-go/v1/v1connect"
 )
 
 // WorksheetService implements the worksheet service.
 type WorksheetService struct {
-	v1pb.UnimplementedWorksheetServiceServer
+	v1connect.UnimplementedWorksheetServiceHandler
 	store      *store.Store
 	iamManager *iam.Manager
 }
@@ -39,7 +41,11 @@ func NewWorksheetService(store *store.Store, iamManager *iam.Manager) *Worksheet
 }
 
 // CreateWorksheet creates a new worksheet.
-func (s *WorksheetService) CreateWorksheet(ctx context.Context, request *v1pb.CreateWorksheetRequest) (*v1pb.Worksheet, error) {
+func (s *WorksheetService) CreateWorksheet(
+	ctx context.Context,
+	req *connect.Request[v1pb.CreateWorksheetRequest],
+) (*connect.Response[v1pb.Worksheet], error) {
+	request := req.Msg
 	if request.Worksheet == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "worksheet must be set")
 	}
@@ -67,32 +73,16 @@ func (s *WorksheetService) CreateWorksheet(ctx context.Context, request *v1pb.Cr
 
 	var database *store.DatabaseMessage
 	if request.Worksheet.Database != "" {
-		instanceResourceID, databaseName, err := common.GetInstanceDatabaseID(request.Worksheet.Database)
+		db, err := getDatabaseMessage(ctx, s.store, request.Worksheet.Database)
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
 		}
-		instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{
-			ResourceID: &instanceResourceID,
-		})
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get instance with resource id %q, err: %v", instanceResourceID, err)
-		}
-		if instance == nil {
-			return nil, status.Errorf(codes.NotFound, "instance with resource id %q not found", instanceResourceID)
-		}
-
-		find := &store.FindDatabaseMessage{
-			ProjectID:       &projectResourceID,
-			InstanceID:      &instanceResourceID,
-			DatabaseName:    &databaseName,
-			IsCaseSensitive: store.IsObjectCaseSensitive(instance),
-		}
-		db, err := s.store.GetDatabaseV2(ctx, find)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get database with name %q, err: %v", databaseName, err)
+		// Verify the database belongs to the specified project
+		if db.ProjectID != projectResourceID {
+			return nil, status.Errorf(codes.NotFound, "database %q not found in project %q", request.Worksheet.Database, projectResourceID)
 		}
 		if db == nil {
-			return nil, status.Errorf(codes.NotFound, "database with name %q not found in project %q instance %q", databaseName, projectResourceID, instanceResourceID)
+			return nil, status.Errorf(codes.NotFound, "database %q not found", request.Worksheet.Database)
 		}
 		database = db
 	}
@@ -108,11 +98,15 @@ func (s *WorksheetService) CreateWorksheet(ctx context.Context, request *v1pb.Cr
 	if err != nil {
 		return nil, err
 	}
-	return v1pbWorksheet, nil
+	return connect.NewResponse(v1pbWorksheet), nil
 }
 
 // GetWorksheet returns the requested worksheet, cutoff the content if the content is too long and the `raw` flag in request is false.
-func (s *WorksheetService) GetWorksheet(ctx context.Context, request *v1pb.GetWorksheetRequest) (*v1pb.Worksheet, error) {
+func (s *WorksheetService) GetWorksheet(
+	ctx context.Context,
+	req *connect.Request[v1pb.GetWorksheetRequest],
+) (*connect.Response[v1pb.Worksheet], error) {
+	request := req.Msg
 	worksheetUID, err := common.GetWorksheetUID(request.Name)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -142,7 +136,7 @@ func (s *WorksheetService) GetWorksheet(ctx context.Context, request *v1pb.GetWo
 	if err != nil {
 		return nil, err
 	}
-	return v1pbWorksheet, nil
+	return connect.NewResponse(v1pbWorksheet), nil
 }
 
 func (s *WorksheetService) getListSheetFilter(ctx context.Context, callerID int, filter string) (*store.ListResourceFilter, error) {
@@ -267,7 +261,11 @@ func (s *WorksheetService) getListSheetFilter(ctx context.Context, callerID int,
 }
 
 // SearchWorksheets returns a list of worksheets based on the search filters.
-func (s *WorksheetService) SearchWorksheets(ctx context.Context, request *v1pb.SearchWorksheetsRequest) (*v1pb.SearchWorksheetsResponse, error) {
+func (s *WorksheetService) SearchWorksheets(
+	ctx context.Context,
+	req *connect.Request[v1pb.SearchWorksheetsRequest],
+) (*connect.Response[v1pb.SearchWorksheetsResponse], error) {
+	request := req.Msg
 	principalID, ok := ctx.Value(common.PrincipalIDContextKey).(int)
 	if !ok {
 		return nil, status.Errorf(codes.Internal, "principal ID not found")
@@ -315,13 +313,17 @@ func (s *WorksheetService) SearchWorksheets(ctx context.Context, request *v1pb.S
 		}
 		v1pbWorksheets = append(v1pbWorksheets, v1pbWorksheet)
 	}
-	return &v1pb.SearchWorksheetsResponse{
+	return connect.NewResponse(&v1pb.SearchWorksheetsResponse{
 		Worksheets: v1pbWorksheets,
-	}, nil
+	}), nil
 }
 
 // UpdateWorksheet updates a worksheet.
-func (s *WorksheetService) UpdateWorksheet(ctx context.Context, request *v1pb.UpdateWorksheetRequest) (*v1pb.Worksheet, error) {
+func (s *WorksheetService) UpdateWorksheet(
+	ctx context.Context,
+	req *connect.Request[v1pb.UpdateWorksheetRequest],
+) (*connect.Response[v1pb.Worksheet], error) {
+	request := req.Msg
 	if request.Worksheet == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "worksheet cannot be empty")
 	}
@@ -379,19 +381,12 @@ func (s *WorksheetService) UpdateWorksheet(ctx context.Context, request *v1pb.Up
 			stringVisibility := string(visibility)
 			worksheetPatch.Visibility = &stringVisibility
 		case "database":
-			instanceID, databaseName, err := common.GetInstanceDatabaseID(request.Worksheet.Database)
+			database, err := getDatabaseMessage(ctx, s.store, request.Worksheet.Database)
 			if err != nil {
-				return nil, status.Error(codes.InvalidArgument, err.Error())
+				return nil, status.Errorf(codes.Internal, "failed to found database %v", request.Worksheet.Database)
 			}
-			database, err := s.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{
-				InstanceID:   &instanceID,
-				DatabaseName: &databaseName,
-			})
-			if err != nil {
-				return nil, status.Error(codes.Internal, err.Error())
-			}
-			if database == nil {
-				return nil, status.Errorf(codes.InvalidArgument, `database "%q" not found`, request.Worksheet.Database)
+			if database == nil || database.Deleted {
+				return nil, status.Errorf(codes.NotFound, "database %v not found", request.Worksheet.Database)
 			}
 			worksheetPatch.InstanceID, worksheetPatch.DatabaseName = &database.InstanceID, &database.DatabaseName
 		default:
@@ -416,11 +411,15 @@ func (s *WorksheetService) UpdateWorksheet(ctx context.Context, request *v1pb.Up
 		return nil, err
 	}
 
-	return v1pbWorksheet, nil
+	return connect.NewResponse(v1pbWorksheet), nil
 }
 
 // DeleteWorksheet deletes a worksheet.
-func (s *WorksheetService) DeleteWorksheet(ctx context.Context, request *v1pb.DeleteWorksheetRequest) (*emptypb.Empty, error) {
+func (s *WorksheetService) DeleteWorksheet(
+	ctx context.Context,
+	req *connect.Request[v1pb.DeleteWorksheetRequest],
+) (*connect.Response[emptypb.Empty], error) {
+	request := req.Msg
 	worksheetUID, err := common.GetWorksheetUID(request.Name)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -451,11 +450,15 @@ func (s *WorksheetService) DeleteWorksheet(ctx context.Context, request *v1pb.De
 		return nil, status.Errorf(codes.Internal, "failed to delete worksheet: %v", err)
 	}
 
-	return &emptypb.Empty{}, nil
+	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
 // UpdateWorksheetOrganizer upsert the worksheet organizer.
-func (s *WorksheetService) UpdateWorksheetOrganizer(ctx context.Context, request *v1pb.UpdateWorksheetOrganizerRequest) (*v1pb.WorksheetOrganizer, error) {
+func (s *WorksheetService) UpdateWorksheetOrganizer(
+	ctx context.Context,
+	req *connect.Request[v1pb.UpdateWorksheetOrganizerRequest],
+) (*connect.Response[v1pb.WorksheetOrganizer], error) {
+	request := req.Msg
 	worksheetUID, err := common.GetWorksheetUID(request.Organizer.Worksheet)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -471,7 +474,7 @@ func (s *WorksheetService) UpdateWorksheetOrganizer(ctx context.Context, request
 		return nil, err
 	}
 
-	ok, err := s.canWriteWorksheet(ctx, worksheet)
+	ok, err := s.canReadWorksheet(ctx, worksheet)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to check access with error: %v", err)
 	}
@@ -499,10 +502,10 @@ func (s *WorksheetService) UpdateWorksheetOrganizer(ctx context.Context, request
 		return nil, status.Errorf(codes.Internal, "failed to upsert organizer for worksheet %s with error: %v", request.Organizer.Worksheet, err)
 	}
 
-	return &v1pb.WorksheetOrganizer{
+	return connect.NewResponse(&v1pb.WorksheetOrganizer{
 		Worksheet: request.Organizer.Worksheet,
 		Starred:   organizer.Starred,
-	}, nil
+	}), nil
 }
 
 func (s *WorksheetService) findWorksheet(ctx context.Context, find *store.FindWorkSheetMessage) (*store.WorkSheetMessage, error) {

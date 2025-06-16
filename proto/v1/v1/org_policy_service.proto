@@ -13,7 +13,7 @@ import "google/type/expr.proto";
 import "v1/annotation.proto";
 import "v1/common.proto";
 
-option go_package = "generated-go/v1";
+option go_package = "github.com/bytebase/bytebase/proto/generated-go/v1";
 
 service OrgPolicyService {
   rpc GetPolicy(GetPolicyRequest) returns (Policy) {
@@ -274,8 +274,6 @@ enum PolicyResourceType {
   WORKSPACE = 1;
   ENVIRONMENT = 2;
   PROJECT = 3;
-  INSTANCE = 4;
-  DATABASE = 5;
 }
 
 message RolloutPolicy {
@@ -300,9 +298,12 @@ message QueryDataPolicy {
   google.protobuf.Duration timeout = 1;
 }
 
+// The SQL review rules. Check the SQL_REVIEW_RULES_DOCUMENTATION.md for details.
 message SQLReviewRule {
   string type = 1;
   SQLReviewRuleLevel level = 2;
+
+  // The payload is a JSON string that varies by rule type.
   string payload = 3;
   Engine engine = 4;
   string comment = 5;

@@ -6,13 +6,11 @@ import (
 	"strings"
 
 	grpcruntime "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"github.com/labstack/echo-contrib/prometheus"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/pkg/errors"
 	"github.com/tmc/grpc-websocket-proxy/wsproxy"
-	"google.golang.org/grpc"
 
 	directorysync "github.com/bytebase/bytebase/backend/api/directory-sync"
 	"github.com/bytebase/bytebase/backend/api/lsp"
@@ -22,11 +20,11 @@ import (
 
 func configureEchoRouters(
 	e *echo.Echo,
-	grpcServer *grpc.Server,
 	lspServer *lsp.Server,
 	directorySyncServer *directorysync.Service,
 	mux *grpcruntime.ServeMux,
 	profile *config.Profile,
+	connectHandlers map[string]http.Handler,
 ) {
 	e.Use(recoverMiddleware)
 
@@ -77,19 +75,10 @@ func configureEchoRouters(
 	)))
 	e.Any("/v1/*", echo.WrapHandler(mux))
 
-	// GRPC web proxy.
-	options := []grpcweb.Option{
-		grpcweb.WithCorsForRegisteredEndpointsOnly(false),
-		grpcweb.WithOriginFunc(func(_ string) bool {
-			return true
-		}),
-		grpcweb.WithWebsockets(true),
-		grpcweb.WithWebsocketOriginFunc(func(_ *http.Request) bool {
-			return true
-		}),
+	// Register Connect RPC handlers
+	for path, handler := range connectHandlers {
+		e.Any(path+"*", echo.WrapHandler(handler))
 	}
-	wrappedGrpc := grpcweb.WrapServer(grpcServer, options...)
-	e.Any("/bytebase.v1.*", echo.WrapHandler(wrappedGrpc))
 
 	// LSP server.
 	e.GET(lspAPI, lspServer.Router)

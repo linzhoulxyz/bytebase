@@ -1,14 +1,14 @@
 package webhook
 
 import (
-	"github.com/bytebase/bytebase/backend/base"
+	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/store"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 type Event struct {
 	Actor   *store.UserMessage
-	Type    base.EventType
+	Type    common.EventType
 	Comment string
 	// nullable
 	Issue   *Issue
@@ -86,7 +86,7 @@ type EventIssueRolloutReady struct {
 
 type EventStageStatusUpdate struct {
 	StageTitle string
-	StageUID   int
+	StageID    string
 }
 
 type EventTaskRunStatusUpdate struct {

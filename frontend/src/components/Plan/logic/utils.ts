@@ -1,36 +1,9 @@
-import { mockDatabase } from "@/components/IssueV1";
-import { useDatabaseV1Store, useProjectV1Store } from "@/store";
-import { isValidDatabaseName, unknownDatabase } from "@/types";
+import { useProjectV1Store } from "@/store";
 import type { ComposedProject } from "@/types";
-import type { Plan_Spec } from "@/types/proto/v1/plan_service";
-import type { ComposedPlan } from "@/types/v1/issue/plan";
+import type { Plan } from "@/types/proto/v1/plan_service";
+import { extractProjectResourceName } from "@/utils";
 
-export const projectOfPlan = (plan: ComposedPlan): ComposedProject =>
-  useProjectV1Store().getProjectByName(plan.project);
-
-export const targetOfSpec = (spec: Plan_Spec) => {
-  if (spec.changeDatabaseConfig) {
-    return spec.changeDatabaseConfig.target;
-  } else if (spec.exportDataConfig) {
-    return spec.exportDataConfig.target;
-  }
-  return undefined;
-};
-
-export const databaseOfSpec = (project: ComposedProject, spec: Plan_Spec) => {
-  if (spec.createDatabaseConfig) {
-    return mockDatabase(
-      project,
-      `${spec.createDatabaseConfig.target}/databases/${spec.createDatabaseConfig.database}`
-    );
-  }
-  const target = targetOfSpec(spec);
-  if (!target) {
-    return unknownDatabase();
-  }
-  const db = useDatabaseV1Store().getDatabaseByName(target);
-  if (!isValidDatabaseName(db.name)) {
-    return mockDatabase(project, target);
-  }
-  return db;
+export const projectOfPlan = (plan: Plan): ComposedProject => {
+  const project = `projects/${extractProjectResourceName(plan.name)}`;
+  return useProjectV1Store().getProjectByName(project);
 };

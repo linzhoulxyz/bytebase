@@ -10,7 +10,6 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/bytebase/bytebase/backend/base"
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/component/state"
 	"github.com/bytebase/bytebase/backend/store"
@@ -33,7 +32,6 @@ func convertToPlans(ctx context.Context, s *store.Store, plans []*store.PlanMess
 func convertToPlan(ctx context.Context, s *store.Store, plan *store.PlanMessage) (*v1pb.Plan, error) {
 	p := &v1pb.Plan{
 		Name:                    common.FormatPlan(plan.ProjectID, plan.UID),
-		Issue:                   "",
 		Title:                   plan.Name,
 		Description:             plan.Description,
 		Specs:                   convertToPlanSpecs(plan.Config.Specs), // Use specs field for output
@@ -55,6 +53,9 @@ func convertToPlan(ctx context.Context, s *store.Store, plan *store.PlanMessage)
 	}
 	if issue != nil {
 		p.Issue = common.FormatIssue(issue.Project.ResourceID, issue.UID)
+	}
+	if plan.PipelineUID != nil {
+		p.Rollout = common.FormatRollout(plan.ProjectID, *plan.PipelineUID)
 	}
 	return p, nil
 }
@@ -104,14 +105,12 @@ func convertToPlanSpecChangeDatabaseConfig(config *storepb.PlanConfig_Spec_Chang
 	c := config.ChangeDatabaseConfig
 	return &v1pb.Plan_Spec_ChangeDatabaseConfig{
 		ChangeDatabaseConfig: &v1pb.Plan_ChangeDatabaseConfig{
-			Target:     c.Target,
-			Sheet:      c.Sheet,
-			Release:    c.Release,
-			Type:       convertToPlanSpecChangeDatabaseConfigType(c.Type),
-			GhostFlags: c.GhostFlags,
-			PreUpdateBackupDetail: &v1pb.Plan_ChangeDatabaseConfig_PreUpdateBackupDetail{
-				Database: c.PreUpdateBackupDetail.GetDatabase(),
-			},
+			Targets:           c.Targets,
+			Sheet:             c.Sheet,
+			Release:           c.Release,
+			Type:              convertToPlanSpecChangeDatabaseConfigType(c.Type),
+			GhostFlags:        c.GhostFlags,
+			EnablePriorBackup: c.EnablePriorBackup,
 		},
 	}
 }
@@ -137,7 +136,7 @@ func convertToPlanSpecExportDataConfig(config *storepb.PlanConfig_Spec_ExportDat
 	c := config.ExportDataConfig
 	return &v1pb.Plan_Spec_ExportDataConfig{
 		ExportDataConfig: &v1pb.Plan_ExportDataConfig{
-			Target:   c.Target,
+			Targets:  c.Targets,
 			Sheet:    c.Sheet,
 			Format:   convertExportFormat(c.Format),
 			Password: c.Password,
@@ -183,34 +182,6 @@ func convertPlan(plan *v1pb.Plan) *storepb.PlanConfig {
 	return &storepb.PlanConfig{
 		Specs:      convertPlanSpecs(plan.Specs),
 		Deployment: nil,
-	}
-}
-
-func convertPlanDeployment(s *v1pb.Plan_Deployment) *storepb.PlanConfig_Deployment {
-	if s == nil {
-		return nil
-	}
-	return &storepb.PlanConfig_Deployment{
-		Environments:          s.Environments,
-		DatabaseGroupMappings: convertDatabaseGroupMappings(s.DatabaseGroupMappings),
-	}
-}
-
-func convertDatabaseGroupMappings(s []*v1pb.Plan_Deployment_DatabaseGroupMapping) []*storepb.PlanConfig_Deployment_DatabaseGroupMapping {
-	storeMappings := make([]*storepb.PlanConfig_Deployment_DatabaseGroupMapping, len(s))
-	for i := range s {
-		storeMappings[i] = convertDatabaseGroupMapping(s[i])
-	}
-	return storeMappings
-}
-
-func convertDatabaseGroupMapping(s *v1pb.Plan_Deployment_DatabaseGroupMapping) *storepb.PlanConfig_Deployment_DatabaseGroupMapping {
-	if s == nil {
-		return nil
-	}
-	return &storepb.PlanConfig_Deployment_DatabaseGroupMapping{
-		DatabaseGroup: s.DatabaseGroup,
-		Databases:     s.Databases,
 	}
 }
 
@@ -260,20 +231,14 @@ func convertPlanConfigCreateDatabaseConfig(c *v1pb.Plan_CreateDatabaseConfig) *s
 
 func convertPlanSpecChangeDatabaseConfig(config *v1pb.Plan_Spec_ChangeDatabaseConfig) *storepb.PlanConfig_Spec_ChangeDatabaseConfig {
 	c := config.ChangeDatabaseConfig
-	var preUpdateBackupDetail *storepb.PreUpdateBackupDetail
-	if c.PreUpdateBackupDetail != nil && c.GetPreUpdateBackupDetail().GetDatabase() != "" {
-		preUpdateBackupDetail = &storepb.PreUpdateBackupDetail{
-			Database: c.GetPreUpdateBackupDetail().GetDatabase(),
-		}
-	}
 	return &storepb.PlanConfig_Spec_ChangeDatabaseConfig{
 		ChangeDatabaseConfig: &storepb.PlanConfig_ChangeDatabaseConfig{
-			Target:                c.Target,
-			Sheet:                 c.Sheet,
-			Release:               c.Release,
-			Type:                  storepb.PlanConfig_ChangeDatabaseConfig_Type(c.Type),
-			GhostFlags:            c.GhostFlags,
-			PreUpdateBackupDetail: preUpdateBackupDetail,
+			Targets:           c.Targets,
+			Sheet:             c.Sheet,
+			Release:           c.Release,
+			Type:              storepb.PlanConfig_ChangeDatabaseConfig_Type(c.Type),
+			GhostFlags:        c.GhostFlags,
+			EnablePriorBackup: c.EnablePriorBackup,
 		},
 	}
 }
@@ -282,7 +247,7 @@ func convertPlanSpecExportDataConfig(config *v1pb.Plan_Spec_ExportDataConfig) *s
 	c := config.ExportDataConfig
 	return &storepb.PlanConfig_Spec_ExportDataConfig{
 		ExportDataConfig: &storepb.PlanConfig_ExportDataConfig{
-			Target:   c.Target,
+			Targets:  c.Targets,
 			Sheet:    c.Sheet,
 			Format:   convertToExportFormat(c.Format),
 			Password: c.Password,
@@ -424,7 +389,7 @@ func convertToTaskRuns(ctx context.Context, s *store.Store, stateCfg *state.Stat
 
 func convertToTaskRun(ctx context.Context, s *store.Store, stateCfg *state.State, taskRun *store.TaskRunMessage) (*v1pb.TaskRun, error) {
 	t := &v1pb.TaskRun{
-		Name:          common.FormatTaskRun(taskRun.ProjectID, taskRun.PipelineUID, taskRun.StageUID, taskRun.TaskUID, taskRun.ID),
+		Name:          common.FormatTaskRun(taskRun.ProjectID, taskRun.PipelineUID, taskRun.Environment, taskRun.TaskUID, taskRun.ID),
 		Creator:       common.FormatUserEmail(taskRun.Creator.Email),
 		CreateTime:    timestamppb.New(taskRun.CreatedAt),
 		UpdateTime:    timestamppb.New(taskRun.UpdatedAt),
@@ -535,7 +500,7 @@ func convertToSchedulerInfoWaitingCause(ctx context.Context, s *store.Store, c *
 		return &v1pb.TaskRun_SchedulerInfo_WaitingCause{
 			Cause: &v1pb.TaskRun_SchedulerInfo_WaitingCause_Task_{
 				Task: &v1pb.TaskRun_SchedulerInfo_WaitingCause_Task{
-					Task:  common.FormatTask(pipeline.ProjectID, task.PipelineID, task.StageID, task.ID),
+					Task:  common.FormatTask(pipeline.ProjectID, task.PipelineID, task.Environment, task.ID),
 					Issue: issueName,
 				},
 			},
@@ -551,19 +516,19 @@ func convertToSchedulerInfoWaitingCause(ctx context.Context, s *store.Store, c *
 	}
 }
 
-func convertToTaskRunStatus(status base.TaskRunStatus) v1pb.TaskRun_Status {
+func convertToTaskRunStatus(status storepb.TaskRun_Status) v1pb.TaskRun_Status {
 	switch status {
-	case base.TaskRunUnknown:
+	case storepb.TaskRun_STATUS_UNSPECIFIED:
 		return v1pb.TaskRun_STATUS_UNSPECIFIED
-	case base.TaskRunPending:
+	case storepb.TaskRun_PENDING:
 		return v1pb.TaskRun_PENDING
-	case base.TaskRunRunning:
+	case storepb.TaskRun_RUNNING:
 		return v1pb.TaskRun_RUNNING
-	case base.TaskRunDone:
+	case storepb.TaskRun_DONE:
 		return v1pb.TaskRun_DONE
-	case base.TaskRunFailed:
+	case storepb.TaskRun_FAILED:
 		return v1pb.TaskRun_FAILED
-	case base.TaskRunCanceled:
+	case storepb.TaskRun_CANCELED:
 		return v1pb.TaskRun_CANCELED
 	default:
 		return v1pb.TaskRun_STATUS_UNSPECIFIED
@@ -626,36 +591,66 @@ func convertToRollout(ctx context.Context, s *store.Store, project *store.Projec
 		rolloutV1.Issue = common.FormatIssue(project.ResourceID, *rollout.IssueID)
 	}
 
-	taskIDToName := map[int]string{}
-	for _, stage := range rollout.Stages {
-		rolloutStage := &v1pb.Stage{
-			Name:        common.FormatStage(project.ResourceID, rollout.ID, stage.ID),
-			Environment: common.FormatEnvironment(stage.Environment),
+	// Get environment order from plan deployment config or global settings
+	var environmentOrder []string
+	if plan != nil && len(plan.Config.GetDeployment().GetEnvironments()) > 0 {
+		environmentOrder = plan.Config.Deployment.GetEnvironments()
+	} else {
+		// Use global environment setting order
+		var err error
+		environmentOrder, err = getAllEnvironmentIDs(ctx, s)
+		if err != nil {
+			return nil, err
 		}
-		for _, task := range stage.TaskList {
-			rolloutTask, err := convertToTask(ctx, s, project, task)
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to convert task, error: %v", err)
-			}
-			taskIDToName[task.ID] = rolloutTask.Name
-			rolloutStage.Tasks = append(rolloutStage.Tasks, rolloutTask)
-		}
-
-		rolloutV1.Stages = append(rolloutV1.Stages, rolloutStage)
 	}
 
+	environmentExists := make(map[string]bool)
+	for _, env := range environmentOrder {
+		environmentExists[env] = true
+	}
+
+	// Group tasks by environment.
+	tasksByEnv := map[string][]*v1pb.Task{}
+	for _, task := range rollout.Tasks {
+		// Skip tasks with environments not in the deployment list
+		if !environmentExists[task.Environment] {
+			continue
+		}
+
+		rolloutTask, err := convertToTask(ctx, s, project, task)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to convert task, error: %v", err)
+		}
+
+		tasksByEnv[task.Environment] = append(tasksByEnv[task.Environment], rolloutTask)
+	}
+
+	var stages []*v1pb.Stage
+	for _, environment := range environmentOrder {
+		tasks := tasksByEnv[environment]
+		if len(tasks) > 0 {
+			stages = append(stages, &v1pb.Stage{
+				Name:        common.FormatStage(project.ResourceID, rollout.ID, environment),
+				Id:          environment,
+				Environment: common.FormatEnvironment(environment),
+				Tasks:       tasks,
+			})
+		}
+	}
+
+	rolloutV1.Stages = stages
 	return rolloutV1, nil
 }
 
 func convertToTask(ctx context.Context, s *store.Store, project *store.ProjectMessage, task *store.TaskMessage) (*v1pb.Task, error) {
 	switch task.Type {
-	case base.TaskDatabaseCreate:
+	case storepb.Task_DATABASE_CREATE:
 		return convertToTaskFromDatabaseCreate(ctx, s, project, task)
-	case base.TaskDatabaseSchemaUpdate, base.TaskDatabaseSchemaUpdateGhost:
+	case storepb.Task_DATABASE_SCHEMA_UPDATE, storepb.Task_DATABASE_SCHEMA_UPDATE_GHOST:
 		return convertToTaskFromSchemaUpdate(ctx, s, project, task)
-	case base.TaskDatabaseDataUpdate:
+	case storepb.Task_DATABASE_DATA_UPDATE:
 		return convertToTaskFromDataUpdate(ctx, s, project, task)
-	case base.TaskDatabaseDataExport:
+	case storepb.Task_DATABASE_EXPORT:
 		return convertToTaskFromDatabaseDataExport(ctx, s, project, task)
 	default:
 		return nil, errors.Errorf("task type %v is not supported", task.Type)
@@ -670,7 +665,7 @@ func convertToTaskFromDatabaseCreate(ctx context.Context, s *store.Store, projec
 		return nil, errors.Wrapf(err, "failed to get instance %s", task.InstanceID)
 	}
 	v1pbTask := &v1pb.Task{
-		Name:          common.FormatTask(project.ResourceID, task.PipelineID, task.StageID, task.ID),
+		Name:          common.FormatTask(project.ResourceID, task.PipelineID, task.Environment, task.ID),
 		SpecId:        task.Payload.GetSpecId(),
 		Type:          convertToTaskType(task.Type),
 		Status:        convertToTaskStatus(task.LatestTaskRunStatus, task.Payload.GetSkipped()),
@@ -705,7 +700,7 @@ func convertToTaskFromSchemaUpdate(ctx context.Context, s *store.Store, project 
 	}
 
 	v1pbTask := &v1pb.Task{
-		Name:          common.FormatTask(project.ResourceID, task.PipelineID, task.StageID, task.ID),
+		Name:          common.FormatTask(project.ResourceID, task.PipelineID, task.Environment, task.ID),
 		SpecId:        task.Payload.GetSpecId(),
 		Type:          convertToTaskType(task.Type),
 		Status:        convertToTaskStatus(task.LatestTaskRunStatus, task.Payload.GetSkipped()),
@@ -734,7 +729,7 @@ func convertToTaskFromDataUpdate(ctx context.Context, s *store.Store, project *s
 	}
 
 	v1pbTask := &v1pb.Task{
-		Name:          common.FormatTask(project.ResourceID, task.PipelineID, task.StageID, task.ID),
+		Name:          common.FormatTask(project.ResourceID, task.PipelineID, task.Environment, task.ID),
 		SpecId:        task.Payload.GetSpecId(),
 		Type:          convertToTaskType(task.Type),
 		Status:        convertToTaskStatus(task.LatestTaskRunStatus, task.Payload.GetSkipped()),
@@ -775,7 +770,7 @@ func convertToTaskFromDatabaseDataExport(ctx context.Context, s *store.Store, pr
 		},
 	}
 	v1pbTask := &v1pb.Task{
-		Name:    common.FormatTask(project.ResourceID, task.PipelineID, task.StageID, task.ID),
+		Name:    common.FormatTask(project.ResourceID, task.PipelineID, task.Environment, task.ID),
 		SpecId:  task.Payload.GetSpecId(),
 		Type:    convertToTaskType(task.Type),
 		Status:  convertToTaskStatus(task.LatestTaskRunStatus, false),
@@ -785,40 +780,40 @@ func convertToTaskFromDatabaseDataExport(ctx context.Context, s *store.Store, pr
 	return v1pbTask, nil
 }
 
-func convertToTaskStatus(latestTaskRunStatus base.TaskRunStatus, skipped bool) v1pb.Task_Status {
+func convertToTaskStatus(latestTaskRunStatus storepb.TaskRun_Status, skipped bool) v1pb.Task_Status {
 	if skipped {
 		return v1pb.Task_SKIPPED
 	}
 	switch latestTaskRunStatus {
-	case base.TaskRunNotStarted:
+	case storepb.TaskRun_NOT_STARTED:
 		return v1pb.Task_NOT_STARTED
-	case base.TaskRunPending:
+	case storepb.TaskRun_PENDING:
 		return v1pb.Task_PENDING
-	case base.TaskRunRunning:
+	case storepb.TaskRun_RUNNING:
 		return v1pb.Task_RUNNING
-	case base.TaskRunDone:
+	case storepb.TaskRun_DONE:
 		return v1pb.Task_DONE
-	case base.TaskRunFailed:
+	case storepb.TaskRun_FAILED:
 		return v1pb.Task_FAILED
-	case base.TaskRunCanceled:
+	case storepb.TaskRun_CANCELED:
 		return v1pb.Task_CANCELED
 	default:
 		return v1pb.Task_STATUS_UNSPECIFIED
 	}
 }
 
-func convertToTaskType(taskType base.TaskType) v1pb.Task_Type {
+func convertToTaskType(taskType storepb.Task_Type) v1pb.Task_Type {
 	switch taskType {
-	case base.TaskDatabaseCreate:
+	case storepb.Task_DATABASE_CREATE:
 		return v1pb.Task_DATABASE_CREATE
-	case base.TaskDatabaseSchemaUpdate:
+	case storepb.Task_DATABASE_SCHEMA_UPDATE:
 		return v1pb.Task_DATABASE_SCHEMA_UPDATE
-	case base.TaskDatabaseSchemaUpdateGhost:
+	case storepb.Task_DATABASE_SCHEMA_UPDATE_GHOST:
 		return v1pb.Task_DATABASE_SCHEMA_UPDATE_GHOST
-	case base.TaskDatabaseDataUpdate:
+	case storepb.Task_DATABASE_DATA_UPDATE:
 		return v1pb.Task_DATABASE_DATA_UPDATE
-	case base.TaskDatabaseDataExport:
-		return v1pb.Task_DATABASE_DATA_EXPORT
+	case storepb.Task_DATABASE_EXPORT:
+		return v1pb.Task_DATABASE_EXPORT
 	default:
 		return v1pb.Task_TYPE_UNSPECIFIED
 	}

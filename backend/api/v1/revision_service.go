@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"connectrpc.com/connect"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -16,11 +17,12 @@ import (
 	"github.com/bytebase/bytebase/backend/store"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
+	"github.com/bytebase/bytebase/proto/generated-go/v1/v1connect"
 )
 
 // RevisionService implements the revision service.
 type RevisionService struct {
-	v1pb.UnimplementedRevisionServiceServer
+	v1connect.UnimplementedRevisionServiceHandler
 	store *store.Store
 }
 
@@ -31,28 +33,16 @@ func NewRevisionService(store *store.Store) *RevisionService {
 	}
 }
 
-func (s *RevisionService) ListRevisions(ctx context.Context, request *v1pb.ListRevisionsRequest) (*v1pb.ListRevisionsResponse, error) {
-	instanceID, databaseName, err := common.GetInstanceDatabaseID(request.Parent)
+func (s *RevisionService) ListRevisions(
+	ctx context.Context,
+	req *connect.Request[v1pb.ListRevisionsRequest],
+) (*connect.Response[v1pb.ListRevisionsResponse], error) {
+	request := req.Msg
+	database, err := getDatabaseMessage(ctx, s.store, request.Parent)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "failed to get instance and database from %v, err: %v", request.Parent, err)
+		return nil, status.Errorf(codes.Internal, "failed to found database %v", request.Parent)
 	}
-
-	instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{ResourceID: &instanceID})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to find instance %v, err: %v", instanceID, err)
-	}
-	if instance == nil {
-		return nil, status.Errorf(codes.NotFound, "instance %v not found", instanceID)
-	}
-
-	database, err := s.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{
-		InstanceID:   &instanceID,
-		DatabaseName: &databaseName,
-	})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to find database %v, err: %v", request.Parent, err)
-	}
-	if database == nil {
+	if database == nil || database.Deleted {
 		return nil, status.Errorf(codes.NotFound, "database %v not found", request.Parent)
 	}
 
@@ -92,13 +82,17 @@ func (s *RevisionService) ListRevisions(ctx context.Context, request *v1pb.ListR
 		return nil, status.Errorf(codes.Internal, "failed to convert to revisions, err: %v", err)
 	}
 
-	return &v1pb.ListRevisionsResponse{
+	return connect.NewResponse(&v1pb.ListRevisionsResponse{
 		Revisions:     converted,
 		NextPageToken: nextPageToken,
-	}, nil
+	}), nil
 }
 
-func (s *RevisionService) GetRevision(ctx context.Context, request *v1pb.GetRevisionRequest) (*v1pb.Revision, error) {
+func (s *RevisionService) GetRevision(
+	ctx context.Context,
+	req *connect.Request[v1pb.GetRevisionRequest],
+) (*connect.Response[v1pb.Revision], error) {
+	request := req.Msg
 	instanceName, databaseName, revisionUID, err := common.GetInstanceDatabaseRevisionID(request.Name)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to get revision UID from %v, err: %v", request.Name, err)
@@ -112,26 +106,23 @@ func (s *RevisionService) GetRevision(ctx context.Context, request *v1pb.GetRevi
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert to revision, err: %v", err)
 	}
-	return converted, nil
+	return connect.NewResponse(converted), nil
 }
 
-func (s *RevisionService) CreateRevision(ctx context.Context, request *v1pb.CreateRevisionRequest) (*v1pb.Revision, error) {
-	instanceID, databaseID, err := common.GetInstanceDatabaseID(request.Parent)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "failed to get instance and database from %v, err: %v", request.Parent, err)
-	}
+func (s *RevisionService) CreateRevision(
+	ctx context.Context,
+	req *connect.Request[v1pb.CreateRevisionRequest],
+) (*connect.Response[v1pb.Revision], error) {
+	request := req.Msg
 	if request.Revision == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "request.Revision is not set")
 	}
-	database, err := s.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{
-		InstanceID:   &instanceID,
-		DatabaseName: &databaseID,
-	})
+	database, err := getDatabaseMessage(ctx, s.store, request.Parent)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get database, err: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to found database %v", request.Parent)
 	}
-	if database == nil {
-		return nil, status.Errorf(codes.NotFound, "database %q not found", request.Parent)
+	if database == nil || database.Deleted {
+		return nil, status.Errorf(codes.NotFound, "database %v not found", request.Parent)
 	}
 	_, sheetUID, err := common.GetProjectResourceIDSheetUID(request.Revision.Sheet)
 	if err != nil {
@@ -159,7 +150,7 @@ func (s *RevisionService) CreateRevision(ctx context.Context, request *v1pb.Crea
 		}
 		if taskRun.ProjectID != projectID ||
 			taskRun.PipelineUID != rolloutID ||
-			taskRun.StageUID != stageID ||
+			taskRun.Environment != stageID ||
 			taskRun.TaskUID != taskID {
 			return nil, status.Errorf(codes.NotFound, "taskRun %q not found", request.Revision.TaskRun)
 		}
@@ -215,27 +206,20 @@ func (s *RevisionService) CreateRevision(ctx context.Context, request *v1pb.Crea
 		return nil, status.Errorf(codes.Internal, "failed to convert to revision, err: %v", err)
 	}
 
-	return converted, nil
+	return connect.NewResponse(converted), nil
 }
 
-func (s *RevisionService) BatchCreateRevisions(ctx context.Context, request *v1pb.BatchCreateRevisionsRequest) (*v1pb.BatchCreateRevisionsResponse, error) {
-	instanceID, databaseID, err := common.GetInstanceDatabaseID(request.Parent)
+func (s *RevisionService) BatchCreateRevisions(
+	ctx context.Context,
+	req *connect.Request[v1pb.BatchCreateRevisionsRequest],
+) (*connect.Response[v1pb.BatchCreateRevisionsResponse], error) {
+	request := req.Msg
+	database, err := getDatabaseMessage(ctx, s.store, request.Parent)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "failed to get instance and database from %v, err: %v", request.Parent, err)
+		return nil, status.Errorf(codes.Internal, "failed to found database %v", request.Parent)
 	}
-	if len(request.Requests) == 0 {
-		return nil, status.Errorf(codes.InvalidArgument, "requests is empty")
-	}
-
-	database, err := s.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{
-		InstanceID:   &instanceID,
-		DatabaseName: &databaseID,
-	})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get database, err: %v", err)
-	}
-	if database == nil {
-		return nil, status.Errorf(codes.NotFound, "database %q not found", request.Parent)
+	if database == nil || database.Deleted {
+		return nil, status.Errorf(codes.NotFound, "database %v not found", request.Parent)
 	}
 
 	var revisions []*v1pb.Revision
@@ -246,19 +230,23 @@ func (s *RevisionService) BatchCreateRevisions(ctx context.Context, request *v1p
 		}
 
 		// Reuse the CreateRevision logic by calling it directly
-		revision, err := s.CreateRevision(ctx, req)
+		revisionResp, err := s.CreateRevision(ctx, connect.NewRequest(req))
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to create revision for request: %v, err: %v", req, err)
 		}
-		revisions = append(revisions, revision)
+		revisions = append(revisions, revisionResp.Msg)
 	}
 
-	return &v1pb.BatchCreateRevisionsResponse{
+	return connect.NewResponse(&v1pb.BatchCreateRevisionsResponse{
 		Revisions: revisions,
-	}, nil
+	}), nil
 }
 
-func (s *RevisionService) DeleteRevision(ctx context.Context, request *v1pb.DeleteRevisionRequest) (*emptypb.Empty, error) {
+func (s *RevisionService) DeleteRevision(
+	ctx context.Context,
+	req *connect.Request[v1pb.DeleteRevisionRequest],
+) (*connect.Response[emptypb.Empty], error) {
+	request := req.Msg
 	_, _, revisionUID, err := common.GetInstanceDatabaseRevisionID(request.Name)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to get revision UID from %v, err: %v", request.Name, err)
@@ -270,7 +258,7 @@ func (s *RevisionService) DeleteRevision(ctx context.Context, request *v1pb.Dele
 	if err := s.store.DeleteRevision(ctx, revisionUID, user.ID); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete revision %v, err: %v", revisionUID, err)
 	}
-	return &emptypb.Empty{}, nil
+	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
 func convertToRevisions(ctx context.Context, s *store.Store, parent string, revisions []*store.RevisionMessage) ([]*v1pb.Revision, error) {

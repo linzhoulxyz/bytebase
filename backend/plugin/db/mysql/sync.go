@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -548,6 +548,12 @@ func (d *Driver) SyncDBSchema(ctx context.Context) (*storepb.DatabaseSchemaMetad
 		// Quoted string has a single quote around it.
 		comment = stripSingleQuote(comment)
 
+		// Skip partition entries by checking if CREATE_OPTIONS contains 'partitioned'
+		// This happens when MySQL shows individual partitions as separate table entries
+		if strings.Contains(strings.ToLower(createOptions), "partitioned") {
+			continue
+		}
+
 		key := db.TableKey{Schema: "", Table: tableName}
 		switch tableType {
 		case baseTableType:
@@ -577,7 +583,7 @@ func (d *Driver) SyncDBSchema(ctx context.Context) (*storepb.DatabaseSchemaMetad
 				for indexName := range indexes {
 					indexNames = append(indexNames, indexName)
 				}
-				sort.Strings(indexNames)
+				slices.Sort(indexNames)
 				for _, indexName := range indexNames {
 					tableMetadata.Indexes = append(tableMetadata.Indexes, indexes[indexName])
 				}
@@ -1318,8 +1324,13 @@ func (d *Driver) getForeignKeyList(ctx context.Context, databaseName string) (ma
 
 	orderedResult := make(map[db.TableKey][]*storepb.ForeignKeyMetadata)
 	for key, fks := range unordered {
-		sort.Slice(fks, func(i, j int) bool {
-			return fks[i].Name < fks[j].Name
+		slices.SortFunc(fks, func(x, y *storepb.ForeignKeyMetadata) int {
+			if x.Name < y.Name {
+				return -1
+			} else if x.Name > y.Name {
+				return 1
+			}
+			return 0
 		})
 		orderedResult[key] = fks
 	}

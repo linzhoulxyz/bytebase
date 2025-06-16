@@ -11,7 +11,7 @@ import "v1/annotation.proto";
 import "v1/common.proto";
 import "v1/plan_service.proto";
 
-option go_package = "generated-go/v1";
+option go_package = "github.com/bytebase/bytebase/proto/generated-go/v1";
 
 service RolloutService {
   rpc GetRollout(GetRolloutRequest) returns (Rollout) {
@@ -335,11 +335,12 @@ message Stage {
   // Format: projects/{project}/rollouts/{rollout}/stages/{stage}
   string name = 1;
 
-  // The id comes from the deployment config.
-  // Format: UUID
-  // Empty for legacy stages.
+  // id is the environment id of the stage.
+  // e.g. "prod".
   string id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 
+  // environment is the environment of the stage.
+  // Format: environments/{environment}.
   string environment = 4;
 
   repeated Task tasks = 5;
@@ -388,7 +389,7 @@ message Task {
     // use payload DatabaseDataUpdate
     DATABASE_DATA_UPDATE = 8;
     // use payload DatabaseDataExport
-    DATABASE_DATA_EXPORT = 12;
+    DATABASE_EXPORT = 12;
   }
   Type type = 6;
 

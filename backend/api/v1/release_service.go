@@ -2,9 +2,12 @@ package v1
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"slices"
 
+	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
@@ -20,10 +23,11 @@ import (
 	"github.com/bytebase/bytebase/backend/store/model"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
+	"github.com/bytebase/bytebase/proto/generated-go/v1/v1connect"
 )
 
 type ReleaseService struct {
-	v1pb.UnimplementedReleaseServiceServer
+	v1connect.UnimplementedReleaseServiceHandler
 	store        *store.Store
 	sheetManager *sheet.Manager
 	schemaSyncer *schemasync.Syncer
@@ -44,8 +48,8 @@ func NewReleaseService(
 	}
 }
 
-func (s *ReleaseService) CreateRelease(ctx context.Context, request *v1pb.CreateReleaseRequest) (*v1pb.Release, error) {
-	if request.Release == nil {
+func (s *ReleaseService) CreateRelease(ctx context.Context, req *connect.Request[v1pb.CreateReleaseRequest]) (*connect.Response[v1pb.Release], error) {
+	if req.Msg.Release == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "request.Release cannot be nil")
 	}
 
@@ -54,7 +58,7 @@ func (s *ReleaseService) CreateRelease(ctx context.Context, request *v1pb.Create
 		return nil, status.Errorf(codes.Internal, "user not found")
 	}
 
-	projectID, err := common.GetProjectID(request.Parent)
+	projectID, err := common.GetProjectID(req.Msg.Parent)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to get project id, err: %v", err)
 	}
@@ -66,7 +70,7 @@ func (s *ReleaseService) CreateRelease(ctx context.Context, request *v1pb.Create
 		return nil, status.Errorf(codes.NotFound, "project %v not found", projectID)
 	}
 
-	request.Release.Files, err = validateAndSanitizeReleaseFiles(request.Release.Files)
+	req.Msg.Release.Files, err = validateAndSanitizeReleaseFiles(ctx, s.store, req.Msg.Release.Files)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid release files, err: %v", err)
 	}
@@ -74,11 +78,9 @@ func (s *ReleaseService) CreateRelease(ctx context.Context, request *v1pb.Create
 	var filesWithoutSheet []*v1pb.Release_File
 	// Prepare sheets to create for files with missing sheets.
 	// Check versions.
-	for _, file := range request.Release.Files {
+	for _, file := range req.Msg.Release.Files {
 		if file.Sheet == "" {
-			if file.Statement == nil {
-				return nil, status.Errorf(codes.InvalidArgument, "either sheet or statement must be set")
-			}
+			// statement must be present due to validation in validateAndSanitizeReleaseFiles
 			sheet := &store.SheetMessage{
 				Title:     fmt.Sprintf("File %s", file.Path),
 				Statement: string(file.Statement),
@@ -104,7 +106,7 @@ func (s *ReleaseService) CreateRelease(ctx context.Context, request *v1pb.Create
 		}
 	}
 
-	files, err := convertReleaseFiles(ctx, s.store, request.Release.Files)
+	files, err := convertReleaseFiles(ctx, s.store, req.Msg.Release.Files)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert files, err: %v", err)
 	}
@@ -112,9 +114,9 @@ func (s *ReleaseService) CreateRelease(ctx context.Context, request *v1pb.Create
 	releaseMessage := &store.ReleaseMessage{
 		ProjectID: project.ResourceID,
 		Payload: &storepb.ReleasePayload{
-			Title:     request.Release.Title,
+			Title:     req.Msg.Release.Title,
 			Files:     files,
-			VcsSource: convertReleaseVcsSource(request.Release.VcsSource),
+			VcsSource: convertReleaseVcsSource(req.Msg.Release.VcsSource),
 		},
 	}
 
@@ -128,11 +130,11 @@ func (s *ReleaseService) CreateRelease(ctx context.Context, request *v1pb.Create
 		return nil, status.Errorf(codes.Internal, "failed to convert release, err: %v", err)
 	}
 
-	return converted, nil
+	return connect.NewResponse(converted), nil
 }
 
-func (s *ReleaseService) GetRelease(ctx context.Context, request *v1pb.GetReleaseRequest) (*v1pb.Release, error) {
-	_, releaseUID, err := common.GetProjectReleaseUID(request.Name)
+func (s *ReleaseService) GetRelease(ctx context.Context, req *connect.Request[v1pb.GetReleaseRequest]) (*connect.Response[v1pb.Release], error) {
+	_, releaseUID, err := common.GetProjectReleaseUID(req.Msg.Name)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to get release uid, err: %v", err)
 	}
@@ -147,15 +149,15 @@ func (s *ReleaseService) GetRelease(ctx context.Context, request *v1pb.GetReleas
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert to release, err: %v", err)
 	}
-	return release, nil
+	return connect.NewResponse(release), nil
 }
 
-func (s *ReleaseService) ListReleases(ctx context.Context, request *v1pb.ListReleasesRequest) (*v1pb.ListReleasesResponse, error) {
-	if request.PageSize < 0 {
-		return nil, status.Errorf(codes.InvalidArgument, "page size must be non-negative: %d", request.PageSize)
+func (s *ReleaseService) ListReleases(ctx context.Context, req *connect.Request[v1pb.ListReleasesRequest]) (*connect.Response[v1pb.ListReleasesResponse], error) {
+	if req.Msg.PageSize < 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "page size must be non-negative: %d", req.Msg.PageSize)
 	}
 
-	projectID, err := common.GetProjectID(request.Parent)
+	projectID, err := common.GetProjectID(req.Msg.Parent)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to get project id, err: %v", err)
 	}
@@ -168,8 +170,8 @@ func (s *ReleaseService) ListReleases(ctx context.Context, request *v1pb.ListRel
 	}
 
 	offset, err := parseLimitAndOffset(&pageSize{
-		token:   request.PageToken,
-		limit:   int(request.PageSize),
+		token:   req.Msg.PageToken,
+		limit:   int(req.Msg.PageSize),
 		maximum: 1000,
 	})
 	if err != nil {
@@ -181,7 +183,7 @@ func (s *ReleaseService) ListReleases(ctx context.Context, request *v1pb.ListRel
 		ProjectID:   &project.ResourceID,
 		Limit:       &limitPlusOne,
 		Offset:      &offset.offset,
-		ShowDeleted: request.ShowDeleted,
+		ShowDeleted: req.Msg.ShowDeleted,
 	}
 
 	releaseMessages, err := s.store.ListReleases(ctx, releaseFind)
@@ -202,18 +204,18 @@ func (s *ReleaseService) ListReleases(ctx context.Context, request *v1pb.ListRel
 		return nil, status.Errorf(codes.Internal, "failed to convert to release, err: %v", err)
 	}
 
-	return &v1pb.ListReleasesResponse{
+	return connect.NewResponse(&v1pb.ListReleasesResponse{
 		Releases:      releases,
 		NextPageToken: nextPageToken,
-	}, nil
+	}), nil
 }
 
-func (s *ReleaseService) UpdateRelease(ctx context.Context, request *v1pb.UpdateReleaseRequest) (*v1pb.Release, error) {
-	if request.UpdateMask == nil {
+func (s *ReleaseService) UpdateRelease(ctx context.Context, req *connect.Request[v1pb.UpdateReleaseRequest]) (*connect.Response[v1pb.Release], error) {
+	if req.Msg.UpdateMask == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "update_mask must be set")
 	}
 
-	_, releaseUID, err := common.GetProjectReleaseUID(request.Release.Name)
+	_, releaseUID, err := common.GetProjectReleaseUID(req.Msg.Release.Name)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to get release uid, err: %v", err)
 	}
@@ -231,10 +233,10 @@ func (s *ReleaseService) UpdateRelease(ctx context.Context, request *v1pb.Update
 	update := &store.UpdateReleaseMessage{
 		UID: releaseUID,
 	}
-	for _, path := range request.UpdateMask.Paths {
+	for _, path := range req.Msg.UpdateMask.Paths {
 		if path == "title" {
 			payload := release.Payload
-			payload.Title = request.Release.Title
+			payload.Title = req.Msg.Release.Title
 			update.Payload = payload
 		}
 	}
@@ -247,11 +249,11 @@ func (s *ReleaseService) UpdateRelease(ctx context.Context, request *v1pb.Update
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert release, err: %v", err)
 	}
-	return converted, nil
+	return connect.NewResponse(converted), nil
 }
 
-func (s *ReleaseService) DeleteRelease(ctx context.Context, request *v1pb.DeleteReleaseRequest) (*emptypb.Empty, error) {
-	_, releaseUID, err := common.GetProjectReleaseUID(request.Name)
+func (s *ReleaseService) DeleteRelease(ctx context.Context, req *connect.Request[v1pb.DeleteReleaseRequest]) (*connect.Response[emptypb.Empty], error) {
+	_, releaseUID, err := common.GetProjectReleaseUID(req.Msg.Name)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to get release uid, err: %v", err)
 	}
@@ -261,11 +263,11 @@ func (s *ReleaseService) DeleteRelease(ctx context.Context, request *v1pb.Delete
 	}); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete release, err: %v", err)
 	}
-	return &emptypb.Empty{}, nil
+	return connect.NewResponse(&emptypb.Empty{}), nil
 }
 
-func (s *ReleaseService) UndeleteRelease(ctx context.Context, request *v1pb.UndeleteReleaseRequest) (*v1pb.Release, error) {
-	_, releaseUID, err := common.GetProjectReleaseUID(request.Name)
+func (s *ReleaseService) UndeleteRelease(ctx context.Context, req *connect.Request[v1pb.UndeleteReleaseRequest]) (*connect.Response[v1pb.Release], error) {
+	_, releaseUID, err := common.GetProjectReleaseUID(req.Msg.Name)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to get release uid, err: %v", err)
 	}
@@ -280,7 +282,7 @@ func (s *ReleaseService) UndeleteRelease(ctx context.Context, request *v1pb.Unde
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert release, err: %v", err)
 	}
-	return release, nil
+	return connect.NewResponse(release), nil
 }
 
 func convertToReleases(ctx context.Context, s *store.Store, releases []*store.ReleaseMessage) ([]*v1pb.Release, error) {
@@ -413,11 +415,50 @@ func convertReleaseVcsSource(vs *v1pb.Release_VCSSource) *storepb.ReleasePayload
 	}
 }
 
-func validateAndSanitizeReleaseFiles(files []*v1pb.Release_File) ([]*v1pb.Release_File, error) {
+// validateAndSanitizeReleaseFiles validates and sanitizes the release files inputs.
+// It ensures that each file has either a sheet or a statement, and that the sheet is valid.
+// It also checks for duplicate versions and sorts the files by version.
+// If a sheet is provided, it populates the statement from the sheet.
+// If a statement is provided, it computes the sheetSha256 from the statement.
+// It returns an error if any validation fails.
+// The function also generates a unique ID for each file.
+// The files are sorted by version in ascending order.
+func validateAndSanitizeReleaseFiles(ctx context.Context, s *store.Store, files []*v1pb.Release_File) ([]*v1pb.Release_File, error) {
 	versionSet := map[string]struct{}{}
 
 	for _, f := range files {
 		f.Id = uuid.NewString()
+
+		switch {
+		// Validate that either sheet or statement is provided
+		case f.Sheet == "" && len(f.Statement) == 0:
+			return nil, errors.Errorf("either sheet or statement must be set for file %q", f.Path)
+		case f.Sheet != "" && len(f.Statement) > 0:
+			return nil, errors.Errorf("cannot set both sheet and statement for file %q", f.Path)
+
+		// If sheet is provided but statement is not, populate statement from sheet
+		case f.Sheet != "":
+			_, sheetUID, err := common.GetProjectResourceIDSheetUID(f.Sheet)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to get sheet UID from %q", f.Sheet)
+			}
+			sheet, err := s.GetSheet(ctx, &store.FindSheetMessage{
+				UID:      &sheetUID,
+				LoadFull: true,
+			})
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to get sheet %q", f.Sheet)
+			}
+			if sheet == nil {
+				return nil, errors.Errorf("sheet %q not found", f.Sheet)
+			}
+			f.Statement = []byte(sheet.Statement)
+			f.SheetSha256 = sheet.GetSha256Hex()
+		case len(f.Statement) > 0:
+			// populate sheetSha256 from statement
+			h := sha256.Sum256(f.Statement)
+			f.SheetSha256 = hex.EncodeToString(h[:])
+		}
 
 		switch f.Type {
 		case v1pb.ReleaseFileType_VERSIONED:

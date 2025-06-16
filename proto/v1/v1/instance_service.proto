@@ -13,7 +13,7 @@ import "v1/annotation.proto";
 import "v1/common.proto";
 import "v1/instance_role_service.proto";
 
-option go_package = "generated-go/v1";
+option go_package = "github.com/bytebase/bytebase/proto/generated-go/v1";
 
 service InstanceService {
   rpc GetInstance(GetInstanceRequest) returns (Instance) {
@@ -95,6 +95,16 @@ service InstanceService {
     };
     option (bytebase.v1.permission) = "bb.instances.sync";
     option (bytebase.v1.auth_method) = IAM;
+  }
+
+  rpc BatchUpdateInstances(BatchUpdateInstancesRequest) returns (BatchUpdateInstancesResponse) {
+    option (google.api.http) = {
+      post: "/v1/instances:batchUpdate"
+      body: "*"
+    };
+    option (bytebase.v1.permission) = "bb.instances.update";
+    option (bytebase.v1.auth_method) = IAM;
+    option (bytebase.v1.audit) = true;
   }
 
   rpc AddDataSource(AddDataSourceRequest) returns (Instance) {
@@ -286,6 +296,15 @@ message BatchSyncInstancesRequest {
 }
 
 message BatchSyncInstancesResponse {}
+
+message BatchUpdateInstancesRequest {
+  // The request message specifying the resources to update.
+  repeated UpdateInstanceRequest requests = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message BatchUpdateInstancesResponse {
+  repeated Instance instances = 1;
+}
 
 message AddDataSourceRequest {
   // The name of the instance to add a data source to.

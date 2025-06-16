@@ -1,9 +1,12 @@
 <template>
   <div class="flex items-center max-w-full overflow-hidden gap-x-1">
+    <LinkIcon
+      v-if="tabStore.currentTab?.connection.database === database.name"
+      class="w-4 textinfolabel"
+    />
     <NCheckbox
-      v-if="!disallowBatchQuery && canQuery"
+      v-else-if="!disallowBatchQuery && canQuery"
       :checked="checked"
-      :disabled="tabStore.currentTab?.connection.database === database.name"
       @click.stop.prevent=""
       @update:checked="$emit('update:checked', $event)"
     />
@@ -31,10 +34,11 @@
 </template>
 
 <script setup lang="ts">
+import { LinkIcon } from "lucide-vue-next";
 import { NCheckbox } from "naive-ui";
 import { computed } from "vue";
 import { RichDatabaseName } from "@/components/v2";
-import { hasFeature, useAppFeature, useSQLEditorTabStore } from "@/store";
+import { useAppFeature, useSQLEditorTabStore } from "@/store";
 import type {
   SQLEditorTreeNode as TreeNode,
   SQLEditorTreeFactor as Factor,
@@ -74,12 +78,7 @@ const database = computed(
 const canQuery = computed(() => isDatabaseV1Queryable(database.value));
 
 const showRequestQueryButton = computed(() => {
-  // Developer self-helped request query is guarded by "Access Control" feature
-  return (
-    hasFeature("bb.feature.access-control") &&
-    !disallowRequestQuery.value &&
-    !canQuery.value
-  );
+  return !disallowRequestQuery.value && !canQuery.value;
 });
 
 const hasInstanceContext = computed(() => {

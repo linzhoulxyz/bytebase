@@ -36,7 +36,7 @@
       <div v-if="features.includes('TIER')" class="flex flex-col gap-y-2">
         <label class="font-medium flex items-center">
           {{ $t("policy.environment-tier.name") }}
-          <FeatureBadge feature="bb.feature.environment-tier-policy" />
+          <FeatureBadge :feature="PlanFeature.FEATURE_ENVIRONMENT_TIERS" />
         </label>
         <p class="text-sm text-gray-600">
           <i18n-t tag="span" keypath="policy.environment-tier.description">
@@ -44,7 +44,7 @@
           </i18n-t>
           <a
             class="inline-flex items-center text-blue-600 ml-1 hover:underline"
-            href="https://www.bytebase.com/docs/administration/environment-policy/overview/?source=console#environment-tier"
+            href="https://docs.bytebase.com/administration/environment-policy/overview/?source=console#environment-tier"
             target="_blank"
             >{{ $t("common.learn-more")
             }}<heroicons-outline:external-link class="w-4 h-4"
@@ -84,7 +84,7 @@
           {{ $t("policy.rollout.info", { permission: "bb.taskRuns.create" }) }}
           <a
             class="inline-flex items-center text-blue-600 ml-1 hover:underline"
-            href="https://www.bytebase.com/docs/administration/environment-policy/rollout-policy"
+            href="https://docs.bytebase.com/administration/environment-policy/rollout-policy"
             target="_blank"
           >
             {{ $t("common.learn-more") }}
@@ -146,6 +146,7 @@ import {
   pushNotification,
 } from "@/store";
 import { environmentNamePrefix } from "@/store/modules/v1/common";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import { FeatureBadge } from "../FeatureGuard";
 import SQLReviewForResource from "../SQLReview/components/SQLReviewForResource.vue";
 import { ResourceIdField } from "../v2";
@@ -205,7 +206,7 @@ watch(
 );
 
 const hasEnvironmentPolicyFeature = computed(() =>
-  hasFeature("bb.feature.environment-tier-policy")
+  hasFeature(PlanFeature.FEATURE_ENVIRONMENT_TIERS)
 );
 
 const allowArchive = computed(() => {
@@ -241,7 +242,7 @@ const renderColorPicker = () => {
       }}
       onUpdateValue={(color: string) => {
         if (!hasEnvironmentPolicyFeature.value) {
-          missingFeature.value = "bb.feature.environment-tier-policy";
+          missingFeature.value = PlanFeature.FEATURE_ENVIRONMENT_TIERS;
           return;
         }
         state.value.environment.color = color;

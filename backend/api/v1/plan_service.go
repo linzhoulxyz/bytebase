@@ -2,23 +2,21 @@ package v1
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"slices"
 	"strings"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/google/cel-go/cel"
 	celast "github.com/google/cel-go/common/ast"
 	celoperators "github.com/google/cel-go/common/operators"
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/testing/protocmp"
 
-	"github.com/bytebase/bytebase/backend/base"
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
 	"github.com/bytebase/bytebase/backend/component/config"
@@ -27,19 +25,20 @@ import (
 	"github.com/bytebase/bytebase/backend/component/iam"
 	"github.com/bytebase/bytebase/backend/component/sheet"
 	"github.com/bytebase/bytebase/backend/component/state"
-	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
+	"github.com/bytebase/bytebase/backend/enterprise"
 	"github.com/bytebase/bytebase/backend/store"
 	"github.com/bytebase/bytebase/backend/utils"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
+	"github.com/bytebase/bytebase/proto/generated-go/v1/v1connect"
 )
 
 // PlanService represents a service for managing plan.
 type PlanService struct {
-	v1pb.UnimplementedPlanServiceServer
+	v1connect.UnimplementedPlanServiceHandler
 	store          *store.Store
 	sheetManager   *sheet.Manager
-	licenseService enterprise.LicenseService
+	licenseService *enterprise.LicenseService
 	dbFactory      *dbfactory.DBFactory
 	stateCfg       *state.State
 	profile        *config.Profile
@@ -47,7 +46,7 @@ type PlanService struct {
 }
 
 // NewPlanService returns a plan service instance.
-func NewPlanService(store *store.Store, sheetManager *sheet.Manager, licenseService enterprise.LicenseService, dbFactory *dbfactory.DBFactory, stateCfg *state.State, profile *config.Profile, iamManager *iam.Manager) *PlanService {
+func NewPlanService(store *store.Store, sheetManager *sheet.Manager, licenseService *enterprise.LicenseService, dbFactory *dbfactory.DBFactory, stateCfg *state.State, profile *config.Profile, iamManager *iam.Manager) *PlanService {
 	return &PlanService{
 		store:          store,
 		sheetManager:   sheetManager,
@@ -60,8 +59,9 @@ func NewPlanService(store *store.Store, sheetManager *sheet.Manager, licenseServ
 }
 
 // GetPlan gets a plan.
-func (s *PlanService) GetPlan(ctx context.Context, request *v1pb.GetPlanRequest) (*v1pb.Plan, error) {
-	projectID, planID, err := common.GetProjectIDPlanID(request.Name)
+func (s *PlanService) GetPlan(ctx context.Context, request *connect.Request[v1pb.GetPlanRequest]) (*connect.Response[v1pb.Plan], error) {
+	req := request.Msg
+	projectID, planID, err := common.GetProjectIDPlanID(req.Name)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -85,19 +85,20 @@ func (s *PlanService) GetPlan(ctx context.Context, request *v1pb.GetPlanRequest)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert to plan, error: %v", err)
 	}
-	return convertedPlan, nil
+	return connect.NewResponse(convertedPlan), nil
 }
 
 // ListPlans lists plans.
-func (s *PlanService) ListPlans(ctx context.Context, request *v1pb.ListPlansRequest) (*v1pb.ListPlansResponse, error) {
-	projectID, err := common.GetProjectID(request.Parent)
+func (s *PlanService) ListPlans(ctx context.Context, request *connect.Request[v1pb.ListPlansRequest]) (*connect.Response[v1pb.ListPlansResponse], error) {
+	req := request.Msg
+	projectID, err := common.GetProjectID(req.Parent)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	offset, err := parseLimitAndOffset(&pageSize{
-		token:   request.PageToken,
-		limit:   int(request.PageSize),
+		token:   req.PageToken,
+		limit:   int(req.PageSize),
 		maximum: 1000,
 	})
 	if err != nil {
@@ -129,15 +130,16 @@ func (s *PlanService) ListPlans(ctx context.Context, request *v1pb.ListPlansRequ
 		return nil, status.Errorf(codes.Internal, "failed to convert to plans, error: %v", err)
 	}
 
-	return &v1pb.ListPlansResponse{
+	return connect.NewResponse(&v1pb.ListPlansResponse{
 		Plans:         convertedPlans,
 		NextPageToken: nextPageToken,
-	}, nil
+	}), nil
 }
 
 // SearchPlans searches plans.
-func (s *PlanService) SearchPlans(ctx context.Context, request *v1pb.SearchPlansRequest) (*v1pb.SearchPlansResponse, error) {
-	projectID, err := common.GetProjectID(request.Parent)
+func (s *PlanService) SearchPlans(ctx context.Context, request *connect.Request[v1pb.SearchPlansRequest]) (*connect.Response[v1pb.SearchPlansResponse], error) {
+	req := request.Msg
+	projectID, err := common.GetProjectID(req.Parent)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -152,8 +154,8 @@ func (s *PlanService) SearchPlans(ctx context.Context, request *v1pb.SearchPlans
 	}
 
 	offset, err := parseLimitAndOffset(&pageSize{
-		token:   request.PageToken,
-		limit:   int(request.PageSize),
+		token:   req.PageToken,
+		limit:   int(req.PageSize),
 		maximum: 1000,
 	})
 	if err != nil {
@@ -169,7 +171,7 @@ func (s *PlanService) SearchPlans(ctx context.Context, request *v1pb.SearchPlans
 	if projectID != "-" {
 		find.ProjectID = &projectID
 	}
-	if err := s.buildPlanFindWithFilter(ctx, find, request.Filter); err != nil {
+	if err := s.buildPlanFindWithFilter(ctx, find, req.Filter); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to build plan find with filter, error: %v", err)
 	}
 
@@ -192,10 +194,10 @@ func (s *PlanService) SearchPlans(ctx context.Context, request *v1pb.SearchPlans
 		return nil, status.Errorf(codes.Internal, "failed to convert to plans, error: %v", err)
 	}
 
-	return &v1pb.SearchPlansResponse{
+	return connect.NewResponse(&v1pb.SearchPlansResponse{
 		Plans:         convertedPlans,
 		NextPageToken: nextPageToken,
-	}, nil
+	}), nil
 }
 
 func getProjectIDsSearchFilter(ctx context.Context, user *store.UserMessage, permission iam.Permission, iamManager *iam.Manager, stores *store.Store) (*[]string, error) {
@@ -225,12 +227,13 @@ func getProjectIDsSearchFilter(ctx context.Context, user *store.UserMessage, per
 }
 
 // CreatePlan creates a new plan.
-func (s *PlanService) CreatePlan(ctx context.Context, request *v1pb.CreatePlanRequest) (*v1pb.Plan, error) {
+func (s *PlanService) CreatePlan(ctx context.Context, request *connect.Request[v1pb.CreatePlanRequest]) (*connect.Response[v1pb.Plan], error) {
+	req := request.Msg
 	principalID, ok := ctx.Value(common.PrincipalIDContextKey).(int)
 	if !ok {
 		return nil, status.Errorf(codes.Internal, "principal ID not found")
 	}
-	projectID, err := common.GetProjectID(request.Parent)
+	projectID, err := common.GetProjectID(req.Parent)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -243,20 +246,18 @@ func (s *PlanService) CreatePlan(ctx context.Context, request *v1pb.CreatePlanRe
 	if project == nil {
 		return nil, status.Errorf(codes.NotFound, "project not found for id: %v", projectID)
 	}
-	// Convert steps to specs if needed for backward compatibility
-	convertStepsToSpecs(request.Plan)
 
 	// Validate plan specs
-	if err := validateSpecs(request.Plan.Specs); err != nil {
+	if err := validateSpecs(req.Plan.Specs); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to validate plan specs, error: %v", err)
 	}
 
 	planMessage := &store.PlanMessage{
 		ProjectID:   projectID,
 		PipelineUID: nil,
-		Name:        request.Plan.Title,
-		Description: request.Plan.Description,
-		Config:      convertPlan(request.Plan),
+		Name:        req.Plan.Title,
+		Description: req.Plan.Description,
+		Config:      convertPlan(req.Plan),
 	}
 	deployment, err := getPlanDeployment(ctx, s.store, planMessage.Config.GetSpecs(), project)
 	if err != nil {
@@ -274,7 +275,7 @@ func (s *PlanService) CreatePlan(ctx context.Context, request *v1pb.CreatePlanRe
 
 	// Don't create plan checks if the plan comes from releases.
 	// Plan check results don't match release checks.
-	if !planHasRelease(request.Plan) {
+	if !planHasRelease(req.Plan) {
 		planCheckRuns, err := getPlanCheckRunsFromPlan(ctx, s.store, plan)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get plan check runs for plan, error: %v", err)
@@ -291,22 +292,23 @@ func (s *PlanService) CreatePlan(ctx context.Context, request *v1pb.CreatePlanRe
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert to plan, error: %v", err)
 	}
-	return convertedPlan, nil
+	return connect.NewResponse(convertedPlan), nil
 }
 
 // UpdatePlan updates a plan.
-func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRequest) (*v1pb.Plan, error) {
-	if request.UpdateMask == nil {
+func (s *PlanService) UpdatePlan(ctx context.Context, request *connect.Request[v1pb.UpdatePlanRequest]) (*connect.Response[v1pb.Plan], error) {
+	req := request.Msg
+	if req.UpdateMask == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "update_mask must be set")
 	}
-	if len(request.UpdateMask.Paths) == 0 {
+	if len(req.UpdateMask.Paths) == 0 {
 		return nil, status.Errorf(codes.InvalidArgument, "update_mask must not be empty")
 	}
 	user, ok := ctx.Value(common.UserContextKey).(*store.UserMessage)
 	if !ok {
 		return nil, status.Errorf(codes.Internal, "user not found")
 	}
-	projectID, planID, err := common.GetProjectIDPlanID(request.Plan.Name)
+	projectID, planID, err := common.GetProjectIDPlanID(req.Plan.Name)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -319,13 +321,13 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 	}
 	oldPlan, err := s.store.GetPlan(ctx, &store.FindPlanMessage{ProjectID: &projectID, UID: &planID})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get plan %q: %v", request.Plan.Name, err)
+		return nil, status.Errorf(codes.Internal, "failed to get plan %q: %v", req.Plan.Name, err)
 	}
 	if oldPlan == nil {
-		return nil, status.Errorf(codes.NotFound, "plan %q not found", request.Plan.Name)
+		return nil, status.Errorf(codes.NotFound, "plan %q not found", req.Plan.Name)
 	}
 
-	if storePlanConfigHasRelease(oldPlan.Config) && slices.Contains(request.UpdateMask.Paths, "specs") {
+	if storePlanConfigHasRelease(oldPlan.Config) && slices.Contains(req.UpdateMask.Paths, "specs") {
 		return nil, status.Errorf(codes.InvalidArgument, "disallowed to update the plan steps because the plan is created from a release")
 	}
 
@@ -347,20 +349,39 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 	}
 
 	var planCheckRunsTrigger bool
-	for _, path := range request.UpdateMask.Paths {
+
+	// Update the deployment in the end because the specs might change.
+	paths := slices.Clone(req.UpdateMask.Paths)
+	slices.SortFunc(paths, func(a, b string) int {
+		if a == "deployment" {
+			return 1
+		}
+		if b == "deployment" {
+			return -1
+		}
+		return strings.Compare(a, b)
+	})
+	for _, path := range paths {
 		switch path {
 		case "title":
-			title := request.Plan.Title
+			title := req.Plan.Title
 			planUpdate.Name = &title
 		case "description":
-			description := request.Plan.Description
+			description := req.Plan.Description
 			planUpdate.Description = &description
 		case "deployment":
-			convertedDeployment := convertPlanDeployment(request.Plan.Deployment)
-			planUpdate.Deployment = &convertedDeployment
+			specs := oldPlan.Config.GetSpecs()
+			if planUpdate.Specs != nil {
+				specs = *planUpdate.Specs
+			}
+			deployment, err := getPlanDeployment(ctx, s.store, specs, project)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "failed to get plan deployment snapshot, error: %v", err)
+			}
+			planUpdate.Deployment = &deployment
 		case "specs":
 			// Use specs directly for internal storage
-			allSpecs := convertPlanSpecs(request.GetPlan().GetSpecs())
+			allSpecs := convertPlanSpecs(req.GetPlan().GetSpecs())
 			planUpdate.Specs = &allSpecs
 
 			if _, err := GetPipelineCreate(ctx,
@@ -377,7 +398,7 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 			// Compare specs directly
 			oldSpecs := convertToPlanSpecs(oldPlan.Config.Specs)
 
-			removed, added, updated := diffSpecsDirectly(oldSpecs, request.Plan.Specs)
+			removed, added, updated := diffSpecsDirectly(oldSpecs, req.Plan.Specs)
 			if len(removed) > 0 {
 				return nil, status.Errorf(codes.InvalidArgument, "cannot remove specs from plan")
 			}
@@ -435,9 +456,9 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 						return nil, status.Errorf(codes.Internal, "failed to get task type from spec, err: %v", err)
 					}
 					if newTaskType != task.Type {
-						taskTypes := []base.TaskType{
-							base.TaskDatabaseSchemaUpdate,
-							base.TaskDatabaseSchemaUpdateGhost,
+						taskTypes := []storepb.Task_Type{
+							storepb.Task_DATABASE_SCHEMA_UPDATE,
+							storepb.Task_DATABASE_SCHEMA_UPDATE_GHOST,
 						}
 						if !slices.Contains(taskTypes, newTaskType) || !slices.Contains(taskTypes, task.Type) {
 							return nil, status.Errorf(codes.InvalidArgument, "task types in %v are allowed to updated, and they are allowed to be changed to %v", taskTypes, taskTypes)
@@ -449,7 +470,7 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 					// Flags for gh-ost.
 					if err := func() error {
 						switch newTaskType {
-						case base.TaskDatabaseSchemaUpdateGhost:
+						case storepb.Task_DATABASE_SCHEMA_UPDATE_GHOST:
 						default:
 							return nil
 						}
@@ -469,9 +490,9 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 						return nil, err
 					}
 
-					// PreUpdateBackupDetail
+					// Prior Backup
 					if err := func() error {
-						if newTaskType != base.TaskDatabaseDataUpdate {
+						if newTaskType != storepb.Task_DATABASE_DATA_UPDATE {
 							return nil
 						}
 						config, ok := spec.Config.(*v1pb.Plan_Spec_ChangeDatabaseConfig)
@@ -479,53 +500,11 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 							return nil
 						}
 
-						// The target backup database name.
-						// Format: instances/{instance}/databases/{database}
-						var backupDatabaseName *string
-						if config.ChangeDatabaseConfig.PreUpdateBackupDetail == nil {
-							if task.Payload.GetPreUpdateBackupDetail().GetDatabase() != "" {
-								emptyValue := ""
-								backupDatabaseName = &emptyValue
-							}
-						} else {
-							if config.ChangeDatabaseConfig.PreUpdateBackupDetail.Database != task.Payload.GetPreUpdateBackupDetail().GetDatabase() {
-								backupDatabaseName = &config.ChangeDatabaseConfig.PreUpdateBackupDetail.Database
-							}
-						}
-						if backupDatabaseName != nil {
-							if *backupDatabaseName != "" {
-								// If backup is enabled, we need to check if the backup is available for the source database. AKA, the task's target database.
-								sourceDatabaseName := config.ChangeDatabaseConfig.Target
-								instanceID, databaseName, err := common.GetInstanceDatabaseID(sourceDatabaseName)
-								if err != nil {
-									return errors.Wrapf(err, "failed to get instance database id from %q", sourceDatabaseName)
-								}
-								instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{ResourceID: &instanceID})
-								if err != nil {
-									return errors.Wrapf(err, "failed to get instance %s", instanceID)
-								}
-								if instance == nil {
-									return status.Errorf(codes.NotFound, "instance %q not found", instanceID)
-								}
-								database, err := s.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{
-									InstanceID:      &instanceID,
-									DatabaseName:    &databaseName,
-									IsCaseSensitive: store.IsObjectCaseSensitive(instance),
-								})
-								if err != nil {
-									return errors.Wrapf(err, "failed to get database %s", databaseName)
-								}
-								if database == nil {
-									return status.Errorf(codes.NotFound, "database %q not found", databaseName)
-								}
-								if database.Metadata == nil || !database.Metadata.GetBackupAvailable() {
-									return status.Errorf(codes.FailedPrecondition, "backup is not available for database %q", databaseName)
-								}
-							}
-
-							taskPatch.PreUpdateBackupDetail = &storepb.PreUpdateBackupDetail{
-								Database: *backupDatabaseName,
-							}
+						// Check if backup setting has changed.
+						planEnableBackup := config.ChangeDatabaseConfig.GetEnablePriorBackup()
+						taskEnableBackup := task.Payload.GetEnablePriorBackup()
+						if planEnableBackup != taskEnableBackup {
+							taskPatch.EnablePriorBackup = &planEnableBackup
 							doUpdate = true
 						}
 						return nil
@@ -536,9 +515,9 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 					// Sheet
 					if err := func() error {
 						switch newTaskType {
-						case base.TaskDatabaseSchemaUpdate, base.TaskDatabaseSchemaUpdateGhost, base.TaskDatabaseDataUpdate, base.TaskDatabaseDataExport:
+						case storepb.Task_DATABASE_SCHEMA_UPDATE, storepb.Task_DATABASE_SCHEMA_UPDATE_GHOST, storepb.Task_DATABASE_DATA_UPDATE, storepb.Task_DATABASE_EXPORT:
 							var oldSheetName string
-							if newTaskType == base.TaskDatabaseDataExport {
+							if newTaskType == storepb.Task_DATABASE_EXPORT {
 								config, ok := spec.Config.(*v1pb.Plan_Spec_ExportDataConfig)
 								if !ok {
 									return nil
@@ -579,7 +558,7 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 									Payload: &storepb.IssueCommentPayload{
 										Event: &storepb.IssueCommentPayload_TaskUpdate_{
 											TaskUpdate: &storepb.IssueCommentPayload_TaskUpdate{
-												Tasks:     []string{common.FormatTask(issue.Project.ResourceID, task.PipelineID, task.StageID, task.ID)},
+												Tasks:     []string{common.FormatTask(issue.Project.ResourceID, task.PipelineID, task.Environment, task.ID)},
 												FromSheet: &oldSheet,
 												ToSheet:   &newSheet,
 											},
@@ -595,7 +574,7 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 
 					// ExportDataConfig
 					if err := func() error {
-						if newTaskType != base.TaskDatabaseDataExport {
+						if newTaskType != storepb.Task_DATABASE_EXPORT {
 							return nil
 						}
 						config, ok := spec.Config.(*v1pb.Plan_Spec_ExportDataConfig)
@@ -632,7 +611,7 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 					}
 					if issue != nil {
 						// Do not allow to update task if issue is done or canceled.
-						if issue.Status == base.IssueDone || issue.Status == base.IssueCanceled {
+						if issue.Status == storepb.Issue_DONE || issue.Status == storepb.Issue_CANCELED {
 							return nil, status.Errorf(codes.FailedPrecondition, "cannot update task because issue %q is %s", issue.Title, issue.Status)
 						}
 					}
@@ -642,7 +621,7 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 			for _, taskPatch := range taskPatchList {
 				if taskPatch.SheetID != nil {
 					task := tasksMap[taskPatch.ID]
-					if task.LatestTaskRunStatus == base.TaskRunPending || task.LatestTaskRunStatus == base.TaskRunRunning || task.LatestTaskRunStatus == base.TaskRunSkipped || task.LatestTaskRunStatus == base.TaskRunDone {
+					if task.LatestTaskRunStatus == storepb.TaskRun_PENDING || task.LatestTaskRunStatus == storepb.TaskRun_RUNNING || task.LatestTaskRunStatus == storepb.TaskRun_SKIPPED || task.LatestTaskRunStatus == storepb.TaskRun_DONE {
 						return nil, status.Errorf(codes.FailedPrecondition, "cannot update plan because task %v is %s", task.ID, task.LatestTaskRunStatus)
 					}
 				}
@@ -650,8 +629,8 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 
 			var doUpdateSheet bool
 			for _, taskPatch := range taskPatchList {
-				// If pre-backup detail has been updated, we need to rerun the plan check runs.
-				if taskPatch.PreUpdateBackupDetail != nil {
+				// If backup setting has been updated, we need to rerun the plan check runs.
+				if taskPatch.EnablePriorBackup != nil {
 					planCheckRunsTrigger = true
 				}
 				if taskPatch.SheetID != nil {
@@ -699,7 +678,7 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 			if issue != nil && doUpdateSheet {
 				if err := func() error {
 					issue, err := s.store.UpdateIssueV2(ctx, issue.UID, &store.UpdateIssueMessage{
-						PayloadUpsert: &storepb.IssuePayload{
+						PayloadUpsert: &storepb.Issue{
 							Approval: &storepb.IssuePayloadApproval{
 								ApprovalFindingDone: false,
 							},
@@ -720,15 +699,15 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 	}
 
 	if err := s.store.UpdatePlan(ctx, planUpdate); err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to update plan %q: %v", request.Plan.Name, err)
+		return nil, status.Errorf(codes.Internal, "failed to update plan %q: %v", req.Plan.Name, err)
 	}
 
 	updatedPlan, err := s.store.GetPlan(ctx, &store.FindPlanMessage{UID: &oldPlan.UID})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get updated plan %q: %v", request.Plan.Name, err)
+		return nil, status.Errorf(codes.Internal, "failed to get updated plan %q: %v", req.Plan.Name, err)
 	}
 	if updatedPlan == nil {
-		return nil, status.Errorf(codes.NotFound, "updated plan %q not found", request.Plan.Name)
+		return nil, status.Errorf(codes.NotFound, "updated plan %q not found", req.Plan.Name)
 	}
 
 	if planCheckRunsTrigger {
@@ -745,18 +724,27 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *v1pb.UpdatePlanRe
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert to plan, error: %v", err)
 	}
-	return convertedPlan, nil
+	return connect.NewResponse(convertedPlan), nil
 }
 
 // ListPlanCheckRuns lists plan check runs for the plan.
-func (s *PlanService) ListPlanCheckRuns(ctx context.Context, request *v1pb.ListPlanCheckRunsRequest) (*v1pb.ListPlanCheckRunsResponse, error) {
-	projectID, planUID, err := common.GetProjectIDPlanID(request.Parent)
+func (s *PlanService) ListPlanCheckRuns(ctx context.Context, request *connect.Request[v1pb.ListPlanCheckRunsRequest]) (*connect.Response[v1pb.ListPlanCheckRunsResponse], error) {
+	req := request.Msg
+	projectID, planUID, err := common.GetProjectIDPlanID(req.Parent)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	planCheckRuns, err := s.store.ListPlanCheckRuns(ctx, &store.FindPlanCheckRunMessage{
+
+	find := &store.FindPlanCheckRunMessage{
 		PlanUID: &planUID,
-	})
+	}
+	// Parse filter if provided
+	if req.Filter != "" {
+		if err := s.parsePlanCheckRunFilter(req.Filter, find); err != nil {
+			return nil, err
+		}
+	}
+	planCheckRuns, err := s.store.ListPlanCheckRuns(ctx, find)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list plan check runs, error: %v", err)
 	}
@@ -765,15 +753,176 @@ func (s *PlanService) ListPlanCheckRuns(ctx context.Context, request *v1pb.ListP
 		return nil, status.Errorf(codes.Internal, "failed to convert plan check runs, error: %v", err)
 	}
 
-	return &v1pb.ListPlanCheckRunsResponse{
+	return connect.NewResponse(&v1pb.ListPlanCheckRunsResponse{
 		PlanCheckRuns: converted,
 		NextPageToken: "",
-	}, nil
+	}), nil
+}
+
+// parsePlanCheckRunFilter parses the filter for plan check runs.
+func (*PlanService) parsePlanCheckRunFilter(filter string, find *store.FindPlanCheckRunMessage) error {
+	if filter == "" {
+		return nil
+	}
+
+	e, err := cel.NewEnv()
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to create cel env")
+	}
+	ast, iss := e.Parse(filter)
+	if iss != nil {
+		return status.Errorf(codes.InvalidArgument, "failed to parse filter %v, error: %v", filter, iss.String())
+	}
+
+	var parseFilter func(expr celast.Expr) error
+	parseFilter = func(expr celast.Expr) error {
+		switch expr.Kind() {
+		case celast.CallKind:
+			functionName := expr.AsCall().FunctionName()
+			switch functionName {
+			case celoperators.LogicalAnd:
+				// Handle AND operator by recursively parsing left and right expressions
+				for _, arg := range expr.AsCall().Args() {
+					if err := parseFilter(arg); err != nil {
+						return err
+					}
+				}
+			case celoperators.Equals:
+				variable, value := getVariableAndValueFromExpr(expr)
+				switch variable {
+				case "status":
+					statusStr, ok := value.(string)
+					if !ok {
+						return status.Errorf(codes.InvalidArgument, "status value must be a string")
+					}
+					// Convert v1pb status to store status
+					v1Status := v1pb.PlanCheckRun_Status_value[statusStr]
+					if v1Status == 0 && statusStr != "STATUS_UNSPECIFIED" {
+						return status.Errorf(codes.InvalidArgument, "invalid status value: %s", statusStr)
+					}
+					storeStatus := convertToStorePlanCheckRunStatus(v1pb.PlanCheckRun_Status(v1Status))
+					if find.Status == nil {
+						find.Status = &[]store.PlanCheckRunStatus{}
+					}
+					*find.Status = append(*find.Status, storeStatus)
+				case "result_status":
+					resultStatusStr, ok := value.(string)
+					if !ok {
+						return status.Errorf(codes.InvalidArgument, "result_status value must be a string")
+					}
+					// Convert v1pb result status to store result status
+					v1ResultStatus := v1pb.PlanCheckRun_Result_Status_value[resultStatusStr]
+					if v1ResultStatus == 0 && resultStatusStr != "STATUS_UNSPECIFIED" {
+						return status.Errorf(codes.InvalidArgument, "invalid result_status value: %s", resultStatusStr)
+					}
+					storeResultStatus := convertToStoreResultStatus(v1pb.PlanCheckRun_Result_Status(v1ResultStatus))
+					if find.ResultStatus == nil {
+						find.ResultStatus = &[]storepb.PlanCheckRunResult_Result_Status{}
+					}
+					*find.ResultStatus = append(*find.ResultStatus, storeResultStatus)
+				default:
+					return status.Errorf(codes.InvalidArgument, "unsupported filter variable: %s", variable)
+				}
+			case celoperators.In:
+				variable, value := getVariableAndValueFromExpr(expr)
+				switch variable {
+				case "status":
+					rawList, ok := value.([]any)
+					if !ok {
+						return status.Errorf(codes.InvalidArgument, "invalid list value %q for %v", value, variable)
+					}
+					if len(rawList) == 0 {
+						return status.Errorf(codes.InvalidArgument, "empty list value for filter %v", variable)
+					}
+					if find.Status == nil {
+						find.Status = &[]store.PlanCheckRunStatus{}
+					}
+					for _, raw := range rawList {
+						statusStr, ok := raw.(string)
+						if !ok {
+							return status.Errorf(codes.InvalidArgument, "status value must be a string")
+						}
+						// Convert v1pb status to store status
+						v1Status := v1pb.PlanCheckRun_Status_value[statusStr]
+						if v1Status == 0 && statusStr != "STATUS_UNSPECIFIED" {
+							return status.Errorf(codes.InvalidArgument, "invalid status value: %s", statusStr)
+						}
+						storeStatus := convertToStorePlanCheckRunStatus(v1pb.PlanCheckRun_Status(v1Status))
+						*find.Status = append(*find.Status, storeStatus)
+					}
+				case "result_status":
+					rawList, ok := value.([]any)
+					if !ok {
+						return status.Errorf(codes.InvalidArgument, "invalid list value %q for %v", value, variable)
+					}
+					if len(rawList) == 0 {
+						return status.Errorf(codes.InvalidArgument, "empty list value for filter %v", variable)
+					}
+					if find.ResultStatus == nil {
+						find.ResultStatus = &[]storepb.PlanCheckRunResult_Result_Status{}
+					}
+					for _, raw := range rawList {
+						resultStatusStr, ok := raw.(string)
+						if !ok {
+							return status.Errorf(codes.InvalidArgument, "result_status value must be a string")
+						}
+						// Convert v1pb result status to store result status
+						v1ResultStatus := v1pb.PlanCheckRun_Result_Status_value[resultStatusStr]
+						if v1ResultStatus == 0 && resultStatusStr != "STATUS_UNSPECIFIED" {
+							return status.Errorf(codes.InvalidArgument, "invalid result_status value: %s", resultStatusStr)
+						}
+						storeResultStatus := convertToStoreResultStatus(v1pb.PlanCheckRun_Result_Status(v1ResultStatus))
+						*find.ResultStatus = append(*find.ResultStatus, storeResultStatus)
+					}
+				default:
+					return status.Errorf(codes.InvalidArgument, "unsupported filter variable: %s", variable)
+				}
+			default:
+				return status.Errorf(codes.InvalidArgument, "unsupported operator: %s", functionName)
+			}
+		default:
+			return status.Errorf(codes.InvalidArgument, "invalid filter expression")
+		}
+		return nil
+	}
+
+	return parseFilter(ast.NativeRep().Expr())
+}
+
+// convertToStorePlanCheckRunStatus converts v1pb.PlanCheckRun_Status to store.PlanCheckRunStatus.
+func convertToStorePlanCheckRunStatus(status v1pb.PlanCheckRun_Status) store.PlanCheckRunStatus {
+	switch status {
+	case v1pb.PlanCheckRun_CANCELED:
+		return store.PlanCheckRunStatusCanceled
+	case v1pb.PlanCheckRun_DONE:
+		return store.PlanCheckRunStatusDone
+	case v1pb.PlanCheckRun_FAILED:
+		return store.PlanCheckRunStatusFailed
+	case v1pb.PlanCheckRun_RUNNING:
+		return store.PlanCheckRunStatusRunning
+	default:
+		return store.PlanCheckRunStatusRunning
+	}
+}
+
+// convertToStoreResultStatus converts v1pb.PlanCheckRun_Result_Status to storepb.PlanCheckRunResult_Result_Status.
+func convertToStoreResultStatus(status v1pb.PlanCheckRun_Result_Status) storepb.PlanCheckRunResult_Result_Status {
+	switch status {
+	case v1pb.PlanCheckRun_Result_ERROR:
+		return storepb.PlanCheckRunResult_Result_ERROR
+	case v1pb.PlanCheckRun_Result_WARNING:
+		return storepb.PlanCheckRunResult_Result_WARNING
+	case v1pb.PlanCheckRun_Result_SUCCESS:
+		return storepb.PlanCheckRunResult_Result_SUCCESS
+	default:
+		return storepb.PlanCheckRunResult_Result_STATUS_UNSPECIFIED
+	}
 }
 
 // RunPlanChecks runs plan checks for a plan.
-func (s *PlanService) RunPlanChecks(ctx context.Context, request *v1pb.RunPlanChecksRequest) (*v1pb.RunPlanChecksResponse, error) {
-	projectID, planID, err := common.GetProjectIDPlanID(request.Name)
+func (s *PlanService) RunPlanChecks(ctx context.Context, request *connect.Request[v1pb.RunPlanChecksRequest]) (*connect.Response[v1pb.RunPlanChecksResponse], error) {
+	req := request.Msg
+	projectID, planID, err := common.GetProjectIDPlanID(req.Name)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -794,9 +943,28 @@ func (s *PlanService) RunPlanChecks(ctx context.Context, request *v1pb.RunPlanCh
 		return nil, status.Errorf(codes.NotFound, "plan not found")
 	}
 
-	planCheckRuns, err := getPlanCheckRunsFromPlan(ctx, s.store, plan)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get plan check runs for plan, error: %v", err)
+	var planCheckRuns []*store.PlanCheckRunMessage
+	if req.SpecId != nil {
+		var foundSpec *storepb.PlanConfig_Spec
+		for _, spec := range plan.Config.GetSpecs() {
+			if spec.Id == *req.SpecId {
+				foundSpec = spec
+				break
+			}
+		}
+		if foundSpec == nil {
+			return nil, status.Errorf(codes.InvalidArgument, "spec with id %q not found in plan", *req.SpecId)
+		}
+		planCheckRuns, err = getPlanCheckRunsFromSpec(ctx, s.store, plan, foundSpec)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get plan check runs for spec, error: %v", err)
+		}
+	} else {
+		// If spec ID is not provided, run plan check runs for all specs in the plan.
+		planCheckRuns, err = getPlanCheckRunsFromPlan(ctx, s.store, plan)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get plan check runs for plan, error: %v", err)
+		}
 	}
 	if err := s.store.CreatePlanCheckRuns(ctx, plan, planCheckRuns...); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create plan check runs, error: %v", err)
@@ -805,16 +973,17 @@ func (s *PlanService) RunPlanChecks(ctx context.Context, request *v1pb.RunPlanCh
 	// Tickle plan check scheduler.
 	s.stateCfg.PlanCheckTickleChan <- 0
 
-	return &v1pb.RunPlanChecksResponse{}, nil
+	return connect.NewResponse(&v1pb.RunPlanChecksResponse{}), nil
 }
 
 // BatchCancelPlanCheckRuns cancels a list of plan check runs.
-func (s *PlanService) BatchCancelPlanCheckRuns(ctx context.Context, request *v1pb.BatchCancelPlanCheckRunsRequest) (*v1pb.BatchCancelPlanCheckRunsResponse, error) {
-	if len(request.PlanCheckRuns) == 0 {
+func (s *PlanService) BatchCancelPlanCheckRuns(ctx context.Context, request *connect.Request[v1pb.BatchCancelPlanCheckRunsRequest]) (*connect.Response[v1pb.BatchCancelPlanCheckRunsResponse], error) {
+	req := request.Msg
+	if len(req.PlanCheckRuns) == 0 {
 		return nil, status.Errorf(codes.InvalidArgument, "plan check runs cannot be empty")
 	}
 
-	projectID, _, err := common.GetProjectIDPlanID(request.Parent)
+	projectID, _, err := common.GetProjectIDPlanID(req.Parent)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -829,7 +998,7 @@ func (s *PlanService) BatchCancelPlanCheckRuns(ctx context.Context, request *v1p
 	}
 
 	var planCheckRunIDs []int
-	for _, planCheckRun := range request.PlanCheckRuns {
+	for _, planCheckRun := range req.PlanCheckRuns {
 		_, _, planCheckRunID, err := common.GetProjectIDPlanIDPlanCheckRunID(planCheckRun)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -863,7 +1032,7 @@ func (s *PlanService) BatchCancelPlanCheckRuns(ctx context.Context, request *v1p
 		return nil, status.Errorf(codes.Internal, "failed to batch patch task run status to canceled, error: %v", err)
 	}
 
-	return &v1pb.BatchCancelPlanCheckRunsResponse{}, nil
+	return connect.NewResponse(&v1pb.BatchCancelPlanCheckRunsResponse{}), nil
 }
 
 func (s *PlanService) buildPlanFindWithFilter(ctx context.Context, planFind *store.FindPlanMessage, filter string) error {
@@ -963,203 +1132,6 @@ func (s *PlanService) getUserByIdentifier(ctx context.Context, identifier string
 	return user, nil
 }
 
-func (s *PlanService) PreviewPlan(ctx context.Context, request *v1pb.PreviewPlanRequest) (*v1pb.PreviewPlanResponse, error) {
-	projectID, err := common.GetProjectID(request.Project)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "failed to get project from %v, err: %v", request.Project, err)
-	}
-
-	project, err := s.store.GetProjectV2(ctx, &store.FindProjectMessage{ResourceID: &projectID})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get project, err: %v", err)
-	}
-
-	_, releaseUID, err := common.GetProjectReleaseUID(request.Release)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "failed to get releaseUID from %q, err: %v", request.Release, err)
-	}
-	release, err := s.store.GetRelease(ctx, releaseUID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get release, err: %v", err)
-	}
-	if release == nil {
-		return nil, status.Errorf(codes.NotFound, "release %q not found", request.Release)
-	}
-
-	allDatabases, err := s.store.ListDatabases(ctx, &store.FindDatabaseMessage{ProjectID: &projectID})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to list databases, err: %v", err)
-	}
-	allDatabasesByName := map[string]*store.DatabaseMessage{}
-
-	for _, db := range allDatabases {
-		name := common.FormatDatabase(db.InstanceID, db.DatabaseName)
-		allDatabasesByName[name] = db
-	}
-
-	var databaseTargets, databaseGroupTargets [][]string
-	for _, target := range request.Targets {
-		if instance, database, err := common.GetInstanceDatabaseID(target); err == nil {
-			databaseTargets = append(databaseTargets, []string{instance, database})
-		} else if projectID, databaseGroupID, err := common.GetProjectIDDatabaseGroupID(target); err == nil {
-			databaseGroupTargets = append(databaseGroupTargets, []string{projectID, databaseGroupID})
-		} else {
-			return nil, status.Errorf(codes.InvalidArgument, "unknown target %v", target)
-		}
-	}
-
-	databasesToDeploy := map[string]bool{}
-
-	for _, databaseTarget := range databaseTargets {
-		name := common.FormatDatabase(databaseTarget[0], databaseTarget[1])
-		databasesToDeploy[name] = true
-	}
-
-	for _, databaseGroupTarget := range databaseGroupTargets {
-		projectID, databaseGroupID := databaseGroupTarget[0], databaseGroupTarget[1]
-		if projectID != project.ResourceID {
-			return nil, status.Errorf(codes.InvalidArgument, "databaseGroup target projectID %q doesn't match the projectID of request.project %q", projectID, request.Project)
-		}
-
-		databaseGroup, err := s.store.GetDatabaseGroup(ctx, &store.FindDatabaseGroupMessage{ProjectID: &project.ResourceID, ResourceID: &databaseGroupID})
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get database group %q", databaseGroupID)
-		}
-		if databaseGroup == nil {
-			return nil, errors.Errorf("database group %q not found", databaseGroupID)
-		}
-		matchedDatabases, _, err := utils.GetMatchedAndUnmatchedDatabasesInDatabaseGroup(ctx, databaseGroup, allDatabases)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to find matched databases")
-		}
-		for _, db := range matchedDatabases {
-			name := common.FormatDatabase(db.InstanceID, db.DatabaseName)
-			databasesToDeploy[name] = true
-		}
-	}
-
-	response := &v1pb.PreviewPlanResponse{}
-
-	var allSpecs []*v1pb.Plan_Spec
-	for database := range databasesToDeploy {
-		db, ok := allDatabasesByName[database]
-		if !ok {
-			continue
-		}
-		specs, ooo, abm, err := s.getSpecsForDatabase(ctx, db, release, request.Release, request.AllowOutOfOrder)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get specs for database, err: %v", err)
-		}
-		if len(ooo.Files) > 0 {
-			response.OutOfOrderFiles = append(response.OutOfOrderFiles, ooo)
-		}
-		if len(abm.Files) > 0 {
-			response.AppliedButModifiedFiles = append(response.AppliedButModifiedFiles, abm)
-		}
-		allSpecs = append(allSpecs, specs...)
-	}
-
-	response.Plan = &v1pb.Plan{
-		Title: fmt.Sprintf("Preview plan for release %q", request.Release),
-		Steps: []*v1pb.Plan_Step{
-			{
-				Title: "",
-				Specs: allSpecs,
-			},
-		},
-	}
-
-	return response, nil
-}
-
-func (s *PlanService) getSpecsForDatabase(ctx context.Context, database *store.DatabaseMessage, release *store.ReleaseMessage, releaseName string, allowOoo bool) ([]*v1pb.Plan_Spec, *v1pb.PreviewPlanResponse_DatabaseFiles, *v1pb.PreviewPlanResponse_DatabaseFiles, error) {
-	revisions, err := s.store.ListRevisions(ctx, &store.FindRevisionMessage{InstanceID: &database.InstanceID, DatabaseName: &database.DatabaseName})
-	if err != nil {
-		return nil, nil, nil, errors.Wrapf(err, "failed to list revisions")
-	}
-	return getSpecs(database, revisions, release, releaseName, allowOoo)
-}
-
-func getSpecs(database *store.DatabaseMessage, revisions []*store.RevisionMessage, release *store.ReleaseMessage, releaseName string, allowOoo bool) ([]*v1pb.Plan_Spec, *v1pb.PreviewPlanResponse_DatabaseFiles, *v1pb.PreviewPlanResponse_DatabaseFiles, error) {
-	var specs []*v1pb.Plan_Spec
-	var outOfOrderFiles []string
-	var modifiedFiles []string
-
-	var lastVersion string
-	revisionByVersion := map[string]*store.RevisionMessage{}
-
-	for _, r := range revisions {
-		if lastVersion == "" {
-			lastVersion = r.Version
-		} else if lastVersion < r.Version {
-			lastVersion = r.Version
-		}
-		revisionByVersion[r.Version] = r
-	}
-
-	for _, file := range release.Payload.Files {
-		r, ok := revisionByVersion[file.Version]
-		if ok {
-			// applied, so we will not deploy it.
-			if r.Payload.SheetSha256 != file.SheetSha256 {
-				// It's been modified! warn users.
-				modifiedFiles = append(modifiedFiles, common.FormatReleaseFile(releaseName, file.Id))
-			}
-			continue
-		}
-
-		if lastVersion != "" && lastVersion >= file.Version {
-			// out of order detected
-			outOfOrderFiles = append(outOfOrderFiles, common.FormatReleaseFile(releaseName, file.Id))
-
-			// allowOutOfOrder=false
-			// continue so that we don't add it into the plan.
-			if !allowOoo {
-				continue
-			}
-		}
-
-		spec := &v1pb.Plan_Spec{
-			Id: uuid.NewString(),
-			Config: &v1pb.Plan_Spec_ChangeDatabaseConfig{
-				ChangeDatabaseConfig: &v1pb.Plan_ChangeDatabaseConfig{
-					Type:    convertReleaseFileChangeTypeToPlanSpecType(file.ChangeType),
-					Target:  common.FormatDatabase(database.InstanceID, database.DatabaseName),
-					Sheet:   file.Sheet,
-					Release: common.FormatReleaseName(release.ProjectID, release.UID),
-				},
-			},
-		}
-		specs = append(specs, spec)
-	}
-
-	return specs,
-		&v1pb.PreviewPlanResponse_DatabaseFiles{
-			Database: common.FormatDatabase(database.InstanceID, database.DatabaseName),
-			Files:    outOfOrderFiles,
-		},
-		&v1pb.PreviewPlanResponse_DatabaseFiles{
-			Database: common.FormatDatabase(database.InstanceID, database.DatabaseName),
-			Files:    modifiedFiles,
-		},
-		nil
-}
-
-func convertReleaseFileChangeTypeToPlanSpecType(t storepb.ReleasePayload_File_ChangeType) v1pb.Plan_ChangeDatabaseConfig_Type {
-	switch t {
-	case storepb.ReleasePayload_File_CHANGE_TYPE_UNSPECIFIED:
-		return v1pb.Plan_ChangeDatabaseConfig_MIGRATE
-	case storepb.ReleasePayload_File_DDL:
-		return v1pb.Plan_ChangeDatabaseConfig_MIGRATE
-	case storepb.ReleasePayload_File_DDL_GHOST:
-		return v1pb.Plan_ChangeDatabaseConfig_MIGRATE_GHOST
-	case storepb.ReleasePayload_File_DML:
-		return v1pb.Plan_ChangeDatabaseConfig_DATA
-	default:
-		return v1pb.Plan_ChangeDatabaseConfig_MIGRATE
-	}
-}
-
 // diffSpecs check if there are any specs removed, added or updated in the new plan.
 // Only updating sheet is taken into account.
 func diffSpecsDirectly(oldSpecs []*v1pb.Plan_Spec, newSpecs []*v1pb.Plan_Spec) ([]*v1pb.Plan_Spec, []*v1pb.Plan_Spec, []*v1pb.Plan_Spec) {
@@ -1195,7 +1167,6 @@ func validateSpecs(specs []*v1pb.Plan_Spec) error {
 	if len(specs) == 0 {
 		return errors.Errorf("the plan has zero spec")
 	}
-	var databaseTarget, databaseGroupTarget int
 	configTypeCount := map[string]int{}
 	seenID := map[string]bool{}
 
@@ -1213,15 +1184,20 @@ func validateSpecs(specs []*v1pb.Plan_Spec) error {
 		case *v1pb.Plan_Spec_CreateDatabaseConfig:
 			configTypeCount["create_database"]++
 		case *v1pb.Plan_Spec_ChangeDatabaseConfig:
-			target := config.ChangeDatabaseConfig.Target
-			if _, _, err := common.GetInstanceDatabaseID(target); err == nil {
-				databaseTarget++
-				configTypeCount["change_database"]++
-			} else if _, _, err := common.GetProjectIDDatabaseGroupID(target); err == nil {
-				databaseGroupTarget++
-				configTypeCount["change_database_group"]++
-			} else {
-				return errors.Errorf("invalid target %v", target)
+			configTypeCount["change_database"]++
+			var databaseTarget, databaseGroupTarget int
+			for _, target := range config.ChangeDatabaseConfig.Targets {
+				if _, _, err := common.GetInstanceDatabaseID(target); err == nil {
+					databaseTarget++
+				} else if _, _, err := common.GetProjectIDDatabaseGroupID(target); err == nil {
+					databaseGroupTarget++
+				} else {
+					return errors.Errorf("invalid target %v", target)
+				}
+			}
+			// Disallow mixing database and database group targets in the same spec.
+			if databaseTarget > 0 && databaseGroupTarget > 0 {
+				return errors.Errorf("found databaseTarget and databaseGroupTarget, expect only one kind")
 			}
 		case *v1pb.Plan_Spec_ExportDataConfig:
 			configTypeCount["export_data"]++
@@ -1229,9 +1205,8 @@ func validateSpecs(specs []*v1pb.Plan_Spec) error {
 			return errors.Errorf("invalid spec type")
 		}
 	}
-
-	if databaseTarget > 0 && databaseGroupTarget > 0 {
-		return errors.Errorf("found databaseGroupTarget and databaseTarget, expect only one kind")
+	if len(configTypeCount) > 1 {
+		return errors.Errorf("plan contains multiple types of spec configurations (%v), but each plan must contain only one type", len(configTypeCount))
 	}
 	return nil
 }
@@ -1239,7 +1214,10 @@ func validateSpecs(specs []*v1pb.Plan_Spec) error {
 func getPlanSpecDatabaseGroups(specs []*storepb.PlanConfig_Spec) []string {
 	var databaseGroups []string
 	for _, spec := range specs {
-		if target := spec.GetChangeDatabaseConfig().GetTarget(); target != "" {
+		if _, ok := spec.Config.(*storepb.PlanConfig_Spec_ChangeDatabaseConfig); !ok {
+			continue
+		}
+		for _, target := range spec.GetChangeDatabaseConfig().GetTargets() {
 			if _, _, err := common.GetProjectIDDatabaseGroupID(target); err == nil {
 				databaseGroups = append(databaseGroups, target)
 			}
@@ -1248,16 +1226,27 @@ func getPlanSpecDatabaseGroups(specs []*storepb.PlanConfig_Spec) []string {
 	return databaseGroups
 }
 
-func getPlanDeployment(ctx context.Context, s *store.Store, specs []*storepb.PlanConfig_Spec, project *store.ProjectMessage) (*storepb.PlanConfig_Deployment, error) {
-	snapshot := &storepb.PlanConfig_Deployment{}
-
+// getAllEnvironmentIDs returns all environment IDs from the store.
+func getAllEnvironmentIDs(ctx context.Context, s *store.Store) ([]string, error) {
 	environments, err := s.GetEnvironmentSetting(ctx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to list environments")
 	}
+	var environmentIDs []string
 	for _, e := range environments.GetEnvironments() {
-		snapshot.Environments = append(snapshot.Environments, e.Id)
+		environmentIDs = append(environmentIDs, e.Id)
 	}
+	return environmentIDs, nil
+}
+
+func getPlanDeployment(ctx context.Context, s *store.Store, specs []*storepb.PlanConfig_Spec, project *store.ProjectMessage) (*storepb.PlanConfig_Deployment, error) {
+	snapshot := &storepb.PlanConfig_Deployment{}
+
+	environmentIDs, err := getAllEnvironmentIDs(ctx, s)
+	if err != nil {
+		return nil, err
+	}
+	snapshot.Environments = environmentIDs
 
 	databaseGroups := getPlanSpecDatabaseGroups(specs)
 
@@ -1323,33 +1312,21 @@ func storePlanConfigHasRelease(plan *storepb.PlanConfig) bool {
 	return false
 }
 
-func getTaskTypeFromSpec(spec *v1pb.Plan_Spec) (base.TaskType, error) {
+func getTaskTypeFromSpec(spec *v1pb.Plan_Spec) (storepb.Task_Type, error) {
 	switch s := spec.Config.(type) {
 	case *v1pb.Plan_Spec_CreateDatabaseConfig:
-		return base.TaskDatabaseCreate, nil
+		return storepb.Task_DATABASE_CREATE, nil
 	case *v1pb.Plan_Spec_ChangeDatabaseConfig:
 		switch s.ChangeDatabaseConfig.Type {
 		case v1pb.Plan_ChangeDatabaseConfig_DATA:
-			return base.TaskDatabaseDataUpdate, nil
+			return storepb.Task_DATABASE_DATA_UPDATE, nil
 		case v1pb.Plan_ChangeDatabaseConfig_MIGRATE:
-			return base.TaskDatabaseSchemaUpdate, nil
+			return storepb.Task_DATABASE_SCHEMA_UPDATE, nil
 		case v1pb.Plan_ChangeDatabaseConfig_MIGRATE_GHOST:
-			return base.TaskDatabaseSchemaUpdateGhost, nil
+			return storepb.Task_DATABASE_SCHEMA_UPDATE_GHOST, nil
 		}
 	case *v1pb.Plan_Spec_ExportDataConfig:
-		return base.TaskDatabaseDataExport, nil
+		return storepb.Task_DATABASE_EXPORT, nil
 	}
-	return "", errors.Errorf("unknown spec config type")
-}
-
-// convertStepsToSpecs converts deprecated Plan.Steps to Plan.Specs for backward compatibility.
-//
-//nolint:staticcheck // SA1019: deprecated field used for backward compatibility
-func convertStepsToSpecs(plan *v1pb.Plan) {
-	if len(plan.Specs) == 0 && len(plan.Steps) > 0 {
-		//nolint:staticcheck // SA1019: deprecated field used for backward compatibility
-		for _, step := range plan.Steps {
-			plan.Specs = append(plan.Specs, step.Specs...)
-		}
-	}
+	return storepb.Task_TASK_TYPE_UNSPECIFIED, errors.Errorf("unknown spec config type")
 }
