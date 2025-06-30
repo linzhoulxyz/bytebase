@@ -45,6 +45,7 @@
 </template>
 
 <script setup lang="ts">
+import { create } from "@bufbuild/protobuf";
 import { NTooltip, NButton } from "naive-ui";
 import { zindexable as vZindexable } from "vdirs";
 import { computed, ref } from "vue";
@@ -69,20 +70,26 @@ import { databaseForTask } from "@/components/Rollout/RolloutDetail";
 import { SQLCheckPanel } from "@/components/SQLCheck";
 import { STATEMENT_SKIP_CHECK_THRESHOLD } from "@/components/SQLCheck/common";
 import {
-  issueServiceClient,
-  planServiceClient,
-  releaseServiceClient,
-  rolloutServiceClient,
+  issueServiceClientConnect,
+  planServiceClientConnect,
+  releaseServiceClientConnect,
+  rolloutServiceClientConnect,
 } from "@/grpcweb";
 import { emitWindowEvent } from "@/plugins";
 import { PROJECT_V1_ROUTE_ISSUE_DETAIL } from "@/router/dashboard/projectV1";
 import { useSheetV1Store, useCurrentProjectV1 } from "@/store";
 import { dialectOfEngineV1, languageOfEngineV1 } from "@/types";
-import type { Engine } from "@/types/proto/v1/common";
+import { CreateIssueRequestSchema } from "@/types/proto-es/v1/issue_service_pb";
+import { CreatePlanRequestSchema } from "@/types/proto-es/v1/plan_service_pb";
+import {
+  CheckReleaseRequestSchema,
+  ReleaseFileType,
+} from "@/types/proto-es/v1/release_service_pb";
+import { CreateRolloutRequestSchema } from "@/types/proto-es/v1/rollout_service_pb";
+import type { Engine } from "@/types/proto-es/v1/common_pb";
 import { Issue, Issue_Type } from "@/types/proto/v1/issue_service";
 import type { Plan_ExportDataConfig } from "@/types/proto/v1/plan_service";
 import { type Plan_ChangeDatabaseConfig } from "@/types/proto/v1/plan_service";
-import { ReleaseFileType } from "@/types/proto/v1/release_service";
 import type { Sheet } from "@/types/proto/v1/sheet_service";
 import { Advice_Status } from "@/types/proto/v1/sql_service";
 import {
@@ -98,6 +105,19 @@ import {
   sheetNameOfTaskV1,
   type Defer,
 } from "@/utils";
+import {
+  convertOldIssueToNew,
+  convertNewIssueToOld,
+} from "@/utils/v1/issue-conversions";
+import {
+  convertOldPlanToNew,
+  convertNewPlanToOld,
+} from "@/utils/v1/plan-conversions";
+import { convertEngineToOld } from "@/utils/v1/common-conversions";
+import {
+  convertNewCheckReleaseResponseToOld,
+  convertOldChangeTypeToNew,
+} from "@/utils/v1/release-conversions";
 
 const MAX_FORMATTABLE_STATEMENT_SIZE = 10000; // 10K characters
 
@@ -148,8 +168,12 @@ const issueCreateErrorList = computed(() => {
 
 const doCreateIssue = async () => {
   loading.value = true;
-  // Run SQL check for issue creation.
-  if (!(await runSQLCheckForIssue())) {
+
+  // Run SQL check for database change issues.
+  if (
+    issue.value.type === Issue_Type.DATABASE_CHANGE &&
+    !(await runSQLCheckForIssue())
+  ) {
     loading.value = false;
     return;
   }
@@ -166,24 +190,27 @@ const doCreateIssue = async () => {
       ...Issue.fromPartial(issue.value),
       rollout: "",
     };
-    const createdIssue = await issueServiceClient.createIssue({
+    const request = create(CreateIssueRequestSchema, {
       parent: issue.value.project,
-      issue: issueCreate,
+      issue: convertOldIssueToNew(issueCreate),
     });
+    const response = await issueServiceClientConnect.createIssue(request);
+    const createdIssue = convertNewIssueToOld(response);
 
-    await rolloutServiceClient.createRollout({
+    const rolloutRequest = create(CreateRolloutRequestSchema, {
       parent: issue.value.project,
       rollout: {
         plan: createdPlan.name,
       },
     });
+    await rolloutServiceClientConnect.createRollout(rolloutRequest);
 
     emitIssueCreateWindowEvent(createdIssue);
     router.replace({
       name: PROJECT_V1_ROUTE_ISSUE_DETAIL,
       params: {
         projectId: extractProjectResourceName(issue.value.project),
-        issueSlug: issueV1Slug(createdIssue),
+        issueSlug: issueV1Slug(createdIssue.name, createdIssue.title),
       },
     });
   } catch {
@@ -210,9 +237,9 @@ const createSheets = async () => {
       // The sheet is pending create
       const sheet = getLocalSheetByName(config.sheet);
       const engine = await databaseEngineForSpec(spec);
-      sheet.engine = engine;
+      sheet.engine = convertEngineToOld(engine as Engine);
       pendingCreateSheetMap.set(sheet.name, sheet);
-      await maybeFormatSQL(sheet, engine);
+      await maybeFormatSQL(sheet, engine as Engine);
     }
   }
   const pendingCreateSheetList = Array.from(pendingCreateSheetMap.values());
@@ -237,11 +264,13 @@ const createSheets = async () => {
 const createPlan = async () => {
   const plan = issue.value.planEntity;
   if (!plan) return;
-  const createdPlan = await planServiceClient.createPlan({
+  const newPlan = convertOldPlanToNew(plan);
+  const request = create(CreatePlanRequestSchema, {
     parent: issue.value.project,
-    plan,
+    plan: newPlan,
   });
-  return createdPlan;
+  const response = await planServiceClientConnect.createPlan(request);
+  return convertNewPlanToOld(response);
 };
 
 const maybeFormatSQL = async (sheet: Sheet, engine: Engine) => {
@@ -312,7 +341,7 @@ const runSQLCheckForIssue = async () => {
     );
   }
   for (const [statement, targets] of statementTargetsMap.entries()) {
-    const result = await releaseServiceClient.checkRelease({
+    const request = create(CheckReleaseRequestSchema, {
       parent: issue.value.project,
       release: {
         files: [
@@ -321,14 +350,18 @@ const runSQLCheckForIssue = async () => {
             version: "0",
             type: ReleaseFileType.VERSIONED,
             statement: new TextEncoder().encode(statement),
-            changeType: getSpecChangeType(
-              specForTask(issue.value.planEntity, selectedTask.value)
+            changeType: convertOldChangeTypeToNew(
+              getSpecChangeType(
+                specForTask(issue.value.planEntity, selectedTask.value)
+              )
             ),
           },
         ],
       },
       targets: targets,
     });
+    const response = await releaseServiceClientConnect.checkRelease(request);
+    const result = convertNewCheckReleaseResponseToOld(response);
     // Upsert check result for each target.
     for (const r of result?.results || []) {
       upsertCheckResult(r.target, r);

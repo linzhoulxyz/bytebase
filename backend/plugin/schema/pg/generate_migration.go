@@ -24,9 +24,7 @@ func generateMigration(diff *schema.MetadataDiff) (string, error) {
 	//    - Use topological sort to create in safe order
 
 	// Phase 1: Drop dependent objects using topological sort
-	if err := dropObjectsInOrder(diff, &buf); err != nil {
-		return "", err
-	}
+	dropObjectsInOrder(diff, &buf)
 
 	// Only add blank line if we have drops AND we're about to create something
 	dropPhaseHasContent := buf.Len() > 0
@@ -45,7 +43,7 @@ func generateMigration(diff *schema.MetadataDiff) (string, error) {
 }
 
 // dropObjectsInOrder drops all objects in reverse topological order (most dependent first)
-func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
+func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) {
 	// First, drop all triggers that might depend on functions we're about to drop
 	// This is necessary because PostgreSQL doesn't allow dropping functions that are used by triggers
 	functionsBeingDropped := make(map[string]bool)
@@ -64,9 +62,7 @@ func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
 				triggerBody := strings.ToLower(trigger.Body)
 				for funcName := range functionsBeingDropped {
 					if strings.Contains(triggerBody, funcName) {
-						if err := writeDropTrigger(buf, tableDiff.SchemaName, tableDiff.TableName, trigger.Name); err != nil {
-							return err
-						}
+						writeDropTrigger(buf, tableDiff.SchemaName, tableDiff.TableName, trigger.Name)
 						break
 					}
 				}
@@ -196,9 +192,7 @@ func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
 			if tableDiff.Action == schema.MetadataDiffActionAlter {
 				for _, fkDiff := range tableDiff.ForeignKeyChanges {
 					if fkDiff.Action == schema.MetadataDiffActionDrop {
-						if err := writeDropForeignKey(buf, tableDiff.SchemaName, tableDiff.TableName, fkDiff.OldForeignKey.Name); err != nil {
-							return err
-						}
+						writeDropForeignKey(buf, tableDiff.SchemaName, tableDiff.TableName, fkDiff.OldForeignKey.Name)
 					}
 				}
 			}
@@ -208,9 +202,7 @@ func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
 		for _, tableDiff := range diff.TableChanges {
 			if tableDiff.Action == schema.MetadataDiffActionDrop && tableDiff.OldTable != nil {
 				for _, trigger := range tableDiff.OldTable.Triggers {
-					if err := writeDropTrigger(buf, tableDiff.SchemaName, tableDiff.TableName, trigger.Name); err != nil {
-						return err
-					}
+					writeDropTrigger(buf, tableDiff.SchemaName, tableDiff.TableName, trigger.Name)
 				}
 			}
 		}
@@ -219,39 +211,29 @@ func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
 		for _, tableDiff := range diff.TableChanges {
 			if tableDiff.Action == schema.MetadataDiffActionDrop && tableDiff.OldTable != nil {
 				for _, fk := range tableDiff.OldTable.ForeignKeys {
-					if err := writeDropForeignKey(buf, tableDiff.SchemaName, tableDiff.TableName, fk.Name); err != nil {
-						return err
-					}
+					writeDropForeignKey(buf, tableDiff.SchemaName, tableDiff.TableName, fk.Name)
 				}
 			}
 		}
 
 		// Drop views
 		for _, viewDiff := range viewMap {
-			if err := writeDropView(buf, viewDiff.SchemaName, viewDiff.ViewName); err != nil {
-				return err
-			}
+			writeDropView(buf, viewDiff.SchemaName, viewDiff.ViewName)
 		}
 
 		// Drop materialized views
 		for _, mvDiff := range materializedViewMap {
-			if err := writeDropMaterializedView(buf, mvDiff.SchemaName, mvDiff.MaterializedViewName); err != nil {
-				return err
-			}
+			writeDropMaterializedView(buf, mvDiff.SchemaName, mvDiff.MaterializedViewName)
 		}
 
 		// Drop functions
 		for _, funcDiff := range functionMap {
-			if err := writeDropFunction(buf, funcDiff.SchemaName, funcDiff.FunctionName); err != nil {
-				return err
-			}
+			writeDropFunction(buf, funcDiff.SchemaName, funcDiff.FunctionName)
 		}
 
 		// Drop tables
 		for _, tableDiff := range tableMap {
-			if err := writeDropTable(buf, tableDiff.SchemaName, tableDiff.TableName); err != nil {
-				return err
-			}
+			writeDropTable(buf, tableDiff.SchemaName, tableDiff.TableName)
 		}
 
 		// Handle remaining ALTER table operations (constraints, indexes, columns)
@@ -260,9 +242,7 @@ func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
 				// Drop check constraints
 				for _, checkDiff := range tableDiff.CheckConstraintChanges {
 					if checkDiff.Action == schema.MetadataDiffActionDrop {
-						if err := writeDropCheckConstraint(buf, tableDiff.SchemaName, tableDiff.TableName, checkDiff.OldCheckConstraint.Name); err != nil {
-							return err
-						}
+						writeDropCheckConstraint(buf, tableDiff.SchemaName, tableDiff.TableName, checkDiff.OldCheckConstraint.Name)
 					}
 				}
 
@@ -270,13 +250,9 @@ func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
 				for _, indexDiff := range tableDiff.IndexChanges {
 					if indexDiff.Action == schema.MetadataDiffActionDrop {
 						if indexDiff.OldIndex.IsConstraint {
-							if err := writeDropConstraint(buf, tableDiff.SchemaName, tableDiff.TableName, indexDiff.OldIndex.Name); err != nil {
-								return err
-							}
+							writeDropConstraint(buf, tableDiff.SchemaName, tableDiff.TableName, indexDiff.OldIndex.Name)
 						} else {
-							if err := writeDropIndex(buf, tableDiff.SchemaName, indexDiff.OldIndex.Name); err != nil {
-								return err
-							}
+							writeDropIndex(buf, tableDiff.SchemaName, indexDiff.OldIndex.Name)
 						}
 					}
 				}
@@ -284,9 +260,7 @@ func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
 				// Drop columns
 				for _, colDiff := range tableDiff.ColumnChanges {
 					if colDiff.Action == schema.MetadataDiffActionDrop {
-						if err := writeDropColumn(buf, tableDiff.SchemaName, tableDiff.TableName, colDiff.OldColumn.Name); err != nil {
-							return err
-						}
+						writeDropColumn(buf, tableDiff.SchemaName, tableDiff.TableName, colDiff.OldColumn.Name)
 					}
 				}
 			}
@@ -298,9 +272,7 @@ func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
 				// Drop foreign keys first
 				for _, fkDiff := range tableDiff.ForeignKeyChanges {
 					if fkDiff.Action == schema.MetadataDiffActionDrop {
-						if err := writeDropForeignKey(buf, tableDiff.SchemaName, tableDiff.TableName, fkDiff.OldForeignKey.Name); err != nil {
-							return err
-						}
+						writeDropForeignKey(buf, tableDiff.SchemaName, tableDiff.TableName, fkDiff.OldForeignKey.Name)
 					}
 				}
 			}
@@ -311,37 +283,25 @@ func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
 			// Drop triggers for tables being dropped
 			if tableDiff, ok := tableMap[objID]; ok && tableDiff.OldTable != nil {
 				for _, trigger := range tableDiff.OldTable.Triggers {
-					if err := writeDropTrigger(buf, tableDiff.SchemaName, tableDiff.TableName, trigger.Name); err != nil {
-						return err
-					}
+					writeDropTrigger(buf, tableDiff.SchemaName, tableDiff.TableName, trigger.Name)
 				}
 			}
 
 			// Drop the object itself
 			if viewDiff, ok := viewMap[objID]; ok {
-				if err := writeDropView(buf, viewDiff.SchemaName, viewDiff.ViewName); err != nil {
-					return err
-				}
+				writeDropView(buf, viewDiff.SchemaName, viewDiff.ViewName)
 			} else if mvDiff, ok := materializedViewMap[objID]; ok {
-				if err := writeDropMaterializedView(buf, mvDiff.SchemaName, mvDiff.MaterializedViewName); err != nil {
-					return err
-				}
+				writeDropMaterializedView(buf, mvDiff.SchemaName, mvDiff.MaterializedViewName)
 			} else if funcDiff, ok := functionMap[objID]; ok {
-				if err := writeDropFunction(buf, funcDiff.SchemaName, funcDiff.FunctionName); err != nil {
-					return err
-				}
+				writeDropFunction(buf, funcDiff.SchemaName, funcDiff.FunctionName)
 			} else if tableDiff, ok := tableMap[objID]; ok {
 				// Drop foreign keys before table
 				if tableDiff.OldTable != nil {
 					for _, fk := range tableDiff.OldTable.ForeignKeys {
-						if err := writeDropForeignKey(buf, tableDiff.SchemaName, tableDiff.TableName, fk.Name); err != nil {
-							return err
-						}
+						writeDropForeignKey(buf, tableDiff.SchemaName, tableDiff.TableName, fk.Name)
 					}
 				}
-				if err := writeDropTable(buf, tableDiff.SchemaName, tableDiff.TableName); err != nil {
-					return err
-				}
+				writeDropTable(buf, tableDiff.SchemaName, tableDiff.TableName)
 			}
 		}
 
@@ -351,9 +311,7 @@ func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
 				// Drop check constraints
 				for _, checkDiff := range tableDiff.CheckConstraintChanges {
 					if checkDiff.Action == schema.MetadataDiffActionDrop {
-						if err := writeDropCheckConstraint(buf, tableDiff.SchemaName, tableDiff.TableName, checkDiff.OldCheckConstraint.Name); err != nil {
-							return err
-						}
+						writeDropCheckConstraint(buf, tableDiff.SchemaName, tableDiff.TableName, checkDiff.OldCheckConstraint.Name)
 					}
 				}
 
@@ -361,13 +319,9 @@ func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
 				for _, indexDiff := range tableDiff.IndexChanges {
 					if indexDiff.Action == schema.MetadataDiffActionDrop {
 						if indexDiff.OldIndex.IsConstraint {
-							if err := writeDropConstraint(buf, tableDiff.SchemaName, tableDiff.TableName, indexDiff.OldIndex.Name); err != nil {
-								return err
-							}
+							writeDropConstraint(buf, tableDiff.SchemaName, tableDiff.TableName, indexDiff.OldIndex.Name)
 						} else {
-							if err := writeDropIndex(buf, tableDiff.SchemaName, indexDiff.OldIndex.Name); err != nil {
-								return err
-							}
+							writeDropIndex(buf, tableDiff.SchemaName, indexDiff.OldIndex.Name)
 						}
 					}
 				}
@@ -375,9 +329,7 @@ func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
 				// Drop columns
 				for _, colDiff := range tableDiff.ColumnChanges {
 					if colDiff.Action == schema.MetadataDiffActionDrop {
-						if err := writeDropColumn(buf, tableDiff.SchemaName, tableDiff.TableName, colDiff.OldColumn.Name); err != nil {
-							return err
-						}
+						writeDropColumn(buf, tableDiff.SchemaName, tableDiff.TableName, colDiff.OldColumn.Name)
 					}
 				}
 			}
@@ -387,9 +339,7 @@ func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
 	// Drop enum types
 	for _, enumDiff := range diff.EnumTypeChanges {
 		if enumDiff.Action == schema.MetadataDiffActionDrop {
-			if err := writeDropType(buf, enumDiff.SchemaName, enumDiff.EnumTypeName); err != nil {
-				return err
-			}
+			writeDropType(buf, enumDiff.SchemaName, enumDiff.EnumTypeName)
 		}
 	}
 
@@ -411,17 +361,13 @@ func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
 	// Drop sequences in schemas being dropped first
 	for _, seqInfo := range sequencesInDroppedSchemas {
 		parts := strings.Split(seqInfo, ".")
-		if err := writeDropSequence(buf, parts[0], parts[1]); err != nil {
-			return err
-		}
+		writeDropSequence(buf, parts[0], parts[1])
 	}
 
 	// Then drop other sequences
 	for _, seqInfo := range otherSequences {
 		parts := strings.Split(seqInfo, ".")
-		if err := writeDropSequence(buf, parts[0], parts[1]); err != nil {
-			return err
-		}
+		writeDropSequence(buf, parts[0], parts[1])
 	}
 
 	// Drop schemas (must be empty)
@@ -439,58 +385,42 @@ func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
 
 				// Drop views first (they might depend on tables)
 				for _, view := range schemaDiff.OldSchema.Views {
-					if err := writeDropView(buf, schemaDiff.SchemaName, view.Name); err != nil {
-						return err
-					}
+					writeDropView(buf, schemaDiff.SchemaName, view.Name)
 				}
 
 				// Drop materialized views
 				for _, mv := range schemaDiff.OldSchema.MaterializedViews {
-					if err := writeDropMaterializedView(buf, schemaDiff.SchemaName, mv.Name); err != nil {
-						return err
-					}
+					writeDropMaterializedView(buf, schemaDiff.SchemaName, mv.Name)
 				}
 
 				// Drop functions
 				for _, fn := range schemaDiff.OldSchema.Functions {
-					if err := writeDropFunction(buf, schemaDiff.SchemaName, fn.Name); err != nil {
-						return err
-					}
+					writeDropFunction(buf, schemaDiff.SchemaName, fn.Name)
 				}
 
 				// Drop tables (this will handle foreign keys internally)
 				for _, table := range schemaDiff.OldSchema.Tables {
 					// Drop triggers first
 					for _, trigger := range table.Triggers {
-						if err := writeDropTrigger(buf, schemaDiff.SchemaName, table.Name, trigger.Name); err != nil {
-							return err
-						}
+						writeDropTrigger(buf, schemaDiff.SchemaName, table.Name, trigger.Name)
 					}
 
 					// Drop the table
-					if err := writeDropTable(buf, schemaDiff.SchemaName, table.Name); err != nil {
-						return err
-					}
+					writeDropTable(buf, schemaDiff.SchemaName, table.Name)
 				}
 
 				// Drop sequences
 				for _, seq := range schemaDiff.OldSchema.Sequences {
-					if err := writeDropSequence(buf, schemaDiff.SchemaName, seq.Name); err != nil {
-						return err
-					}
+					writeDropSequence(buf, schemaDiff.SchemaName, seq.Name)
 				}
 
 				// Drop types (enums)
 				for _, enum := range schemaDiff.OldSchema.EnumTypes {
-					if err := writeDropType(buf, schemaDiff.SchemaName, enum.Name); err != nil {
-						return err
-					}
+					writeDropType(buf, schemaDiff.SchemaName, enum.Name)
 				}
 			}
 
-			if err := writeDropSchema(buf, schemaDiff.SchemaName); err != nil {
-				return err
-			}
+			writeDropSchema(buf, schemaDiff.SchemaName)
 		} else if schemaDiff.Action == schema.MetadataDiffActionAlter {
 			// Handle ALTER schema - check for enum types that need to be dropped
 			// This handles cases where enum types are added to an existing schema
@@ -504,16 +434,12 @@ func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
 				// Drop enum types that exist in old but not in new
 				for _, enum := range schemaDiff.OldSchema.EnumTypes {
 					if !newEnumMap[enum.Name] {
-						if err := writeDropType(buf, schemaDiff.SchemaName, enum.Name); err != nil {
-							return err
-						}
+						writeDropType(buf, schemaDiff.SchemaName, enum.Name)
 					}
 				}
 			}
 		}
 	}
-
-	return nil
 }
 
 // createObjectsInOrder creates all objects in topological order (dependencies first)
@@ -671,12 +597,28 @@ func createObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error
 			if createTableSQL != "" {
 				_, _ = buf.WriteString("\n")
 			}
+
+			// Add table and column comments for newly created tables
+			if tableDiff.NewTable != nil && tableDiff.NewTable.Comment != "" {
+				writeCommentOnTable(buf, tableDiff.SchemaName, tableDiff.TableName, tableDiff.NewTable.Comment)
+			}
+			if tableDiff.NewTable != nil {
+				for _, col := range tableDiff.NewTable.Columns {
+					if col.Comment != "" {
+						writeCommentOnColumn(buf, tableDiff.SchemaName, tableDiff.TableName, col.Name, col.Comment)
+					}
+				}
+			}
 		}
 
 		// Create views
 		for _, viewDiff := range viewMap {
 			if err := writeMigrationView(buf, viewDiff.SchemaName, viewDiff.NewView); err != nil {
 				return err
+			}
+			// Add view comment for newly created views
+			if viewDiff.NewView != nil && viewDiff.NewView.Comment != "" {
+				writeCommentOnView(buf, viewDiff.SchemaName, viewDiff.ViewName, viewDiff.NewView.Comment)
 			}
 		}
 
@@ -685,12 +627,29 @@ func createObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error
 			if err := writeMigrationMaterializedView(buf, mvDiff.SchemaName, mvDiff.NewMaterializedView); err != nil {
 				return err
 			}
+			// Add materialized view comment for newly created materialized views
+			if mvDiff.NewMaterializedView != nil && mvDiff.NewMaterializedView.Comment != "" {
+				writeCommentOnMaterializedView(buf, mvDiff.SchemaName, mvDiff.MaterializedViewName, mvDiff.NewMaterializedView.Comment)
+			}
 		}
 
 		// Create functions
 		for _, funcDiff := range functionMap {
 			if err := writeFunctionDiff(buf, funcDiff); err != nil {
 				return err
+			}
+			// Add function comment for newly created functions
+			if funcDiff.Action == schema.MetadataDiffActionCreate && funcDiff.NewFunction != nil && funcDiff.NewFunction.Comment != "" {
+				writeCommentOnFunction(buf, funcDiff.SchemaName, funcDiff.NewFunction.Signature, funcDiff.NewFunction.Comment)
+			}
+		}
+
+		// Set sequence ownership after all tables are created
+		for _, seqDiff := range diff.SequenceChanges {
+			if seqDiff.Action == schema.MetadataDiffActionCreate && seqDiff.NewSequence.OwnerTable != "" && seqDiff.NewSequence.OwnerColumn != "" {
+				if err := writeMigrationSequenceOwnership(buf, seqDiff.SchemaName, seqDiff.NewSequence); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -705,7 +664,7 @@ func createObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error
 			}
 		}
 	} else {
-		// Create in topological order (dependencies first)
+		// First pass: Create tables and functions only
 		for _, objID := range orderedList {
 			if tableDiff, ok := tableMap[objID]; ok {
 				// Create table without foreign keys
@@ -717,16 +676,66 @@ func createObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error
 				if createTableSQL != "" {
 					_, _ = buf.WriteString("\n")
 				}
-			} else if viewDiff, ok := viewMap[objID]; ok {
+
+				// Add table and column comments for newly created tables
+				if tableDiff.NewTable != nil && tableDiff.NewTable.Comment != "" {
+					writeCommentOnTable(buf, tableDiff.SchemaName, tableDiff.TableName, tableDiff.NewTable.Comment)
+				}
+				if tableDiff.NewTable != nil {
+					for _, col := range tableDiff.NewTable.Columns {
+						if col.Comment != "" {
+							writeCommentOnColumn(buf, tableDiff.SchemaName, tableDiff.TableName, col.Name, col.Comment)
+						}
+					}
+				}
+			} else if funcDiff, ok := functionMap[objID]; ok {
+				if err := writeFunctionDiff(buf, funcDiff); err != nil {
+					return err
+				}
+				// Add function comment for newly created functions
+				if funcDiff.Action == schema.MetadataDiffActionCreate && funcDiff.NewFunction != nil && funcDiff.NewFunction.Comment != "" {
+					writeCommentOnFunction(buf, funcDiff.SchemaName, funcDiff.NewFunction.Signature, funcDiff.NewFunction.Comment)
+				}
+			}
+		}
+
+		// Handle ALTER table operations that add columns (views might depend on these)
+		for _, tableDiff := range diff.TableChanges {
+			if tableDiff.Action == schema.MetadataDiffActionAlter {
+				// Only process column additions here
+				for _, colDiff := range tableDiff.ColumnChanges {
+					if colDiff.Action == schema.MetadataDiffActionCreate {
+						writeAddColumn(buf, tableDiff.SchemaName, tableDiff.TableName, colDiff.NewColumn)
+					}
+				}
+			}
+		}
+
+		// Second pass: Create views and materialized views (after columns are added)
+		for _, objID := range orderedList {
+			if viewDiff, ok := viewMap[objID]; ok {
 				if err := writeMigrationView(buf, viewDiff.SchemaName, viewDiff.NewView); err != nil {
 					return err
+				}
+				// Add view comment for newly created views
+				if viewDiff.NewView != nil && viewDiff.NewView.Comment != "" {
+					writeCommentOnView(buf, viewDiff.SchemaName, viewDiff.ViewName, viewDiff.NewView.Comment)
 				}
 			} else if mvDiff, ok := materializedViewMap[objID]; ok {
 				if err := writeMigrationMaterializedView(buf, mvDiff.SchemaName, mvDiff.NewMaterializedView); err != nil {
 					return err
 				}
-			} else if funcDiff, ok := functionMap[objID]; ok {
-				if err := writeFunctionDiff(buf, funcDiff); err != nil {
+				// Add materialized view comment for newly created materialized views
+				if mvDiff.NewMaterializedView != nil && mvDiff.NewMaterializedView.Comment != "" {
+					writeCommentOnMaterializedView(buf, mvDiff.SchemaName, mvDiff.MaterializedViewName, mvDiff.NewMaterializedView.Comment)
+				}
+			}
+		}
+
+		// Set sequence ownership after all tables are created
+		for _, seqDiff := range diff.SequenceChanges {
+			if seqDiff.Action == schema.MetadataDiffActionCreate && seqDiff.NewSequence.OwnerTable != "" && seqDiff.NewSequence.OwnerColumn != "" {
+				if err := writeMigrationSequenceOwnership(buf, seqDiff.SchemaName, seqDiff.NewSequence); err != nil {
 					return err
 				}
 			}
@@ -742,12 +751,31 @@ func createObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error
 				}
 			}
 		}
+
+		// Create triggers after foreign keys
+		for _, tableDiff := range tableMap {
+			if tableDiff.NewTable != nil {
+				for _, trigger := range tableDiff.NewTable.Triggers {
+					writeMigrationTrigger(buf, trigger)
+				}
+			}
+		}
+
+		// Create indexes for materialized views after they are created
+		for _, mvDiff := range diff.MaterializedViewChanges {
+			if mvDiff.Action == schema.MetadataDiffActionCreate && mvDiff.NewMaterializedView != nil {
+				for _, index := range mvDiff.NewMaterializedView.Indexes {
+					writeMigrationMaterializedViewIndex(buf, mvDiff.SchemaName, mvDiff.NewMaterializedView.Name, index)
+				}
+			}
+		}
 	}
 
 	// Handle ALTER table operations
 	for _, tableDiff := range diff.TableChanges {
 		if tableDiff.Action == schema.MetadataDiffActionAlter {
-			alterTableSQL, err := generateAlterTable(tableDiff)
+			// Skip column additions as they were handled earlier
+			alterTableSQL, err := generateAlterTableWithOptions(tableDiff, false)
 			if err != nil {
 				return err
 			}
@@ -755,24 +783,61 @@ func createObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error
 			if alterTableSQL != "" {
 				_, _ = buf.WriteString("\n")
 			}
+
+			// Handle table comment changes
+			if err := generateTableCommentChanges(buf, tableDiff); err != nil {
+				return err
+			}
+
+			// Handle column comment changes
+			if err := generateColumnCommentChanges(buf, tableDiff); err != nil {
+				return err
+			}
+
+			// Handle index comment changes
+			if err := generateIndexCommentChanges(buf, tableDiff); err != nil {
+				return err
+			}
 		}
 	}
 
-	return nil
+	// Handle schema comment changes
+	if err := generateSchemaCommentChanges(buf, diff); err != nil {
+		return err
+	}
+
+	// Handle view comment changes
+	if err := generateViewCommentChanges(buf, diff); err != nil {
+		return err
+	}
+
+	// Handle materialized view comment changes
+	if err := generateMaterializedViewCommentChanges(buf, diff); err != nil {
+		return err
+	}
+
+	// Handle function comment changes
+	if err := generateFunctionCommentChanges(buf, diff); err != nil {
+		return err
+	}
+
+	// Handle sequence comment changes
+	if err := generateSequenceCommentChanges(buf, diff); err != nil {
+		return err
+	}
+
+	// Handle enum type comment changes
+	return generateEnumTypeCommentChanges(buf, diff)
 }
 
 func generateCreateTable(schemaName, tableName string, table *storepb.TableMetadata, includeForeignKeys bool) (string, error) {
 	var buf strings.Builder
 
-	if err := writeMigrationCreateTable(&buf, schemaName, tableName, table.Columns, table.CheckConstraints); err != nil {
-		return "", err
-	}
+	writeMigrationCreateTable(&buf, schemaName, tableName, table.Columns, table.CheckConstraints)
 
 	// Add partitioning clause if needed
 	if len(table.Partitions) > 0 {
-		if err := writeMigrationPartitionClause(&buf, table.Partitions[0]); err != nil {
-			return "", err
-		}
+		writeMigrationPartitionClause(&buf, table.Partitions[0])
 	}
 
 	if _, err := buf.WriteString(";\n"); err != nil {
@@ -782,22 +847,16 @@ func generateCreateTable(schemaName, tableName string, table *storepb.TableMetad
 	// Add constraints (primary key, unique)
 	for _, index := range table.Indexes {
 		if index.Primary {
-			if err := writeMigrationPrimaryKey(&buf, schemaName, tableName, index); err != nil {
-				return "", err
-			}
+			writeMigrationPrimaryKey(&buf, schemaName, tableName, index)
 		} else if index.Unique && index.IsConstraint {
-			if err := writeMigrationUniqueKey(&buf, schemaName, tableName, index); err != nil {
-				return "", err
-			}
+			writeMigrationUniqueKey(&buf, schemaName, tableName, index)
 		}
 	}
 
 	// Add non-constraint indexes
 	for _, index := range table.Indexes {
 		if !index.IsConstraint {
-			if err := writeMigrationIndex(&buf, schemaName, tableName, index); err != nil {
-				return "", err
-			}
+			writeMigrationIndex(&buf, schemaName, tableName, index)
 		}
 	}
 
@@ -813,14 +872,14 @@ func generateCreateTable(schemaName, tableName string, table *storepb.TableMetad
 	return buf.String(), nil
 }
 
-func generateAlterTable(tableDiff *schema.TableDiff) (string, error) {
+func generateAlterTableWithOptions(tableDiff *schema.TableDiff, includeColumnAdditions bool) (string, error) {
 	var buf strings.Builder
 
 	// Add columns first (other operations might depend on them)
-	for _, colDiff := range tableDiff.ColumnChanges {
-		if colDiff.Action == schema.MetadataDiffActionCreate {
-			if err := writeAddColumn(&buf, tableDiff.SchemaName, tableDiff.TableName, colDiff.NewColumn); err != nil {
-				return "", err
+	if includeColumnAdditions {
+		for _, colDiff := range tableDiff.ColumnChanges {
+			if colDiff.Action == schema.MetadataDiffActionCreate {
+				writeAddColumn(&buf, tableDiff.SchemaName, tableDiff.TableName, colDiff.NewColumn)
 			}
 		}
 	}
@@ -828,10 +887,7 @@ func generateAlterTable(tableDiff *schema.TableDiff) (string, error) {
 	// Alter columns
 	for _, colDiff := range tableDiff.ColumnChanges {
 		if colDiff.Action == schema.MetadataDiffActionAlter {
-			alterColSQL, err := generateAlterColumn(tableDiff.SchemaName, tableDiff.TableName, colDiff)
-			if err != nil {
-				return "", err
-			}
+			alterColSQL := generateAlterColumn(tableDiff.SchemaName, tableDiff.TableName, colDiff)
 			_, _ = buf.WriteString(alterColSQL)
 		}
 	}
@@ -842,18 +898,12 @@ func generateAlterTable(tableDiff *schema.TableDiff) (string, error) {
 			if indexDiff.NewIndex.IsConstraint {
 				// Add constraint (primary key or unique constraint)
 				if indexDiff.NewIndex.Primary {
-					if err := writeMigrationPrimaryKey(&buf, tableDiff.SchemaName, tableDiff.TableName, indexDiff.NewIndex); err != nil {
-						return "", err
-					}
+					writeMigrationPrimaryKey(&buf, tableDiff.SchemaName, tableDiff.TableName, indexDiff.NewIndex)
 				} else if indexDiff.NewIndex.Unique {
-					if err := writeMigrationUniqueKey(&buf, tableDiff.SchemaName, tableDiff.TableName, indexDiff.NewIndex); err != nil {
-						return "", err
-					}
+					writeMigrationUniqueKey(&buf, tableDiff.SchemaName, tableDiff.TableName, indexDiff.NewIndex)
 				}
 			} else {
-				if err := writeMigrationIndex(&buf, tableDiff.SchemaName, tableDiff.TableName, indexDiff.NewIndex); err != nil {
-					return "", err
-				}
+				writeMigrationIndex(&buf, tableDiff.SchemaName, tableDiff.TableName, indexDiff.NewIndex)
 			}
 		}
 	}
@@ -861,9 +911,7 @@ func generateAlterTable(tableDiff *schema.TableDiff) (string, error) {
 	// Add check constraints
 	for _, checkDiff := range tableDiff.CheckConstraintChanges {
 		if checkDiff.Action == schema.MetadataDiffActionCreate {
-			if err := writeAddCheckConstraint(&buf, tableDiff.SchemaName, tableDiff.TableName, checkDiff.NewCheckConstraint); err != nil {
-				return "", err
-			}
+			writeAddCheckConstraint(&buf, tableDiff.SchemaName, tableDiff.TableName, checkDiff.NewCheckConstraint)
 		}
 	}
 
@@ -876,31 +924,32 @@ func generateAlterTable(tableDiff *schema.TableDiff) (string, error) {
 		}
 	}
 
+	// Add triggers after foreign keys
+	for _, triggerDiff := range tableDiff.TriggerChanges {
+		if triggerDiff.Action == schema.MetadataDiffActionCreate {
+			writeMigrationTrigger(&buf, triggerDiff.NewTrigger)
+		}
+	}
+
 	return buf.String(), nil
 }
 
-func generateAlterColumn(schemaName, tableName string, colDiff *schema.ColumnDiff) (string, error) {
+func generateAlterColumn(schemaName, tableName string, colDiff *schema.ColumnDiff) string {
 	var buf strings.Builder
 
 	// In PostgreSQL, we need to handle different aspects of column changes separately
 
 	// If type changed, alter the column type
 	if colDiff.OldColumn.Type != colDiff.NewColumn.Type {
-		if err := writeAlterColumnType(&buf, schemaName, tableName, colDiff.NewColumn.Name, colDiff.NewColumn.Type); err != nil {
-			return "", err
-		}
+		writeAlterColumnType(&buf, schemaName, tableName, colDiff.NewColumn.Name, colDiff.NewColumn.Type)
 	}
 
 	// If nullability changed
 	if colDiff.OldColumn.Nullable != colDiff.NewColumn.Nullable {
 		if colDiff.NewColumn.Nullable {
-			if err := writeAlterColumnDropNotNull(&buf, schemaName, tableName, colDiff.NewColumn.Name); err != nil {
-				return "", err
-			}
+			writeAlterColumnDropNotNull(&buf, schemaName, tableName, colDiff.NewColumn.Name)
 		} else {
-			if err := writeAlterColumnSetNotNull(&buf, schemaName, tableName, colDiff.NewColumn.Name); err != nil {
-				return "", err
-			}
+			writeAlterColumnSetNotNull(&buf, schemaName, tableName, colDiff.NewColumn.Name)
 		}
 	}
 
@@ -911,22 +960,18 @@ func generateAlterColumn(schemaName, tableName string, colDiff *schema.ColumnDif
 		if !defaultValuesEqual(colDiff.OldColumn, colDiff.NewColumn) {
 			// First drop the old default if it exists
 			if oldHasDefault {
-				if err := writeAlterColumnDropDefault(&buf, schemaName, tableName, colDiff.OldColumn.Name); err != nil {
-					return "", err
-				}
+				writeAlterColumnDropDefault(&buf, schemaName, tableName, colDiff.OldColumn.Name)
 			}
 
 			// Add new default if needed
 			if newHasDefault {
 				defaultExpr := getDefaultExpression(colDiff.NewColumn)
-				if err := writeAlterColumnSetDefault(&buf, schemaName, tableName, colDiff.NewColumn.Name, defaultExpr); err != nil {
-					return "", err
-				}
+				writeAlterColumnSetDefault(&buf, schemaName, tableName, colDiff.NewColumn.Name, defaultExpr)
 			}
 		}
 	}
 
-	return buf.String(), nil
+	return buf.String()
 }
 
 // hasDefaultValue checks if a column has any default value
@@ -935,7 +980,7 @@ func hasDefaultValue(column *storepb.ColumnMetadata) bool {
 		return false
 	}
 	return column.GetDefaultExpression() != "" ||
-		(column.GetDefault() != nil && column.GetDefault().Value != "") ||
+		column.GetDefault() != "" ||
 		column.GetDefaultNull()
 }
 
@@ -953,10 +998,10 @@ func defaultValuesEqual(col1, col2 *storepb.ColumnMetadata) bool {
 	// Check default value
 	def1 := col1.GetDefault()
 	def2 := col2.GetDefault()
-	if (def1 == nil) != (def2 == nil) {
+	if (def1 == "") != (def2 == "") {
 		return false
 	}
-	if def1 != nil && def1.Value != def2.Value {
+	if def1 != "" && def1 != def2 {
 		return false
 	}
 
@@ -974,16 +1019,16 @@ func getDefaultExpression(column *storepb.ColumnMetadata) string {
 		return ""
 	}
 
-	if expr := column.GetDefaultExpression(); expr != "" {
-		return expr
+	if column.DefaultExpression != "" {
+		return column.DefaultExpression
 	}
 
-	if def := column.GetDefault(); def != nil && def.Value != "" {
+	if column.Default != "" {
 		// Quote string literals
-		return fmt.Sprintf("'%s'", def.Value)
+		return fmt.Sprintf("'%s'", column.Default)
 	}
 
-	if column.GetDefaultNull() {
+	if column.DefaultNull {
 		return "NULL"
 	}
 
@@ -992,7 +1037,7 @@ func getDefaultExpression(column *storepb.ColumnMetadata) string {
 
 // Write functions for various DDL statements
 
-func writeDropTrigger(out *strings.Builder, schema, table, trigger string) error {
+func writeDropTrigger(out *strings.Builder, schema, table, trigger string) {
 	_, _ = out.WriteString(`DROP TRIGGER IF EXISTS "`)
 	_, _ = out.WriteString(trigger)
 	_, _ = out.WriteString(`" ON "`)
@@ -1001,10 +1046,9 @@ func writeDropTrigger(out *strings.Builder, schema, table, trigger string) error
 	_, _ = out.WriteString(table)
 	_, _ = out.WriteString(`";`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
-func writeDropForeignKey(out *strings.Builder, schema, table, constraint string) error {
+func writeDropForeignKey(out *strings.Builder, schema, table, constraint string) {
 	_, _ = out.WriteString(`ALTER TABLE "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
@@ -1013,40 +1057,36 @@ func writeDropForeignKey(out *strings.Builder, schema, table, constraint string)
 	_, _ = out.WriteString(constraint)
 	_, _ = out.WriteString(`";`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
-func writeDropFunction(out *strings.Builder, schema, function string) error {
+func writeDropFunction(out *strings.Builder, schema, function string) {
 	_, _ = out.WriteString(`DROP FUNCTION IF EXISTS "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
 	_, _ = out.WriteString(function)
 	_, _ = out.WriteString(`";`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
-func writeDropView(out *strings.Builder, schema, view string) error {
+func writeDropView(out *strings.Builder, schema, view string) {
 	_, _ = out.WriteString(`DROP VIEW IF EXISTS "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
 	_, _ = out.WriteString(view)
 	_, _ = out.WriteString(`";`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
-func writeDropMaterializedView(out *strings.Builder, schema, view string) error {
+func writeDropMaterializedView(out *strings.Builder, schema, view string) {
 	_, _ = out.WriteString(`DROP MATERIALIZED VIEW IF EXISTS "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
 	_, _ = out.WriteString(view)
 	_, _ = out.WriteString(`";`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
-func writeDropCheckConstraint(out *strings.Builder, schema, table, constraint string) error {
+func writeDropCheckConstraint(out *strings.Builder, schema, table, constraint string) {
 	_, _ = out.WriteString(`ALTER TABLE "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
@@ -1055,10 +1095,9 @@ func writeDropCheckConstraint(out *strings.Builder, schema, table, constraint st
 	_, _ = out.WriteString(constraint)
 	_, _ = out.WriteString(`";`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
-func writeDropConstraint(out *strings.Builder, schema, table, constraint string) error {
+func writeDropConstraint(out *strings.Builder, schema, table, constraint string) {
 	_, _ = out.WriteString(`ALTER TABLE "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
@@ -1067,20 +1106,18 @@ func writeDropConstraint(out *strings.Builder, schema, table, constraint string)
 	_, _ = out.WriteString(constraint)
 	_, _ = out.WriteString(`";`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
-func writeDropIndex(out *strings.Builder, schema, index string) error {
+func writeDropIndex(out *strings.Builder, schema, index string) {
 	_, _ = out.WriteString(`DROP INDEX IF EXISTS "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
 	_, _ = out.WriteString(index)
 	_, _ = out.WriteString(`";`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
-func writeDropColumn(out *strings.Builder, schema, table, column string) error {
+func writeDropColumn(out *strings.Builder, schema, table, column string) {
 	_, _ = out.WriteString(`ALTER TABLE "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
@@ -1089,45 +1126,40 @@ func writeDropColumn(out *strings.Builder, schema, table, column string) error {
 	_, _ = out.WriteString(column)
 	_, _ = out.WriteString(`";`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
-func writeDropTable(out *strings.Builder, schema, table string) error {
+func writeDropTable(out *strings.Builder, schema, table string) {
 	_, _ = out.WriteString(`DROP TABLE IF EXISTS "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
 	_, _ = out.WriteString(table)
 	_, _ = out.WriteString(`";`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
-func writeDropSequence(out *strings.Builder, schema, sequence string) error {
+func writeDropSequence(out *strings.Builder, schema, sequence string) {
 	_, _ = out.WriteString(`DROP SEQUENCE IF EXISTS "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
 	_, _ = out.WriteString(sequence)
 	_, _ = out.WriteString(`";`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
-func writeDropSchema(out *strings.Builder, schema string) error {
+func writeDropSchema(out *strings.Builder, schema string) {
 	_, _ = out.WriteString(`DROP SCHEMA IF EXISTS "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`";`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
-func writeDropType(out *strings.Builder, schema, typeName string) error {
+func writeDropType(out *strings.Builder, schema, typeName string) {
 	_, _ = out.WriteString(`DROP TYPE IF EXISTS "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
 	_, _ = out.WriteString(typeName)
 	_, _ = out.WriteString(`";`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
 func writeCreateEnumType(out *strings.Builder, schema string, enum *storepb.EnumTypeMetadata) error {
@@ -1159,7 +1191,7 @@ func writeCreateSchema(out *strings.Builder, schema string) error {
 	return nil
 }
 
-func writeAddColumn(out *strings.Builder, schema, table string, column *storepb.ColumnMetadata) error {
+func writeAddColumn(out *strings.Builder, schema, table string, column *storepb.ColumnMetadata) {
 	_, _ = out.WriteString(`ALTER TABLE "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
@@ -1169,11 +1201,11 @@ func writeAddColumn(out *strings.Builder, schema, table string, column *storepb.
 	_, _ = out.WriteString(`" `)
 	_, _ = out.WriteString(column.Type)
 
-	if column.DefaultValue != nil {
-		if defaultValue, ok := column.DefaultValue.(*storepb.ColumnMetadata_DefaultExpression); ok {
-			_, _ = out.WriteString(` DEFAULT `)
-			_, _ = out.WriteString(defaultValue.DefaultExpression)
-		}
+	// Handle default values
+	defaultExpr := getDefaultExpression(column)
+	if defaultExpr != "" {
+		_, _ = out.WriteString(` DEFAULT `)
+		_, _ = out.WriteString(defaultExpr)
 	}
 
 	if !column.Nullable {
@@ -1182,10 +1214,9 @@ func writeAddColumn(out *strings.Builder, schema, table string, column *storepb.
 
 	_, _ = out.WriteString(`;`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
-func writeAlterColumnType(out *strings.Builder, schema, table, column, newType string) error {
+func writeAlterColumnType(out *strings.Builder, schema, table, column, newType string) {
 	_, _ = out.WriteString(`ALTER TABLE "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
@@ -1196,10 +1227,9 @@ func writeAlterColumnType(out *strings.Builder, schema, table, column, newType s
 	_, _ = out.WriteString(newType)
 	_, _ = out.WriteString(`;`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
-func writeAlterColumnSetNotNull(out *strings.Builder, schema, table, column string) error {
+func writeAlterColumnSetNotNull(out *strings.Builder, schema, table, column string) {
 	_, _ = out.WriteString(`ALTER TABLE "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
@@ -1208,10 +1238,9 @@ func writeAlterColumnSetNotNull(out *strings.Builder, schema, table, column stri
 	_, _ = out.WriteString(column)
 	_, _ = out.WriteString(`" SET NOT NULL;`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
-func writeAlterColumnDropNotNull(out *strings.Builder, schema, table, column string) error {
+func writeAlterColumnDropNotNull(out *strings.Builder, schema, table, column string) {
 	_, _ = out.WriteString(`ALTER TABLE "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
@@ -1220,10 +1249,9 @@ func writeAlterColumnDropNotNull(out *strings.Builder, schema, table, column str
 	_, _ = out.WriteString(column)
 	_, _ = out.WriteString(`" DROP NOT NULL;`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
-func writeAlterColumnSetDefault(out *strings.Builder, schema, table, column, defaultExpr string) error {
+func writeAlterColumnSetDefault(out *strings.Builder, schema, table, column, defaultExpr string) {
 	_, _ = out.WriteString(`ALTER TABLE "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
@@ -1234,10 +1262,9 @@ func writeAlterColumnSetDefault(out *strings.Builder, schema, table, column, def
 	_, _ = out.WriteString(defaultExpr)
 	_, _ = out.WriteString(`;`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
-func writeAlterColumnDropDefault(out *strings.Builder, schema, table, column string) error {
+func writeAlterColumnDropDefault(out *strings.Builder, schema, table, column string) {
 	_, _ = out.WriteString(`ALTER TABLE "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
@@ -1246,10 +1273,9 @@ func writeAlterColumnDropDefault(out *strings.Builder, schema, table, column str
 	_, _ = out.WriteString(column)
 	_, _ = out.WriteString(`" DROP DEFAULT;`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
-func writeAddCheckConstraint(out *strings.Builder, schema, table string, check *storepb.CheckConstraintMetadata) error {
+func writeAddCheckConstraint(out *strings.Builder, schema, table string, check *storepb.CheckConstraintMetadata) {
 	_, _ = out.WriteString(`ALTER TABLE "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
@@ -1260,7 +1286,6 @@ func writeAddCheckConstraint(out *strings.Builder, schema, table string, check *
 	_, _ = out.WriteString(check.Expression)
 	_, _ = out.WriteString(`;`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
 func writeFunctionDiff(out *strings.Builder, funcDiff *schema.FunctionDiff) error {
@@ -1366,6 +1391,23 @@ func writeMigrationCreateSequence(out *strings.Builder, schema string, seq *stor
 	return nil
 }
 
+// writeMigrationSequenceOwnership writes an ALTER SEQUENCE OWNED BY statement
+func writeMigrationSequenceOwnership(out *strings.Builder, schema string, seq *storepb.SequenceMetadata) error {
+	_, _ = out.WriteString(`ALTER SEQUENCE "`)
+	_, _ = out.WriteString(schema)
+	_, _ = out.WriteString(`"."`)
+	_, _ = out.WriteString(seq.Name)
+	_, _ = out.WriteString(`" OWNED BY "`)
+	_, _ = out.WriteString(schema)
+	_, _ = out.WriteString(`"."`)
+	_, _ = out.WriteString(seq.OwnerTable)
+	_, _ = out.WriteString(`"."`)
+	_, _ = out.WriteString(seq.OwnerColumn)
+	_, _ = out.WriteString(`";`)
+	_, _ = out.WriteString("\n")
+	return nil
+}
+
 // writeView writes a CREATE VIEW statement
 func writeMigrationView(out *strings.Builder, schema string, view *storepb.ViewMetadata) error {
 	_, _ = out.WriteString(`CREATE VIEW "`)
@@ -1446,8 +1488,32 @@ func writeMigrationForeignKey(out *strings.Builder, schema, table string, fk *st
 	return nil
 }
 
+// writeMigrationTrigger writes a trigger creation statement
+func writeMigrationTrigger(out *strings.Builder, trigger *storepb.TriggerMetadata) {
+	if trigger == nil || trigger.Body == "" {
+		return
+	}
+	_, _ = out.WriteString(trigger.Body)
+	if !strings.HasSuffix(strings.TrimSpace(trigger.Body), ";") {
+		_, _ = out.WriteString(";")
+	}
+	_, _ = out.WriteString("\n")
+}
+
+// writeMigrationMaterializedViewIndex writes an index creation statement for a materialized view
+func writeMigrationMaterializedViewIndex(out *strings.Builder, _ string, _ string, index *storepb.IndexMetadata) {
+	if index == nil || index.Definition == "" {
+		return
+	}
+	_, _ = out.WriteString(index.Definition)
+	if !strings.HasSuffix(strings.TrimSpace(index.Definition), ";") {
+		_, _ = out.WriteString(";")
+	}
+	_, _ = out.WriteString("\n")
+}
+
 // writeCreateTable writes a CREATE TABLE statement
-func writeMigrationCreateTable(out *strings.Builder, schema, table string, columns []*storepb.ColumnMetadata, checks []*storepb.CheckConstraintMetadata) error {
+func writeMigrationCreateTable(out *strings.Builder, schema, table string, columns []*storepb.ColumnMetadata, checks []*storepb.CheckConstraintMetadata) {
 	_, _ = out.WriteString(`CREATE TABLE "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
@@ -1469,9 +1535,10 @@ func writeMigrationCreateTable(out *strings.Builder, schema, table string, colum
 			_, _ = out.WriteString(" NOT NULL")
 		}
 
-		if col.DefaultValue != nil {
+		defaultExpr := getDefaultExpression(col)
+		if defaultExpr != "" {
 			_, _ = out.WriteString(" DEFAULT ")
-			_, _ = out.WriteString(getDefaultExpression(col))
+			_, _ = out.WriteString(defaultExpr)
 		}
 	}
 
@@ -1486,18 +1553,16 @@ func writeMigrationCreateTable(out *strings.Builder, schema, table string, colum
 	}
 
 	_, _ = out.WriteString("\n)")
-	return nil
 }
 
 // writePartitionClause writes the partition clause for a table
-func writeMigrationPartitionClause(out *strings.Builder, partition *storepb.TablePartitionMetadata) error {
+func writeMigrationPartitionClause(out *strings.Builder, partition *storepb.TablePartitionMetadata) {
 	_, _ = out.WriteString(" PARTITION BY ")
 	_, _ = out.WriteString(partition.Expression)
-	return nil
 }
 
 // writePrimaryKey writes an ALTER TABLE ADD PRIMARY KEY statement
-func writeMigrationPrimaryKey(out *strings.Builder, schema, table string, index *storepb.IndexMetadata) error {
+func writeMigrationPrimaryKey(out *strings.Builder, schema, table string, index *storepb.IndexMetadata) {
 	_, _ = out.WriteString(`ALTER TABLE "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
@@ -1515,11 +1580,10 @@ func writeMigrationPrimaryKey(out *strings.Builder, schema, table string, index 
 
 	_, _ = out.WriteString(`);`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
 // writeUniqueKey writes an ALTER TABLE ADD UNIQUE statement
-func writeMigrationUniqueKey(out *strings.Builder, schema, table string, index *storepb.IndexMetadata) error {
+func writeMigrationUniqueKey(out *strings.Builder, schema, table string, index *storepb.IndexMetadata) {
 	_, _ = out.WriteString(`ALTER TABLE "`)
 	_, _ = out.WriteString(schema)
 	_, _ = out.WriteString(`"."`)
@@ -1537,11 +1601,21 @@ func writeMigrationUniqueKey(out *strings.Builder, schema, table string, index *
 
 	_, _ = out.WriteString(`);`)
 	_, _ = out.WriteString("\n")
-	return nil
 }
 
 // writeIndex writes a CREATE INDEX statement
-func writeMigrationIndex(out *strings.Builder, schema, table string, index *storepb.IndexMetadata) error {
+func writeMigrationIndex(out *strings.Builder, schema, table string, index *storepb.IndexMetadata) {
+	// If index has a full definition, use it directly
+	if index.Definition != "" {
+		_, _ = out.WriteString(index.Definition)
+		if !strings.HasSuffix(strings.TrimSpace(index.Definition), ";") {
+			_, _ = out.WriteString(";")
+		}
+		_, _ = out.WriteString("\n")
+		return
+	}
+
+	// Otherwise, construct the CREATE INDEX statement
 	_, _ = out.WriteString(`CREATE `)
 	if index.Unique {
 		_, _ = out.WriteString(`UNIQUE `)
@@ -1574,10 +1648,382 @@ func writeMigrationIndex(out *strings.Builder, schema, table string, index *stor
 	}
 	_, _ = out.WriteString(`)`)
 
-	// Note: IndexMetadata doesn't have a Where field in the current protobuf definition
-	// This would need to be added if partial indexes need to be supported
-
 	_, _ = out.WriteString(`;`)
 	_, _ = out.WriteString("\n")
+}
+
+// generateTableCommentChanges generates COMMENT ON TABLE statements for table comment changes
+func generateTableCommentChanges(buf *strings.Builder, tableDiff *schema.TableDiff) error {
+	if tableDiff.OldTable == nil || tableDiff.NewTable == nil {
+		return nil
+	}
+
+	oldComment := tableDiff.OldTable.Comment
+	newComment := tableDiff.NewTable.Comment
+
+	// If comments are different, generate COMMENT ON TABLE statement
+	if oldComment != newComment {
+		writeCommentOnTable(buf, tableDiff.SchemaName, tableDiff.TableName, newComment)
+	}
+
 	return nil
+}
+
+// generateColumnCommentChanges generates COMMENT ON COLUMN statements for column comment changes
+func generateColumnCommentChanges(buf *strings.Builder, tableDiff *schema.TableDiff) error {
+	if tableDiff.OldTable == nil || tableDiff.NewTable == nil {
+		return nil
+	}
+
+	// Build maps for efficient lookup
+	oldColumnMap := make(map[string]*storepb.ColumnMetadata)
+	for _, col := range tableDiff.OldTable.Columns {
+		oldColumnMap[col.Name] = col
+	}
+
+	newColumnMap := make(map[string]*storepb.ColumnMetadata)
+	for _, col := range tableDiff.NewTable.Columns {
+		newColumnMap[col.Name] = col
+	}
+
+	// Check for comment changes in existing columns
+	for _, newCol := range tableDiff.NewTable.Columns {
+		if oldCol, exists := oldColumnMap[newCol.Name]; exists {
+			// Column exists in both old and new - check if comment changed
+			if oldCol.Comment != newCol.Comment {
+				writeCommentOnColumn(buf, tableDiff.SchemaName, tableDiff.TableName, newCol.Name, newCol.Comment)
+			}
+		} else {
+			// New column - if it has a comment, add it
+			if newCol.Comment != "" {
+				writeCommentOnColumn(buf, tableDiff.SchemaName, tableDiff.TableName, newCol.Name, newCol.Comment)
+			}
+		}
+	}
+
+	// Check for columns that were removed (comments need to be handled by column drop which is handled elsewhere)
+
+	return nil
+}
+
+// writeCommentOnTable writes a COMMENT ON TABLE statement
+func writeCommentOnTable(out *strings.Builder, schema, table, comment string) {
+	_, _ = out.WriteString(`COMMENT ON TABLE "`)
+	_, _ = out.WriteString(schema)
+	_, _ = out.WriteString(`"."`)
+	_, _ = out.WriteString(table)
+	_, _ = out.WriteString(`" IS `)
+	if comment == "" {
+		_, _ = out.WriteString(`NULL`)
+	} else {
+		_, _ = out.WriteString(`'`)
+		// Escape single quotes in the comment
+		escapedComment := strings.ReplaceAll(comment, "'", "''")
+		_, _ = out.WriteString(escapedComment)
+		_, _ = out.WriteString(`'`)
+	}
+	_, _ = out.WriteString(`;`)
+	_, _ = out.WriteString("\n")
+}
+
+// writeCommentOnColumn writes a COMMENT ON COLUMN statement
+func writeCommentOnColumn(out *strings.Builder, schema, table, column, comment string) {
+	_, _ = out.WriteString(`COMMENT ON COLUMN "`)
+	_, _ = out.WriteString(schema)
+	_, _ = out.WriteString(`"."`)
+	_, _ = out.WriteString(table)
+	_, _ = out.WriteString(`"."`)
+	_, _ = out.WriteString(column)
+	_, _ = out.WriteString(`" IS `)
+	if comment == "" {
+		_, _ = out.WriteString(`NULL`)
+	} else {
+		_, _ = out.WriteString(`'`)
+		// Escape single quotes in the comment
+		escapedComment := strings.ReplaceAll(comment, "'", "''")
+		_, _ = out.WriteString(escapedComment)
+		_, _ = out.WriteString(`'`)
+	}
+	_, _ = out.WriteString(`;`)
+	_, _ = out.WriteString("\n")
+}
+
+// generateSchemaCommentChanges generates COMMENT ON SCHEMA statements for schema comment changes
+func generateSchemaCommentChanges(buf *strings.Builder, diff *schema.MetadataDiff) error {
+	for _, schemaDiff := range diff.SchemaChanges {
+		if schemaDiff.Action == schema.MetadataDiffActionAlter {
+			if schemaDiff.OldSchema == nil || schemaDiff.NewSchema == nil {
+				continue
+			}
+
+			oldComment := schemaDiff.OldSchema.Comment
+			newComment := schemaDiff.NewSchema.Comment
+
+			// If comments are different, generate COMMENT ON SCHEMA statement
+			if oldComment != newComment {
+				writeCommentOnSchema(buf, schemaDiff.SchemaName, newComment)
+			}
+		}
+	}
+	return nil
+}
+
+// generateViewCommentChanges generates COMMENT ON VIEW statements for view comment changes
+func generateViewCommentChanges(buf *strings.Builder, diff *schema.MetadataDiff) error {
+	for _, viewDiff := range diff.ViewChanges {
+		if viewDiff.Action == schema.MetadataDiffActionAlter {
+			if viewDiff.OldView == nil || viewDiff.NewView == nil {
+				continue
+			}
+
+			oldComment := viewDiff.OldView.Comment
+			newComment := viewDiff.NewView.Comment
+
+			// If comments are different, generate COMMENT ON VIEW statement
+			if oldComment != newComment {
+				writeCommentOnView(buf, viewDiff.SchemaName, viewDiff.ViewName, newComment)
+			}
+		}
+	}
+	return nil
+}
+
+// generateMaterializedViewCommentChanges generates COMMENT ON MATERIALIZED VIEW statements
+func generateMaterializedViewCommentChanges(buf *strings.Builder, diff *schema.MetadataDiff) error {
+	for _, mvDiff := range diff.MaterializedViewChanges {
+		if mvDiff.Action == schema.MetadataDiffActionAlter {
+			if mvDiff.OldMaterializedView == nil || mvDiff.NewMaterializedView == nil {
+				continue
+			}
+
+			oldComment := mvDiff.OldMaterializedView.Comment
+			newComment := mvDiff.NewMaterializedView.Comment
+
+			// If comments are different, generate COMMENT ON MATERIALIZED VIEW statement
+			if oldComment != newComment {
+				writeCommentOnMaterializedView(buf, mvDiff.SchemaName, mvDiff.MaterializedViewName, newComment)
+			}
+		}
+	}
+	return nil
+}
+
+// generateFunctionCommentChanges generates COMMENT ON FUNCTION statements for function comment changes
+func generateFunctionCommentChanges(buf *strings.Builder, diff *schema.MetadataDiff) error {
+	for _, funcDiff := range diff.FunctionChanges {
+		if funcDiff.Action == schema.MetadataDiffActionAlter {
+			if funcDiff.OldFunction == nil || funcDiff.NewFunction == nil {
+				continue
+			}
+
+			oldComment := funcDiff.OldFunction.Comment
+			newComment := funcDiff.NewFunction.Comment
+
+			// If comments are different, generate COMMENT ON FUNCTION statement
+			if oldComment != newComment {
+				writeCommentOnFunction(buf, funcDiff.SchemaName, funcDiff.NewFunction.Signature, newComment)
+			}
+		}
+	}
+	return nil
+}
+
+// generateSequenceCommentChanges generates COMMENT ON SEQUENCE statements for sequence comment changes
+func generateSequenceCommentChanges(buf *strings.Builder, diff *schema.MetadataDiff) error {
+	for _, seqDiff := range diff.SequenceChanges {
+		if seqDiff.Action == schema.MetadataDiffActionAlter {
+			if seqDiff.OldSequence == nil || seqDiff.NewSequence == nil {
+				continue
+			}
+
+			oldComment := seqDiff.OldSequence.Comment
+			newComment := seqDiff.NewSequence.Comment
+
+			// If comments are different, generate COMMENT ON SEQUENCE statement
+			if oldComment != newComment {
+				writeCommentOnSequence(buf, seqDiff.SchemaName, seqDiff.SequenceName, newComment)
+			}
+		}
+	}
+	return nil
+}
+
+// generateIndexCommentChanges generates COMMENT ON INDEX statements for index comment changes within table diffs
+func generateIndexCommentChanges(buf *strings.Builder, tableDiff *schema.TableDiff) error {
+	for _, indexDiff := range tableDiff.IndexChanges {
+		if indexDiff.Action == schema.MetadataDiffActionAlter {
+			if indexDiff.OldIndex == nil || indexDiff.NewIndex == nil {
+				continue
+			}
+
+			oldComment := indexDiff.OldIndex.Comment
+			newComment := indexDiff.NewIndex.Comment
+
+			// If comments are different, generate COMMENT ON INDEX statement
+			if oldComment != newComment {
+				writeCommentOnIndex(buf, tableDiff.SchemaName, indexDiff.NewIndex.Name, newComment)
+			}
+		}
+	}
+	return nil
+}
+
+// Helper functions to write comment statements for different object types
+
+// writeCommentOnSchema writes a COMMENT ON SCHEMA statement
+func writeCommentOnSchema(out *strings.Builder, schema, comment string) {
+	_, _ = out.WriteString(`COMMENT ON SCHEMA "`)
+	_, _ = out.WriteString(schema)
+	_, _ = out.WriteString(`" IS `)
+	if comment == "" {
+		_, _ = out.WriteString(`NULL`)
+	} else {
+		_, _ = out.WriteString(`'`)
+		// Escape single quotes in the comment
+		escapedComment := strings.ReplaceAll(comment, "'", "''")
+		_, _ = out.WriteString(escapedComment)
+		_, _ = out.WriteString(`'`)
+	}
+	_, _ = out.WriteString(`;`)
+	_, _ = out.WriteString("\n")
+}
+
+// writeCommentOnView writes a COMMENT ON VIEW statement
+func writeCommentOnView(out *strings.Builder, schema, view, comment string) {
+	_, _ = out.WriteString(`COMMENT ON VIEW "`)
+	_, _ = out.WriteString(schema)
+	_, _ = out.WriteString(`"."`)
+	_, _ = out.WriteString(view)
+	_, _ = out.WriteString(`" IS `)
+	if comment == "" {
+		_, _ = out.WriteString(`NULL`)
+	} else {
+		_, _ = out.WriteString(`'`)
+		// Escape single quotes in the comment
+		escapedComment := strings.ReplaceAll(comment, "'", "''")
+		_, _ = out.WriteString(escapedComment)
+		_, _ = out.WriteString(`'`)
+	}
+	_, _ = out.WriteString(`;`)
+	_, _ = out.WriteString("\n")
+}
+
+// writeCommentOnMaterializedView writes a COMMENT ON MATERIALIZED VIEW statement
+func writeCommentOnMaterializedView(out *strings.Builder, schema, view, comment string) {
+	_, _ = out.WriteString(`COMMENT ON MATERIALIZED VIEW "`)
+	_, _ = out.WriteString(schema)
+	_, _ = out.WriteString(`"."`)
+	_, _ = out.WriteString(view)
+	_, _ = out.WriteString(`" IS `)
+	if comment == "" {
+		_, _ = out.WriteString(`NULL`)
+	} else {
+		_, _ = out.WriteString(`'`)
+		// Escape single quotes in the comment
+		escapedComment := strings.ReplaceAll(comment, "'", "''")
+		_, _ = out.WriteString(escapedComment)
+		_, _ = out.WriteString(`'`)
+	}
+	_, _ = out.WriteString(`;`)
+	_, _ = out.WriteString("\n")
+}
+
+// writeCommentOnFunction writes a COMMENT ON FUNCTION statement
+func writeCommentOnFunction(out *strings.Builder, schema, signature, comment string) {
+	_, _ = out.WriteString(`COMMENT ON FUNCTION "`)
+	_, _ = out.WriteString(schema)
+	_, _ = out.WriteString(`".`)
+	_, _ = out.WriteString(signature)
+	_, _ = out.WriteString(` IS `)
+	if comment == "" {
+		_, _ = out.WriteString(`NULL`)
+	} else {
+		_, _ = out.WriteString(`'`)
+		// Escape single quotes in the comment
+		escapedComment := strings.ReplaceAll(comment, "'", "''")
+		_, _ = out.WriteString(escapedComment)
+		_, _ = out.WriteString(`'`)
+	}
+	_, _ = out.WriteString(`;`)
+	_, _ = out.WriteString("\n")
+}
+
+// writeCommentOnSequence writes a COMMENT ON SEQUENCE statement
+func writeCommentOnSequence(out *strings.Builder, schema, sequence, comment string) {
+	_, _ = out.WriteString(`COMMENT ON SEQUENCE "`)
+	_, _ = out.WriteString(schema)
+	_, _ = out.WriteString(`"."`)
+	_, _ = out.WriteString(sequence)
+	_, _ = out.WriteString(`" IS `)
+	if comment == "" {
+		_, _ = out.WriteString(`NULL`)
+	} else {
+		_, _ = out.WriteString(`'`)
+		// Escape single quotes in the comment
+		escapedComment := strings.ReplaceAll(comment, "'", "''")
+		_, _ = out.WriteString(escapedComment)
+		_, _ = out.WriteString(`'`)
+	}
+	_, _ = out.WriteString(`;`)
+	_, _ = out.WriteString("\n")
+}
+
+// writeCommentOnIndex writes a COMMENT ON INDEX statement
+func writeCommentOnIndex(out *strings.Builder, schema, index, comment string) {
+	_, _ = out.WriteString(`COMMENT ON INDEX "`)
+	_, _ = out.WriteString(schema)
+	_, _ = out.WriteString(`"."`)
+	_, _ = out.WriteString(index)
+	_, _ = out.WriteString(`" IS `)
+	if comment == "" {
+		_, _ = out.WriteString(`NULL`)
+	} else {
+		_, _ = out.WriteString(`'`)
+		// Escape single quotes in the comment
+		escapedComment := strings.ReplaceAll(comment, "'", "''")
+		_, _ = out.WriteString(escapedComment)
+		_, _ = out.WriteString(`'`)
+	}
+	_, _ = out.WriteString(`;`)
+	_, _ = out.WriteString("\n")
+}
+
+// generateEnumTypeCommentChanges generates COMMENT ON TYPE statements for enum type comment changes
+func generateEnumTypeCommentChanges(buf *strings.Builder, diff *schema.MetadataDiff) error {
+	for _, enumDiff := range diff.EnumTypeChanges {
+		if enumDiff.Action == schema.MetadataDiffActionAlter {
+			if enumDiff.OldEnumType == nil || enumDiff.NewEnumType == nil {
+				continue
+			}
+
+			oldComment := enumDiff.OldEnumType.Comment
+			newComment := enumDiff.NewEnumType.Comment
+
+			// If comments are different, generate COMMENT ON TYPE statement
+			if oldComment != newComment {
+				writeCommentOnType(buf, enumDiff.SchemaName, enumDiff.EnumTypeName, newComment)
+			}
+		}
+	}
+	return nil
+}
+
+// writeCommentOnType writes a COMMENT ON TYPE statement
+func writeCommentOnType(out *strings.Builder, schema, typeName, comment string) {
+	_, _ = out.WriteString(`COMMENT ON TYPE "`)
+	_, _ = out.WriteString(schema)
+	_, _ = out.WriteString(`"."`)
+	_, _ = out.WriteString(typeName)
+	_, _ = out.WriteString(`" IS `)
+	if comment == "" {
+		_, _ = out.WriteString(`NULL`)
+	} else {
+		_, _ = out.WriteString(`'`)
+		// Escape single quotes in the comment
+		escapedComment := strings.ReplaceAll(comment, "'", "''")
+		_, _ = out.WriteString(escapedComment)
+		_, _ = out.WriteString(`'`)
+	}
+	_, _ = out.WriteString(`;`)
+	_, _ = out.WriteString("\n")
 }

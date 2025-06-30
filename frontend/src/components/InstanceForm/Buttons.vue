@@ -56,15 +56,19 @@ import {
   useInstanceV1Store,
   useSubscriptionV1Store,
 } from "@/store";
-import { Engine } from "@/types/proto/v1/common";
-import {
+import { Engine } from "@/types/proto-es/v1/common_pb";
+import type {
   DataSource,
-  DataSourceType,
   Instance,
-} from "@/types/proto/v1/instance_service";
-import { PlanFeature } from "@/types/proto/v1/subscription_service";
+} from "@/types/proto-es/v1/instance_service_pb";
+import {
+  DataSourceType,
+  InstanceSchema,
+} from "@/types/proto-es/v1/instance_service_pb";
+import { PlanFeature } from "@/types/proto-es/v1/subscription_service_pb";
 import { defer, isValidSpannerHost } from "@/utils";
 import { cloneDeep, isEqual } from "lodash-es";
+import { create } from "@bufbuild/protobuf";
 import { NButton } from "naive-ui";
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -336,7 +340,7 @@ const doUpdate = async () => {
   const pendingRequestRunners: (() => Promise<any>)[] = [];
 
   const maybeQueueUpdateInstanceBasicInfo = () => {
-    const instancePatch = Instance.fromPartial({
+    const instancePatch = create(InstanceSchema, {
       ...instance,
       ...basicInfo.value,
     });
@@ -354,8 +358,8 @@ const doUpdate = async () => {
       updateMask.push("environment");
     }
     if (
-      instancePatch.syncInterval?.seconds?.toNumber() !==
-      inst.syncInterval?.seconds?.toNumber()
+      Number(instancePatch.syncInterval?.seconds || 0n) !==
+      Number(inst.syncInterval?.seconds || 0n)
     ) {
       updateMask.push("sync_interval");
     }

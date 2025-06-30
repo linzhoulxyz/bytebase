@@ -28,11 +28,13 @@ import { DownloadIcon, CircleCheckBigIcon } from "lucide-vue-next";
 import { NButton } from "naive-ui";
 import { computed, reactive } from "vue";
 import { watchEffect } from "vue";
+import { create } from "@bufbuild/protobuf";
 import { useIssueContext } from "@/components/IssueV1";
-import { issueServiceClient } from "@/grpcweb";
+import { issueServiceClientConnect } from "@/grpcweb";
+import { BatchUpdateIssuesStatusRequestSchema, IssueStatus as NewIssueStatus } from "@/types/proto-es/v1/issue_service_pb";
 import { useSQLStore } from "@/store";
-import { ExportFormat } from "@/types/proto/v1/common";
 import { IssueStatus } from "@/types/proto/v1/issue_service";
+import { ExportFormat } from "@/types/proto-es/v1/common_pb";
 import {
   Plan_ExportDataConfig,
   Plan_Spec,
@@ -43,6 +45,7 @@ import {
 } from "@/types/proto/v1/rollout_service";
 import { ExportRequest } from "@/types/proto/v1/sql_service";
 import { flattenTaskV1List } from "@/utils";
+import { convertExportFormatToNew } from "@/utils/v1/common-conversions";
 
 interface LocalState {
   isExporting: boolean;
@@ -71,11 +74,12 @@ watchEffect(async () => {
         return [Task_Status.DONE, Task_Status.SKIPPED].includes(task.status);
       })
     ) {
-      await issueServiceClient.batchUpdateIssuesStatus({
+      const request = create(BatchUpdateIssuesStatusRequestSchema, {
         parent: issue.value.project,
         issues: [issue.value.name],
-        status: IssueStatus.DONE,
+        status: NewIssueStatus.DONE,
       });
+      await issueServiceClientConnect.batchUpdateIssuesStatus(request);
     }
   }
 });
@@ -107,7 +111,7 @@ const getExportFileType = (exportDataConfig: Plan_ExportDataConfig) => {
   if (exportDataConfig.password) {
     return "application/zip";
   }
-  switch (exportDataConfig.format) {
+  switch (convertExportFormatToNew(exportDataConfig.format)) {
     case ExportFormat.CSV:
       return "text/csv";
     case ExportFormat.JSON:

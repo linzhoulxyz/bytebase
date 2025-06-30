@@ -190,7 +190,11 @@ import {
 import { databaseForTask } from "@/components/Rollout/RolloutDetail";
 import DownloadSheetButton from "@/components/Sheet/DownloadSheetButton.vue";
 import SQLUploadButton from "@/components/misc/SQLUploadButton.vue";
-import { planServiceClient } from "@/grpcweb";
+import { create } from "@bufbuild/protobuf";
+import { planServiceClientConnect } from "@/grpcweb";
+import { UpdatePlanRequestSchema } from "@/types/proto-es/v1/plan_service_pb";
+import { convertOldPlanToNew, convertNewPlanToOld } from "@/utils/v1/plan-conversions";
+import { convertEngineToOld } from "@/utils/v1/common-conversions";
 import { emitWindowEvent } from "@/plugins";
 import {
   pushNotification,
@@ -202,6 +206,7 @@ import { dialectOfEngineV1 } from "@/types";
 import { IssueStatus } from "@/types/proto/v1/issue_service";
 import { Sheet } from "@/types/proto/v1/sheet_service";
 import type { Advice } from "@/types/proto/v1/sql_service";
+import type { Engine } from "@/types/proto-es/v1/common_pb";
 import {
   flattenTaskV1List,
   getSheetStatement,
@@ -453,7 +458,7 @@ const updateStatement = async (statement: string) => {
   const sheet = Sheet.fromPartial({
     ...createEmptyLocalSheet(),
     title: issue.value.title,
-    engine: await databaseEngineForSpec(head(planPatch.specs)),
+    engine: convertEngineToOld(await databaseEngineForSpec(head(planPatch.specs)) as Engine),
   });
   setSheetStatement(sheet, statement);
   const createdSheet = await useSheetV1Store().createSheet(
@@ -473,10 +478,13 @@ const updateStatement = async (statement: string) => {
     config.sheet = createdSheet.name;
   }
 
-  const updatedPlan = await planServiceClient.updatePlan({
-    plan: planPatch,
-    updateMask: ["specs"],
+  const newPlan = convertOldPlanToNew(planPatch);
+  const request = create(UpdatePlanRequestSchema, {
+    plan: newPlan,
+    updateMask: { paths: ["specs"] },
   });
+  const response = await planServiceClientConnect.updatePlan(request);
+  const updatedPlan = convertNewPlanToOld(response);
 
   issue.value.planEntity = updatedPlan;
 

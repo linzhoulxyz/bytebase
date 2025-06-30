@@ -29,7 +29,7 @@ import { NButton, NTabs, NTabPane } from "naive-ui";
 import { computed, reactive, ref, watch } from "vue";
 import { databaseForTask } from "@/components/Rollout/RolloutDetail";
 import { useSheetV1Store, useCurrentProjectV1 } from "@/store";
-import { Engine } from "@/types/proto/v1/common";
+import { Engine } from "@/types/proto-es/v1/common_pb";
 import { TaskRun_Status, type TaskRun } from "@/types/proto/v1/rollout_service";
 import { useIssueContext } from "../../logic";
 import TaskRunLogTable from "./TaskRunLogTable";

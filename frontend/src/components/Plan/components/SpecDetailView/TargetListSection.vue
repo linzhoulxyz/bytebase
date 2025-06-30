@@ -3,7 +3,9 @@
     <div class="flex items-center justify-between gap-2">
       <div class="flex items-center gap-1">
         <h3 class="text-base font-medium">{{ $t("plan.targets.title") }}</h3>
-        <span class="text-control-light">({{ targets.length }})</span>
+        <span class="text-control-light" v-if="targets.length > 1"
+          >({{ targets.length }})</span
+        >
       </div>
       <div class="flex items-center gap-1">
         <NButton
@@ -70,6 +72,13 @@
           >
             {{ getTypeLabel(item.type) }}
           </div>
+          <div
+            v-if="item.type === 'databaseGroup'"
+            class="flex items-center justify-end cursor-pointer opacity-60 hover:opacity-100"
+            @click="gotoDatabaseGroupDetailPage(item.target)"
+          >
+            <ExternalLinkIcon class="w-4 h-auto" />
+          </div>
         </div>
       </div>
       <div v-else class="text-center text-control-light py-8">
@@ -94,13 +103,19 @@ import {
   DatabaseIcon,
   FolderIcon,
   EditIcon,
+  ExternalLinkIcon,
 } from "lucide-vue-next";
 import { NEllipsis, NButton } from "naive-ui";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 import { BBSpin } from "@/bbkit";
 import EngineIcon from "@/components/Icon/EngineIcon.vue";
-import { planServiceClient } from "@/grpcweb";
+import { create } from "@bufbuild/protobuf";
+import { planServiceClientConnect } from "@/grpcweb";
+import { UpdatePlanRequestSchema } from "@/types/proto-es/v1/plan_service_pb";
+import { convertOldPlanToNew, convertNewPlanToOld } from "@/utils/v1/plan-conversions";
+import { PROJECT_V1_ROUTE_DATABASE_GROUP_DETAIL } from "@/router/dashboard/projectV1";
 import {
   useInstanceV1Store,
   useDatabaseV1Store,
@@ -108,8 +123,9 @@ import {
   useProjectV1Store,
   pushNotification,
   batchGetOrFetchDatabases,
+  getProjectNameAndDatabaseGroupName,
 } from "@/store";
-import type { Engine } from "@/types/proto/v1/common";
+import type { Engine } from "@/types/proto-es/v1/common_pb";
 import {
   extractInstanceResourceName,
   instanceV1Name,
@@ -137,6 +153,7 @@ interface TargetRow {
 const DEFAULT_VISIBLE_TARGETS = 20;
 
 const { t } = useI18n();
+const router = useRouter();
 const { plan, isCreating, events } = usePlanContext();
 const { selectedSpec } = usePlanSpecContext();
 const instanceStore = useInstanceV1Store();
@@ -262,10 +279,14 @@ const handleUpdateTargets = async (targets: string[]) => {
   }
 
   if (!isCreating.value) {
-    await planServiceClient.updatePlan({
-      plan: plan.value,
-      updateMask: ["specs"],
+    const newPlan = convertOldPlanToNew(plan.value);
+    const request = create(UpdatePlanRequestSchema, {
+      plan: newPlan,
+      updateMask: { paths: ["specs"] },
     });
+    const response = await planServiceClientConnect.updatePlan(request);
+    const updated = convertNewPlanToOld(response);
+    Object.assign(plan.value, updated);
     events.emit("status-changed", {
       eager: true,
     });
@@ -321,6 +342,19 @@ const loadTargetData = async () => {
   } finally {
     isLoadingTargets.value = false;
   }
+};
+
+const gotoDatabaseGroupDetailPage = (dbGroup: string) => {
+  const [projectId, databaseGroupName] =
+    getProjectNameAndDatabaseGroupName(dbGroup);
+  const url = router.resolve({
+    name: PROJECT_V1_ROUTE_DATABASE_GROUP_DETAIL,
+    params: {
+      projectId,
+      databaseGroupName,
+    },
+  }).fullPath;
+  window.open(url, "_blank");
 };
 
 // Watch for target changes and load data

@@ -749,6 +749,7 @@ type ListDatabasesRequest struct {
 	// - label: the database label in "{key}:{value1},{value2}" format. Support "==" operator.
 	// - exclude_unassigned: should be "true" or "false", will not show unassigned databases if it's true, support "==" operator.
 	// - drifted: should be "true" or "false", show drifted databases if it's true, support "==" operator.
+	// - table: filter by the database table, support "==" and ".matches()" operator.
 	//
 	// For example:
 	// environment == "environments/{environment resource id}"
@@ -763,6 +764,9 @@ type ListDatabasesRequest struct {
 	// label == "region:asia" && label == "tenant:bytebase"
 	// exclude_unassigned == true
 	// drifted == true
+	// table == "sample"
+	// table.matches("sam")
+	//
 	// You can combine filter conditions like:
 	// environment == "environments/prod" && name.matches("employee")
 	Filter string `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
@@ -1771,10 +1775,12 @@ type SchemaMetadata struct {
 	Packages []*PackageMetadata `protobuf:"bytes,10,rep,name=packages,proto3" json:"packages,omitempty"`
 	Owner    string             `protobuf:"bytes,11,opt,name=owner,proto3" json:"owner,omitempty"`
 	// The sequences is the list of sequences in a schema, sorted by name.
-	Sequences     []*SequenceMetadata `protobuf:"bytes,13,rep,name=sequences,proto3" json:"sequences,omitempty"`
-	Events        []*EventMetadata    `protobuf:"bytes,14,rep,name=events,proto3" json:"events,omitempty"`
-	EnumTypes     []*EnumTypeMetadata `protobuf:"bytes,15,rep,name=enum_types,json=enumTypes,proto3" json:"enum_types,omitempty"`
-	SkipDump      bool                `protobuf:"varint,16,opt,name=skip_dump,json=skipDump,proto3" json:"skip_dump,omitempty"`
+	Sequences []*SequenceMetadata `protobuf:"bytes,13,rep,name=sequences,proto3" json:"sequences,omitempty"`
+	Events    []*EventMetadata    `protobuf:"bytes,14,rep,name=events,proto3" json:"events,omitempty"`
+	EnumTypes []*EnumTypeMetadata `protobuf:"bytes,15,rep,name=enum_types,json=enumTypes,proto3" json:"enum_types,omitempty"`
+	SkipDump  bool                `protobuf:"varint,16,opt,name=skip_dump,json=skipDump,proto3" json:"skip_dump,omitempty"`
+	// The comment is the comment of a schema.
+	Comment       string `protobuf:"bytes,17,opt,name=comment,proto3" json:"comment,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1914,6 +1920,13 @@ func (x *SchemaMetadata) GetSkipDump() bool {
 	return false
 }
 
+func (x *SchemaMetadata) GetComment() string {
+	if x != nil {
+		return x.Comment
+	}
+	return ""
+}
+
 type EnumTypeMetadata struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The name of a type.
@@ -1995,8 +2008,10 @@ type EventMetadata struct {
 	SqlMode             string `protobuf:"bytes,4,opt,name=sql_mode,json=sqlMode,proto3" json:"sql_mode,omitempty"`
 	CharacterSetClient  string `protobuf:"bytes,5,opt,name=character_set_client,json=characterSetClient,proto3" json:"character_set_client,omitempty"`
 	CollationConnection string `protobuf:"bytes,6,opt,name=collation_connection,json=collationConnection,proto3" json:"collation_connection,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// The comment is the comment of an event.
+	Comment       string `protobuf:"bytes,7,opt,name=comment,proto3" json:"comment,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *EventMetadata) Reset() {
@@ -2067,6 +2082,13 @@ func (x *EventMetadata) GetCharacterSetClient() string {
 func (x *EventMetadata) GetCollationConnection() string {
 	if x != nil {
 		return x.CollationConnection
+	}
+	return ""
+}
+
+func (x *EventMetadata) GetComment() string {
+	if x != nil {
+		return x.Comment
 	}
 	return ""
 }
@@ -2832,14 +2854,10 @@ type ColumnMetadata struct {
 	// The position is the position in columns.
 	Position   int32 `protobuf:"varint,2,opt,name=position,proto3" json:"position,omitempty"`
 	HasDefault bool  `protobuf:"varint,3,opt,name=has_default,json=hasDefault,proto3" json:"has_default,omitempty"`
-	// The default is the default value of a column.
-	//
-	// Types that are valid to be assigned to Default:
-	//
-	//	*ColumnMetadata_DefaultNull
-	//	*ColumnMetadata_DefaultString
-	//	*ColumnMetadata_DefaultExpression
-	Default isColumnMetadata_Default `protobuf_oneof:"default"`
+	// The default value of column.
+	DefaultNull       bool   `protobuf:"varint,4,opt,name=default_null,json=defaultNull,proto3" json:"default_null,omitempty"`
+	DefaultString     string `protobuf:"bytes,5,opt,name=default_string,json=defaultString,proto3" json:"default_string,omitempty"`
+	DefaultExpression string `protobuf:"bytes,6,opt,name=default_expression,json=defaultExpression,proto3" json:"default_expression,omitempty"`
 	// Oracle specific metadata.
 	// The default_on_null is the default on null of a column.
 	DefaultOnNull bool `protobuf:"varint,18,opt,name=default_on_null,json=defaultOnNull,proto3" json:"default_on_null,omitempty"`
@@ -2869,8 +2887,32 @@ type ColumnMetadata struct {
 	IdentitySeed int64 `protobuf:"varint,20,opt,name=identity_seed,json=identitySeed,proto3" json:"identity_seed,omitempty"`
 	// The identity_increment is for identity columns, MSSQL only.
 	IdentityIncrement int64 `protobuf:"varint,21,opt,name=identity_increment,json=identityIncrement,proto3" json:"identity_increment,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// The default_constraint_name is the name of the default constraint, MSSQL only.
+	// In MSSQL, default values are implemented as named constraints. When modifying or
+	// dropping a column's default value, you must reference the constraint by name.
+	// This field stores the actual constraint name from the database.
+	//
+	// Example: A column definition like:
+	//
+	//	CREATE TABLE employees (
+	//	  status NVARCHAR(20) DEFAULT 'active'
+	//	)
+	//
+	// Will create a constraint with an auto-generated name like 'DF__employees__statu__3B75D760'
+	// or a user-defined name if specified:
+	//
+	//	ALTER TABLE employees ADD CONSTRAINT DF_employees_status DEFAULT 'active' FOR status
+	//
+	// To modify the default, you must first drop the existing constraint by name:
+	//
+	//	ALTER TABLE employees DROP CONSTRAINT DF__employees__statu__3B75D760
+	//	ALTER TABLE employees ADD CONSTRAINT DF_employees_status DEFAULT 'inactive' FOR status
+	//
+	// This field is populated when syncing from the database. When empty (e.g., when parsing
+	// from SQL files), the system cannot automatically drop the constraint.
+	DefaultConstraintName string `protobuf:"bytes,22,opt,name=default_constraint_name,json=defaultConstraintName,proto3" json:"default_constraint_name,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *ColumnMetadata) Reset() {
@@ -2924,36 +2966,23 @@ func (x *ColumnMetadata) GetHasDefault() bool {
 	return false
 }
 
-func (x *ColumnMetadata) GetDefault() isColumnMetadata_Default {
-	if x != nil {
-		return x.Default
-	}
-	return nil
-}
-
 func (x *ColumnMetadata) GetDefaultNull() bool {
 	if x != nil {
-		if x, ok := x.Default.(*ColumnMetadata_DefaultNull); ok {
-			return x.DefaultNull
-		}
+		return x.DefaultNull
 	}
 	return false
 }
 
 func (x *ColumnMetadata) GetDefaultString() string {
 	if x != nil {
-		if x, ok := x.Default.(*ColumnMetadata_DefaultString); ok {
-			return x.DefaultString
-		}
+		return x.DefaultString
 	}
 	return ""
 }
 
 func (x *ColumnMetadata) GetDefaultExpression() string {
 	if x != nil {
-		if x, ok := x.Default.(*ColumnMetadata_DefaultExpression); ok {
-			return x.DefaultExpression
-		}
+		return x.DefaultExpression
 	}
 	return ""
 }
@@ -3049,27 +3078,12 @@ func (x *ColumnMetadata) GetIdentityIncrement() int64 {
 	return 0
 }
 
-type isColumnMetadata_Default interface {
-	isColumnMetadata_Default()
+func (x *ColumnMetadata) GetDefaultConstraintName() string {
+	if x != nil {
+		return x.DefaultConstraintName
+	}
+	return ""
 }
-
-type ColumnMetadata_DefaultNull struct {
-	DefaultNull bool `protobuf:"varint,4,opt,name=default_null,json=defaultNull,proto3,oneof"`
-}
-
-type ColumnMetadata_DefaultString struct {
-	DefaultString string `protobuf:"bytes,5,opt,name=default_string,json=defaultString,proto3,oneof"`
-}
-
-type ColumnMetadata_DefaultExpression struct {
-	DefaultExpression string `protobuf:"bytes,6,opt,name=default_expression,json=defaultExpression,proto3,oneof"`
-}
-
-func (*ColumnMetadata_DefaultNull) isColumnMetadata_Default() {}
-
-func (*ColumnMetadata_DefaultString) isColumnMetadata_Default() {}
-
-func (*ColumnMetadata_DefaultExpression) isColumnMetadata_Default() {}
 
 type GenerationMetadata struct {
 	state         protoimpl.MessageState  `protogen:"open.v1"`
@@ -3579,9 +3593,11 @@ type ProcedureMetadata struct {
 	CollationConnection string `protobuf:"bytes,5,opt,name=collation_connection,json=collationConnection,proto3" json:"collation_connection,omitempty"`
 	DatabaseCollation   string `protobuf:"bytes,6,opt,name=database_collation,json=databaseCollation,proto3" json:"database_collation,omitempty"`
 	SqlMode             string `protobuf:"bytes,7,opt,name=sql_mode,json=sqlMode,proto3" json:"sql_mode,omitempty"`
-	SkipDump            bool   `protobuf:"varint,8,opt,name=skip_dump,json=skipDump,proto3" json:"skip_dump,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// The comment is the comment of a procedure.
+	Comment       string `protobuf:"bytes,9,opt,name=comment,proto3" json:"comment,omitempty"`
+	SkipDump      bool   `protobuf:"varint,8,opt,name=skip_dump,json=skipDump,proto3" json:"skip_dump,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ProcedureMetadata) Reset() {
@@ -3659,6 +3675,13 @@ func (x *ProcedureMetadata) GetDatabaseCollation() string {
 func (x *ProcedureMetadata) GetSqlMode() string {
 	if x != nil {
 		return x.SqlMode
+	}
+	return ""
+}
+
+func (x *ProcedureMetadata) GetComment() string {
+	if x != nil {
+		return x.Comment
 	}
 	return ""
 }
@@ -5692,7 +5715,7 @@ const file_v1_database_service_proto_rawDesc = "" +
 	"\x05owner\x18\a \x01(\tR\x05owner\x12\x1f\n" +
 	"\vsearch_path\x18\b \x01(\tR\n" +
 	"searchPath:W\xeaAT\n" +
-	"\x1dbytebase.com/DatabaseMetadata\x123bytebase.com/Database/databases/{database}/metadata\"\xad\x06\n" +
+	"\x1dbytebase.com/DatabaseMetadata\x123bytebase.com/Database/databases/{database}/metadata\"\xc7\x06\n" +
 	"\x0eSchemaMetadata\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x122\n" +
 	"\x06tables\x18\x02 \x03(\v2\x1a.bytebase.v1.TableMetadataR\x06tables\x12K\n" +
@@ -5712,12 +5735,13 @@ const file_v1_database_service_proto_rawDesc = "" +
 	"\x06events\x18\x0e \x03(\v2\x1a.bytebase.v1.EventMetadataR\x06events\x12<\n" +
 	"\n" +
 	"enum_types\x18\x0f \x03(\v2\x1d.bytebase.v1.EnumTypeMetadataR\tenumTypes\x12\x1b\n" +
-	"\tskip_dump\x18\x10 \x01(\bR\bskipDump\"u\n" +
+	"\tskip_dump\x18\x10 \x01(\bR\bskipDump\x12\x18\n" +
+	"\acomment\x18\x11 \x01(\tR\acomment\"u\n" +
 	"\x10EnumTypeMetadata\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
 	"\x06values\x18\x02 \x03(\tR\x06values\x12\x18\n" +
 	"\acomment\x18\x03 \x01(\tR\acomment\x12\x1b\n" +
-	"\tskip_dump\x18\x04 \x01(\bR\bskipDump\"\xe0\x01\n" +
+	"\tskip_dump\x18\x04 \x01(\bR\bskipDump\"\xfa\x01\n" +
 	"\rEventMetadata\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1e\n" +
 	"\n" +
@@ -5726,7 +5750,8 @@ const file_v1_database_service_proto_rawDesc = "" +
 	"\ttime_zone\x18\x03 \x01(\tR\btimeZone\x12\x19\n" +
 	"\bsql_mode\x18\x04 \x01(\tR\asqlMode\x120\n" +
 	"\x14character_set_client\x18\x05 \x01(\tR\x12characterSetClient\x121\n" +
-	"\x14collation_connection\x18\x06 \x01(\tR\x13collationConnection\"\x80\x03\n" +
+	"\x14collation_connection\x18\x06 \x01(\tR\x13collationConnection\x12\x18\n" +
+	"\acomment\x18\a \x01(\tR\acomment\"\x80\x03\n" +
 	"\x10SequenceMetadata\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
 	"\tdata_type\x18\x02 \x01(\tR\bdataType\x12\x14\n" +
@@ -5815,15 +5840,15 @@ const file_v1_database_service_proto_rawDesc = "" +
 	"\vLINEAR_HASH\x10\x06\x12\a\n" +
 	"\x03KEY\x10\a\x12\x0e\n" +
 	"\n" +
-	"LINEAR_KEY\x10\b\"\xce\x06\n" +
+	"LINEAR_KEY\x10\b\"\xf5\x06\n" +
 	"\x0eColumnMetadata\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
 	"\bposition\x18\x02 \x01(\x05R\bposition\x12\x1f\n" +
 	"\vhas_default\x18\x03 \x01(\bR\n" +
-	"hasDefault\x12#\n" +
-	"\fdefault_null\x18\x04 \x01(\bH\x00R\vdefaultNull\x12'\n" +
-	"\x0edefault_string\x18\x05 \x01(\tH\x00R\rdefaultString\x12/\n" +
-	"\x12default_expression\x18\x06 \x01(\tH\x00R\x11defaultExpression\x12&\n" +
+	"hasDefault\x12!\n" +
+	"\fdefault_null\x18\x04 \x01(\bR\vdefaultNull\x12%\n" +
+	"\x0edefault_string\x18\x05 \x01(\tR\rdefaultString\x12-\n" +
+	"\x12default_expression\x18\x06 \x01(\tR\x11defaultExpression\x12&\n" +
 	"\x0fdefault_on_null\x18\x12 \x01(\bR\rdefaultOnNull\x12\x1b\n" +
 	"\ton_update\x18\x0f \x01(\tR\bonUpdate\x12\x1a\n" +
 	"\bnullable\x18\a \x01(\bR\bnullable\x12\x12\n" +
@@ -5840,14 +5865,14 @@ const file_v1_database_service_proto_rawDesc = "" +
 	"isIdentity\x12_\n" +
 	"\x13identity_generation\x18\x11 \x01(\x0e2..bytebase.v1.ColumnMetadata.IdentityGenerationR\x12identityGeneration\x12#\n" +
 	"\ridentity_seed\x18\x14 \x01(\x03R\fidentitySeed\x12-\n" +
-	"\x12identity_increment\x18\x15 \x01(\x03R\x11identityIncrement\"U\n" +
+	"\x12identity_increment\x18\x15 \x01(\x03R\x11identityIncrement\x126\n" +
+	"\x17default_constraint_name\x18\x16 \x01(\tR\x15defaultConstraintName\"U\n" +
 	"\x12IdentityGeneration\x12#\n" +
 	"\x1fIDENTITY_GENERATION_UNSPECIFIED\x10\x00\x12\n" +
 	"\n" +
 	"\x06ALWAYS\x10\x01\x12\x0e\n" +
 	"\n" +
-	"BY_DEFAULT\x10\x02B\t\n" +
-	"\adefault\"\xaf\x01\n" +
+	"BY_DEFAULT\x10\x02\"\xaf\x01\n" +
 	"\x12GenerationMetadata\x128\n" +
 	"\x04type\x18\x01 \x01(\x0e2$.bytebase.v1.GenerationMetadata.TypeR\x04type\x12\x1e\n" +
 	"\n" +
@@ -5897,7 +5922,7 @@ const file_v1_database_service_proto_rawDesc = "" +
 	"\acomment\x18\b \x01(\tR\acomment\x12I\n" +
 	"\x11dependency_tables\x18\t \x03(\v2\x1c.bytebase.v1.DependencyTableR\x10dependencyTables\x12\x1b\n" +
 	"\tskip_dump\x18\n" +
-	" \x01(\bR\bskipDump\"\xb1\x02\n" +
+	" \x01(\bR\bskipDump\"\xcb\x02\n" +
 	"\x11ProcedureMetadata\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1e\n" +
 	"\n" +
@@ -5907,7 +5932,8 @@ const file_v1_database_service_proto_rawDesc = "" +
 	"\x14character_set_client\x18\x04 \x01(\tR\x12characterSetClient\x121\n" +
 	"\x14collation_connection\x18\x05 \x01(\tR\x13collationConnection\x12-\n" +
 	"\x12database_collation\x18\x06 \x01(\tR\x11databaseCollation\x12\x19\n" +
-	"\bsql_mode\x18\a \x01(\tR\asqlMode\x12\x1b\n" +
+	"\bsql_mode\x18\a \x01(\tR\asqlMode\x12\x18\n" +
+	"\acomment\x18\t \x01(\tR\acomment\x12\x1b\n" +
 	"\tskip_dump\x18\b \x01(\bR\bskipDump\"E\n" +
 	"\x0fPackageMetadata\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1e\n" +
@@ -6354,11 +6380,6 @@ func file_v1_database_service_proto_init() {
 	file_v1_database_service_proto_msgTypes[14].OneofWrappers = []any{
 		(*DiffSchemaRequest_Schema)(nil),
 		(*DiffSchemaRequest_Changelog)(nil),
-	}
-	file_v1_database_service_proto_msgTypes[27].OneofWrappers = []any{
-		(*ColumnMetadata_DefaultNull)(nil),
-		(*ColumnMetadata_DefaultString)(nil),
-		(*ColumnMetadata_DefaultExpression)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

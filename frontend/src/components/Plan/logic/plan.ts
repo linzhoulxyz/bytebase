@@ -7,7 +7,7 @@ import {
   unknownDatabase,
   type ComposedProject,
 } from "@/types";
-import { Engine } from "@/types/proto/v1/common";
+import { Engine } from "@/types/proto-es/v1/common_pb";
 import type { Plan_Spec } from "@/types/proto/v1/plan_service";
 
 export const databaseForSpec = (project: ComposedProject, spec: Plan_Spec) => {
@@ -79,7 +79,7 @@ export const isDatabaseChangeSpec = (spec?: Plan_Spec) => {
   return false;
 };
 
-export const isGroupingChangeSpec = (spec?: Plan_Spec) => {
+export const isDBGroupChangeSpec = (spec?: Plan_Spec) => {
   if (!spec) return false;
   const config = spec.changeDatabaseConfig || spec.exportDataConfig;
   if (config) {

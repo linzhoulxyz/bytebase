@@ -112,7 +112,6 @@
     "empty": "Trống",
     "creating": "Đang tạo...",
     "address": "Địa chỉ",
-    "subscribed": "Đã đăng ký",
     "created": "Đã tạo",
     "labels": "Nhãn",
     "mode": "Chế độ",
@@ -196,7 +195,6 @@
     "schedule": "Lịch trình",
     "state": "Trạng thái",
     "condition": "Điều kiện",
-    "search-user": "Tìm người dùng",
     "info": "Thông tin",
     "minutes": "Phút",
     "filter-by-name": "Lọc theo tên",
@@ -513,8 +511,7 @@
         "gitlab-template-description": "Đăng nhập bằng tài khoản GitLab",
         "microsoft-entra-template-description": "Đăng nhập bằng ID Microsoft Entra",
         "custom-template-description": "Cấu hình nhà cung cấp OAuth 2.0 tùy chỉnh"
-      },
-      "copy-redirect-url": "URL chuyển hướng đã được sao chép vào bộ nhớ tạm."
+      }
     },
     "general": {
       "workspace": {
@@ -568,8 +565,14 @@
           "never-expires": "Không bao giờ hết hạn"
         },
         "maximum-sql-result": {
-          "self": "Kích thước kết quả SQL tối đa",
-          "description": "Giới hạn kích thước kết quả truy vấn SQL đầu ra."
+          "size": {
+            "self": "Kích thước kết quả SQL tối đa",
+            "description": "Giới hạn kích thước kết quả truy vấn SQL đầu ra."
+          },
+          "rows": {
+            "self": "Số lượng hàng kết quả SQL tối đa",
+            "description": "Giới hạn số hàng đầu ra trong kết quả truy vấn SQL, giá trị <= 0 nghĩa là không giới hạn."
+          }
         },
         "query-data-policy": {
           "timeout": {
@@ -741,7 +744,6 @@
       "classification": {
         "upload": "Tải lên phân loại",
         "upload-label": "Bạn có thể tải lên tệp phân loại với định dạng JSON.",
-        "copy-succeed": "Sao chép ví dụ thành công",
         "override-title": "Ghi đè dữ liệu phân loại",
         "override-desc": "Dữ liệu phân loại hiện có sẽ bị ghi đè và ảnh hưởng đến tất cả các dự án.",
         "override-confirm": "Vẫn tải lên"
@@ -803,8 +805,6 @@
         "some-tasks-are-still-running": "Một số tác vụ vẫn đang chạy"
       }
     },
-    "subscribe": "Theo dõi",
-    "unsubscribe": "Bỏ theo dõi",
     "add-some-description": "Thêm mô tả...",
     "add-a-comment": "Thêm bình luận",
     "leave-a-comment": "Để lại bình luận...",
@@ -849,10 +849,7 @@
           "title": "Người tạo",
           "description": "Tìm kiếm theo người tạo vấn đề"
         },
-        "subscriber": {
-          "title": "Người theo dõi",
-          "description": "Tìm kiếm theo người theo dõi vấn đề"
-        },
+        "subscriber": {},
         "approver": {
           "title": "Người phê duyệt",
           "description": "Tìm kiếm theo người phê duyệt vấn đề"
@@ -869,8 +866,12 @@
           "title": "Nhãn",
           "description": "Lọc theo nhãn vấn đề"
         },
+        "table": {
+          "title": "bề mặt",
+          "description": "Nhập giá trị sau đó nhấn Enter"
+        },
         "database-label": {
-          "title": "Nhãn",
+          "title": "Nhãn cơ sở dữ liệu",
           "description": "Nhập \"key:value\" rồi nhấn Enter"
         },
         "engine": {
@@ -917,7 +918,6 @@
     },
     "approval-flow": {
       "self": "Quy trình phê duyệt",
-      "tooltip": "Người phê duyệt sẽ xem xét và phê duyệt vấn đề theo thứ tự được chỉ định trong quy trình. Vấn đề chỉ có thể được áp dụng sau khi tất cả các bước trong quy trình đã được phê duyệt. Bạn có thể định cấu hình quy trình phê duyệt tùy chỉnh cho từng rủi ro.",
       "pre-issue-created-tips": "Sau khi một vấn đề được tạo, Bytebase sẽ tự động khớp với phê duyệt tùy chỉnh tương ứng dựa trên loại và mức độ rủi ro của vấn đề."
     },
     "risk-level": {
@@ -1009,7 +1009,6 @@
       }
     },
     "sql-review-only": "Chỉ đánh giá SQL",
-    "create-issue": "Tạo vấn đề",
     "this-plan-will-be-converted-to-a-new-issue": "Kế hoạch này sẽ được chuyển đổi thành một vấn đề mới",
     "title": {
       "edit-schema": "Chỉnh sửa lược đồ",
@@ -1022,9 +1021,19 @@
     "schema-drift-detected": {
       "self": "Đã phát hiện sự trôi dạt của sơ đồ",
       "description": "Cơ sở dữ liệu được chọn có sự trôi dạt lược đồ. Vui lòng đảm bảo rằng sự trôi dạt này được mong đợi và an toàn để áp dụng."
+    },
+    "review": {
+      "approved": "Tán thành",
+      "rejected": "Vật bị loại bỏ",
+      "under-review": "Đang xem xét"
+    },
+    "expermental-page": {
+      "self": "Trang vấn đề thử nghiệm"
     }
   },
   "plan": {
+    "self": "Kế hoạch",
+    "plans": "Kế hoạch",
     "new-plan": "Kế hoạch mới",
     "add-spec": "Thêm thông số kỹ thuật",
     "change-type": "Thay đổi loại",
@@ -1033,6 +1042,7 @@
     "data-change": "Thay đổi dữ liệu",
     "data-change-description": "Sửa đổi nội dung cơ sở dữ liệu (DML) bao gồm chèn, cập nhật, xóa và chuyển đổi dữ liệu",
     "select-targets": "Chọn mục tiêu",
+    "ready-for-review": "Sẵn sàng để xem xét",
     "overview": {
       "description": "Xem và quản lý tất cả các thông số kỹ thuật trong kế hoạch này",
       "total-specs": "Tổng số thông số kỹ thuật",
@@ -1044,6 +1054,8 @@
     "navigator": {
       "specifications": "Thông số kỹ thuật",
       "checks": "Kiểm tra",
+      "review": "Ôn tập",
+      "rollout": "Triển khai",
       "statement-empty": "Câu lệnh trống rỗng"
     },
     "spec": {
@@ -1090,10 +1102,11 @@
       "configuration-has-issues": "Cấu hình có vấn đề {count} | Cấu hình có vấn đề {count}"
     },
     "checks": {
-      "self": "Kiểm tra",
-      "no-checks": "Không có kết quả kiểm tra nào có sẵn",
-      "click-to-run-checks": "Nhấp vào \"Chạy kiểm tra\" để xác thực thông số kỹ thuật này"
+      "self": "Kiểm tra"
     }
+  },
+  "rollout": {
+    "rollouts": "Triển khai"
   },
   "quick-action": {
     "create-db": "Tạo cơ sở dữ liệu",
@@ -1208,7 +1221,6 @@
       "console": {
         "snowflake": "URL bảng điều khiển bên ngoài quản lý phiên bản này (ví dụ: bảng điều khiển AWS RDS, bảng điều khiển phiên bản cơ sở dữ liệu nội bộ của bạn)"
       },
-      "outbound-ip-list": "Nếu bạn sử dụng quy tắc tường lửa gửi đến cho phiên bản cơ sở dữ liệu của mình, vui lòng bao gồm các địa chỉ IP sau trong danh sách cho phép để cho phép truy cập bởi Bytebase Cloud.",
       "create-admin-user": "Đây là người dùng kết nối được Bytebase sử dụng để thực hiện các hoạt động DDL và DML (không phải SELECT).",
       "create-readonly-user": "Đây là kết nối được Bytebase sử dụng để thực hiện các hoạt động chỉ đọc như truy vấn SELECT.",
       "create-admin-user-non-sql": "Đây là người dùng kết nối được Bytebase sử dụng để thực hiện các hoạt động ghi và quản trị.",
@@ -1249,7 +1261,8 @@
         "redis": {
           "template": "Dưới đây là ví dụ để tạo người dùng {user} với mật khẩu {password} và cấp cho người dùng các đặc quyền cần thiết."
         }
-      }
+      },
+      "firewall-info": "Nếu bạn sử dụng các quy tắc tường lửa gửi đến cho thể hiện cơ sở dữ liệu của mình, vui lòng tham khảo Hướng dẫn kết nối đám mây Bytebase."
     },
     "no-password": "Không có mật khẩu",
     "type-or-paste-credentials": "Nhập hoặc dán THÔNG TIN XÁC THỰC",
@@ -1269,7 +1282,8 @@
       "credential-source": "Credential Source",
       "tenant-id": "Tenant ID",
       "client-id": "Client ID",
-      "client-secret": "Client Secret"
+      "client-secret": "Client Secret",
+      "specific-credential": "Chứng chỉ cụ thể"
     },
     "database-region": "Khu vực cơ sở dữ liệu",
     "external-secret-gcp": {
@@ -1309,7 +1323,6 @@
     "unable-to-connect": "Bytebase không thể kết nối với phiên bản. Chúng tôi khuyên bạn nên xem xét lại thông tin kết nối. Nhưng bạn có thể bỏ qua cảnh báo này ngay bây giờ. Bạn vẫn có thể sửa thông tin kết nối từ trang chi tiết phiên bản sau khi tạo.\n\nChi tiết lỗi: {0}",
     "successfully-created-instance-createdinstance-name": "Đã tạo thành công phiên bản '{0}'.",
     "successfully-updated-instance-instance-name": "Đã cập nhật thành công phiên bản '{0}'.",
-    "copy-grant-statement": "Các câu lệnh CREATE USER và GRANT đã được sao chép vào khay nhớ tạm. Dán vào ứng dụng khách {engine} của bạn để áp dụng.",
     "successfully-connected-instance": "Đã kết nối thành công với phiên bản.",
     "failed-to-connect-instance": "Không kết nối được với phiên bản.",
     "failed-to-connect-instance-localhost": "Nếu bạn chạy Bytebase bằng Docker, vui lòng thử \"host.docker.internal\" cho địa chỉ máy chủ.",
@@ -1482,7 +1495,6 @@
     "batch-action-permission-denied": "Không có quyền {action} đối với cơ sở dữ liệu",
     "batch-action-disabled": "Không thể {action} đối với các cơ sở dữ liệu từ các dự án khác nhau",
     "batch-action-disabled-for-unassigned": "Không thể {action} đối với cơ sở dữ liệu chưa được gán",
-    "data-export-action-disabled": "Không thể xuất dữ liệu cho nhiều hơn một cơ sở dữ liệu",
     "successfully-transferred-databases": "Đã chuyển thành công cơ sở dữ liệu",
     "nullable": "Có thể null",
     "expression": "Biểu thức",
@@ -1607,7 +1619,8 @@
       "new-baseline": {
         "self": "Đường cơ sở mới",
         "successfully-established": "Đã thiết lập thành công đường cơ sở mới"
-      }
+      },
+      "view-diff": "Xem sự khác biệt"
     }
   },
   "project": {
@@ -1871,18 +1884,14 @@
       }
     },
     "copy-url": "Sao chép URL",
-    "notify": {
-      "copy-code-succeed": "Sao chép mã thành công",
-      "copy-share-link": "Liên kết chia sẻ đã được sao chép vào khay nhớ tạm."
-    },
     "connect-to-a-database": "Kết nối với cơ sở dữ liệu",
     "link-access": "Truy cập liên kết",
     "private": "Riêng tư",
     "private-desc": "Chỉ bạn mới có thể truy cập trang tính này",
     "project-read": "Đọc dự án",
-    "project-read-desc": "Cả CHỦ SỞ HỮU trang tính và CHỦ SỞ HỮU dự án đều có thể đọc/ghi, các thành viên dự án khác có thể đọc",
+    "project-read-desc": "Cả chủ sở hữu trang tính và người dùng có quyền \"bb.worksheets.manage\" đều có thể đọc/ghi, những người dùng dự án khác có quyền \"bb.worksheets.get\" có thể đọc",
     "project-write": "Ghi dự án",
-    "project-write-desc": "Cả CHỦ SỞ HỮU trang tính và thành viên dự án đều có thể đọc/ghi",
+    "project-write-desc": "Cả chủ sở hữu trang tính và người dùng dự án có quyền \"bb.worksheets.get\" đều có thể đọc/ghi",
     "create-read-only-data-source": "Đi tới tạo",
     "save-sheet": "Lưu trang tính",
     "save-sheet-input-placeholder": "Vui lòng nhập tên trang tính",
@@ -1940,7 +1949,6 @@
     "pending-query": "Đang chờ truy vấn",
     "executing-query": "Đang thực hiện truy vấn",
     "request-query": "Yêu cầu truy vấn",
-    "copy-success": "Sao chép thành công",
     "connect-in-new-tab": "Kết nối trong tab mới",
     "copy-name": "Sao chép tên",
     "preview-table-data": "Xem trước dữ liệu bảng",
@@ -1965,7 +1973,6 @@
       "rows": "dòng"
     },
     "n-per-page": "{n} / trang",
-    "customize-tree-structure": "Tùy chỉnh cấu trúc cây",
     "add-a-new-instance": "Thêm một phiên bản mới",
     "web-socket": {
       "errors": {
@@ -2308,6 +2315,7 @@
   "identity-provider": {
     "test-connection": "Kiểm tra kết nối",
     "test-connection-success": "Kiểm tra kết nối thành công",
+    "userinfo-description": "Thông tin người dùng đã khớp.",
     "claims-description": "Các yêu cầu sau đây đã được nhà cung cấp danh tính trả về. Thông tin này có thể giúp bạn cấu hình ánh xạ trường.",
     "no-claims": "Nhà cung cấp danh tính không trả lại bất kỳ khiếu nại nào.",
     "identity-provider-created": "Nhà cung cấp danh tính đã được tạo thành công",
@@ -2315,7 +2323,8 @@
     "identity-provider-update-failed": "Không cập nhật được nhà cung cấp danh tính",
     "identity-provider-create-failed": "Không tạo được nhà cung cấp danh tính",
     "identity-provider-delete-failed": "Không xóa được nhà cung cấp danh tính",
-    "identity-provider-permission-denied": "Quyền bị từ chối"
+    "identity-provider-permission-denied": "Quyền bị từ chối",
+    "delete-warning": "Bạn có chắc chắn muốn xóa nhà cung cấp danh tính này không? Người dùng đã đăng ký qua SSO này sẽ không thể đăng nhập bằng SSO này nữa. Nếu đăng nhập bằng mật khẩu bị vô hiệu hóa trong cài đặt không gian làm việc của bạn, những người dùng này có thể bị khóa hoàn toàn."
   },
   "sensitive-data": {
     "self": "Dữ liệu nhạy cảm"
@@ -2416,7 +2425,6 @@
           "no-more": "không còn nữa"
         }
       },
-      "statement-copied": "Câu lệnh đã được sao chép vào khay nhớ tạm",
       "text2sql": "Chuyển văn bản thành SQL",
       "actions": {
         "explain-code": "Giải thích mã",
@@ -2520,10 +2528,10 @@
       "re-request-review-issue": "Yêu cầu xem xét lại vấn đề?",
       "sent-back-issue": "Đã gửi lại vấn đề",
       "re-requested-review": "đã yêu cầu xem xét lại vấn đề",
-      "no-one-matched": "Không ai khớp",
-      "any-n-role-can-approve": "Bất kỳ {role} nào cũng có thể phê duyệt",
-      "approved-by-n": "Đã được phê duyệt bởi {approver}",
-      "issue-creators-cannot-approve-their-own-issue": "Người tạo vấn đề không thể phê duyệt vấn đề của chính họ"
+      "approved-by": "Được chấp thuận bởi",
+      "rejected-by": "Bị từ chối bởi",
+      "and-n-other-users": "{names} và {count} người dùng khác",
+      "self-approval-not-allowed": "Không được phép tự phê duyệt cho dự án này. Bạn không thể phê duyệt với tư cách là người sáng tạo."
     }
   },
   "schema-template": {
@@ -2716,8 +2724,6 @@
     "title": "Giải phóng",
     "releases": "Bản phát hành",
     "files": "Tệp",
-    "create": "Tạo bản phát hành",
-    "select": "Chọn bản phát hành",
     "archive-this-release": "Lưu trữ bản phát hành này",
     "total-files": "Tổng số {count} tệp",
     "plan-tip": "Kế hoạch này được cấu hình để sử dụng bản phát hành. Các thay đổi cơ sở dữ liệu sẽ được thực hiện bằng các câu lệnh SQL từ các tệp phát hành đã chọn.",
@@ -2738,15 +2744,8 @@
     "vcs-type": {
       "unspecified": "Không xác định"
     },
-    "actions": {
-      "new-file": "Tệp mới",
-      "import-from-release": "Nhập từ bản phát hành"
-    },
-    "messages": {
-      "succeed-to-create-release": "Đã tạo thành công bản phát hành",
-      "files-will-always-be-sorted-and-executed-in-version-order": "Các tệp sẽ luôn được sắp xếp và thực hiện theo thứ tự phiên bản.",
-      "cannot-modify-files-after-created": "Bạn không thể sửa đổi tệp sau khi bản phát hành được tạo."
-    },
+    "actions": {},
+    "messages": {},
     "usage-description": "Bản phát hành chỉ được sử dụng trong GitOps tùy chỉnh với tích hợp API."
   },
   "export-data": {

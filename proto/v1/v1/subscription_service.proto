@@ -14,12 +14,14 @@ service SubscriptionService {
   // GetSubscription returns the current subscription.
   // If there is no license, we will return a free plan subscription without expiration time.
   // If there is expired license, we will return a free plan subscription with the expiration time of the expired license.
+  // Permissions required: None
   rpc GetSubscription(GetSubscriptionRequest) returns (Subscription) {
     option (google.api.http) = {get: "/v1/subscription"};
     option (google.api.method_signature) = "";
     option (bytebase.v1.allow_without_credential) = true;
   }
 
+  // Permissions required: bb.settings.set
   rpc UpdateSubscription(UpdateSubscriptionRequest) returns (Subscription) {
     option (google.api.http) = {
       patch: "/v1/subscription"
@@ -48,17 +50,19 @@ enum PlanType {
 }
 
 message Subscription {
-  int32 seat_count = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  PlanType plan = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  int32 instance_count = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 seats = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  google.protobuf.Timestamp expires_time = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 instances = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  PlanType plan = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 active_instances = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  bool trialing = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp expires_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  string org_name = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool trialing = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  string org_name = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // PlanFeature represents the available features in Bytebase

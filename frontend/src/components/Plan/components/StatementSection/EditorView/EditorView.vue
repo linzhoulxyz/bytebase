@@ -93,11 +93,7 @@
       </template>
     </BBAttention>
 
-    <div
-      ref="editorContainerElRef"
-      class="whitespace-pre-wrap overflow-hidden min-h-[120px] relative"
-      :data-height="editorContainerHeight"
-    >
+    <div class="relative">
       <MonacoEditor
         ref="monacoEditorRef"
         class="w-full h-auto max-h-[240px] min-h-[120px] border rounded-[3px]"
@@ -116,11 +112,10 @@
         }"
         @update:content="handleStatementChange"
       />
-      <div class="absolute bottom-[3px] right-[18px]">
+      <div class="absolute bottom-1 right-4">
         <NButton
           size="small"
           :quaternary="true"
-          style="--n-padding: 0 5px"
           @click="state.showEditorModal = true"
         >
           <template #icon>
@@ -170,7 +165,6 @@
 </template>
 
 <script setup lang="ts">
-import { useElementSize } from "@vueuse/core";
 import { cloneDeep, head, isEmpty } from "lodash-es";
 import { ExpandIcon } from "lucide-vue-next";
 import { NButton, NTooltip, useDialog } from "naive-ui";
@@ -190,7 +184,12 @@ import {
 } from "@/components/Plan/logic";
 import DownloadSheetButton from "@/components/Sheet/DownloadSheetButton.vue";
 import SQLUploadButton from "@/components/misc/SQLUploadButton.vue";
-import { planServiceClient } from "@/grpcweb";
+import { create } from "@bufbuild/protobuf";
+import { planServiceClientConnect } from "@/grpcweb";
+import { UpdatePlanRequestSchema } from "@/types/proto-es/v1/plan_service_pb";
+import { convertOldPlanToNew, convertNewPlanToOld } from "@/utils/v1/plan-conversions";
+import { convertEngineToOld } from "@/utils/v1/common-conversions";
+import { Engine } from "@/types/proto-es/v1/common_pb";
 import {
   pushNotification,
   useCurrentProjectV1,
@@ -220,9 +219,7 @@ const dialog = useDialog();
 const { project } = useCurrentProjectV1();
 const { isCreating, plan, events, planCheckRunList } = usePlanContext();
 const { selectedSpec } = usePlanSpecContext();
-const editorContainerElRef = ref<HTMLElement>();
 const monacoEditorRef = ref<InstanceType<typeof MonacoEditor>>();
-const { height: editorContainerHeight } = useElementSize(editorContainerElRef);
 
 const state = reactive<LocalState>({
   isEditing: false,
@@ -401,10 +398,11 @@ const updateStatement = async (statement: string) => {
   const specsToPatch = planPatch.specs.filter(
     (spec) => spec.id === selectedSpec.value.id
   );
+  const specEngine = await databaseEngineForSpec(head(specsToPatch));
   const sheet = Sheet.fromPartial({
     ...createEmptyLocalSheet(),
     title: plan.value.title,
-    engine: await databaseEngineForSpec(head(specsToPatch)),
+    engine: convertEngineToOld((specEngine ?? Engine.ENGINE_UNSPECIFIED) as Engine),
   });
   setSheetStatement(sheet, statement);
   const createdSheet = await useSheetV1Store().createSheet(
@@ -424,10 +422,13 @@ const updateStatement = async (statement: string) => {
     }
   }
 
-  const updatedPlan = await planServiceClient.updatePlan({
-    plan: planPatch,
-    updateMask: ["specs"],
+  const newPlan = convertOldPlanToNew(planPatch);
+  const request = create(UpdatePlanRequestSchema, {
+    plan: newPlan,
+    updateMask: { paths: ["specs"] },
   });
+  const response = await planServiceClientConnect.updatePlan(request);
+  const updatedPlan = convertNewPlanToOld(response);
 
   Object.assign(plan.value, updatedPlan);
   events.emit("status-changed", { eager: true });

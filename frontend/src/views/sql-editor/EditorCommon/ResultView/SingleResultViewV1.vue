@@ -234,9 +234,10 @@ import {
   isValidDatabaseName,
   isValidInstanceName,
 } from "@/types";
-import { Engine, ExportFormat } from "@/types/proto/v1/common";
+import { Engine, ExportFormat } from "@/types/proto-es/v1/common_pb";
+import { convertExportFormatToOld } from "@/utils/v1/common-conversions";
 import { PolicyType } from "@/types/proto/v1/org_policy_service";
-import { DatabaseChangeMode } from "@/types/proto/v1/setting_service";
+import { DatabaseChangeMode } from "@/types/proto-es/v1/setting_service_pb";
 import type {
   QueryResult,
   QueryRow,
@@ -259,6 +260,8 @@ import EmptyView from "./EmptyView.vue";
 import ErrorView from "./ErrorView";
 import SelectionCopyTooltips from "./SelectionCopyTooltips.vue";
 import { useSQLResultViewContext } from "./context";
+
+// Using conversion function from common-conversions.ts
 
 type LocalState = {
   search: string;
@@ -306,9 +309,6 @@ const router = useRouter();
 const { dark, keyword } = useSQLResultViewContext();
 const tabStore = useSQLEditorTabStore();
 const editorStore = useSQLEditorStore();
-const appFeatureDisallowExport = useAppFeature(
-  "bb.feature.sql-editor.disallow-export-query-data"
-);
 const databaseChangeMode = useAppFeature("bb.feature.database-change-mode");
 const currentTab = computed(() => tabStore.currentTab);
 const { instance: connectedInstance } = useConnectionOfCurrentSQLEditorTab();
@@ -321,10 +321,7 @@ const { policy: exportDataPolicy } = usePolicyByParentAndType(
 );
 
 const disallowExportQueryData = computed(() => {
-  const disableDataExport =
-    exportDataPolicy.value?.exportDataPolicy?.disable ?? false;
-
-  return disableDataExport || appFeatureDisallowExport.value;
+  return exportDataPolicy.value?.exportDataPolicy?.disable ?? false;
 });
 
 const viewMode = computed((): ViewMode => {
@@ -485,7 +482,7 @@ const handleExportBtnClick = async ({
     const content = await useSQLStore().exportData({
       name: props.database.name,
       dataSourceId: props.params.connection.dataSourceId ?? "",
-      format: options.format,
+      format: convertExportFormatToOld(options.format),
       statement,
       limit,
       admin,

@@ -156,7 +156,6 @@ export enum Setting_SettingName {
   APP_IM = "APP_IM",
   WATERMARK = "WATERMARK",
   AI = "AI",
-  PLUGIN_AGENT = "PLUGIN_AGENT",
   SCHEMA_TEMPLATE = "SCHEMA_TEMPLATE",
   DATA_CLASSIFICATION = "DATA_CLASSIFICATION",
   SEMANTIC_TYPES = "SEMANTIC_TYPES",
@@ -202,9 +201,6 @@ export function setting_SettingNameFromJSON(object: any): Setting_SettingName {
     case 10:
     case "AI":
       return Setting_SettingName.AI;
-    case 11:
-    case "PLUGIN_AGENT":
-      return Setting_SettingName.PLUGIN_AGENT;
     case 13:
     case "SCHEMA_TEMPLATE":
       return Setting_SettingName.SCHEMA_TEMPLATE;
@@ -257,8 +253,6 @@ export function setting_SettingNameToJSON(object: Setting_SettingName): string {
       return "WATERMARK";
     case Setting_SettingName.AI:
       return "AI";
-    case Setting_SettingName.PLUGIN_AGENT:
-      return "PLUGIN_AGENT";
     case Setting_SettingName.SCHEMA_TEMPLATE:
       return "SCHEMA_TEMPLATE";
     case Setting_SettingName.DATA_CLASSIFICATION:
@@ -303,8 +297,6 @@ export function setting_SettingNameToNumber(object: Setting_SettingName): number
       return 9;
     case Setting_SettingName.AI:
       return 10;
-    case Setting_SettingName.PLUGIN_AGENT:
-      return 11;
     case Setting_SettingName.SCHEMA_TEMPLATE:
       return 13;
     case Setting_SettingName.DATA_CLASSIFICATION:
@@ -329,18 +321,20 @@ export function setting_SettingNameToNumber(object: Setting_SettingName): number
 export interface Value {
   /** Defines this value as being a string value. */
   stringValue?: string | undefined;
-  appImSettingValue?: AppIMSetting | undefined;
-  agentPluginSettingValue?: AgentPluginSetting | undefined;
+  appImSettingValue?:
+    | AppIMSetting
+    | undefined;
+  /** reserved 4; // was AgentPluginSetting agent_plugin_setting_value */
   workspaceProfileSettingValue?: WorkspaceProfileSetting | undefined;
   workspaceApprovalSettingValue?: WorkspaceApprovalSetting | undefined;
   schemaTemplateSettingValue?: SchemaTemplateSetting | undefined;
   dataClassificationSettingValue?: DataClassificationSetting | undefined;
   semanticTypeSettingValue?: SemanticTypeSetting | undefined;
-  maximumSqlResultSizeSetting?: MaximumSQLResultSizeSetting | undefined;
   scimSetting?: SCIMSetting | undefined;
   passwordRestrictionSetting?: PasswordRestrictionSetting | undefined;
   aiSetting?: AISetting | undefined;
   environmentSetting?: EnvironmentSetting | undefined;
+  sqlQueryRestrictionSetting?: SQLQueryRestrictionSetting | undefined;
 }
 
 export interface AppIMSetting {
@@ -382,13 +376,6 @@ export interface AppIMSetting_DingTalk {
   robotCode: string;
 }
 
-export interface AgentPluginSetting {
-  /** The URL for the agent API. */
-  url: string;
-  /** The token for the agent. */
-  token: string;
-}
-
 export interface WorkspaceProfileSetting {
   /** The external URL is used for sso authentication callback. */
   externalUrl: string;
@@ -396,8 +383,6 @@ export interface WorkspaceProfileSetting {
   disallowSignup: boolean;
   /** Require 2FA for all users. */
   require2fa: boolean;
-  /** outbound_ip_list is the outbound IP for Bytebase instance in SaaS mode. */
-  outboundIpList: string[];
   /** The duration for token. */
   tokenDuration:
     | Duration
@@ -697,12 +682,17 @@ export function algorithm_InnerOuterMask_MaskTypeToNumber(object: Algorithm_Inne
   }
 }
 
-export interface MaximumSQLResultSizeSetting {
+export interface SQLQueryRestrictionSetting {
   /**
-   * The limit is in bytes.
+   * The size limit in bytes.
    * The default value is 100MB, we will use the default value if the setting not exists, or the limit <= 0.
    */
-  limit: Long;
+  maximumResultSize: Long;
+  /**
+   * The return rows limit.
+   * The default value is -1, means no limit.
+   */
+  maximumResultRows: number;
 }
 
 export interface SCIMSetting {
@@ -1292,17 +1282,16 @@ function createBaseValue(): Value {
   return {
     stringValue: undefined,
     appImSettingValue: undefined,
-    agentPluginSettingValue: undefined,
     workspaceProfileSettingValue: undefined,
     workspaceApprovalSettingValue: undefined,
     schemaTemplateSettingValue: undefined,
     dataClassificationSettingValue: undefined,
     semanticTypeSettingValue: undefined,
-    maximumSqlResultSizeSetting: undefined,
     scimSetting: undefined,
     passwordRestrictionSetting: undefined,
     aiSetting: undefined,
     environmentSetting: undefined,
+    sqlQueryRestrictionSetting: undefined,
   };
 }
 
@@ -1313,9 +1302,6 @@ export const Value: MessageFns<Value> = {
     }
     if (message.appImSettingValue !== undefined) {
       AppIMSetting.encode(message.appImSettingValue, writer.uint32(26).fork()).join();
-    }
-    if (message.agentPluginSettingValue !== undefined) {
-      AgentPluginSetting.encode(message.agentPluginSettingValue, writer.uint32(34).fork()).join();
     }
     if (message.workspaceProfileSettingValue !== undefined) {
       WorkspaceProfileSetting.encode(message.workspaceProfileSettingValue, writer.uint32(42).fork()).join();
@@ -1332,9 +1318,6 @@ export const Value: MessageFns<Value> = {
     if (message.semanticTypeSettingValue !== undefined) {
       SemanticTypeSetting.encode(message.semanticTypeSettingValue, writer.uint32(90).fork()).join();
     }
-    if (message.maximumSqlResultSizeSetting !== undefined) {
-      MaximumSQLResultSizeSetting.encode(message.maximumSqlResultSizeSetting, writer.uint32(106).fork()).join();
-    }
     if (message.scimSetting !== undefined) {
       SCIMSetting.encode(message.scimSetting, writer.uint32(114).fork()).join();
     }
@@ -1346,6 +1329,9 @@ export const Value: MessageFns<Value> = {
     }
     if (message.environmentSetting !== undefined) {
       EnvironmentSetting.encode(message.environmentSetting, writer.uint32(138).fork()).join();
+    }
+    if (message.sqlQueryRestrictionSetting !== undefined) {
+      SQLQueryRestrictionSetting.encode(message.sqlQueryRestrictionSetting, writer.uint32(146).fork()).join();
     }
     return writer;
   },
@@ -1371,14 +1357,6 @@ export const Value: MessageFns<Value> = {
           }
 
           message.appImSettingValue = AppIMSetting.decode(reader, reader.uint32());
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.agentPluginSettingValue = AgentPluginSetting.decode(reader, reader.uint32());
           continue;
         }
         case 5: {
@@ -1421,14 +1399,6 @@ export const Value: MessageFns<Value> = {
           message.semanticTypeSettingValue = SemanticTypeSetting.decode(reader, reader.uint32());
           continue;
         }
-        case 13: {
-          if (tag !== 106) {
-            break;
-          }
-
-          message.maximumSqlResultSizeSetting = MaximumSQLResultSizeSetting.decode(reader, reader.uint32());
-          continue;
-        }
         case 14: {
           if (tag !== 114) {
             break;
@@ -1461,6 +1431,14 @@ export const Value: MessageFns<Value> = {
           message.environmentSetting = EnvironmentSetting.decode(reader, reader.uint32());
           continue;
         }
+        case 18: {
+          if (tag !== 146) {
+            break;
+          }
+
+          message.sqlQueryRestrictionSetting = SQLQueryRestrictionSetting.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1474,9 +1452,6 @@ export const Value: MessageFns<Value> = {
     return {
       stringValue: isSet(object.stringValue) ? globalThis.String(object.stringValue) : undefined,
       appImSettingValue: isSet(object.appImSettingValue) ? AppIMSetting.fromJSON(object.appImSettingValue) : undefined,
-      agentPluginSettingValue: isSet(object.agentPluginSettingValue)
-        ? AgentPluginSetting.fromJSON(object.agentPluginSettingValue)
-        : undefined,
       workspaceProfileSettingValue: isSet(object.workspaceProfileSettingValue)
         ? WorkspaceProfileSetting.fromJSON(object.workspaceProfileSettingValue)
         : undefined,
@@ -1492,9 +1467,6 @@ export const Value: MessageFns<Value> = {
       semanticTypeSettingValue: isSet(object.semanticTypeSettingValue)
         ? SemanticTypeSetting.fromJSON(object.semanticTypeSettingValue)
         : undefined,
-      maximumSqlResultSizeSetting: isSet(object.maximumSqlResultSizeSetting)
-        ? MaximumSQLResultSizeSetting.fromJSON(object.maximumSqlResultSizeSetting)
-        : undefined,
       scimSetting: isSet(object.scimSetting) ? SCIMSetting.fromJSON(object.scimSetting) : undefined,
       passwordRestrictionSetting: isSet(object.passwordRestrictionSetting)
         ? PasswordRestrictionSetting.fromJSON(object.passwordRestrictionSetting)
@@ -1502,6 +1474,9 @@ export const Value: MessageFns<Value> = {
       aiSetting: isSet(object.aiSetting) ? AISetting.fromJSON(object.aiSetting) : undefined,
       environmentSetting: isSet(object.environmentSetting)
         ? EnvironmentSetting.fromJSON(object.environmentSetting)
+        : undefined,
+      sqlQueryRestrictionSetting: isSet(object.sqlQueryRestrictionSetting)
+        ? SQLQueryRestrictionSetting.fromJSON(object.sqlQueryRestrictionSetting)
         : undefined,
     };
   },
@@ -1513,9 +1488,6 @@ export const Value: MessageFns<Value> = {
     }
     if (message.appImSettingValue !== undefined) {
       obj.appImSettingValue = AppIMSetting.toJSON(message.appImSettingValue);
-    }
-    if (message.agentPluginSettingValue !== undefined) {
-      obj.agentPluginSettingValue = AgentPluginSetting.toJSON(message.agentPluginSettingValue);
     }
     if (message.workspaceProfileSettingValue !== undefined) {
       obj.workspaceProfileSettingValue = WorkspaceProfileSetting.toJSON(message.workspaceProfileSettingValue);
@@ -1532,9 +1504,6 @@ export const Value: MessageFns<Value> = {
     if (message.semanticTypeSettingValue !== undefined) {
       obj.semanticTypeSettingValue = SemanticTypeSetting.toJSON(message.semanticTypeSettingValue);
     }
-    if (message.maximumSqlResultSizeSetting !== undefined) {
-      obj.maximumSqlResultSizeSetting = MaximumSQLResultSizeSetting.toJSON(message.maximumSqlResultSizeSetting);
-    }
     if (message.scimSetting !== undefined) {
       obj.scimSetting = SCIMSetting.toJSON(message.scimSetting);
     }
@@ -1546,6 +1515,9 @@ export const Value: MessageFns<Value> = {
     }
     if (message.environmentSetting !== undefined) {
       obj.environmentSetting = EnvironmentSetting.toJSON(message.environmentSetting);
+    }
+    if (message.sqlQueryRestrictionSetting !== undefined) {
+      obj.sqlQueryRestrictionSetting = SQLQueryRestrictionSetting.toJSON(message.sqlQueryRestrictionSetting);
     }
     return obj;
   },
@@ -1559,10 +1531,6 @@ export const Value: MessageFns<Value> = {
     message.appImSettingValue = (object.appImSettingValue !== undefined && object.appImSettingValue !== null)
       ? AppIMSetting.fromPartial(object.appImSettingValue)
       : undefined;
-    message.agentPluginSettingValue =
-      (object.agentPluginSettingValue !== undefined && object.agentPluginSettingValue !== null)
-        ? AgentPluginSetting.fromPartial(object.agentPluginSettingValue)
-        : undefined;
     message.workspaceProfileSettingValue =
       (object.workspaceProfileSettingValue !== undefined && object.workspaceProfileSettingValue !== null)
         ? WorkspaceProfileSetting.fromPartial(object.workspaceProfileSettingValue)
@@ -1583,10 +1551,6 @@ export const Value: MessageFns<Value> = {
       (object.semanticTypeSettingValue !== undefined && object.semanticTypeSettingValue !== null)
         ? SemanticTypeSetting.fromPartial(object.semanticTypeSettingValue)
         : undefined;
-    message.maximumSqlResultSizeSetting =
-      (object.maximumSqlResultSizeSetting !== undefined && object.maximumSqlResultSizeSetting !== null)
-        ? MaximumSQLResultSizeSetting.fromPartial(object.maximumSqlResultSizeSetting)
-        : undefined;
     message.scimSetting = (object.scimSetting !== undefined && object.scimSetting !== null)
       ? SCIMSetting.fromPartial(object.scimSetting)
       : undefined;
@@ -1600,6 +1564,10 @@ export const Value: MessageFns<Value> = {
     message.environmentSetting = (object.environmentSetting !== undefined && object.environmentSetting !== null)
       ? EnvironmentSetting.fromPartial(object.environmentSetting)
       : undefined;
+    message.sqlQueryRestrictionSetting =
+      (object.sqlQueryRestrictionSetting !== undefined && object.sqlQueryRestrictionSetting !== null)
+        ? SQLQueryRestrictionSetting.fromPartial(object.sqlQueryRestrictionSetting)
+        : undefined;
     return message;
   },
 };
@@ -2214,88 +2182,11 @@ export const AppIMSetting_DingTalk: MessageFns<AppIMSetting_DingTalk> = {
   },
 };
 
-function createBaseAgentPluginSetting(): AgentPluginSetting {
-  return { url: "", token: "" };
-}
-
-export const AgentPluginSetting: MessageFns<AgentPluginSetting> = {
-  encode(message: AgentPluginSetting, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.url !== "") {
-      writer.uint32(10).string(message.url);
-    }
-    if (message.token !== "") {
-      writer.uint32(18).string(message.token);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): AgentPluginSetting {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseAgentPluginSetting();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.url = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.token = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): AgentPluginSetting {
-    return {
-      url: isSet(object.url) ? globalThis.String(object.url) : "",
-      token: isSet(object.token) ? globalThis.String(object.token) : "",
-    };
-  },
-
-  toJSON(message: AgentPluginSetting): unknown {
-    const obj: any = {};
-    if (message.url !== "") {
-      obj.url = message.url;
-    }
-    if (message.token !== "") {
-      obj.token = message.token;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<AgentPluginSetting>): AgentPluginSetting {
-    return AgentPluginSetting.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<AgentPluginSetting>): AgentPluginSetting {
-    const message = createBaseAgentPluginSetting();
-    message.url = object.url ?? "";
-    message.token = object.token ?? "";
-    return message;
-  },
-};
-
 function createBaseWorkspaceProfileSetting(): WorkspaceProfileSetting {
   return {
     externalUrl: "",
     disallowSignup: false,
     require2fa: false,
-    outboundIpList: [],
     tokenDuration: undefined,
     announcement: undefined,
     maximumRoleExpiration: undefined,
@@ -2316,9 +2207,6 @@ export const WorkspaceProfileSetting: MessageFns<WorkspaceProfileSetting> = {
     }
     if (message.require2fa !== false) {
       writer.uint32(24).bool(message.require2fa);
-    }
-    for (const v of message.outboundIpList) {
-      writer.uint32(34).string(v!);
     }
     if (message.tokenDuration !== undefined) {
       Duration.encode(message.tokenDuration, writer.uint32(50).fork()).join();
@@ -2373,14 +2261,6 @@ export const WorkspaceProfileSetting: MessageFns<WorkspaceProfileSetting> = {
           }
 
           message.require2fa = reader.bool();
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.outboundIpList.push(reader.string());
           continue;
         }
         case 6: {
@@ -2453,9 +2333,6 @@ export const WorkspaceProfileSetting: MessageFns<WorkspaceProfileSetting> = {
       externalUrl: isSet(object.externalUrl) ? globalThis.String(object.externalUrl) : "",
       disallowSignup: isSet(object.disallowSignup) ? globalThis.Boolean(object.disallowSignup) : false,
       require2fa: isSet(object.require2fa) ? globalThis.Boolean(object.require2fa) : false,
-      outboundIpList: globalThis.Array.isArray(object?.outboundIpList)
-        ? object.outboundIpList.map((e: any) => globalThis.String(e))
-        : [],
       tokenDuration: isSet(object.tokenDuration) ? Duration.fromJSON(object.tokenDuration) : undefined,
       announcement: isSet(object.announcement) ? Announcement.fromJSON(object.announcement) : undefined,
       maximumRoleExpiration: isSet(object.maximumRoleExpiration)
@@ -2484,9 +2361,6 @@ export const WorkspaceProfileSetting: MessageFns<WorkspaceProfileSetting> = {
     }
     if (message.require2fa !== false) {
       obj.require2fa = message.require2fa;
-    }
-    if (message.outboundIpList?.length) {
-      obj.outboundIpList = message.outboundIpList;
     }
     if (message.tokenDuration !== undefined) {
       obj.tokenDuration = Duration.toJSON(message.tokenDuration);
@@ -2520,7 +2394,6 @@ export const WorkspaceProfileSetting: MessageFns<WorkspaceProfileSetting> = {
     message.externalUrl = object.externalUrl ?? "";
     message.disallowSignup = object.disallowSignup ?? false;
     message.require2fa = object.require2fa ?? false;
-    message.outboundIpList = object.outboundIpList?.map((e) => e) || [];
     message.tokenDuration = (object.tokenDuration !== undefined && object.tokenDuration !== null)
       ? Duration.fromPartial(object.tokenDuration)
       : undefined;
@@ -4447,22 +4320,25 @@ export const Algorithm_InnerOuterMask: MessageFns<Algorithm_InnerOuterMask> = {
   },
 };
 
-function createBaseMaximumSQLResultSizeSetting(): MaximumSQLResultSizeSetting {
-  return { limit: Long.ZERO };
+function createBaseSQLQueryRestrictionSetting(): SQLQueryRestrictionSetting {
+  return { maximumResultSize: Long.ZERO, maximumResultRows: 0 };
 }
 
-export const MaximumSQLResultSizeSetting: MessageFns<MaximumSQLResultSizeSetting> = {
-  encode(message: MaximumSQLResultSizeSetting, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (!message.limit.equals(Long.ZERO)) {
-      writer.uint32(8).int64(message.limit.toString());
+export const SQLQueryRestrictionSetting: MessageFns<SQLQueryRestrictionSetting> = {
+  encode(message: SQLQueryRestrictionSetting, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (!message.maximumResultSize.equals(Long.ZERO)) {
+      writer.uint32(8).int64(message.maximumResultSize.toString());
+    }
+    if (message.maximumResultRows !== 0) {
+      writer.uint32(16).int32(message.maximumResultRows);
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): MaximumSQLResultSizeSetting {
+  decode(input: BinaryReader | Uint8Array, length?: number): SQLQueryRestrictionSetting {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseMaximumSQLResultSizeSetting();
+    const message = createBaseSQLQueryRestrictionSetting();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -4471,7 +4347,15 @@ export const MaximumSQLResultSizeSetting: MessageFns<MaximumSQLResultSizeSetting
             break;
           }
 
-          message.limit = Long.fromString(reader.int64().toString());
+          message.maximumResultSize = Long.fromString(reader.int64().toString());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.maximumResultRows = reader.int32();
           continue;
         }
       }
@@ -4483,24 +4367,33 @@ export const MaximumSQLResultSizeSetting: MessageFns<MaximumSQLResultSizeSetting
     return message;
   },
 
-  fromJSON(object: any): MaximumSQLResultSizeSetting {
-    return { limit: isSet(object.limit) ? Long.fromValue(object.limit) : Long.ZERO };
+  fromJSON(object: any): SQLQueryRestrictionSetting {
+    return {
+      maximumResultSize: isSet(object.maximumResultSize) ? Long.fromValue(object.maximumResultSize) : Long.ZERO,
+      maximumResultRows: isSet(object.maximumResultRows) ? globalThis.Number(object.maximumResultRows) : 0,
+    };
   },
 
-  toJSON(message: MaximumSQLResultSizeSetting): unknown {
+  toJSON(message: SQLQueryRestrictionSetting): unknown {
     const obj: any = {};
-    if (!message.limit.equals(Long.ZERO)) {
-      obj.limit = (message.limit || Long.ZERO).toString();
+    if (!message.maximumResultSize.equals(Long.ZERO)) {
+      obj.maximumResultSize = (message.maximumResultSize || Long.ZERO).toString();
+    }
+    if (message.maximumResultRows !== 0) {
+      obj.maximumResultRows = Math.round(message.maximumResultRows);
     }
     return obj;
   },
 
-  create(base?: DeepPartial<MaximumSQLResultSizeSetting>): MaximumSQLResultSizeSetting {
-    return MaximumSQLResultSizeSetting.fromPartial(base ?? {});
+  create(base?: DeepPartial<SQLQueryRestrictionSetting>): SQLQueryRestrictionSetting {
+    return SQLQueryRestrictionSetting.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<MaximumSQLResultSizeSetting>): MaximumSQLResultSizeSetting {
-    const message = createBaseMaximumSQLResultSizeSetting();
-    message.limit = (object.limit !== undefined && object.limit !== null) ? Long.fromValue(object.limit) : Long.ZERO;
+  fromPartial(object: DeepPartial<SQLQueryRestrictionSetting>): SQLQueryRestrictionSetting {
+    const message = createBaseSQLQueryRestrictionSetting();
+    message.maximumResultSize = (object.maximumResultSize !== undefined && object.maximumResultSize !== null)
+      ? Long.fromValue(object.maximumResultSize)
+      : Long.ZERO;
+    message.maximumResultRows = object.maximumResultRows ?? 0;
     return message;
   },
 };
@@ -5170,6 +5063,7 @@ export const SettingServiceDefinition = {
   name: "SettingService",
   fullName: "bytebase.v1.SettingService",
   methods: {
+    /** Permissions required: bb.settings.list */
     listSettings: {
       name: "ListSettings",
       requestType: ListSettingsRequest,
@@ -5185,6 +5079,7 @@ export const SettingServiceDefinition = {
         },
       },
     },
+    /** Permissions required: bb.settings.get */
     getSetting: {
       name: "GetSetting",
       requestType: GetSettingRequest,
@@ -5227,6 +5122,7 @@ export const SettingServiceDefinition = {
         },
       },
     },
+    /** Permissions required: bb.settings.set */
     updateSetting: {
       name: "UpdateSetting",
       requestType: UpdateSettingRequest,

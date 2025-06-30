@@ -148,10 +148,6 @@ func validateCheckFlags(*cobra.Command, []string) error {
 }
 
 func validateRolloutFlags(*cobra.Command, []string) error {
-	if Config.TargetStage == "" {
-		return errors.Errorf("target-stage is required and cannot be empty")
-	}
-
 	switch Config.CheckPlan {
 	case "SKIP", "FAIL_ON_WARNING", "FAIL_ON_ERROR":
 	default:
@@ -397,7 +393,7 @@ func runAndWaitForPlanChecks(ctx context.Context, client *Client, planName strin
 }
 
 func runAndWaitForRollout(ctx context.Context, client *Client, planName string) error {
-	// preview rollout with all stages
+	// preview rollout with all pending stages
 	rolloutPreview, err := client.createRollout(&v1pb.CreateRolloutRequest{
 		Parent: Config.Project,
 		Rollout: &v1pb.Rollout{
@@ -410,17 +406,9 @@ func runAndWaitForRollout(ctx context.Context, client *Client, planName string) 
 		return errors.Wrapf(err, "failed to create rollout")
 	}
 
-	var stages []string
-	var targetStageFound bool
-	for _, stage := range rolloutPreview.GetStages() {
-		stages = append(stages, stage.Environment)
-		if stage.Environment == Config.TargetStage {
-			targetStageFound = true
-		}
-	}
-	if !targetStageFound {
-		slog.Info("the target stage is not found in the rollout preview. exiting...", "targetStage", Config.TargetStage, "rolloutStages", stages, "hint", "make sure your target-stage input exists in the rollout stages")
-		return nil
+	pendingStages := []string{}
+	for _, stage := range rolloutPreview.Stages {
+		pendingStages = append(pendingStages, stage.Environment)
 	}
 
 	// create rollout with no stages to obtain the rollout name
@@ -441,22 +429,14 @@ func runAndWaitForRollout(ctx context.Context, client *Client, planName string) 
 
 	slog.Info("rollout created", "url", fmt.Sprintf("%s/%s", client.url, rolloutEmpty.Name))
 
-	return waitForRollout(ctx, client, rolloutPreview, rolloutEmpty.Name)
+	return waitForRollout(ctx, client, pendingStages, rolloutEmpty.Name)
 }
 
-func waitForRollout(ctx context.Context, client *Client, rolloutPreview *v1pb.Rollout, rolloutName string) error {
-	if len(rolloutPreview.Stages) == 0 {
+func waitForRollout(ctx context.Context, client *Client, pendingStages []string, rolloutName string) error {
+	if Config.TargetStage == "" {
+		slog.Info("target stage is not specified, exiting...")
 		return nil
 	}
-	slog.Info("exit after the target stage is completed", "targetStage", Config.TargetStage)
-	slog.Info("the rollout has the following stages", "stageCount", len(rolloutPreview.Stages), "stages",
-		slices.Collect(func(yield func(string) bool) {
-			for _, stage := range rolloutPreview.Stages {
-				if !yield(stage.Environment) {
-					return
-				}
-			}
-		}))
 
 	defer func() {
 		if ctx.Err() == nil {
@@ -492,6 +472,62 @@ func waitForRollout(ctx context.Context, client *Client, rolloutPreview *v1pb.Ro
 			slog.Error("failed to cancel rollout", "error", err)
 		}
 	}()
+
+	rollout, err := client.getRollout(rolloutName)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get rollout")
+	}
+
+	slog.Info("exit after the target stage is completed", "targetStage", Config.TargetStage)
+	slog.Info("the rollout has the following stages",
+		"createdStages", slices.Collect(func(yield func(string) bool) {
+			for _, stage := range rollout.GetStages() {
+				if !yield(stage.Environment) {
+					return
+				}
+			}
+		}),
+		"pendingStages", pendingStages)
+
+	targetStageFound := false
+	for _, stage := range rollout.GetStages() {
+		if stage.Environment == Config.TargetStage {
+			targetStageFound = true
+			break
+		}
+	}
+	for _, stage := range pendingStages {
+		if stage == Config.TargetStage {
+			targetStageFound = true
+			break
+		}
+	}
+	if !targetStageFound {
+		slog.Info("the target stage is not found in the rollout. exiting...", "targetStage", Config.TargetStage)
+		return nil
+	}
+
+	// To make it more robust,
+	// - remove pending stage that already in the rollout stage and call CreateRollout with latest rollout stage once so no new tasks will be missed
+	if len(rollout.Stages) > 0 {
+		latestStage := rollout.Stages[len(rollout.Stages)-1].Environment
+		index := slices.Index(pendingStages, latestStage)
+		if index != -1 {
+			slog.Info("removing pending stage that already in the rollout stage", "latestStage", latestStage)
+			pendingStages = pendingStages[index+1:]
+			_, err := client.createRollout(&v1pb.CreateRolloutRequest{
+				Parent: Config.Project,
+				Rollout: &v1pb.Rollout{
+					Plan: rollout.GetPlan(),
+				},
+				Target: &latestStage,
+			})
+			if err != nil {
+				return errors.Wrapf(err, "failed to create rollout")
+			}
+		}
+	}
+
 	i := 0
 	for {
 		if ctx.Err() != nil {
@@ -503,8 +539,13 @@ func waitForRollout(ctx context.Context, client *Client, rolloutPreview *v1pb.Ro
 			return errors.Wrapf(err, "failed to get rollout")
 		}
 		if i >= len(rollout.GetStages()) {
+			if len(pendingStages) == 0 {
+				return errors.Errorf("rollout has no more stages")
+			}
 			// create a new target
-			target := rolloutPreview.Stages[i].Environment
+			target := pendingStages[0]
+			pendingStages = pendingStages[1:]
+
 			rolloutAdvanced, err := client.createRollout(&v1pb.CreateRolloutRequest{
 				Parent: Config.Project,
 				Rollout: &v1pb.Rollout{

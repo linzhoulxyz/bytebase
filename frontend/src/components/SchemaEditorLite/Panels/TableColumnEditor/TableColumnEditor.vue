@@ -61,24 +61,26 @@ import { pick } from "lodash-es";
 import type { DataTableColumn, DataTableInst } from "naive-ui";
 import { NCheckbox, NDataTable } from "naive-ui";
 import { computed, h, reactive, ref } from "vue";
+import { create } from "@bufbuild/protobuf";
 import { useI18n } from "vue-i18n";
 import ClassificationCell from "@/components/ColumnDataTable/ClassificationCell.vue";
 import LabelEditorDrawer from "@/components/LabelEditorDrawer.vue";
 import SemanticTypesDrawer from "@/components/SensitiveData/components/SemanticTypesDrawer.vue";
 import { InlineInput } from "@/components/v2";
 import { useSettingV1Store, hasFeature } from "@/store";
-import { PlanFeature } from "@/types/proto/v1/subscription_service";
+import { PlanFeature } from "@/types/proto-es/v1/subscription_service_pb";
 import type { ComposedDatabase } from "@/types";
-import { Engine } from "@/types/proto/v1/common";
-import { ColumnCatalog } from "@/types/proto/v1/database_catalog_service";
-import { Setting_SettingName } from "@/types/proto/v1/setting_service";
+import { Engine } from "@/types/proto-es/v1/common_pb";
+import type { ColumnCatalog } from "@/types/proto-es/v1/database_catalog_service_pb";
+import { ColumnCatalogSchema } from "@/types/proto-es/v1/database_catalog_service_pb";
+import { Setting_SettingName } from "@/types/proto-es/v1/setting_service_pb";
 import type {
   ColumnMetadata,
   DatabaseMetadata,
   ForeignKeyMetadata,
   SchemaMetadata,
   TableMetadata,
-} from "@/types/proto/v1/database_service";
+} from "@/types/proto-es/v1/database_service_pb";
 import ColumnDefaultValueExpressionModal from "../../Modals/ColumnDefaultValueExpressionModal.vue";
 import { useSchemaEditorContext } from "../../context";
 import type { EditStatus } from "../../types";
@@ -237,10 +239,11 @@ const markColumnStatus = (
 };
 
 const semanticTypeList = computed(() => {
-  return (
-    settingStore.getSettingByName(Setting_SettingName.SEMANTIC_TYPES)?.value
-      ?.semanticTypeSettingValue?.types ?? []
-  );
+  const setting = settingStore.getSettingByName(Setting_SettingName.SEMANTIC_TYPES);
+  if (setting?.value?.value?.case === "semanticTypeSettingValue") {
+    return setting.value.value.value.types ?? [];
+  }
+  return [];
 });
 
 const catalogForColumn = (column: string) => {
@@ -250,7 +253,7 @@ const catalogForColumn = (column: string) => {
       schema: props.schema.name,
       table: props.table.name,
       column,
-    }) ?? ColumnCatalog.fromPartial({ name: column })
+    }) ?? create(ColumnCatalogSchema, { name: column })
   );
 };
 
@@ -625,13 +628,15 @@ const isColumnPrimaryKey = (column: ColumnMetadata): boolean => {
 
 const schemaTemplateColumnTypes = computed(() => {
   const setting = settingStore.getSettingByName(Setting_SettingName.SCHEMA_TEMPLATE);
-  const columnTypes = setting?.value?.schemaTemplateSettingValue?.columnTypes;
-  if (columnTypes && columnTypes.length > 0) {
-    const columnType = columnTypes.find(
-      (columnType) => columnType.engine === props.engine
-    );
-    if (columnType && columnType.enabled) {
-      return columnType.types;
+  if (setting?.value?.value?.case === "schemaTemplateSettingValue") {
+    const columnTypes = setting.value.value.value.columnTypes;
+    if (columnTypes && columnTypes.length > 0) {
+      const columnType = columnTypes.find(
+        (columnType) => columnType.engine === props.engine
+      );
+      if (columnType && columnType.enabled) {
+        return columnType.types;
+      }
     }
   }
   return [];
@@ -698,8 +703,8 @@ const handleSelectColumnDefaultValueExpression = (expression: string) => {
     return;
   }
   column.hasDefault = true;
-  column.defaultNull = undefined;
-  column.defaultString = undefined;
+  column.defaultNull = false;
+  column.defaultString = "";
   column.defaultExpression = expression;
 
   markColumnStatus(column, "updated");

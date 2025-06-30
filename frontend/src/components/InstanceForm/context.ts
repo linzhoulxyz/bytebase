@@ -4,27 +4,34 @@ import { useDialog } from "naive-ui";
 import type { InjectionKey, Ref } from "vue";
 import { computed, inject, provide, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { instanceServiceClient } from "@/grpcweb";
+import { instanceServiceClientConnect } from "@/grpcweb";
+import { convertOldInstanceToNew, convertOldDataSourceToNew, convertNewInstanceToOld, convertNewDataSourceToOld } from "@/utils/v1/instance-conversions";
+import { create } from "@bufbuild/protobuf";
+import { createContextValues } from "@connectrpc/connect";
+import { silentContextKey } from "@/grpcweb/context-key";
+import { 
+  CreateInstanceRequestSchema,
+  AddDataSourceRequestSchema,
+  UpdateDataSourceRequestSchema
+} from "@/types/proto-es/v1/instance_service_pb";
 import {
   environmentNamePrefix,
   pushNotification,
   useEnvironmentV1Store,
   useSubscriptionV1Store,
 } from "@/store";
-import {
-  isValidEnvironmentName,
-  unknownEnvironment,
-} from "@/types";
-import { Engine, State } from "@/types/proto/v1/common";
-import type { DataSource, Instance } from "@/types/proto/v1/instance_service";
+import { isValidEnvironmentName, unknownEnvironment } from "@/types";
+import type { Instance, DataSource } from "@/types/proto-es/v1/instance_service_pb";
+import { InstanceSchema } from "@/types/proto-es/v1/instance_service_pb";
+import { Engine, State } from "@/types/proto-es/v1/common_pb";
 import {
   DataSourceExternalSecret_AuthType,
   DataSourceExternalSecret_SecretType,
   DataSourceType,
   DataSource_AuthenticationType,
   DataSource_RedisType,
-} from "@/types/proto/v1/instance_service";
-import { PlanFeature } from "@/types/proto/v1/subscription_service";
+} from "@/types/proto-es/v1/instance_service_pb";
+import { PlanFeature } from "@/types/proto-es/v1/subscription_service_pb";
 import {
   extractInstanceResourceName,
   hasWorkspacePermissionV2,
@@ -73,7 +80,7 @@ export const provideInstanceFormContext = (baseContext: {
     if (isCreating.value) return true;
 
     return (
-      instance.value?.state === State.ACTIVE &&
+      (instance.value?.state || State.STATE_UNSPECIFIED) === State.ACTIVE &&
       hasWorkspacePermissionV2("bb.instances.update")
     );
   });
@@ -144,12 +151,13 @@ export const provideInstanceFormContext = (baseContext: {
         }
       }
 
-      if (ds.saslConfig?.krbConfig) {
+      if (ds.saslConfig?.mechanism?.case === 'krbConfig') {
+        const krbConfig = ds.saslConfig.mechanism.value;
         if (
-          !ds.saslConfig.krbConfig.primary ||
-          !ds.saslConfig.krbConfig.realm ||
-          !ds.saslConfig.krbConfig.kdcHost ||
-          !ds.saslConfig.krbConfig.keytab
+          !krbConfig.primary ||
+          !krbConfig.realm ||
+          !krbConfig.kdcHost ||
+          !krbConfig.keytab
         ) {
           return false;
         }
@@ -188,11 +196,12 @@ export const provideInstanceFormContext = (baseContext: {
 
       switch (ds.externalSecret.authType) {
         case DataSourceExternalSecret_AuthType.TOKEN:
-          return !!ds.externalSecret.token;
+          return !!(ds.externalSecret.authOption?.case === 'token' && ds.externalSecret.authOption.value);
         case DataSourceExternalSecret_AuthType.VAULT_APP_ROLE:
-          return (
-            !!ds.externalSecret.appRole?.roleId &&
-            !!ds.externalSecret.appRole.secretId
+          return !!(
+            ds.externalSecret.authOption?.case === 'appRole' &&
+            ds.externalSecret.authOption.value?.roleId &&
+            ds.externalSecret.authOption.value.secretId
           );
       }
 
@@ -305,11 +314,11 @@ export const provideInstanceFormContext = (baseContext: {
 
   const pendingCreateInstance = computed(() => {
     // When creating new instance, use the adminDataSource.
-    const instance: Instance = {
+    const instance: Instance = create(InstanceSchema, {
       ...basicInfo.value,
       engineVersion: "",
       dataSources: [],
-    };
+    });
     if (editingDataSource.value) {
       const dataSourceCreate = extractDataSourceFromEdit(
         instance,
@@ -362,24 +371,24 @@ export const provideInstanceFormContext = (baseContext: {
     if (isCreating.value) {
       // When creating new instance, use
       // adminDataSource + CreateInstanceRequest.validateOnly = true
-      const instance: Instance = {
+      const instance: Instance = create(InstanceSchema, {
         ...basicInfo.value,
         engineVersion: "",
         dataSources: [],
-      };
+      });
       const dataSourceCreate = extractDataSourceFromEdit(instance, editingDS);
       instance.dataSources = [dataSourceCreate];
       try {
-        await instanceServiceClient.createInstance(
-          {
-            instance,
-            instanceId: extractInstanceResourceName(instance.name),
-            validateOnly: true,
-          },
-          {
-            silent: true,
-          }
-        );
+        const oldInstance = convertNewInstanceToOld(instance);
+        const newInstance = convertOldInstanceToNew(oldInstance);
+        const request = create(CreateInstanceRequestSchema, {
+          instance: newInstance,
+          instanceId: extractInstanceResourceName(instance.name),
+          validateOnly: true,
+        });
+        await instanceServiceClientConnect.createInstance(request, {
+          contextValues: createContextValues().set(silentContextKey, true),
+        });
         return ok();
       } catch (err) {
         return fail(dataSourceCreate.host, err);
@@ -391,14 +400,15 @@ export const provideInstanceFormContext = (baseContext: {
         // When read-only data source is about to be created, use
         // editingDataSource + AddDataSourceRequest.validateOnly = true
         try {
-          await instanceServiceClient.addDataSource(
-            {
-              name: instance.value!.name,
-              dataSource: ds,
-              validateOnly: true,
-            },
-            {
-              silent: true,
+          const oldDataSource = convertNewDataSourceToOld(ds);
+          const newDataSource = convertOldDataSourceToNew(oldDataSource);
+          const request = create(AddDataSourceRequestSchema, {
+            name: instance.value!.name,
+            dataSource: newDataSource,
+            validateOnly: true,
+          });
+          await instanceServiceClientConnect.addDataSource(request, {
+            contextValues: createContextValues().set(silentContextKey, true),
             }
           );
           return ok();
@@ -416,17 +426,17 @@ export const provideInstanceFormContext = (baseContext: {
             throw new Error("should never reach this line");
           }
           const updateMask = calcDataSourceUpdateMask(ds, original, editingDS);
-          await instanceServiceClient.updateDataSource(
-            {
-              name: instance.value!.name,
-              dataSource: ds,
-              updateMask,
-              validateOnly: true,
-            },
-            {
-              silent: true,
-            }
-          );
+          const oldDataSource = convertNewDataSourceToOld(ds);
+          const newDataSource = convertOldDataSourceToNew(oldDataSource);
+          const request = create(UpdateDataSourceRequestSchema, {
+            name: instance.value!.name,
+            dataSource: newDataSource,
+            updateMask: { paths: updateMask },
+            validateOnly: true,
+          });
+          await instanceServiceClientConnect.updateDataSource(request, {
+            contextValues: createContextValues().set(silentContextKey, true),
+          });
           return ok();
         } catch (err) {
           return fail(ds.host, err);

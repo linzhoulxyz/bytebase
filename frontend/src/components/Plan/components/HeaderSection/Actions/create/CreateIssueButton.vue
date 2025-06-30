@@ -9,7 +9,7 @@
         :loading="loading"
         @click="handleCreateIssue"
       >
-        {{ loading ? $t("common.creating") : $t("issue.create-issue") }}
+        {{ $t("plan.ready-for-review") }}
       </NButton>
     </template>
 
@@ -40,21 +40,24 @@ import {
   usePlanContext,
 } from "@/components/Plan/logic";
 import { planCheckRunSummaryForCheckRunList } from "@/components/PlanCheckRun/common";
-import { issueServiceClient, rolloutServiceClient } from "@/grpcweb";
-import { PROJECT_V1_ROUTE_ISSUE_DETAIL } from "@/router/dashboard/projectV1";
+import { create } from "@bufbuild/protobuf";
+import { issueServiceClientConnect } from "@/grpcweb";
+import { CreateIssueRequestSchema } from "@/types/proto-es/v1/issue_service_pb";
+import { convertNewIssueToOld, convertOldIssueToNew } from "@/utils/v1/issue-conversions";
+import { PROJECT_V1_ROUTE_ISSUE_DETAIL_V1 } from "@/router/dashboard/projectV1";
 import {
   useCurrentProjectV1,
   useCurrentUserV1,
   usePolicyV1Store,
 } from "@/store";
-import { emptyIssue, type ComposedIssue } from "@/types";
+import { emptyIssue } from "@/types";
 import { Issue, IssueStatus, Issue_Type } from "@/types/proto/v1/issue_service";
 import { PolicyType } from "@/types/proto/v1/org_policy_service";
 import { PlanCheckRun_Result_Status } from "@/types/proto/v1/plan_service";
 import {
+  extractIssueUID,
   extractProjectResourceName,
   hasProjectPermissionV2,
-  issueV1Slug,
 } from "@/utils";
 
 const { t } = useI18n();
@@ -146,41 +149,29 @@ const doCreateIssue = async () => {
   // TODO(steven): Check plan check results before creating issue.
 
   try {
-    const createdIssue = await issueServiceClient.createIssue({
-      parent: project.value.name,
-      issue: {
-        ...Issue.fromPartial(buildIssue()),
-        rollout: "",
-        plan: plan.value.name,
-      },
-    });
-    const composedIssue: ComposedIssue = {
-      ...emptyIssue(),
-      ...createdIssue,
-      planEntity: plan.value,
+    const issueToCreate = {
+      ...Issue.fromPartial(buildIssue()),
+      rollout: "",
+      plan: plan.value.name,
     };
-    const createdRollout = await rolloutServiceClient.createRollout({
+    const newIssue = convertOldIssueToNew(issueToCreate);
+    const request = create(CreateIssueRequestSchema, {
       parent: project.value.name,
-      rollout: {
-        plan: plan.value.name,
-      },
+      issue: newIssue,
     });
-
-    composedIssue.rollout = createdRollout.name;
-    composedIssue.rolloutEntity = createdRollout;
+    const newCreatedIssue = await issueServiceClientConnect.createIssue(request);
+    const createdIssue = convertNewIssueToOld(newCreatedIssue);
 
     nextTick(() => {
       router.push({
-        name: PROJECT_V1_ROUTE_ISSUE_DETAIL,
+        name: PROJECT_V1_ROUTE_ISSUE_DETAIL_V1,
         params: {
           projectId: extractProjectResourceName(plan.value.name),
-          issueSlug: issueV1Slug(composedIssue),
+          issueId: extractIssueUID(createdIssue.name),
         },
       });
     });
-
-    return composedIssue;
-  } catch {
+  } finally {
     loading.value = false;
   }
 };
@@ -189,7 +180,6 @@ const buildIssue = () => {
   const issue = emptyIssue();
   const me = useCurrentUserV1();
   issue.creator = `users/${me.value.email}`;
-  issue.project = project.value.name;
   issue.title = plan.value.title;
   issue.description = plan.value.description;
   issue.status = IssueStatus.OPEN;

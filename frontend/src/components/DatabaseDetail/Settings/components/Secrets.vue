@@ -179,14 +179,16 @@ import {
   FeatureModal,
 } from "@/components/FeatureGuard";
 import { Drawer, DrawerContent, SpinnerButton } from "@/components/v2";
+import { create } from "@bufbuild/protobuf";
 import {
   pushNotification,
   useDatabaseSecretStore,
   useSubscriptionV1Store,
 } from "@/store";
 import { type ComposedDatabase } from "@/types";
-import { Secret } from "@/types/proto/v1/database_service";
-import { PlanFeature } from "@/types/proto/v1/subscription_service";
+import type { Secret } from "@/types/proto-es/v1/database_service_pb";
+import { SecretSchema } from "@/types/proto-es/v1/database_service_pb";
+import { PlanFeature } from "@/types/proto-es/v1/subscription_service_pb";
 
 export type Detail = {
   secret: Secret;
@@ -272,7 +274,7 @@ const showDetail = (secret?: Secret) => {
     return;
   }
   detail.value = {
-    secret: secret ? cloneDeep(secret) : Secret.fromPartial({}),
+    secret: secret ? cloneDeep(secret) : create(SecretSchema, {}),
     mode: secret ? "UPDATE" : "CREATE",
     loading: false,
     dirty: false,

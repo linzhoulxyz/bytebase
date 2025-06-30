@@ -9,10 +9,13 @@ import {
   type Ref,
 } from "vue";
 import { isDatabaseChangeSpec, targetsForSpec } from "@/components/Plan/logic";
-import { planServiceClient } from "@/grpcweb";
+import { create } from "@bufbuild/protobuf";
+import { planServiceClientConnect } from "@/grpcweb";
+import { UpdatePlanRequestSchema } from "@/types/proto-es/v1/plan_service_pb";
+import { convertOldPlanToNew } from "@/utils/v1/plan-conversions";
 import { useCurrentUserV1, extractUserId, useDatabaseV1Store } from "@/store";
 import { isValidDatabaseName, type ComposedProject } from "@/types";
-import { Engine } from "@/types/proto/v1/common";
+import { Engine } from "@/types/proto-es/v1/common_pb";
 import { IssueStatus, type Issue } from "@/types/proto/v1/issue_service";
 import {
   Plan_ChangeDatabaseConfig_Type,
@@ -80,7 +83,7 @@ export const providePreBackupSettingContext = (refs: {
     if (isDatabaseChangeSpec(selectedSpec.value)) {
       // If any of the databases in the spec is not supported, do not show.
       if (
-        !databases.value.some((db) =>
+        !databases.value.every((db) =>
           BACKUP_AVAILABLE_ENGINES.includes(db.instanceResource.engine)
         )
       ) {
@@ -161,10 +164,12 @@ export const providePreBackupSettingContext = (refs: {
         spec.changeDatabaseConfig.enablePriorBackup = false;
       }
 
-      await planServiceClient.updatePlan({
-        plan: planPatch,
-        updateMask: ["specs"],
+      const newPlan = convertOldPlanToNew(planPatch);
+      const request = create(UpdatePlanRequestSchema, {
+        plan: newPlan,
+        updateMask: { paths: ["specs"] },
       });
+      await planServiceClientConnect.updatePlan(request);
     }
 
     // Emit the update event.

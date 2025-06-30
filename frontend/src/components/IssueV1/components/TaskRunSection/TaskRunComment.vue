@@ -34,11 +34,11 @@ import { useCurrentProjectV1 } from "@/store";
 import { getProjectIdRolloutUidStageUidTaskUid } from "@/store/modules/v1/common";
 import {
   unknownTask,
-  isPostgresFamily,
   type ComposedTaskRun,
   getTimeForPbTimestamp,
   getDateForPbTimestamp,
 } from "@/types";
+import { isPostgresFamily } from "@/types/v1/instance";
 import { TaskRun_Status, Task_Type } from "@/types/proto/v1/rollout_service";
 import { databaseV1Url, extractTaskUID, flattenTaskV1List } from "@/utils";
 import { extractChangelogUID } from "@/utils/v1/changelog";

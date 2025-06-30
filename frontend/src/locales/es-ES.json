@@ -112,7 +112,6 @@
     "empty": "Vacío",
     "creating": "Creando...",
     "address": "Dirección",
-    "subscribed": "Subscrito",
     "created": "Creado",
     "labels": "Etiquetas",
     "mode": "Modo",
@@ -196,7 +195,6 @@
     "schedule": "Horario",
     "state": "Estado",
     "condition": "Condición",
-    "search-user": "Buscar usuario",
     "info": "Información",
     "minutes": "Minutos",
     "filter-by-name": "Filtrar por nombre",
@@ -513,8 +511,7 @@
         "gitlab-template-description": "Iniciar sesión con cuentas de GitLab",
         "microsoft-entra-template-description": "Iniciar sesión con el ID de Microsoft Entra",
         "custom-template-description": "Configurar un proveedor OAuth 2.0 personalizado"
-      },
-      "copy-redirect-url": "URL de redireccionamiento copiada al portapapeles."
+      }
     },
     "general": {
       "workspace": {
@@ -568,8 +565,14 @@
           "never-expires": "Nunca expira"
         },
         "maximum-sql-result": {
-          "self": "Tamaño máximo del resultado SQL",
-          "description": "Limite el tamaño del resultado de la consulta SQL de salida."
+          "size": {
+            "self": "Tamaño máximo del resultado de SQL",
+            "description": "Limite el tamaño del resultado de la consulta SQL de salida."
+          },
+          "rows": {
+            "self": "Máximo de filas de resultados de SQL",
+            "description": "Limite las filas de salida en el resultado de la consulta SQL, el valor <= 0 significa que no hay límite."
+          }
         },
         "query-data-policy": {
           "timeout": {
@@ -741,7 +744,6 @@
       "classification": {
         "upload": "Subir clasificación",
         "upload-label": "Puede cargar un archivo de clasificación con formato JSON.",
-        "copy-succeed": "Copiar ejemplo correctamente",
         "override-title": "Anulación de datos de clasificación",
         "override-desc": "Los datos de clasificación existentes se anularán y afectarán a todos los proyectos.",
         "override-confirm": "Aún subiendo"
@@ -803,8 +805,6 @@
         "some-tasks-are-still-running": "Algunas tareas aún se están ejecutando"
       }
     },
-    "subscribe": "Suscribirse",
-    "unsubscribe": "Cancelar suscripción",
     "add-some-description": "Agregar alguna descripción...",
     "add-a-comment": "Agregar un comentario",
     "leave-a-comment": "Dejar un comentario...",
@@ -849,10 +849,7 @@
           "title": "Creador",
           "description": "Búsqueda por tema creador"
         },
-        "subscriber": {
-          "title": "Abonado",
-          "description": "Buscar por suscriptor del problema"
-        },
+        "subscriber": {},
         "approver": {
           "title": "Aprobador",
           "description": "Búsqueda por aprobador del problema"
@@ -869,8 +866,12 @@
           "title": "Etiqueta",
           "description": "Filtrar por etiqueta de problema"
         },
+        "table": {
+          "title": "Mesa",
+          "description": "Ingrese el valor y luego presione Enter"
+        },
         "database-label": {
-          "title": "Etiqueta",
+          "title": "Etiqueta de base de datos",
           "description": "Ingrese la \"key:value\" y luego presione Enter"
         },
         "engine": {
@@ -917,7 +918,6 @@
     },
     "approval-flow": {
       "self": "Flujo de aprobación",
-      "tooltip": "Los aprobadores revisarán y aprobarán el problema en el orden especificado en el flujo. \nLa emisión solo se puede aplicar después de que se hayan aprobado todos los pasos del flujo. \nPuede configurar un flujo de aprobación personalizado para cada riesgo.",
       "pre-issue-created-tips": "Después de crear un problema, Bytebase coincidirá automáticamente con la aprobación personalizada correspondiente según el tipo y nivel de riesgo del problema."
     },
     "risk-level": {
@@ -1009,7 +1009,6 @@
       }
     },
     "sql-review-only": "Sólo revisión de SQL",
-    "create-issue": "Crear problema",
     "this-plan-will-be-converted-to-a-new-issue": "Este plan se convertirá en una nueva edición.",
     "title": {
       "edit-schema": "Editar esquema",
@@ -1022,9 +1021,19 @@
     "schema-drift-detected": {
       "self": "Se detectó una desviación del esquema",
       "description": "Las bases de datos seleccionadas presentan una desviación de esquema. Asegúrese de que la desviación sea la esperada y de que sea segura para su aplicación."
+    },
+    "review": {
+      "approved": "Aprobado",
+      "rejected": "Rechazado",
+      "under-review": "Bajo revisión"
+    },
+    "expermental-page": {
+      "self": "Página de problemas experimentales"
     }
   },
   "plan": {
+    "self": "Plan",
+    "plans": "Planes",
     "new-plan": "Nuevo plan",
     "add-spec": "Agregar especificación",
     "change-type": "Cambiar tipo",
@@ -1033,6 +1042,7 @@
     "data-change": "Cambio de datos",
     "data-change-description": "Modificaciones del contenido de la base de datos (DML), incluidas inserciones, actualizaciones, eliminaciones y transformaciones de datos",
     "select-targets": "Seleccionar objetivos",
+    "ready-for-review": "Listo para revisión",
     "overview": {
       "description": "Ver y administrar todas las especificaciones de este plan",
       "total-specs": "Especificaciones totales",
@@ -1044,6 +1054,8 @@
     "navigator": {
       "specifications": "Presupuesto",
       "checks": "Cheques",
+      "review": "Revisar",
+      "rollout": "Despliegue",
       "statement-empty": "La declaración está vacía"
     },
     "spec": {
@@ -1090,10 +1102,11 @@
       "configuration-has-issues": "La configuración tiene {count} problemas | La configuración tiene {count} problemas"
     },
     "checks": {
-      "self": "Cheques",
-      "no-checks": "No hay resultados de verificación disponibles",
-      "click-to-run-checks": "Haga clic en \"Ejecutar comprobaciones\" para validar esta especificación"
+      "self": "Cheques"
     }
+  },
+  "rollout": {
+    "rollouts": "Despliegues"
   },
   "quick-action": {
     "create-db": "Crear base de datos",
@@ -1208,7 +1221,6 @@
       "console": {
         "snowflake": "La URL de la consola externa que administra esta instancia (por ejemplo, la consola de AWS RDS, la consola de la instancia de base de datos interna)"
       },
-      "outbound-ip-list": "Si utiliza reglas de firewall de entrada para su instancia de base de datos, incluya las siguientes direcciones IP en su lista de permisos para permitir el acceso desde Bytebase Cloud.",
       "create-admin-user": "Este es el usuario de conexión utilizado por Bytebase para realizar operaciones DDL y DML (no SELECT).",
       "create-readonly-user": "Esta es la conexión utilizada por Bytebase para realizar operaciones de solo lectura como la consulta SELECT.",
       "create-admin-user-non-sql": "Este es el usuario de conexión utilizado por Bytebase para realizar operaciones de escritura y administración.",
@@ -1249,7 +1261,8 @@
         "redis": {
           "template": "A continuación se muestra un ejemplo para crear el usuario {user} con la contraseña {password} y otorgar al usuario los privilegios necesarios."
         }
-      }
+      },
+      "firewall-info": "Si usa reglas de firewall entrante para su instancia de base de datos, consulte la instrucción de conexión de Bytebase Cloud."
     },
     "no-password": "Sin contraseña",
     "type-or-paste-credentials": "Escriba o pegue las CREDENCIALES",
@@ -1269,7 +1282,8 @@
       "credential-source": "Credential Source",
       "tenant-id": "Tenant ID",
       "client-id": "Client ID",
-      "client-secret": "Client Secret"
+      "client-secret": "Client Secret",
+      "specific-credential": "Credencial específica"
     },
     "database-region": "Región de la base de datos",
     "external-secret-gcp": {
@@ -1309,7 +1323,6 @@
     "unable-to-connect": "Bytebase no puede conectar la instancia. Le recomendamos que revise la información de conexión nuevamente. Pero está bien ignorar esta advertencia por ahora. Aún puede solucionar la información de conexión desde la página de detalles de la instancia después de la creación.\n\nDetalle del error: {0}",
     "successfully-created-instance-createdinstance-name": "Se ha creado correctamente la instancia '{0}'.",
     "successfully-updated-instance-instance-name": "Se ha actualizado correctamente la instancia '{0}'.",
-    "copy-grant-statement": "Se ha copiado la declaración CREATE USER y GRANT al portapapeles. Pegue en su cliente de {engine} para aplicar.",
     "successfully-connected-instance": "Instancia conectada correctamente.",
     "failed-to-connect-instance": "Error al conectar la instancia.",
     "failed-to-connect-instance-localhost": "Si ejecuta Bytebase con Docker, intente \"host.docker.internal\" para la dirección del host.",
@@ -1482,7 +1495,6 @@
     "batch-action-permission-denied": "No tengo permiso para {action} para bases de datos",
     "batch-action-disabled": "No se puede {action} para las bases de datos de diferentes proyectos",
     "batch-action-disabled-for-unassigned": "No se puede {action} para una base de datos no asignada",
-    "data-export-action-disabled": "No se puede exportar datos de más de una base de datos",
     "successfully-transferred-databases": "Bases de datos transferidas exitosamente",
     "nullable": "Anulable",
     "expression": "Expresión",
@@ -1607,7 +1619,8 @@
       "new-baseline": {
         "self": "Nueva línea base",
         "successfully-established": "Se estableció con éxito una nueva línea base"
-      }
+      },
+      "view-diff": "Ver diferencia"
     }
   },
   "project": {
@@ -1871,18 +1884,14 @@
       }
     },
     "copy-url": "Copiar URL",
-    "notify": {
-      "copy-code-succeed": "Copia de código exitosa",
-      "copy-share-link": "El enlace compartido se copió al portapapeles."
-    },
     "connect-to-a-database": "Conectarse a una base de datos",
     "link-access": "Acceso al enlace",
     "private": "Privado",
     "private-desc": "Solo tú puedes acceder a esta hoja",
     "project-read": "Lectura del proyecto",
-    "project-read-desc": "Tanto el PROPIETARIO de la hoja como el PROPIETARIO del proyecto pueden leer/escribir, otros miembros del proyecto pueden leer",
+    "project-read-desc": "Tanto el propietario de la hoja como los usuarios con permiso \"bb.worksheets.manage\" pueden leer/escribir, otros usuarios del proyecto con permiso \"bb.worksheets.get\" pueden leer",
     "project-write": "Escritura del proyecto",
-    "project-write-desc": "Tanto el PROPIETARIO de la hoja como los miembros del proyecto pueden leer/escribir",
+    "project-write-desc": "Tanto el propietario de la hoja como los usuarios del proyecto con permiso \"bb.worksheets.get\" pueden leer/escribir",
     "create-read-only-data-source": "Ir a crear",
     "save-sheet": "Guardar hoja",
     "save-sheet-input-placeholder": "Por favor, ingresa un nombre para la hoja",
@@ -1940,7 +1949,6 @@
     "pending-query": "Consulta pendiente",
     "executing-query": "Ejecutando consulta",
     "request-query": "Solicitar consulta",
-    "copy-success": "Copiado al portapapeles",
     "connect-in-new-tab": "Conéctate en una nueva pestaña",
     "copy-name": "Copiar nombre",
     "preview-table-data": "Vista previa de datos de la tabla",
@@ -1965,7 +1973,6 @@
       "rows": "filas"
     },
     "n-per-page": "{n} / página",
-    "customize-tree-structure": "Personalizar la estructura del árbol",
     "add-a-new-instance": "Agregar una nueva instancia",
     "web-socket": {
       "errors": {
@@ -2308,6 +2315,7 @@
   "identity-provider": {
     "test-connection": "Probar conexión",
     "test-connection-success": "Conexión de prueba exitosa",
+    "userinfo-description": "La información del usuario coincidente.",
     "claims-description": "El proveedor de identidad devolvió las siguientes notificaciones. Esta información puede ayudarle a configurar las asignaciones de campos.",
     "no-claims": "El proveedor de identidad no devolvió ninguna reclamación.",
     "identity-provider-created": "Proveedor de identidad creado exitosamente",
@@ -2315,7 +2323,8 @@
     "identity-provider-update-failed": "No se pudo actualizar el proveedor de identidad",
     "identity-provider-create-failed": "No se pudo crear el proveedor de identidad",
     "identity-provider-delete-failed": "No se pudo eliminar el proveedor de identidad",
-    "identity-provider-permission-denied": "Permiso denegado"
+    "identity-provider-permission-denied": "Permiso denegado",
+    "delete-warning": "¿Seguro que desea eliminar este proveedor de identidad? Los usuarios que se registraron con este SSO ya no podrán iniciar sesión con él. Si el inicio de sesión con contraseña está deshabilitado en la configuración de su espacio de trabajo, es posible que estos usuarios queden completamente bloqueados."
   },
   "sensitive-data": {
     "self": "Datos Sensibles"
@@ -2416,7 +2425,6 @@
           "no-more": "No más"
         }
       },
-      "statement-copied": "Declaración copiada al portapapeles",
       "text2sql": "Text2SQL",
       "actions": {
         "explain-code": "Explicar el código",
@@ -2520,10 +2528,10 @@
       "re-request-review-issue": "¿Volver a solicitar revisión?",
       "sent-back-issue": "Problema devuelto",
       "re-requested-review": "revisión de problema nuevamente solicitada",
-      "no-one-matched": "Nadie igualó",
-      "any-n-role-can-approve": "Cualquier {role} puede aprobar",
-      "approved-by-n": "Aprobado por {approver}",
-      "issue-creators-cannot-approve-their-own-issue": "El creador del problema no puede aprobar su propio problema."
+      "approved-by": "Aprobado por",
+      "rejected-by": "Rechazado por",
+      "and-n-other-users": "{names} y {count} otros usuarios",
+      "self-approval-not-allowed": "No se permite la autoaprobación para este proyecto. No puedes aprobarlo como creador."
     }
   },
   "schema-template": {
@@ -2716,8 +2724,6 @@
     "title": "Liberar",
     "releases": "Lanzamientos",
     "files": "Archivos",
-    "create": "Crear lanzamiento",
-    "select": "Seleccionar versión",
     "archive-this-release": "Archivar este comunicado",
     "total-files": "Total de {count} archivos",
     "plan-tip": "Este plan está configurado para usar una versión. Los cambios en la base de datos se ejecutarán mediante las sentencias SQL de los archivos de la versión seleccionada.",
@@ -2738,15 +2744,8 @@
     "vcs-type": {
       "unspecified": "No especificado"
     },
-    "actions": {
-      "new-file": "Nuevo archivo",
-      "import-from-release": "Importar desde la versión"
-    },
-    "messages": {
-      "succeed-to-create-release": "Tener éxito en crear el lanzamiento",
-      "files-will-always-be-sorted-and-executed-in-version-order": "Los archivos siempre se ordenarán y ejecutarán en orden de versión.",
-      "cannot-modify-files-after-created": "No es posible modificar archivos una vez creada la versión."
-    },
+    "actions": {},
+    "messages": {},
     "usage-description": "El lanzamiento solo se utiliza en GitOps personalizado con integración de API."
   },
   "export-data": {

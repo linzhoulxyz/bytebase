@@ -683,15 +683,23 @@
                 </li>
               
                 <li>
+                  <a href="#bytebase.store.DataSource.AWSCredential"><span class="badge">M</span>DataSource.AWSCredential</a>
+                </li>
+              
+                <li>
                   <a href="#bytebase.store.DataSource.Address"><span class="badge">M</span>DataSource.Address</a>
                 </li>
               
                 <li>
-                  <a href="#bytebase.store.DataSource.ClientSecretCredential"><span class="badge">M</span>DataSource.ClientSecretCredential</a>
+                  <a href="#bytebase.store.DataSource.AzureCredential"><span class="badge">M</span>DataSource.AzureCredential</a>
                 </li>
               
                 <li>
                   <a href="#bytebase.store.DataSource.ExtraConnectionParametersEntry"><span class="badge">M</span>DataSource.ExtraConnectionParametersEntry</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.store.DataSource.GCPCredential"><span class="badge">M</span>DataSource.GCPCredential</a>
                 </li>
               
                 <li>
@@ -1173,10 +1181,6 @@
                 </li>
               
                 <li>
-                  <a href="#bytebase.store.AgentPluginSetting"><span class="badge">M</span>AgentPluginSetting</a>
-                </li>
-              
-                <li>
                   <a href="#bytebase.store.Algorithm"><span class="badge">M</span>Algorithm</a>
                 </li>
               
@@ -1261,15 +1265,15 @@
                 </li>
               
                 <li>
-                  <a href="#bytebase.store.MaximumSQLResultSizeSetting"><span class="badge">M</span>MaximumSQLResultSizeSetting</a>
-                </li>
-              
-                <li>
                   <a href="#bytebase.store.PasswordRestrictionSetting"><span class="badge">M</span>PasswordRestrictionSetting</a>
                 </li>
               
                 <li>
                   <a href="#bytebase.store.SCIMSetting"><span class="badge">M</span>SCIMSetting</a>
+                </li>
+              
+                <li>
+                  <a href="#bytebase.store.SQLQueryRestrictionSetting"><span class="badge">M</span>SQLQueryRestrictionSetting</a>
                 </li>
               
                 <li>
@@ -3221,10 +3225,9 @@ Format: projects/{project}/sheets/{sheet} </p></td>
               
                 <tr>
                   <td>default</td>
-                  <td><a href="#google.protobuf.StringValue">google.protobuf.StringValue</a></td>
+                  <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>The default is the default of a column. Use google.protobuf.StringValue
-to distinguish between an empty string default value or no default. </p></td>
+                  <td><p>The default value of column. </p></td>
                 </tr>
               
                 <tr>
@@ -3334,6 +3337,32 @@ classification and user_comment is parsed from the comment. </p></td>
                   <td><a href="#int64">int64</a></td>
                   <td></td>
                   <td><p>The identity_increment is for identity columns, MSSQL only. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>default_constraint_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The default_constraint_name is the name of the default constraint, MSSQL only.
+In MSSQL, default values are implemented as named constraints. When modifying or
+dropping a column&#39;s default value, you must reference the constraint by name.
+This field stores the actual constraint name from the database.
+
+Example: A column definition like:
+  CREATE TABLE employees (
+    status NVARCHAR(20) DEFAULT &#39;active&#39;
+  )
+
+Will create a constraint with an auto-generated name like &#39;DF__employees__statu__3B75D760&#39;
+or a user-defined name if specified:
+  ALTER TABLE employees ADD CONSTRAINT DF_employees_status DEFAULT &#39;active&#39; FOR status
+
+To modify the default, you must first drop the existing constraint by name:
+  ALTER TABLE employees DROP CONSTRAINT DF__employees__statu__3B75D760
+  ALTER TABLE employees ADD CONSTRAINT DF_employees_status DEFAULT &#39;inactive&#39; FOR status
+
+This field is populated when syncing from the database. When empty (e.g., when parsing
+from SQL files), the system cannot automatically drop the constraint. </p></td>
                 </tr>
               
             </tbody>
@@ -3719,6 +3748,13 @@ classification and user_comment is parsed from the comment. </p></td>
               
                 <tr>
                   <td>collation_connection</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>comment</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
@@ -4488,6 +4524,13 @@ function takes. </p></td>
                 </tr>
               
                 <tr>
+                  <td>comment</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
                   <td>skip_dump</td>
                   <td><a href="#bool">bool</a></td>
                   <td></td>
@@ -4625,6 +4668,13 @@ Snowflake. </p></td>
               
                 <tr>
                   <td>owner</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>comment</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
@@ -6569,8 +6619,22 @@ Used for authentication when connecting to the data source. </p></td>
                 </tr>
               
                 <tr>
-                  <td>client_secret_credential</td>
-                  <td><a href="#bytebase.store.DataSource.ClientSecretCredential">DataSource.ClientSecretCredential</a></td>
+                  <td>azure_credential</td>
+                  <td><a href="#bytebase.store.DataSource.AzureCredential">DataSource.AzureCredential</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>aws_credential</td>
+                  <td><a href="#bytebase.store.DataSource.AWSCredential">DataSource.AWSCredential</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>gcp_credential</td>
+                  <td><a href="#bytebase.store.DataSource.GCPCredential">DataSource.GCPCredential</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -6667,6 +6731,65 @@ For PostgreSQL HA, this can be used to set target_session_attrs=read-write </p><
 
         
       
+        <h3 id="bytebase.store.DataSource.AWSCredential">DataSource.AWSCredential</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>access_key_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>obfuscated_access_key_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>secret_access_key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>obfuscated_secret_access_key</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>session_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>obfuscated_session_token</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="bytebase.store.DataSource.Address">DataSource.Address</h3>
         <p></p>
 
@@ -6698,7 +6821,7 @@ For PostgreSQL HA, this can be used to set target_session_attrs=read-write </p><
 
         
       
-        <h3 id="bytebase.store.DataSource.ClientSecretCredential">DataSource.ClientSecretCredential</h3>
+        <h3 id="bytebase.store.DataSource.AzureCredential">DataSource.AzureCredential</h3>
         <p></p>
 
         
@@ -6762,6 +6885,37 @@ For PostgreSQL HA, this can be used to set target_session_attrs=read-write </p><
               
                 <tr>
                   <td>value</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.store.DataSource.GCPCredential">DataSource.GCPCredential</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>content</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>obfuscated_content</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
@@ -10236,37 +10390,6 @@ Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task}/taskRu
 
         
       
-        <h3 id="bytebase.store.AgentPluginSetting">AgentPluginSetting</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>url</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>The URL for the agent API. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>token</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>The token for the agent. </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
         <h3 id="bytebase.store.Algorithm">Algorithm</h3>
         <p></p>
 
@@ -11053,31 +11176,6 @@ are /[a-z][0-9]-/. </p></td>
 
         
       
-        <h3 id="bytebase.store.MaximumSQLResultSizeSetting">MaximumSQLResultSizeSetting</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>limit</td>
-                  <td><a href="#int64">int64</a></td>
-                  <td></td>
-                  <td><p>The limit is in bytes.
-The default value is 100MB, we will use the default value if the setting not exists, or the limit &lt;= 0. </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
         <h3 id="bytebase.store.PasswordRestrictionSetting">PasswordRestrictionSetting</h3>
         <p></p>
 
@@ -11159,6 +11257,39 @@ The default value is 100MB, we will use the default value if the setting not exi
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="bytebase.store.SQLQueryRestrictionSetting">SQLQueryRestrictionSetting</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>maximum_result_size</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p>The size limit in bytes.
+The default value is 100MB, we will use the default value if the setting not exists, or the limit &lt;= 0. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>maximum_result_rows</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>The return rows limit.
+The default value is -1, means no limit. </p></td>
                 </tr>
               
             </tbody>
@@ -11511,13 +11642,6 @@ The default value is 100MB, we will use the default value if the setting not exi
                 </tr>
               
                 <tr>
-                  <td>outbound_ip_list</td>
-                  <td><a href="#string">string</a></td>
-                  <td>repeated</td>
-                  <td><p>outbound_ip_list is the outbound IP for Bytebase instance in SaaS mode. </p></td>
-                </tr>
-              
-                <tr>
                   <td>token_duration</td>
                   <td><a href="#google.protobuf.Duration">google.protobuf.Duration</a></td>
                   <td></td>
@@ -11781,12 +11905,6 @@ Default to this mode.</p></td>
               <tr>
                 <td>AI</td>
                 <td>10</td>
-                <td><p></p></td>
-              </tr>
-            
-              <tr>
-                <td>PLUGIN_AGENT</td>
-                <td>11</td>
                 <td><p></p></td>
               </tr>
             

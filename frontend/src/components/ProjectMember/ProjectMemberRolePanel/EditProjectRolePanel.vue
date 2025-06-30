@@ -139,9 +139,10 @@ import {
 } from "@/store";
 import type { ComposedProject, DatabaseResource } from "@/types";
 import { PresetRoleType } from "@/types";
-import { State } from "@/types/proto/v1/common";
+import { State } from "@/types/proto-es/v1/common_pb";
 import type { Binding } from "@/types/proto/v1/iam_policy";
-import { PlanFeature } from "@/types/proto/v1/subscription_service";
+import { PlanFeature } from "@/types/proto-es/v1/subscription_service_pb";
+import { convertStateToOld } from "@/utils/v1/common-conversions";
 import { displayRoleTitle, checkRoleContainsAnyPermission } from "@/utils";
 import { convertFromExpr, buildConditionExpr } from "@/utils/issue/cel";
 import { getBindingIdentifier } from "../utils";
@@ -183,8 +184,9 @@ const panelTitle = computed(() => {
 });
 
 const maximumRoleExpiration = computed(() => {
-  const seconds =
-    settingStore.workspaceProfileSetting?.maximumRoleExpiration?.seconds?.toNumber();
+  const seconds = settingStore.workspaceProfileSetting?.maximumRoleExpiration?.seconds
+    ? Number(settingStore.workspaceProfileSetting.maximumRoleExpiration.seconds)
+    : undefined;
   if (!seconds) {
     return undefined;
   }
@@ -205,7 +207,7 @@ const isDateDisabled = (date: number) => {
 };
 
 const allowRemoveRole = () => {
-  if (props.project.state === State.DELETED) {
+  if (props.project.state === convertStateToOld(State.DELETED)) {
     return false;
   }
 

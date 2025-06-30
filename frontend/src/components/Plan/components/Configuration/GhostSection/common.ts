@@ -1,6 +1,6 @@
-import { isGroupingChangeSpec } from "@/components/Plan/logic";
+import { isDBGroupChangeSpec } from "@/components/Plan/logic";
 import type { ComposedDatabase } from "@/types";
-import { Engine } from "@/types/proto/v1/common";
+import { Engine } from "@/types/proto-es/v1/common_pb";
 import {
   Plan_ChangeDatabaseConfig_Type,
   type Plan_Spec,
@@ -14,14 +14,15 @@ export const MIN_GHOST_SUPPORT_MYSQL_VERSION = "5.6.0";
 export const MIN_GHOST_SUPPORT_MARIADB_VERSION = "10.6.0";
 
 export const allowGhostForDatabase = (database: ComposedDatabase) => {
+  const engine = database.instanceResource.engine;
   return (
-    (database.instanceResource.engine === Engine.MYSQL &&
+    (engine === Engine.MYSQL &&
       semverCompare(
         database.instanceResource.engineVersion,
         MIN_GHOST_SUPPORT_MYSQL_VERSION,
         "gte"
       )) ||
-    (database.instanceResource.engine === Engine.MARIADB &&
+    (engine === Engine.MARIADB &&
       semverCompare(
         database.instanceResource.engineVersion,
         MIN_GHOST_SUPPORT_MARIADB_VERSION,
@@ -43,7 +44,7 @@ export const allowGhostForSpec = (spec: Plan_Spec | undefined) => {
 export const getGhostEnabledForSpec = (
   spec: Plan_Spec
 ): boolean | undefined => {
-  if (isGroupingChangeSpec(spec)) {
+  if (isDBGroupChangeSpec(spec)) {
     return undefined;
   }
   const config = spec?.changeDatabaseConfig;

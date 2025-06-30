@@ -4,14 +4,15 @@ import {
   Users,
   Settings,
   PencilRuler,
-  SearchCodeIcon,
   DownloadIcon,
   PackageIcon,
+  LayoutList,
+  PlayCircle,
 } from "lucide-vue-next";
 import { computed, h, unref } from "vue";
 import type { RouteLocationNormalizedLoaded } from "vue-router";
 import { useRoute } from "vue-router";
-import type { SidebarItem } from "@/components/v2/Sidebar/CommonSidebar.vue";
+import type { SidebarItem } from "@/components/v2/Sidebar/type";
 import { getFlattenRoutes } from "@/components/v2/Sidebar/utils.ts";
 import { t } from "@/plugins/i18n";
 import projectV1Routes, {
@@ -28,11 +29,12 @@ import projectV1Routes, {
   PROJECT_V1_ROUTE_RELEASES,
   PROJECT_V1_ROUTE_MASKING_EXEMPTION,
   PROJECT_V1_ROUTE_PLANS,
+  PROJECT_V1_ROUTE_ROLLOUTS,
 } from "@/router/dashboard/projectV1";
 import { useAppFeature } from "@/store";
 import type { ComposedProject, MaybeRef } from "@/types";
 import { DEFAULT_PROJECT_NAME } from "@/types";
-import { DatabaseChangeMode } from "@/types/proto/v1/setting_service";
+import { DatabaseChangeMode } from "@/types/proto-es/v1/setting_service_pb";
 import { hasProjectPermissionV2 } from "@/utils";
 
 interface ProjectSidebarItem extends SidebarItem {
@@ -128,10 +130,18 @@ export const useProjectSidebar = (
           databaseChangeMode.value === DatabaseChangeMode.EDITOR,
       },
       {
-        // TODO(claude): rename title to "Plans".
-        title: t("review-center.self"),
-        icon: () => h(SearchCodeIcon),
+        title: t("plan.plans"),
+        icon: () => h(LayoutList),
         path: PROJECT_V1_ROUTE_PLANS,
+        type: "div",
+        hide:
+          isDefaultProject.value ||
+          databaseChangeMode.value === DatabaseChangeMode.EDITOR,
+      },
+      {
+        title: t("rollout.rollouts"),
+        path: PROJECT_V1_ROUTE_ROLLOUTS,
+        icon: () => h(PlayCircle),
         type: "div",
         hide:
           isDefaultProject.value ||

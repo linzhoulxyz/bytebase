@@ -172,8 +172,8 @@ import {
   isValidProjectName,
   UNKNOWN_PROJECT_NAME,
 } from "@/types";
-import { Engine } from "@/types/proto/v1/common";
-import type { InstanceRole } from "@/types/proto/v1/instance_role_service";
+import { Engine } from "@/types/proto-es/v1/common_pb";
+import type { InstanceRole } from "@/types/proto-es/v1/instance_role_service_pb";
 import { Issue, Issue_Type } from "@/types/proto/v1/issue_service";
 import type { Plan_CreateDatabaseConfig } from "@/types/proto/v1/plan_service";
 import { Plan, Plan_Spec } from "@/types/proto/v1/plan_service";
@@ -236,7 +236,9 @@ const isReservedName = computed(() => {
   return state.databaseName.toLowerCase() == "bytebase";
 });
 
-const supportedEngines = computed(() => enginesSupportCreateDatabase());
+const supportedEngines = computed(() => 
+  enginesSupportCreateDatabase()
+);
 
 const allowCreate = computed(() => {
   return (

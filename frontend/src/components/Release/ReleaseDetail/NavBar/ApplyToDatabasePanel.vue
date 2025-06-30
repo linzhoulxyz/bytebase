@@ -50,6 +50,8 @@
 </template>
 
 <script lang="ts" setup>
+import { create } from "@bufbuild/protobuf";
+import { createContextValues } from "@connectrpc/connect";
 import { NButton } from "naive-ui";
 import { computed, reactive } from "vue";
 import { useRouter } from "vue-router";
@@ -57,15 +59,26 @@ import DatabaseAndGroupSelector, {
   type DatabaseSelectState,
 } from "@/components/DatabaseAndGroupSelector/";
 import { Drawer, DrawerContent, ErrorTipsButton } from "@/components/v2";
-import { planServiceClient } from "@/grpcweb";
+import {
+  planServiceClientConnect,
+  rolloutServiceClientConnect,
+} from "@/grpcweb";
+import { silentContextKey } from "@/grpcweb/context-key";
 import { PROJECT_V1_ROUTE_ISSUE_DETAIL } from "@/router/dashboard/projectV1";
-import { useDatabaseV1Store, useDBGroupStore } from "@/store";
+import { pushNotification, useDatabaseV1Store, useDBGroupStore } from "@/store";
+import { CreatePlanRequestSchema } from "@/types/proto-es/v1/plan_service_pb";
+import { PreviewRolloutRequestSchema } from "@/types/proto-es/v1/rollout_service_pb";
 import { DatabaseGroup } from "@/types/proto/v1/database_group_service";
+import { Plan } from "@/types/proto/v1/plan_service";
 import {
   extractProjectResourceName,
   generateIssueTitle,
   issueV1Slug,
 } from "@/utils";
+import {
+  convertOldPlanToNew,
+  convertNewPlanToOld,
+} from "@/utils/v1/plan-conversions";
 import { useReleaseDetailContext } from "../context";
 import { createIssueFromPlan } from "./utils";
 
@@ -111,25 +124,47 @@ const handleCreate = async () => {
       state.targetSelectState.selectedDatabaseGroup || ""
     ),
   });
-  const createdPlan = await planServiceClient.createPlan({
-    parent: project.value.name,
-    plan: {
-      title: `Release "${release.value.title}"`,
-      description: `Apply release "${release.value.title}" to selected databases.`,
-      specs: [
-        {
-          id: crypto.randomUUID(),
-          changeDatabaseConfig: {
-            targets:
-              (state.targetSelectState.changeSource === "DATABASE"
-                ? state.targetSelectState.selectedDatabaseNameList
-                : [state.targetSelectState.selectedDatabaseGroup!]) || [],
-            release: release.value.name,
-          },
+  const planData = Plan.fromPartial({
+    title: `Release "${release.value.title}"`,
+    description: `Apply release "${release.value.title}" to selected databases.`,
+    specs: [
+      {
+        id: crypto.randomUUID(),
+        changeDatabaseConfig: {
+          targets:
+            (state.targetSelectState.changeSource === "DATABASE"
+              ? state.targetSelectState.selectedDatabaseNameList
+              : [state.targetSelectState.selectedDatabaseGroup!]) || [],
+          release: release.value.name,
         },
-      ],
-    },
+      },
+    ],
   });
+  const newPlan = convertOldPlanToNew(planData);
+  try {
+    const previewRolloutRequest = create(PreviewRolloutRequestSchema, {
+      project: project.value.name,
+      plan: newPlan,
+    });
+    await rolloutServiceClientConnect.previewRollout(previewRolloutRequest, {
+      contextValues: createContextValues().set(silentContextKey, true),
+    });
+  } catch (error) {
+    pushNotification({
+      module: "bytebase",
+      style: "CRITICAL",
+      title: "Preview Rollout Failed",
+      description: `${error instanceof Error ? error.message : "Unknown error"}\nPlease check if you had applied the release to the selected databases.`,
+    });
+    return;
+  }
+
+  const request = create(CreatePlanRequestSchema, {
+    parent: project.value.name,
+    plan: newPlan,
+  });
+  const response = await planServiceClientConnect.createPlan(request);
+  const createdPlan = convertNewPlanToOld(response);
   const createdIssue = await createIssueFromPlan(project.value.name, {
     ...createdPlan,
     // Override title and description.
@@ -145,7 +180,7 @@ const handleCreate = async () => {
     name: PROJECT_V1_ROUTE_ISSUE_DETAIL,
     params: {
       projectId: extractProjectResourceName(release.value.project),
-      issueSlug: issueV1Slug(createdIssue),
+      issueSlug: issueV1Slug(createdIssue.name, createdIssue.title),
     },
   });
 };

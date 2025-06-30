@@ -8,8 +8,6 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/pkg/errors"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/bytebase/bytebase/backend/common"
@@ -45,10 +43,7 @@ func (s *IdentityProviderService) GetIdentityProvider(ctx context.Context, req *
 	if err != nil {
 		return nil, err
 	}
-	identityProvider, err := convertToIdentityProvider(identityProviderMessage)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to convert identity provider: %v", err)
-	}
+	identityProvider := convertToIdentityProvider(identityProviderMessage)
 	return connect.NewResponse(identityProvider), nil
 }
 
@@ -56,14 +51,11 @@ func (s *IdentityProviderService) GetIdentityProvider(ctx context.Context, req *
 func (s *IdentityProviderService) ListIdentityProviders(ctx context.Context, _ *connect.Request[v1pb.ListIdentityProvidersRequest]) (*connect.Response[v1pb.ListIdentityProvidersResponse], error) {
 	identityProviders, err := s.store.ListIdentityProviders(ctx, &store.FindIdentityProviderMessage{})
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	response := &v1pb.ListIdentityProvidersResponse{}
 	for _, identityProviderMessage := range identityProviders {
-		identityProvider, err := convertToIdentityProvider(identityProviderMessage)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to convert identity provider: %v", err)
-		}
+		identityProvider := convertToIdentityProvider(identityProviderMessage)
 		response.IdentityProviders = append(response.IdentityProviders, identityProvider)
 	}
 	return connect.NewResponse(response), nil
@@ -77,24 +69,24 @@ func (s *IdentityProviderService) CreateIdentityProvider(ctx context.Context, re
 
 	setting, err := s.store.GetWorkspaceGeneralSetting(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get workspace setting: %v", err)
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get workspace setting"))
 	}
 	if setting.ExternalUrl == "" {
-		return nil, status.Errorf(codes.FailedPrecondition, setupExternalURLError)
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Errorf(setupExternalURLError))
 	}
 
 	if req.Msg.IdentityProvider == nil {
-		return nil, status.Errorf(codes.InvalidArgument, "identity provider must be set")
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("identity provider must be set"))
 	}
 
 	if !isValidResourceID(req.Msg.IdentityProviderId) {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid identity provider ID %v", req.Msg.IdentityProviderId)
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("invalid identity provider ID %v", req.Msg.IdentityProviderId))
 	}
 	if strings.ToLower(req.Msg.IdentityProvider.Domain) != req.Msg.IdentityProvider.Domain {
-		return nil, status.Errorf(codes.InvalidArgument, "domain name must use lower-case")
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("domain name must use lower-case"))
 	}
 	if err := validIdentityProviderConfig(req.Msg.IdentityProvider.Type, req.Msg.IdentityProvider.Config); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 	identityProviderMessage := &store.IdentityProviderMessage{
 		ResourceID: req.Msg.IdentityProviderId,
@@ -104,31 +96,25 @@ func (s *IdentityProviderService) CreateIdentityProvider(ctx context.Context, re
 		Config:     convertIdentityProviderConfigToStore(req.Msg.IdentityProvider.GetConfig()),
 	}
 	if req.Msg.ValidateOnly {
-		identityProvider, err := convertToIdentityProvider(identityProviderMessage)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to convert identity provider: %v", err)
-		}
+		identityProvider := convertToIdentityProvider(identityProviderMessage)
 		return connect.NewResponse(identityProvider), nil
 	}
 
 	identityProviderMessage, err = s.store.CreateIdentityProvider(ctx, identityProviderMessage)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create identity provider: %v", err)
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to create identity provider"))
 	}
-	identityProvider, err := convertToIdentityProvider(identityProviderMessage)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to convert identity provider: %v", err)
-	}
+	identityProvider := convertToIdentityProvider(identityProviderMessage)
 	return connect.NewResponse(identityProvider), nil
 }
 
 // UpdateIdentityProvider updates an identity provider.
 func (s *IdentityProviderService) UpdateIdentityProvider(ctx context.Context, req *connect.Request[v1pb.UpdateIdentityProviderRequest]) (*connect.Response[v1pb.IdentityProvider], error) {
 	if req.Msg.IdentityProvider == nil {
-		return nil, status.Errorf(codes.InvalidArgument, "identity provider must be set")
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("identity provider must be set"))
 	}
 	if req.Msg.UpdateMask == nil {
-		return nil, status.Errorf(codes.InvalidArgument, "update_mask must be set")
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("update_mask must be set"))
 	}
 	if err := s.checkFeatureAvailable(req.Msg.IdentityProvider); err != nil {
 		return nil, err
@@ -148,7 +134,7 @@ func (s *IdentityProviderService) UpdateIdentityProvider(ctx context.Context, re
 			patch.Title = &req.Msg.IdentityProvider.Title
 		case "domain":
 			if strings.ToLower(req.Msg.IdentityProvider.Domain) != req.Msg.IdentityProvider.Domain {
-				return nil, status.Errorf(codes.InvalidArgument, "domain name must use lower-case")
+				return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("domain name must use lower-case"))
 			}
 			patch.Domain = &req.Msg.IdentityProvider.Domain
 		case "config":
@@ -157,7 +143,7 @@ func (s *IdentityProviderService) UpdateIdentityProvider(ctx context.Context, re
 	}
 	if patch.Config != nil {
 		if err := validIdentityProviderConfig(v1pb.IdentityProviderType(identityProviderMessage.Type), req.Msg.IdentityProvider.Config); err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
 		}
 		// Don't update client secret if it's empty string.
 		switch identityProviderMessage.Type {
@@ -178,12 +164,9 @@ func (s *IdentityProviderService) UpdateIdentityProvider(ctx context.Context, re
 
 	identityProviderMessage, err = s.store.UpdateIdentityProvider(ctx, patch)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	identityProvider, err := convertToIdentityProvider(identityProviderMessage)
-	if err != nil {
-		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to convert identity provider: %v", err))
-	}
+	identityProvider := convertToIdentityProvider(identityProviderMessage)
 	return connect.NewResponse(identityProvider), nil
 }
 
@@ -195,7 +178,7 @@ func (s *IdentityProviderService) DeleteIdentityProvider(ctx context.Context, re
 	}
 
 	if err := s.store.DeleteIdentityProvider(ctx, identityProvider.ResourceID); err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&emptypb.Empty{}), nil
 }
@@ -211,7 +194,7 @@ func (s *IdentityProviderService) checkFeatureAvailable(idp *v1pb.IdentityProvid
 		featurePlan = v1pb.PlanFeature_FEATURE_GOOGLE_AND_GITHUB_SSO
 	}
 	if err := s.licenseService.IsFeatureEnabled(featurePlan); err != nil {
-		return status.Error(codes.PermissionDenied, err.Error())
+		return connect.NewError(connect.CodePermissionDenied, err)
 	}
 	return nil
 }
@@ -220,15 +203,15 @@ func (s *IdentityProviderService) checkFeatureAvailable(idp *v1pb.IdentityProvid
 func (s *IdentityProviderService) TestIdentityProvider(ctx context.Context, req *connect.Request[v1pb.TestIdentityProviderRequest]) (*connect.Response[v1pb.TestIdentityProviderResponse], error) {
 	identityProvider := req.Msg.IdentityProvider
 	if identityProvider == nil {
-		return nil, status.Errorf(codes.NotFound, "identity provider not found")
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("identity provider not found"))
 	}
 
 	setting, err := s.store.GetWorkspaceGeneralSetting(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get workspace setting: %v", err)
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get workspace setting"))
 	}
 	if setting.ExternalUrl == "" {
-		return nil, status.Errorf(codes.FailedPrecondition, setupExternalURLError)
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.Errorf(setupExternalURLError))
 	}
 
 	switch identityProvider.Type {
@@ -237,86 +220,111 @@ func (s *IdentityProviderService) TestIdentityProvider(ctx context.Context, req 
 		if identityProvider.Config.GetOauth2Config().ClientSecret == "" {
 			storedIdentityProvider, err := s.getIdentityProviderMessage(ctx, identityProvider.Name)
 			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to find identity provider, error: %s", err.Error())
+				return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to find identity provider, error: %s", err.Error()))
 			}
 			if storedIdentityProvider == nil {
-				return nil, status.Errorf(codes.Internal, "identity provider %s not found", identityProvider.Name)
+				return nil, connect.NewError(connect.CodeInternal, errors.Errorf("identity provider %s not found", identityProvider.Name))
 			}
 			identityProvider.Config.GetOauth2Config().ClientSecret = storedIdentityProvider.Config.GetOauth2Config().ClientSecret
 		}
 		oauth2Context := req.Msg.GetOauth2Context()
 		if oauth2Context == nil {
-			return nil, status.Errorf(codes.InvalidArgument, "missing OAuth2 context")
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("missing OAuth2 context"))
 		}
 		identityProviderConfig := convertIdentityProviderConfigToStore(identityProvider.Config)
 		oauth2IdentityProvider, err := oauth2.NewIdentityProvider(identityProviderConfig.GetOauth2Config())
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to new oauth2 identity provider")
+			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to new oauth2 identity provider"))
 		}
 
 		redirectURL := fmt.Sprintf("%s/oauth/callback", setting.ExternalUrl)
 		token, err := oauth2IdentityProvider.ExchangeToken(ctx, redirectURL, oauth2Context.Code)
 		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "failed to exchange access token, error: %s", err.Error())
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("failed to exchange access token, error: %s", err.Error()))
 		}
-		_, claims, err := oauth2IdentityProvider.UserInfo(token)
+		userInfo, claims, err := oauth2IdentityProvider.UserInfo(token)
 		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "failed to get user info, error: %s", err.Error())
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("failed to get user info, error: %s", err.Error()))
 		}
 
-		// Convert claims to map[string]string for protobuf
-		stringClaims := make(map[string]string)
+		claimsMap := make(map[string]string)
 		for key, value := range claims {
-			stringClaims[key] = fmt.Sprintf("%v", value)
+			claimsMap[key] = fmt.Sprintf("%v", value)
 		}
-		return connect.NewResponse(&v1pb.TestIdentityProviderResponse{Claims: stringClaims}), nil
+		userInfoMap := make(map[string]string)
+		if userInfo != nil {
+			if userInfo.Identifier != "" {
+				userInfoMap["email"] = userInfo.Identifier
+			}
+			if userInfo.DisplayName != "" {
+				userInfoMap["title"] = userInfo.DisplayName
+			}
+			if userInfo.Phone != "" {
+				userInfoMap["phone"] = userInfo.Phone
+			}
+		}
+		return connect.NewResponse(&v1pb.TestIdentityProviderResponse{Claims: claimsMap, UserInfo: userInfoMap}), nil
 	case v1pb.IdentityProviderType_OIDC:
 		// Find client secret for those existed identity providers.
 		if identityProvider.Config.GetOidcConfig().ClientSecret == "" {
 			storedIdentityProvider, err := s.getIdentityProviderMessage(ctx, identityProvider.Name)
 			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to find identity provider, error: %s", err.Error())
+				return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to find identity provider, error: %s", err.Error()))
 			}
 			if storedIdentityProvider == nil {
-				return nil, status.Errorf(codes.Internal, "identity provider %s not found", identityProvider.Name)
+				return nil, connect.NewError(connect.CodeInternal, errors.Errorf("identity provider %s not found", identityProvider.Name))
 			}
 			identityProvider.Config.GetOidcConfig().ClientSecret = storedIdentityProvider.Config.GetOidcConfig().ClientSecret
 		}
 		oauth2Context := req.Msg.GetOauth2Context()
 		if oauth2Context == nil {
-			return nil, status.Errorf(codes.InvalidArgument, "missing OAuth2 context")
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("missing OAuth2 context"))
 		}
 		identityProviderConfig := convertIdentityProviderConfigToStore(identityProvider.Config)
 		oidcIdentityProvider, err := oidc.NewIdentityProvider(ctx, identityProviderConfig.GetOidcConfig())
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to create new OIDC identity provider: %v", err)
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to create new OIDC identity provider"))
 		}
 
 		redirectURL := fmt.Sprintf("%s/oidc/callback", setting.ExternalUrl)
 		token, err := oidcIdentityProvider.ExchangeToken(ctx, redirectURL, oauth2Context.Code)
 		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "failed to exchange access token, error: %s", err.Error())
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("failed to exchange access token, error: %s", err.Error()))
 		}
-		_, claims, err := oidcIdentityProvider.UserInfo(ctx, token, "")
+		userInfo, claims, err := oidcIdentityProvider.UserInfo(ctx, token, "")
 		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "failed to get user info, error: %s", err.Error())
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("failed to get user info, error: %s", err.Error()))
 		}
 
-		// Convert claims to map[string]string for protobuf
-		stringClaims := make(map[string]string)
+		claimsMap := make(map[string]string)
 		for key, value := range claims {
-			stringClaims[key] = fmt.Sprintf("%v", value)
+			claimsMap[key] = fmt.Sprintf("%v", value)
 		}
-		return connect.NewResponse(&v1pb.TestIdentityProviderResponse{Claims: stringClaims}), nil
+		userInfoMap := make(map[string]string)
+		if userInfo != nil {
+			if userInfo.Identifier != "" {
+				userInfoMap["email"] = userInfo.Identifier
+			}
+			if userInfo.DisplayName != "" {
+				userInfoMap["title"] = userInfo.DisplayName
+			}
+			if userInfo.Phone != "" {
+				userInfoMap["phone"] = userInfo.Phone
+			}
+			if userInfo.Groups != nil {
+				userInfoMap["groups"] = fmt.Sprintf("%v", userInfo.Groups)
+			}
+		}
+		return connect.NewResponse(&v1pb.TestIdentityProviderResponse{Claims: claimsMap, UserInfo: userInfoMap}), nil
 	case v1pb.IdentityProviderType_LDAP:
 		// Retrieve bind password from stored identity provider if not provided.
 		if identityProvider.Config.GetLdapConfig().BindPassword == "" {
 			storedIdentityProvider, err := s.getIdentityProviderMessage(ctx, identityProvider.Name)
 			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to find identity provider, error: %s", err.Error())
+				return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to find identity provider, error: %s", err.Error()))
 			}
 			if storedIdentityProvider == nil {
-				return nil, status.Errorf(codes.Internal, "identity provider %s not found", identityProvider.Name)
+				return nil, connect.NewError(connect.CodeInternal, errors.Errorf("identity provider %s not found", identityProvider.Name))
 			}
 			identityProvider.Config.GetLdapConfig().BindPassword = storedIdentityProvider.Config.GetLdapConfig().BindPassword
 		}
@@ -335,57 +343,54 @@ func (s *IdentityProviderService) TestIdentityProvider(ctx context.Context, req 
 			},
 		)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to create new LDAP identity provider: %v", err)
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to create new LDAP identity provider"))
 		}
 
 		conn, err := ldapIdentityProvider.Connect()
 		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "failed to test connection, error: %s", err.Error())
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("failed to test connection, error: %s", err.Error()))
 		}
 		_ = conn.Close()
 
-		// LDAP doesn't return claims like OAuth2/OIDC, so return empty claims
+		// LDAP cannot return claims without username and password so we return an empty claims map.
 		return connect.NewResponse(&v1pb.TestIdentityProviderResponse{Claims: make(map[string]string)}), nil
 	default:
-		return nil, status.Errorf(codes.InvalidArgument, "identity provider type %s not supported", identityProvider.Type.String())
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("identity provider type %s not supported", identityProvider.Type.String()))
 	}
 }
 
 func (s *IdentityProviderService) getIdentityProviderMessage(ctx context.Context, name string) (*store.IdentityProviderMessage, error) {
 	identityProviderID, err := common.GetIdentityProviderID(name)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
 	identityProvider, err := s.store.GetIdentityProvider(ctx, &store.FindIdentityProviderMessage{
 		ResourceID: &identityProviderID,
 	})
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	if identityProvider == nil {
-		return nil, status.Errorf(codes.NotFound, "identity provider %q not found", name)
+		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("identity provider %q not found", name))
 	}
 
 	return identityProvider, nil
 }
 
-func convertToIdentityProvider(identityProvider *store.IdentityProviderMessage) (*v1pb.IdentityProvider, error) {
+func convertToIdentityProvider(identityProvider *store.IdentityProviderMessage) *v1pb.IdentityProvider {
 	identityProviderType := v1pb.IdentityProviderType(identityProvider.Type)
-	config, err := convertIdentityProviderConfigFromStore(identityProvider.Config)
-	if err != nil {
-		return nil, err
-	}
+	config := convertIdentityProviderConfigFromStore(identityProvider.Config)
 	return &v1pb.IdentityProvider{
 		Name:   fmt.Sprintf("%s%s", common.IdentityProviderNamePrefix, identityProvider.ResourceID),
 		Title:  identityProvider.Title,
 		Domain: identityProvider.Domain,
 		Type:   identityProviderType,
 		Config: config,
-	}, nil
+	}
 }
 
-func convertIdentityProviderConfigFromStore(identityProviderConfig *storepb.IdentityProviderConfig) (*v1pb.IdentityProviderConfig, error) {
+func convertIdentityProviderConfigFromStore(identityProviderConfig *storepb.IdentityProviderConfig) *v1pb.IdentityProviderConfig {
 	if v := identityProviderConfig.GetOauth2Config(); v != nil {
 		fieldMapping := v1pb.FieldMapping{
 			Identifier:  v.FieldMapping.Identifier,
@@ -407,7 +412,7 @@ func convertIdentityProviderConfigFromStore(identityProviderConfig *storepb.Iden
 					AuthStyle:     v1pb.OAuth2AuthStyle(v.AuthStyle),
 				},
 			},
-		}, nil
+		}
 	} else if v := identityProviderConfig.GetOidcConfig(); v != nil {
 		fieldMapping := v1pb.FieldMapping{
 			Identifier:  v.FieldMapping.Identifier,
@@ -440,7 +445,7 @@ func convertIdentityProviderConfigFromStore(identityProviderConfig *storepb.Iden
 			Config: &v1pb.IdentityProviderConfig_OidcConfig{
 				OidcConfig: oidcConfig,
 			},
-		}, nil
+		}
 	} else if v := identityProviderConfig.GetLdapConfig(); v != nil {
 		fieldMapping := v1pb.FieldMapping{
 			Identifier:  v.FieldMapping.Identifier,
@@ -462,9 +467,9 @@ func convertIdentityProviderConfigFromStore(identityProviderConfig *storepb.Iden
 					FieldMapping:     &fieldMapping,
 				},
 			},
-		}, nil
+		}
 	}
-	return nil, nil
+	return nil
 }
 
 func convertIdentityProviderConfigToStore(identityProviderConfig *v1pb.IdentityProviderConfig) *storepb.IdentityProviderConfig {

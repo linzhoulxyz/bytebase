@@ -40,11 +40,12 @@ import {
   type EditorPanelViewState,
   typeToView,
 } from "@/types";
-import { Engine } from "@/types/proto/v1/common";
+import { Engine } from "@/types/proto-es/v1/common_pb";
 import {
   GetSchemaStringRequest_ObjectType,
-} from "@/types/proto/v1/database_service";
-import { DataSource, DataSourceType } from "@/types/proto/v1/instance_service";
+} from "@/types/proto-es/v1/database_service_pb";
+import type { DataSource } from "@/types/proto-es/v1/instance_service_pb";
+import { DataSourceType } from "@/types/proto-es/v1/instance_service_pb";
 import {
   defer,
   extractInstanceResourceName,
@@ -150,15 +151,16 @@ export const useActions = () => {
     const { database } = target;
     const db = databaseStore.getDatabaseByName(database);
     const { engine } = db.instanceResource;
+    const protoEsEngine = engine;
 
     const query = await formatCode(
       generateSimpleSelectAllStatement(
-        engine,
+        protoEsEngine,
         schema,
         tableOrViewName,
         SELECT_ALL_LIMIT
       ),
-      engine
+      protoEsEngine
     );
     updateViewState({
       view: "CODE",
@@ -273,9 +275,6 @@ export const useDropdown = () => {
   const disallowEditSchema = useAppFeature(
     "bb.feature.sql-editor.disallow-edit-schema"
   );
-  const disallowNavigateToConsole = useAppFeature(
-    "bb.feature.disallow-navigate-to-console"
-  );
   const $d = useDialog();
 
   const show = ref(false);
@@ -376,7 +375,7 @@ export const useDropdown = () => {
           });
         }
 
-        if (!disallowEditSchema.value && !disallowNavigateToConsole.value) {
+        if (!disallowEditSchema.value) {
           if (instanceV1HasAlterSchema(db.instanceResource)) {
             items.push({
               key: "edit-schema",

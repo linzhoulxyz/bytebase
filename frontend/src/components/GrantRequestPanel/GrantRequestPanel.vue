@@ -42,6 +42,8 @@
 </template>
 
 <script lang="ts" setup>
+import { create } from "@bufbuild/protobuf";
+import { DurationSchema } from "@bufbuild/protobuf/wkt";
 import dayjs from "dayjs";
 import { uniq } from "lodash-es";
 import { NButton } from "naive-ui";
@@ -49,11 +51,15 @@ import { computed, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import AddProjectMemberForm from "@/components/ProjectMember/AddProjectMember/AddProjectMemberForm.vue";
 import { Drawer, DrawerContent } from "@/components/v2";
-import { issueServiceClient } from "@/grpcweb";
+import { issueServiceClientConnect } from "@/grpcweb";
 import { useCurrentUserV1, useProjectV1Store } from "@/store";
 import type { DatabaseResource } from "@/types";
 import { getUserEmailInBinding } from "@/types";
-import { Duration } from "@/types/proto/google/protobuf/duration";
+import {
+  CreateIssueRequestSchema,
+  IssueSchema,
+  Issue_Type as NewIssue_Type,
+} from "@/types/proto-es/v1/issue_service_pb";
 import { Binding } from "@/types/proto/v1/iam_policy";
 import {
   GrantRequest,
@@ -61,6 +67,8 @@ import {
   Issue_Type,
 } from "@/types/proto/v1/issue_service";
 import { generateIssueTitle, displayRoleTitle } from "@/utils";
+import { convertDurationToOld } from "@/utils/v1/common-conversions";
+import { convertNewIssueToOld } from "@/utils/v1/issue-conversions";
 
 interface LocalState {
   binding: Binding;
@@ -138,16 +146,40 @@ const doCreateIssue = async () => {
     newIssue.grantRequest.condition = state.binding.condition;
   }
   if (formRef.value?.expirationTimestampInMS) {
-    newIssue.grantRequest.expiration = Duration.fromPartial({
-      seconds:
-        dayjs(formRef.value.expirationTimestampInMS).unix() - dayjs().unix(),
-    });
+    newIssue.grantRequest.expiration = convertDurationToOld(
+      create(DurationSchema, {
+        seconds: BigInt(
+          dayjs(formRef.value.expirationTimestampInMS).unix() - dayjs().unix()
+        ),
+      })
+    );
   }
 
-  const createdIssue = await issueServiceClient.createIssue({
+  const request = create(CreateIssueRequestSchema, {
     parent: props.projectName,
-    issue: newIssue,
+    issue: create(IssueSchema, {
+      title: newIssue.title,
+      description: newIssue.description,
+      type: NewIssue_Type.DATABASE_CHANGE,
+      grantRequest: newIssue.grantRequest
+        ? {
+            role: newIssue.grantRequest.role,
+            user: newIssue.grantRequest.user,
+            condition: newIssue.grantRequest.condition,
+            expiration: newIssue.grantRequest.expiration
+              ? {
+                  seconds: BigInt(
+                    newIssue.grantRequest.expiration.seconds.toString()
+                  ),
+                  nanos: newIssue.grantRequest.expiration.nanos,
+                }
+              : undefined,
+          }
+        : undefined,
+    }),
   });
+  const response = await issueServiceClientConnect.createIssue(request);
+  const createdIssue = convertNewIssueToOld(response);
 
   // TODO(ed): handle no permission
   const path = `/${createdIssue.name}`;

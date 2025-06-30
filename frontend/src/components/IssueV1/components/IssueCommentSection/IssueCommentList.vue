@@ -3,6 +3,7 @@
     <ul>
       <IssueCreatedComment :issue-comments="issueComments" :issue="issue" />
       <IssueCommentView
+        class="group"
         v-for="(item, index) in issueComments"
         :key="item.comment.name"
         :issue="issue"
@@ -12,8 +13,9 @@
         :similar="item.similar"
       >
         <template v-if="allowEditIssueComment(item.comment)" #subject-suffix>
-          <div class="space-x-2 flex items-center text-control-light">
-            <!-- mr-2 is to vertical align with the text description edit button-->
+          <div
+            class="invisible group-hover:visible space-x-2 flex items-center text-control-light"
+          >
             <div
               v-if="!state.editCommentMode"
               class="mr-2 flex items-center space-x-2"
@@ -24,7 +26,7 @@
                 size="tiny"
                 @click.prevent="onUpdateComment(item.comment)"
               >
-                <heroicons-outline:pencil class="w-4 h-4" />
+                <PencilIcon class="w-4 h-4 text-control-light" />
               </NButton>
             </div>
           </div>
@@ -93,8 +95,9 @@
             @change="(val: string) => (state.newComment = val)"
             @submit="doCreateComment(state.newComment)"
           />
-          <div class="my-4 flex items-center justify-between">
+          <div class="my-3 flex items-center justify-between">
             <NButton
+              size="small"
               :disabled="state.newComment.length == 0"
               @click.prevent="doCreateComment(state.newComment)"
             >
@@ -108,6 +111,7 @@
 </template>
 
 <script setup lang="ts">
+import { PencilIcon } from "lucide-vue-next";
 import { NButton } from "naive-ui";
 import { computed, onMounted, reactive, ref, watch, watchEffect } from "vue";
 import { useRoute } from "vue-router";
@@ -133,6 +137,10 @@ import {
   type DistinctIssueComment,
 } from "./IssueCommentView";
 import IssueCreatedComment from "./IssueCommentView/IssueCreatedComment.vue";
+
+const props = defineProps<{
+  commentFilter?: (comment: ComposedIssueComment) => boolean;
+}>();
 
 interface LocalState {
   editCommentMode: boolean;
@@ -200,7 +208,9 @@ const issueComments = computed((): DistinctIssueComment[] => {
       distinctIssueComments.push({ comment, similar: [] });
     }
   }
-  return distinctIssueComments;
+  return props.commentFilter
+    ? distinctIssueComments.filter((item) => props.commentFilter!(item.comment))
+    : distinctIssueComments;
 });
 
 const allowCreateComment = computed(() => {

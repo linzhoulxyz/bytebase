@@ -67,10 +67,7 @@
       </div>
 
       <!-- Description list -->
-      <div
-        v-if="user.userType === UserType.USER"
-        class="mt-6 mb-2 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8"
-      >
+      <div class="mt-6 mb-2 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <dl class="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-3">
           <div class="sm:col-span-1">
             <dt class="text-sm font-medium text-control-light">
@@ -106,7 +103,6 @@
               <EmailInput
                 v-if="state.editing"
                 v-model:value="state.editingUser!.email"
-                :domain="workspaceDomain"
               />
               <template v-else>
                 {{ user.email }}
@@ -114,7 +110,7 @@
             </dd>
           </div>
 
-          <div class="sm:col-span-1">
+          <div v-if="user.userType === UserType.USER" class="sm:col-span-1">
             <dt class="text-sm font-medium text-control-light">
               {{ $t("settings.profile.phone") }}
             </dt>
@@ -222,7 +218,7 @@
 
 <script lang="ts" setup>
 import { computedAsync, useTitle } from "@vueuse/core";
-import { cloneDeep, head, isEqual } from "lodash-es";
+import { cloneDeep, isEqual } from "lodash-es";
 import type { DropdownOption } from "naive-ui";
 import { NButton, NDropdown, NInput, NTag } from "naive-ui";
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from "vue";
@@ -256,14 +252,15 @@ import {
   SYSTEM_BOT_USER_NAME,
   unknownUser,
 } from "@/types";
-import { State } from "@/types/proto/v1/common";
-import { PlanFeature } from "@/types/proto/v1/subscription_service";
+import { State } from "@/types/proto-es/v1/common_pb";
+import { PlanFeature } from "@/types/proto-es/v1/subscription_service_pb";
 import {
   UpdateUserRequest,
   UserType,
   type User,
 } from "@/types/proto/v1/user_service";
 import { displayRoleTitle, hasWorkspacePermissionV2, sortRoles } from "@/utils";
+import { convertStateToOld } from "@/utils/v1/common-conversions";
 
 interface LocalState {
   editing: boolean;
@@ -297,10 +294,6 @@ const state = reactive<LocalState>({
 
 const editNameTextField = ref<InstanceType<typeof NInput>>();
 const userPasswordRef = ref<InstanceType<typeof UserPassword>>();
-
-const workspaceDomain = computed(() =>
-  head(settingV1Store.workspaceProfileSetting?.domains)
-);
 
 const passwordRestrictionSetting = computed(
   () => settingV1Store.passwordRestriction
@@ -355,11 +348,12 @@ const isSelf = computed(() => currentUser.value.name === user.value.name);
 const allowEdit = computed(() => {
   if (
     user.value.name === SYSTEM_BOT_USER_NAME ||
-    user.value.email === ALL_USERS_USER_EMAIL
+    user.value.email === ALL_USERS_USER_EMAIL ||
+    user.value.userType !== UserType.USER
   ) {
     return false;
   }
-  if (user.value.state !== State.ACTIVE) {
+  if (user.value.state !== convertStateToOld(State.ACTIVE)) {
     return false;
   }
   return isSelf.value || hasWorkspacePermissionV2("bb.policies.update");

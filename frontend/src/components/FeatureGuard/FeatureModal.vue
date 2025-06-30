@@ -35,7 +35,7 @@
               <span class="font-bold text-accent">
                 {{
                   $t(
-                    `subscription.plan.${requiredPlan.toLowerCase()}.title`
+                    `subscription.plan.${PlanType[requiredPlan].toLowerCase()}.title`
                   )
                 }}
               </span>
@@ -104,11 +104,11 @@ import { ENTERPRISE_INQUIRE_LINK } from "@/types";
 import type {
   Instance,
   InstanceResource,
-} from "@/types/proto/v1/instance_service";
+} from "@/types/proto-es/v1/instance_service_pb";
 import {
   PlanFeature,
   PlanType,
-} from "@/types/proto/v1/subscription_service";
+} from "@/types/proto-es/v1/subscription_service_pb";
 import { autoSubscriptionRoute, hasWorkspacePermissionV2 } from "@/utils";
 import { NButton } from "naive-ui";
 import { computed, reactive } from "vue";
@@ -175,7 +175,7 @@ const requiredPlan = computed(() =>
 );
 
 const featureKey = computed(() => {
-  return props.feature.split(".").join("-");
+  return PlanFeature[props.feature].split(".").join("-");
 });
 
 const trialSubscription = () => {

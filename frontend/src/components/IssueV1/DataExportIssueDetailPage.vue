@@ -12,7 +12,6 @@
         <DataExportSection />
         <TaskRunSection v-if="!isCreating" />
         <SQLCheckSection v-if="isCreating" />
-        <PlanCheckSection v-if="!isCreating" />
         <StatementSection />
         <DescriptionSection />
         <IssueCommentSection v-if="!isCreating" />
@@ -65,7 +64,7 @@
 import { computed, ref } from "vue";
 import { FeatureAttention } from "@/components/FeatureGuard";
 import { useCurrentProjectV1 } from "@/store";
-import { PlanFeature } from "@/types/proto/v1/subscription_service";
+import { PlanFeature } from "@/types/proto-es/v1/subscription_service_pb";
 import type { Plan, Plan_Spec } from "@/types/proto/v1/plan_service";
 import type { Task } from "@/types/proto/v1/rollout_service";
 import { SQLCheckSection } from "../Plan/components";
@@ -75,7 +74,6 @@ import { Drawer } from "../v2";
 import {
   BannerSection,
   HeaderSection,
-  PlanCheckSection,
   StatementSection,
   DescriptionSection,
   IssueCommentSection,

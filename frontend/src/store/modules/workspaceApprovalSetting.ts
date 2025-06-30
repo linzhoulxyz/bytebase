@@ -1,19 +1,27 @@
 import { cloneDeep } from "lodash-es";
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { settingServiceClient } from "@/grpcweb";
+import { create } from "@bufbuild/protobuf";
+import { settingServiceClientConnect } from "@/grpcweb";
+import type { Setting } from "@/types/proto-es/v1/setting_service_pb";
+import { 
+  GetSettingRequestSchema, 
+  UpdateSettingRequestSchema,
+  SettingSchema,
+  Setting_SettingName,
+  ValueSchema as SettingValueSchema,
+} from "@/types/proto-es/v1/setting_service_pb";
 import { type LocalApprovalConfig, type LocalApprovalRule } from "@/types";
 import type { Risk_Source } from "@/types/proto/v1/risk_service";
-import type { Setting } from "@/types/proto/v1/setting_service";
-import { Setting_SettingName } from "@/types/proto/v1/setting_service";
 import {
   resolveLocalApprovalConfig,
   buildWorkspaceApprovalSetting,
   seedWorkspaceApprovalSetting,
 } from "@/utils";
+
 import { useGracefulRequest } from "./utils";
 
-const SETTING_NAME = `settings/${Setting_SettingName.WORKSPACE_APPROVAL}`;
+const SETTING_NAME = `settings/${Setting_SettingName[Setting_SettingName.WORKSPACE_APPROVAL]}`;
 
 export const useWorkspaceApprovalSettingStore = defineStore(
   "workspaceApprovalSetting",
@@ -25,8 +33,8 @@ export const useWorkspaceApprovalSettingStore = defineStore(
     });
 
     const setConfigSetting = async (setting: Setting) => {
-      const _config = setting.value?.workspaceApprovalSettingValue;
-      if (_config) {
+      if (setting.value?.value?.case === "workspaceApprovalSettingValue") {
+        const _config = setting.value.value.value;
         if (_config.rules.length === 0) {
           _config.rules.push(...seedWorkspaceApprovalSetting());
         }
@@ -36,26 +44,34 @@ export const useWorkspaceApprovalSettingStore = defineStore(
 
     const fetchConfig = async () => {
       try {
-        const setting = await settingServiceClient.getSetting({
+        const request = create(GetSettingRequestSchema, {
           name: SETTING_NAME,
         });
-        await setConfigSetting(setting);
+        const response = await settingServiceClientConnect.getSetting(request);
+        await setConfigSetting(response);
       } catch (ex) {
         console.error(ex);
       }
     };
 
     const updateConfig = async () => {
-      const setting = await buildWorkspaceApprovalSetting(config.value);
-      await settingServiceClient.updateSetting({
-        allowMissing: true,
-        setting: {
-          name: SETTING_NAME,
+      const approvalSetting = await buildWorkspaceApprovalSetting(config.value);
+      
+      const setting = create(SettingSchema, {
+        name: SETTING_NAME,
+        value: create(SettingValueSchema, {
           value: {
-            workspaceApprovalSettingValue: setting,
+            case: "workspaceApprovalSettingValue",
+            value: approvalSetting,
           },
-        },
+        }),
       });
+      
+      const request = create(UpdateSettingRequestSchema, {
+        allowMissing: true,
+        setting,
+      });
+      await settingServiceClientConnect.updateSetting(request);
     };
 
     const useBackupAndUpdateConfig = async (update: () => Promise<any>) => {

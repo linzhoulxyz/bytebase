@@ -1,8 +1,9 @@
+import { create } from "@bufbuild/protobuf";
 import { orderBy } from "lodash-es";
 import {
-  issueServiceClient,
-  planServiceClient,
-  rolloutServiceClient,
+  issueServiceClientConnect,
+  planServiceClientConnect,
+  rolloutServiceClientConnect,
 } from "@/grpcweb";
 import { useProjectV1Store } from "@/store";
 import type { ComposedIssue, ComposedProject, ComposedTaskRun } from "@/types";
@@ -13,10 +14,37 @@ import {
   unknownIssue,
   UNKNOWN_ID,
 } from "@/types";
+import {
+  CreateIssueRequestSchema,
+  GetIssueRequestSchema,
+} from "@/types/proto-es/v1/issue_service_pb";
+import {
+  GetPlanRequestSchema,
+  ListPlanCheckRunsRequestSchema,
+  CreatePlanRequestSchema,
+} from "@/types/proto-es/v1/plan_service_pb";
+import {
+  GetRolloutRequestSchema,
+  ListTaskRunsRequestSchema,
+  CreateRolloutRequestSchema,
+} from "@/types/proto-es/v1/rollout_service_pb";
 import type { Issue } from "@/types/proto/v1/issue_service";
 import type { Plan } from "@/types/proto/v1/plan_service";
-import { TaskRunLog, type Rollout } from "@/types/proto/v1/rollout_service";
+import { TaskRunLog } from "@/types/proto/v1/rollout_service";
 import { extractProjectResourceName, hasProjectPermissionV2 } from "@/utils";
+import {
+  convertNewIssueToOld,
+  convertOldIssueToNew,
+} from "@/utils/v1/issue-conversions";
+import {
+  convertNewPlanToOld,
+  convertNewPlanCheckRunToOld,
+  convertOldPlanToNew,
+} from "@/utils/v1/plan-conversions";
+import {
+  convertNewRolloutToOld,
+  convertNewTaskRunToOld,
+} from "@/utils/v1/rollout-conversions";
 import { DEFAULT_PAGE_SIZE } from "../common";
 
 export interface ComposeIssueConfig {
@@ -43,33 +71,43 @@ export const composeIssue = async (
 
   if (config.withPlan && issue.plan) {
     if (hasProjectPermissionV2(projectEntity, "bb.plans.get")) {
-      const plan = await planServiceClient.getPlan({
+      const request = create(GetPlanRequestSchema, {
         name: issue.plan,
       });
-      issue.planEntity = plan;
+      const response = await planServiceClientConnect.getPlan(request);
+      issue.planEntity = convertNewPlanToOld(response);
     }
 
     if (hasProjectPermissionV2(projectEntity, "bb.planCheckRuns.list")) {
       // Only show the latest plan check runs.
-      const { planCheckRuns } = await planServiceClient.listPlanCheckRuns({
+      const request = create(ListPlanCheckRunsRequestSchema, {
         parent: issue.plan,
         latestOnly: true,
       });
+      const response =
+        await planServiceClientConnect.listPlanCheckRuns(request);
+      const planCheckRuns = response.planCheckRuns.map(
+        convertNewPlanCheckRunToOld
+      );
       issue.planCheckRunList = orderBy(planCheckRuns, "name", "desc");
     }
   }
   if (config.withRollout && issue.rollout) {
     if (hasProjectPermissionV2(projectEntity, "bb.rollouts.get")) {
-      issue.rolloutEntity = await rolloutServiceClient.getRollout({
+      const request = create(GetRolloutRequestSchema, {
         name: issue.rollout,
       });
+      const response = await rolloutServiceClientConnect.getRollout(request);
+      issue.rolloutEntity = convertNewRolloutToOld(response);
     }
 
     if (hasProjectPermissionV2(projectEntity, "bb.taskRuns.list")) {
-      const { taskRuns } = await rolloutServiceClient.listTaskRuns({
+      const request = create(ListTaskRunsRequestSchema, {
         parent: `${issue.rollout}/stages/-/tasks/-`,
         pageSize: DEFAULT_PAGE_SIZE,
       });
+      const response = await rolloutServiceClientConnect.listTaskRuns(request);
+      const taskRuns = response.taskRuns.map(convertNewTaskRunToOld);
       const composedTaskRuns: ComposedTaskRun[] = [];
       for (const taskRun of taskRuns) {
         const composed: ComposedTaskRun = {
@@ -107,44 +145,46 @@ export const experimentalFetchIssueByUID = async (
   if (uid === String(EMPTY_ID)) return emptyIssue();
   if (uid === String(UNKNOWN_ID)) return unknownIssue();
 
-  const rawIssue = await issueServiceClient.getIssue({
+  const request = create(GetIssueRequestSchema, {
     name: `${project}/issues/${uid}`,
   });
+  const newIssue = await issueServiceClientConnect.getIssue(request);
+  const rawIssue = convertNewIssueToOld(newIssue);
 
   return composeIssue(rawIssue);
 };
 
-export type CreateIssueHooks = {
-  planCreated: (plan: Plan) => Promise<any>;
-  issueCreated: (issue: Issue, plan: Plan) => Promise<any>;
-  rolloutCreated: (issue: Issue, plan: Plan, rollout: Rollout) => Promise<any>;
-};
 export const experimentalCreateIssueByPlan = async (
   project: ComposedProject,
   issueCreate: Issue,
-  planCreate: Plan,
-  hooks?: Partial<CreateIssueHooks>
+  planCreate: Plan
 ) => {
-  const createdPlan = await planServiceClient.createPlan({
+  const newPlan = convertOldPlanToNew(planCreate);
+  const request = create(CreatePlanRequestSchema, {
     parent: project.name,
-    plan: planCreate,
+    plan: newPlan,
   });
+  const response = await planServiceClientConnect.createPlan(request);
+  const createdPlan = convertNewPlanToOld(response);
   issueCreate.plan = createdPlan.name;
-  await hooks?.planCreated?.(planCreate);
 
-  const createdIssue = await issueServiceClient.createIssue({
+  const issueRequest = create(CreateIssueRequestSchema, {
     parent: project.name,
-    issue: issueCreate,
+    issue: convertOldIssueToNew(issueCreate),
   });
-  await hooks?.issueCreated?.(createdIssue, createdPlan);
-  const createdRollout = await rolloutServiceClient.createRollout({
+  const newCreatedIssue =
+    await issueServiceClientConnect.createIssue(issueRequest);
+  const createdIssue = convertNewIssueToOld(newCreatedIssue);
+  const rolloutRequest = create(CreateRolloutRequestSchema, {
     parent: project.name,
     rollout: {
       plan: createdPlan.name,
     },
   });
+  const rolloutResponse =
+    await rolloutServiceClientConnect.createRollout(rolloutRequest);
+  const createdRollout = convertNewRolloutToOld(rolloutResponse);
   createdIssue.rollout = createdRollout.name;
-  await hooks?.rolloutCreated?.(createdIssue, createdPlan, createdRollout);
 
   return { createdPlan, createdIssue, createdRollout };
 };

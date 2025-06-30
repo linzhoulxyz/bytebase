@@ -1,12 +1,21 @@
 import { isEqual } from "lodash-es";
-import { sqlServiceClient } from "@/grpcweb";
+
+import { createContextValues } from "@connectrpc/connect";
+import { sqlServiceClientConnect } from "@/grpcweb";
+import { silentContextKey } from "@/grpcweb/context-key";
+
+import {
+  convertNewDiffMetadataResponseToOld,
+} from "@/utils/v1/sql-conversions";
 import { t } from "@/plugins/i18n";
 import { useSettingV1Store } from "@/store";
 import type { ComposedDatabase } from "@/types";
-import type { DatabaseCatalog } from "@/types/proto/v1/database_catalog_service";
-import type { DatabaseMetadata } from "@/types/proto/v1/database_service";
+import type { DatabaseCatalog } from "@/types/proto-es/v1/database_catalog_service_pb";
+import type { DatabaseMetadata } from "@/types/proto-es/v1/database_service_pb";
 import { extractGrpcErrorMessage } from "@/utils/grpcweb";
 import { validateDatabaseMetadata } from "./utils";
+import { create } from "@bufbuild/protobuf";
+import { DiffMetadataRequestSchema } from "@/types/proto-es/v1/sql_service_pb";
 
 export type GenerateDiffDDLResult = {
   statement: string;
@@ -54,20 +63,19 @@ export const generateDiffDDL = async ({
       database.projectEntity.dataClassificationConfigId
     );
 
-    const diffResponse = await sqlServiceClient.diffMetadata(
-      {
-        sourceMetadata,
-        targetMetadata,
-        sourceCatalog,
-        targetCatalog,
-        engine: database.instanceResource.engine,
-        classificationFromConfig:
-          classificationConfig?.classificationFromConfig ?? false,
-      },
-      {
-        silent: true,
-      }
-    );
+    const newRequest = create(DiffMetadataRequestSchema,{
+      sourceMetadata: sourceMetadata,
+      targetMetadata: targetMetadata,
+      sourceCatalog,
+      targetCatalog,
+      engine: database.instanceResource.engine,
+      classificationFromConfig:
+        classificationConfig?.classificationFromConfig ?? false,
+    });
+    const newResponse = await sqlServiceClientConnect.diffMetadata(newRequest, {
+      contextValues: createContextValues().set(silentContextKey, true),
+    });
+    const diffResponse = convertNewDiffMetadataResponseToOld(newResponse);
     const { diff } = diffResponse;
     if (diff.length === 0) {
       if (

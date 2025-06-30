@@ -1,7 +1,7 @@
 <template>
   <template v-if="initialized">
-    <ArchiveBanner v-if="project.state === State.DELETED" class="py-2" />
-    <template v-if="!hideDefaultProject && isDefaultProject">
+    <ArchiveBanner v-if="convertStateToNew(project.state) === State.DELETED" class="py-2" />
+    <template v-if="isDefaultProject">
       <h1 class="mb-4 text-xl font-bold leading-6 text-main truncate">
         {{ $t("database.unassigned-databases") }}
       </h1>
@@ -82,7 +82,6 @@ import { WORKSPACE_ROUTE_LANDING } from "@/router/dashboard/workspaceRoutes";
 import { useRecentVisit } from "@/router/useRecentVisit";
 import {
   pushNotification,
-  useAppFeature,
   usePermissionStore,
   useProjectByName,
   useProjectV1Store,
@@ -94,8 +93,9 @@ import {
   PresetRoleType,
   UNKNOWN_PROJECT_NAME,
 } from "@/types";
-import { State } from "@/types/proto/v1/common";
-import { PlanFeature } from "@/types/proto/v1/subscription_service";
+import { PlanFeature } from "@/types/proto-es/v1/subscription_service_pb";
+import { State } from "@/types/proto-es/v1/common_pb";
+import { convertStateToNew } from "@/utils/v1/common-conversions";
 import { hasProjectPermissionV2 } from "@/utils";
 import { useBodyLayoutContext } from "./common";
 
@@ -119,8 +119,6 @@ const projectStore = useProjectV1Store();
 const { remove: removeVisit } = useRecentVisit();
 const permissionStore = usePermissionStore();
 
-const hideQuickAction = useAppFeature("bb.feature.console.hide-quick-action");
-const hideDefaultProject = useAppFeature("bb.feature.project.hide-default");
 const projectName = computed(() => `${projectNamePrefix}${props.projectId}`);
 
 watchEffect(async () => {
@@ -180,7 +178,7 @@ const hasPermission = computed(() => {
 });
 
 const allowEdit = computed(() => {
-  if (project.value.state === State.DELETED) {
+  if (convertStateToNew(project.value.state) === State.DELETED) {
     return false;
   }
 
@@ -197,7 +195,7 @@ const hasRequestRoleFeature = featureToRef(
 );
 
 const quickActionListForDatabase = computed(() => {
-  if (project.value.state !== State.ACTIVE) {
+  if (convertStateToNew(project.value.state) !== State.ACTIVE) {
     return [];
   }
 
@@ -233,7 +231,7 @@ const quickActionList = computed(() => {
 });
 
 const hideQuickActionPanel = computed(() => {
-  return hideQuickAction.value || quickActionList.value.length === 0;
+  return quickActionList.value.length === 0;
 });
 
 const { overrideMainContainerClass } = useBodyLayoutContext();

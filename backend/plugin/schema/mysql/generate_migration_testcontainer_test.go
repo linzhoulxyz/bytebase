@@ -8,17 +8,15 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	// Import MySQL driver
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
 	"google.golang.org/protobuf/testing/protocmp"
 
+	"github.com/bytebase/bytebase/backend/common/testcontainer"
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	mysqldb "github.com/bytebase/bytebase/backend/plugin/db/mysql"
 	"github.com/bytebase/bytebase/backend/plugin/schema"
@@ -35,35 +33,14 @@ func TestGenerateMigrationWithTestcontainer(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Start MySQL container
-	req := testcontainers.ContainerRequest{
-		Image: "mysql:8.0",
-		Env: map[string]string{
-			"MYSQL_ROOT_PASSWORD": "test123",
-			"MYSQL_DATABASE":      "testdb",
-		},
-		ExposedPorts: []string{"3306/tcp"},
-		WaitingFor: wait.ForLog("ready for connections").
-			WithOccurrence(2).
-			WithStartupTimeout(5 * time.Minute),
-	}
-
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
+	// Start MySQL container using common testcontainer interface
+	container, err := testcontainer.GetMySQLContainer(ctx)
 	require.NoError(t, err)
-	defer func() {
-		if err := container.Terminate(ctx); err != nil {
-			t.Logf("failed to terminate container: %s", err)
-		}
-	}()
+	defer container.Close(ctx)
 
 	// Get connection details
-	host, err := container.Host(ctx)
-	require.NoError(t, err)
-	port, err := container.MappedPort(ctx, "3306")
-	require.NoError(t, err)
+	host := container.GetHost()
+	port := container.GetPort()
 
 	// Test cases with various schema changes
 	testCases := []struct {
@@ -72,6 +49,86 @@ func TestGenerateMigrationWithTestcontainer(t *testing.T) {
 		migrationDDL  string
 		description   string
 	}{
+		{
+			name:          "drop_table_with_dependencies",
+			initialSchema: ``,
+			migrationDDL: `
+--
+-- Table structure for authors
+--
+CREATE TABLE authors (
+  id int NOT NULL AUTO_INCREMENT,
+  name varchar(100) NOT NULL,
+  email varchar(100) DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Table structure for books
+--
+CREATE TABLE books (
+  id int NOT NULL AUTO_INCREMENT,
+  title varchar(200) NOT NULL,
+  author_id int NOT NULL,
+  isbn varchar(20) DEFAULT NULL,
+  published_year int DEFAULT NULL,
+  price decimal(8,2) DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY idx_author (author_id),
+  KEY idx_year (published_year),
+  UNIQUE KEY uk_isbn (isbn),
+  CONSTRAINT fk_author FOREIGN KEY (author_id) REFERENCES authors (id),
+  CONSTRAINT chk_price_positive CHECK (price > 0),
+  CONSTRAINT chk_year_valid CHECK ((published_year >= 1000) and (published_year <= 2100))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+--
+-- Table structure for products
+--
+CREATE TABLE products (
+  id int NOT NULL AUTO_INCREMENT,
+  name varchar(50) NOT NULL,
+  price decimal(8,2) NOT NULL,
+  description text DEFAULT NULL,
+  category varchar(30) DEFAULT NULL,
+  is_active tinyint(1) DEFAULT '1',
+  PRIMARY KEY (id),
+  KEY idx_category (category),
+  KEY idx_price (price)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+			`,
+		},
+		{
+			name: "create_tables_with_fk",
+			initialSchema: `
+CREATE TABLE users (
+    id INT NOT NULL AUTO_INCREMENT,
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_email (email),
+    INDEX idx_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE posts (
+    id INT NOT NULL AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    content TEXT,
+    published_at DATETIME,
+    PRIMARY KEY (id),
+    INDEX idx_user_id (user_id),
+    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+`,
+			migrationDDL: `
+DROP TABLE IF EXISTS posts;
+DROP TABLE IF EXISTS users;`,
+			description: "Create tables with foreign key constraints",
+		},
 		{
 			name: "basic_table_operations",
 			initialSchema: `
@@ -800,39 +857,771 @@ END;
 `,
 			description: "Events and advanced stored routines",
 		},
+		{
+			name: "table_and_column_comments",
+			initialSchema: `
+CREATE TABLE products (
+    id INT NOT NULL AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    description TEXT,
+    category_id INT,
+    PRIMARY KEY (id),
+    INDEX idx_category (category_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE categories (
+    id INT NOT NULL AUTO_INCREMENT,
+    name VARCHAR(50) NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB;
+`,
+			migrationDDL: `
+-- Add table comments
+ALTER TABLE products COMMENT = 'Product catalog table containing all product information';
+ALTER TABLE categories COMMENT = 'Product categories for organization';
+
+-- Add column comments to existing table
+ALTER TABLE products MODIFY COLUMN name VARCHAR(100) NOT NULL COMMENT 'Product display name';
+ALTER TABLE products MODIFY COLUMN price DECIMAL(10, 2) NOT NULL COMMENT 'Product price in USD';
+ALTER TABLE products MODIFY COLUMN description TEXT COMMENT 'Detailed product description';
+ALTER TABLE products MODIFY COLUMN category_id INT COMMENT 'Foreign key reference to categories table';
+
+-- Add column comments to categories table
+ALTER TABLE categories MODIFY COLUMN name VARCHAR(50) NOT NULL COMMENT 'Category display name';
+
+-- Create new table with comments from the start
+CREATE TABLE suppliers (
+    id INT NOT NULL AUTO_INCREMENT COMMENT 'Unique supplier identifier',
+    company_name VARCHAR(100) NOT NULL COMMENT 'Legal company name',
+    contact_email VARCHAR(100) COMMENT 'Primary contact email address',
+    phone VARCHAR(20) COMMENT 'Business phone number',
+    address TEXT COMMENT 'Full business address',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'Record creation timestamp',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_email (contact_email)
+) ENGINE=InnoDB COMMENT = 'Supplier information and contact details';
+
+-- Add new column with comment
+ALTER TABLE products ADD COLUMN supplier_id INT COMMENT 'Reference to supplier providing this product';
+`,
+			description: "Add comments to tables and columns using MySQL COMMENT syntax",
+		},
+		{
+			name: "modify_and_drop_comments",
+			initialSchema: `
+CREATE TABLE orders (
+    id INT NOT NULL AUTO_INCREMENT COMMENT 'Order unique identifier',
+    customer_name VARCHAR(100) NOT NULL COMMENT 'Customer full name',
+    order_date DATE NOT NULL COMMENT 'Date when order was placed',
+    total_amount DECIMAL(10, 2) COMMENT 'Total order amount in USD',
+    status VARCHAR(20) DEFAULT 'pending' COMMENT 'Current order status',
+    notes TEXT COMMENT 'Additional order notes or special instructions',
+    PRIMARY KEY (id),
+    INDEX idx_date (order_date),
+    INDEX idx_status (status)
+) ENGINE=InnoDB COMMENT = 'Customer orders and order details';
+
+CREATE TABLE order_items (
+    id INT NOT NULL AUTO_INCREMENT COMMENT 'Line item identifier',
+    order_id INT NOT NULL COMMENT 'Reference to parent order',
+    product_name VARCHAR(100) NOT NULL COMMENT 'Name of ordered product',
+    quantity INT NOT NULL COMMENT 'Number of items ordered',
+    unit_price DECIMAL(10, 2) NOT NULL COMMENT 'Price per individual item',
+    PRIMARY KEY (id),
+    INDEX idx_order (order_id)
+) ENGINE=InnoDB COMMENT = 'Individual line items for each order';
+`,
+			migrationDDL: `
+-- Modify existing table comment
+ALTER TABLE orders COMMENT = 'Customer purchase orders with tracking information';
+
+-- Modify existing column comments
+ALTER TABLE orders MODIFY COLUMN customer_name VARCHAR(100) NOT NULL COMMENT 'Full name of the purchasing customer';
+ALTER TABLE orders MODIFY COLUMN status VARCHAR(20) DEFAULT 'pending' COMMENT 'Order processing status (pending, processing, shipped, delivered, cancelled)';
+ALTER TABLE orders MODIFY COLUMN notes TEXT COMMENT 'Special delivery instructions and customer notes';
+
+-- Remove comments by setting them to empty string
+ALTER TABLE orders MODIFY COLUMN total_amount DECIMAL(10, 2) COMMENT '';
+ALTER TABLE orders MODIFY COLUMN order_date DATE NOT NULL COMMENT '';
+
+-- Modify column type and comment simultaneously  
+ALTER TABLE order_items MODIFY COLUMN product_name VARCHAR(150) NOT NULL COMMENT 'Full product name including variant details';
+ALTER TABLE order_items MODIFY COLUMN quantity INT NOT NULL COMMENT 'Quantity ordered (must be positive)';
+
+-- Remove table comment
+ALTER TABLE order_items COMMENT = '';
+
+-- Remove column comment
+ALTER TABLE order_items MODIFY COLUMN unit_price DECIMAL(10, 2) NOT NULL COMMENT '';
+`,
+			description: "Modify existing comments and remove comments by setting to empty string",
+		},
+		{
+			name: "comments_with_special_characters",
+			initialSchema: `
+CREATE TABLE users (
+    id INT NOT NULL AUTO_INCREMENT,
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    bio TEXT,
+    preferences JSON,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_email (email)
+) ENGINE=InnoDB;
+
+CREATE TABLE posts (
+    id INT NOT NULL AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    content LONGTEXT,
+    metadata JSON,
+    PRIMARY KEY (id),
+    INDEX idx_user (user_id)
+) ENGINE=InnoDB;
+`,
+			migrationDDL: `
+-- Comments with single quotes - need proper escaping
+ALTER TABLE users COMMENT = 'User accounts - stores user''s personal information and preferences';
+
+-- Comments with double quotes and mixed quotes
+ALTER TABLE users MODIFY COLUMN username VARCHAR(50) NOT NULL COMMENT 'User''s chosen "display name" for the platform';
+ALTER TABLE users MODIFY COLUMN email VARCHAR(100) NOT NULL COMMENT 'Primary email address - must be "unique" across all users';
+
+-- Multi-line comment using literal newlines
+ALTER TABLE users MODIFY COLUMN bio TEXT COMMENT 'User biography text
+Can contain multiple lines
+and various formatting';
+
+-- Comment with special characters and symbols
+ALTER TABLE users MODIFY COLUMN preferences JSON COMMENT 'User settings: theme, notifications, privacy & security options (@, #, $, %, ^, &, *, +, =, |, \\, /, ?, <, >)';
+
+-- Comments with Unicode characters
+ALTER TABLE posts COMMENT = 'Blog posts and articles - supports international content (中文, العربية, Русский, 日本語, 한국어, Français, Español, Deutsch)';
+ALTER TABLE posts MODIFY COLUMN title VARCHAR(200) NOT NULL COMMENT 'Post title - supports emojis 📝✨🔥💡🎉 and Unicode characters';
+
+-- Comment with HTML/XML-like content
+ALTER TABLE posts MODIFY COLUMN content LONGTEXT COMMENT 'Post content in HTML format: <p>, <strong>, <em>, <a href="...">, <img src="..."/>';
+
+-- Comment with JSON-like structure
+ALTER TABLE posts MODIFY COLUMN metadata JSON COMMENT 'Post metadata: {"tags": ["tag1", "tag2"], "category": "tech", "featured": true, "views": 0}';
+
+-- Create table with complex comments
+CREATE TABLE analytics (
+    id INT NOT NULL AUTO_INCREMENT COMMENT 'Primary key (auto-increment)',
+    event_name VARCHAR(100) NOT NULL COMMENT 'Event identifier - format: "page_view", "button_click", etc.',
+    event_data JSON COMMENT 'Event payload: {"user_id": 123, "timestamp": "2023-12-01T10:30:00Z", "properties": {...}}',
+    ip_address VARCHAR(45) COMMENT 'Client IP address (IPv4: xxx.xxx.xxx.xxx or IPv6: xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx)',
+    user_agent TEXT COMMENT 'Browser user agent string - may contain "Mozilla/5.0", various browser/OS info',
+    referrer VARCHAR(500) COMMENT 'HTTP referrer URL - where user came from (can be NULL)',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'Event timestamp - UTC timezone',
+    processed BOOLEAN DEFAULT FALSE COMMENT 'Processing status: TRUE = processed, FALSE = pending',
+    PRIMARY KEY (id),
+    INDEX idx_event_date (event_name, created_at),
+    INDEX idx_processed (processed)
+) ENGINE=InnoDB COMMENT = 'Analytics events tracking - stores user interactions & system events. Data retention: 2 years. Access level: "admin" & "analyst" roles only.';
+`,
+			description: "Test comments with special characters, quotes, multiline text, and Unicode",
+		},
+		// Reverse test cases
+		{
+			name: "reverse_drop_table_with_dependencies",
+			initialSchema: `
+CREATE TABLE authors (
+  id int NOT NULL AUTO_INCREMENT,
+  name varchar(100) NOT NULL,
+  email varchar(100) DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE books (
+  id int NOT NULL AUTO_INCREMENT,
+  title varchar(200) NOT NULL,
+  author_id int NOT NULL,
+  isbn varchar(20) DEFAULT NULL,
+  published_year int DEFAULT NULL,
+  price decimal(8,2) DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY idx_author (author_id),
+  KEY idx_year (published_year),
+  UNIQUE KEY uk_isbn (isbn),
+  CONSTRAINT fk_author FOREIGN KEY (author_id) REFERENCES authors (id),
+  CONSTRAINT chk_price_positive CHECK (price > 0),
+  CONSTRAINT chk_year_valid CHECK ((published_year >= 1000) and (published_year <= 2100))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE products (
+  id int NOT NULL AUTO_INCREMENT,
+  name varchar(50) NOT NULL,
+  price decimal(8,2) NOT NULL,
+  description text DEFAULT NULL,
+  category varchar(30) DEFAULT NULL,
+  is_active tinyint(1) DEFAULT '1',
+  PRIMARY KEY (id),
+  KEY idx_category (category),
+  KEY idx_price (price)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+			`,
+			migrationDDL: `
+DROP TABLE books;
+DROP TABLE authors;
+DROP TABLE products;
+			`,
+			description: "Reverse: Drop tables with foreign key dependencies",
+		},
+		{
+			name:          "reverse_create_tables_with_fk",
+			initialSchema: ``,
+			migrationDDL: `
+CREATE TABLE users (
+    id INT NOT NULL AUTO_INCREMENT,
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_email (email),
+    INDEX idx_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE posts (
+    id INT NOT NULL AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    content TEXT,
+    published_at DATETIME,
+    PRIMARY KEY (id),
+    INDEX idx_user_id (user_id),
+    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+			`,
+			description: "Reverse: Create tables with foreign key constraints",
+		},
+		{
+			name: "reverse_basic_table_operations",
+			initialSchema: `
+CREATE TABLE users (
+    id INT NOT NULL AUTO_INCREMENT,
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT true,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_email (email),
+    INDEX idx_username (username),
+    INDEX idx_email_active (email, is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE posts (
+    id INT NOT NULL AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    content TEXT,
+    published_at DATETIME,
+    PRIMARY KEY (id),
+    INDEX idx_user_id (user_id),
+    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT chk_title_length CHECK (CHAR_LENGTH(title) > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE comments (
+    id INT NOT NULL AUTO_INCREMENT,
+    post_id INT NOT NULL,
+    user_id INT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    INDEX idx_post_user (post_id, user_id),
+    CONSTRAINT fk_comment_post FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+    CONSTRAINT fk_comment_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+			`,
+			migrationDDL: `
+-- Drop table
+DROP TABLE comments;
+
+-- Remove constraints
+ALTER TABLE posts DROP CHECK chk_title_length;
+
+-- Drop index
+DROP INDEX idx_email_active ON users;
+
+-- Drop column
+ALTER TABLE users DROP COLUMN is_active;
+			`,
+			description: "Reverse: Basic table operations",
+		},
+		{
+			name: "reverse_views_and_triggers",
+			initialSchema: `
+CREATE TABLE products (
+    id INT NOT NULL AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    stock INT DEFAULT 0,
+    PRIMARY KEY (id),
+    INDEX idx_name (name)
+) ENGINE=InnoDB;
+
+CREATE TABLE orders (
+    id INT NOT NULL AUTO_INCREMENT,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL,
+    total DECIMAL(10, 2),
+    order_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_product FOREIGN KEY (product_id) REFERENCES products(id)
+) ENGINE=InnoDB;
+
+CREATE VIEW product_inventory AS
+SELECT 
+    p.id,
+    p.name,
+    p.price,
+    p.stock,
+    COALESCE(SUM(o.quantity), 0) AS total_ordered
+FROM products p
+LEFT JOIN orders o ON p.id = o.product_id
+GROUP BY p.id, p.name, p.price, p.stock;
+
+CREATE VIEW low_stock_products AS
+SELECT * FROM products WHERE stock < 10;
+
+CREATE TRIGGER update_order_total
+BEFORE INSERT ON orders
+FOR EACH ROW
+BEGIN
+    DECLARE product_price DECIMAL(10, 2);
+    SELECT price INTO product_price FROM products WHERE id = NEW.product_id;
+    SET NEW.total = NEW.quantity * product_price;
+END;
+
+CREATE PROCEDURE GetProductInventory(IN product_name VARCHAR(100))
+BEGIN
+    SELECT * FROM product_inventory
+    WHERE name LIKE CONCAT('%', product_name, '%');
+END;
+			`,
+			migrationDDL: `
+-- Drop procedure
+DROP PROCEDURE GetProductInventory;
+
+-- Drop trigger
+DROP TRIGGER update_order_total;
+
+-- Drop views
+DROP VIEW low_stock_products;
+DROP VIEW product_inventory;
+			`,
+			description: "Reverse: Views and triggers",
+		},
+		{
+			name: "reverse_stored_functions",
+			initialSchema: `
+CREATE TABLE sales (
+    id INT NOT NULL AUTO_INCREMENT,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL,
+    unit_price DECIMAL(10, 2) NOT NULL,
+    sale_date DATE NOT NULL,
+    PRIMARY KEY (id),
+    INDEX idx_product_date (product_id, sale_date)
+) ENGINE=InnoDB;
+
+CREATE TABLE sales_summary (
+    id INT NOT NULL AUTO_INCREMENT,
+    product_id INT NOT NULL,
+    month_year VARCHAR(7) NOT NULL,
+    total_sales DECIMAL(10, 2),
+    tax_amount DECIMAL(10, 2),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_product_month (product_id, month_year)
+) ENGINE=InnoDB;
+
+CREATE FUNCTION CalculateTotalSales(p_product_id INT, p_start_date DATE, p_end_date DATE)
+RETURNS DECIMAL(10, 2)
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE total DECIMAL(10, 2);
+    
+    SELECT COALESCE(SUM(quantity * unit_price), 0) INTO total
+    FROM sales
+    WHERE product_id = p_product_id
+    AND sale_date BETWEEN p_start_date AND p_end_date;
+    
+    RETURN total;
+END;
+
+CREATE FUNCTION GetTaxAmount(amount DECIMAL(10, 2), tax_rate DECIMAL(5, 2))
+RETURNS DECIMAL(10, 2)
+DETERMINISTIC
+NO SQL
+BEGIN
+    RETURN amount * (tax_rate / 100);
+END;
+			`,
+			migrationDDL: `
+-- Drop functions
+DROP FUNCTION CalculateTotalSales;
+DROP FUNCTION GetTaxAmount;
+
+-- Drop table
+DROP TABLE sales_summary;
+			`,
+			description: "Reverse: Stored functions",
+		},
+		{
+			name: "reverse_drop_indexes_and_constraints",
+			initialSchema: `
+CREATE TABLE products (
+    id INT NOT NULL AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    category VARCHAR(50),
+    price DECIMAL(10, 2),
+    sku VARCHAR(50) NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB;
+			`,
+			migrationDDL: `
+-- Add indexes and constraints
+CREATE INDEX idx_name ON products(name);
+CREATE INDEX idx_category ON products(category);
+CREATE INDEX idx_price ON products(price);
+ALTER TABLE products ADD UNIQUE KEY uk_sku (sku);
+ALTER TABLE products ADD CONSTRAINT chk_price_positive CHECK (price > 0);
+ALTER TABLE products ADD CONSTRAINT chk_name_length CHECK (CHAR_LENGTH(name) >= 3);
+			`,
+			description: "Reverse: Add indexes and constraints",
+		},
+		{
+			name: "reverse_alter_table_columns",
+			initialSchema: `
+CREATE TABLE products (
+    id INT NOT NULL AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    description TEXT NOT NULL,
+    category VARCHAR(50),
+    is_active TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    stock_quantity INT DEFAULT 0,
+    weight DECIMAL(5, 2),
+    PRIMARY KEY (id),
+    INDEX idx_category (category),
+    INDEX idx_price (price),
+    INDEX idx_created_at (created_at),
+    UNIQUE INDEX uk_name_category (name, category),
+    CONSTRAINT chk_price_positive CHECK (price > 0),
+    CONSTRAINT chk_stock_non_negative CHECK (stock_quantity >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+			`,
+			migrationDDL: `
+-- Drop constraints
+ALTER TABLE products DROP CHECK chk_price_positive;
+ALTER TABLE products DROP CHECK chk_stock_non_negative;
+
+-- Drop indexes
+DROP INDEX idx_created_at ON products;
+DROP INDEX uk_name_category ON products;
+
+-- Drop columns
+ALTER TABLE products DROP COLUMN created_at;
+ALTER TABLE products DROP COLUMN updated_at;
+ALTER TABLE products DROP COLUMN stock_quantity;
+ALTER TABLE products DROP COLUMN weight;
+
+-- Modify columns
+ALTER TABLE products MODIFY COLUMN name VARCHAR(50) NOT NULL;
+ALTER TABLE products MODIFY COLUMN price DECIMAL(8, 2) NOT NULL;
+ALTER TABLE products MODIFY COLUMN description TEXT;
+ALTER TABLE products MODIFY COLUMN category VARCHAR(30);
+			`,
+			description: "Reverse: Alter table columns",
+		},
+		{
+			name: "reverse_fulltext_and_spatial_indexes",
+			initialSchema: `
+CREATE TABLE articles (
+    id INT NOT NULL AUTO_INCREMENT,
+    title VARCHAR(200) NOT NULL,
+    content TEXT NOT NULL,
+    tags VARCHAR(500),
+    PRIMARY KEY (id),
+    FULLTEXT idx_fulltext_content (title, content),
+    FULLTEXT idx_fulltext_tags (tags),
+    INDEX idx_title_tags (title(50), tags(50))
+) ENGINE=InnoDB;
+
+CREATE TABLE locations (
+    id INT NOT NULL AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    position POINT NOT NULL,
+    PRIMARY KEY (id),
+    SPATIAL INDEX idx_spatial_position (position)
+) ENGINE=InnoDB;
+			`,
+			migrationDDL: `
+-- Drop indexes
+DROP INDEX idx_fulltext_content ON articles;
+DROP INDEX idx_fulltext_tags ON articles;
+DROP INDEX idx_title_tags ON articles;
+DROP INDEX idx_spatial_position ON locations;
+			`,
+			description: "Reverse: Drop FULLTEXT and SPATIAL indexes",
+		},
+		{
+			name: "reverse_generated_columns",
+			initialSchema: `
+CREATE TABLE products (
+    id INT NOT NULL AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    tax_rate DECIMAL(5, 2) DEFAULT 8.0,
+    price_with_tax DECIMAL(10, 2) AS (price * (1 + tax_rate / 100)) STORED,
+    name_upper VARCHAR(100) AS (UPPER(name)) VIRTUAL,
+    PRIMARY KEY (id),
+    INDEX idx_price_with_tax (price_with_tax),
+    INDEX idx_name_upper (name_upper)
+) ENGINE=InnoDB;
+
+CREATE TABLE order_summary (
+    id INT NOT NULL AUTO_INCREMENT,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL,
+    unit_price DECIMAL(10, 2) NOT NULL,
+    total_price DECIMAL(10, 2) AS (quantity * unit_price) STORED,
+    order_date DATE NOT NULL,
+    order_year INT AS (YEAR(order_date)) VIRTUAL,
+    order_month INT AS (MONTH(order_date)) VIRTUAL,
+    PRIMARY KEY (id),
+    INDEX idx_year_month (order_year, order_month)
+) ENGINE=InnoDB;
+			`,
+			migrationDDL: `
+-- Drop table
+DROP TABLE order_summary;
+
+-- Drop indexes
+DROP INDEX idx_price_with_tax ON products;
+DROP INDEX idx_name_upper ON products;
+
+-- Drop generated columns
+ALTER TABLE products DROP COLUMN price_with_tax;
+ALTER TABLE products DROP COLUMN name_upper;
+			`,
+			description: "Reverse: Drop generated columns",
+		},
+		{
+			name: "reverse_json_columns_and_indexes",
+			initialSchema: `
+CREATE TABLE users (
+    id INT NOT NULL AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    preferences JSON,
+    metadata JSON,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB;
+
+CREATE TABLE products (
+    id INT NOT NULL AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    details JSON NOT NULL,
+    tags JSON,
+    brand VARCHAR(50) AS (details->>'$.brand') VIRTUAL,
+    PRIMARY KEY (id),
+    INDEX idx_product_brand ((CAST(details->>'$.brand' AS CHAR(50)))),
+    INDEX idx_product_price ((CAST(details->>'$.price' AS DECIMAL(10,2)))),
+    INDEX idx_brand (brand),
+    CONSTRAINT chk_details_not_empty CHECK (JSON_TYPE(details) IS NOT NULL)
+) ENGINE=InnoDB;
+			`,
+			migrationDDL: `
+-- Drop table
+DROP TABLE products;
+
+-- Drop columns
+ALTER TABLE users DROP COLUMN preferences;
+ALTER TABLE users DROP COLUMN metadata;
+			`,
+			description: "Reverse: Drop JSON columns and indexes",
+		},
+		{
+			name: "reverse_complex_triggers",
+			initialSchema: `
+CREATE TABLE inventory (
+    id INT NOT NULL AUTO_INCREMENT,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL DEFAULT 0,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_product (product_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE inventory_log (
+    id INT NOT NULL AUTO_INCREMENT,
+    product_id INT NOT NULL,
+    old_quantity INT,
+    new_quantity INT,
+    change_type VARCHAR(20),
+    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB;
+
+CREATE TRIGGER trg_inventory_insert
+AFTER INSERT ON inventory
+FOR EACH ROW
+BEGIN
+    INSERT INTO inventory_log (product_id, old_quantity, new_quantity, change_type)
+    VALUES (NEW.product_id, NULL, NEW.quantity, 'INSERT');
+END;
+
+CREATE TRIGGER trg_inventory_update
+AFTER UPDATE ON inventory
+FOR EACH ROW
+BEGIN
+    IF OLD.quantity != NEW.quantity THEN
+        INSERT INTO inventory_log (product_id, old_quantity, new_quantity, change_type)
+        VALUES (NEW.product_id, OLD.quantity, NEW.quantity, 'UPDATE');
+    END IF;
+END;
+
+CREATE TRIGGER trg_inventory_delete
+BEFORE DELETE ON inventory
+FOR EACH ROW
+BEGIN
+    INSERT INTO inventory_log (product_id, old_quantity, new_quantity, change_type)
+    VALUES (OLD.product_id, OLD.quantity, NULL, 'DELETE');
+END;
+
+CREATE VIEW inventory_changes AS
+SELECT 
+    product_id,
+    COUNT(*) AS change_count,
+    MAX(changed_at) AS last_changed
+FROM inventory_log
+GROUP BY product_id;
+			`,
+			migrationDDL: `
+-- Drop view
+DROP VIEW inventory_changes;
+
+-- Drop triggers
+DROP TRIGGER trg_inventory_delete;
+DROP TRIGGER trg_inventory_update;
+DROP TRIGGER trg_inventory_insert;
+			`,
+			description: "Reverse: Drop triggers and views",
+		},
+		{
+			name: "reverse_events_and_advanced_features",
+			initialSchema: `
+CREATE TABLE system_stats (
+    id INT NOT NULL AUTO_INCREMENT,
+    stat_name VARCHAR(100) NOT NULL,
+    stat_value DECIMAL(10, 2),
+    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB;
+
+CREATE EVENT IF NOT EXISTS evt_cleanup_old_stats
+ON SCHEDULE EVERY 1 DAY
+STARTS CURRENT_TIMESTAMP
+DO
+BEGIN
+    DELETE FROM system_stats 
+    WHERE recorded_at < DATE_SUB(NOW(), INTERVAL 30 DAY);
+END;
+
+CREATE PROCEDURE RecordSystemStat(
+    IN p_stat_name VARCHAR(100),
+    IN p_stat_value DECIMAL(10, 2)
+)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+    
+    START TRANSACTION;
+    
+    INSERT INTO system_stats (stat_name, stat_value)
+    VALUES (p_stat_name, p_stat_value);
+    
+    COMMIT;
+END;
+
+CREATE FUNCTION GetAverageStat(p_stat_name VARCHAR(100))
+RETURNS DECIMAL(10, 2)
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE avg_value DECIMAL(10, 2);
+    
+    SELECT AVG(stat_value) INTO avg_value
+    FROM system_stats
+    WHERE stat_name = p_stat_name
+    AND recorded_at >= DATE_SUB(NOW(), INTERVAL 7 DAY);
+    
+    RETURN COALESCE(avg_value, 0);
+END;
+			`,
+			migrationDDL: `
+-- Drop event
+DROP EVENT IF EXISTS evt_cleanup_old_stats;
+
+-- Drop procedure
+DROP PROCEDURE RecordSystemStat;
+
+-- Drop function
+DROP FUNCTION GetAverageStat;
+			`,
+			description: "Reverse: Drop events and advanced features",
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Step 1: Initialize the database schema and get schema result A
-			portInt, err := strconv.Atoi(port.Port())
+			portInt, err := strconv.Atoi(port)
 			require.NoError(t, err)
 
-			// Add a small delay to ensure MySQL is fully ready
-			time.Sleep(2 * time.Second)
+			// Get the database connection from container
+			db := container.GetDB()
 
-			t.Logf("Connecting to MySQL at %s:%d", host, portInt)
-			testDB, err := openTestDatabase(host, portInt, "root", "test123", "testdb")
-			require.NoError(t, err, "Failed to connect to MySQL database")
-			defer testDB.Close()
+			// Create a test database
+			testDBName := fmt.Sprintf("test_%s", strings.ReplaceAll(tc.name, " ", "_"))
+			_, err = db.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", testDBName))
+			require.NoError(t, err)
+			_, err = db.Exec(fmt.Sprintf("CREATE DATABASE `%s`", testDBName))
+			require.NoError(t, err)
+			defer func() {
+				_, _ = db.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", testDBName))
+			}()
 
-			// Clean up any existing objects
-			cleanupDatabase(t, testDB)
+			// Use the test database
+			_, err = db.Exec(fmt.Sprintf("USE `%s`", testDBName))
+			require.NoError(t, err)
 
 			// Execute initial schema
-			if err := executeStatements(testDB, tc.initialSchema); err != nil {
-				t.Fatalf("Failed to execute initial schema: %v", err)
+			if strings.TrimSpace(tc.initialSchema) != "" {
+				if err := executeStatements(db, tc.initialSchema); err != nil {
+					t.Fatalf("Failed to execute initial schema: %v", err)
+				}
 			}
 
-			schemaA, err := getSyncMetadataForGenerateMigration(ctx, host, portInt, "root", "test123", "testdb")
+			schemaA, err := getSyncMetadataForGenerateMigration(ctx, host, portInt, "root", "root-password", testDBName)
 			require.NoError(t, err)
 
 			// Step 2: Do some migration and get schema result B
-			if err := executeStatements(testDB, tc.migrationDDL); err != nil {
+			if err := executeStatements(db, tc.migrationDDL); err != nil {
 				t.Fatalf("Failed to execute migration DDL: %v", err)
 			}
 
-			schemaB, err := getSyncMetadataForGenerateMigration(ctx, host, portInt, "root", "test123", "testdb")
+			schemaB, err := getSyncMetadataForGenerateMigration(ctx, host, portInt, "root", "root-password", testDBName)
 			require.NoError(t, err)
 
 			// Step 3: Call generate migration to get the rollback DDL
@@ -841,7 +1630,7 @@ END;
 			dbSchemaB := model.NewDatabaseSchema(schemaB, nil, nil, storepb.Engine_MYSQL, false)
 
 			// Get diff from B to A (to generate rollback)
-			diff, err := schema.GetDatabaseSchemaDiff(dbSchemaB, dbSchemaA)
+			diff, err := schema.GetDatabaseSchemaDiff(storepb.Engine_MYSQL, dbSchemaB, dbSchemaA)
 			require.NoError(t, err)
 
 			// Log the diff for debugging
@@ -866,11 +1655,11 @@ END;
 			t.Logf("Rollback DDL:\n%s", rollbackDDL)
 
 			// Step 4: Run rollback DDL and get schema result C
-			if err := executeStatements(testDB, rollbackDDL); err != nil {
+			if err := executeStatements(db, rollbackDDL); err != nil {
 				t.Fatalf("Failed to execute rollback DDL: %v", err)
 			}
 
-			schemaC, err := getSyncMetadataForGenerateMigration(ctx, host, portInt, "root", "test123", "testdb")
+			schemaC, err := getSyncMetadataForGenerateMigration(ctx, host, portInt, "root", "root-password", testDBName)
 			require.NoError(t, err)
 
 			// Step 5: Compare schema result A and C to ensure they are the same
@@ -882,149 +1671,6 @@ END;
 				t.Errorf("Schema mismatch after rollback (-want +got):\n%s", diff)
 			}
 		})
-	}
-}
-
-// openTestDatabase opens a connection to the test MySQL database
-func openTestDatabase(host string, port int, username, password, database string) (*sql.DB, error) {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=true&multiStatements=true",
-		username, password, host, port, database)
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open connection to MySQL")
-	}
-
-	// Set connection pool settings
-	db.SetMaxOpenConns(5)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(5 * time.Minute)
-
-	// Try to ping with retries
-	var pingErr error
-	for i := 0; i < 5; i++ {
-		if pingErr = db.Ping(); pingErr == nil {
-			break
-		}
-		time.Sleep(time.Second)
-	}
-	if pingErr != nil {
-		return nil, errors.Wrapf(pingErr, "failed to ping MySQL database after retries")
-	}
-
-	return db, nil
-}
-
-// cleanupDatabase removes all objects from the database
-func cleanupDatabase(_ *testing.T, db *sql.DB) {
-	// Disable foreign key checks
-	_, _ = db.Exec("SET FOREIGN_KEY_CHECKS = 0")
-	defer func() {
-		_, _ = db.Exec("SET FOREIGN_KEY_CHECKS = 1")
-	}()
-
-	// Drop all tables
-	rows, err := db.Query("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()")
-	if err == nil {
-		defer func() {
-			rows.Close()
-		}()
-		var tables []string
-		for rows.Next() {
-			var table string
-			if err := rows.Scan(&table); err == nil {
-				tables = append(tables, table)
-			}
-		}
-		if err := rows.Err(); err != nil {
-			return
-		}
-		for _, table := range tables {
-			_, _ = db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS `%s`", table))
-		}
-	}
-
-	// Drop all views
-	rows, err = db.Query("SELECT table_name FROM information_schema.views WHERE table_schema = DATABASE()")
-	if err == nil {
-		defer func() {
-			rows.Close()
-		}()
-		var views []string
-		for rows.Next() {
-			var view string
-			if err := rows.Scan(&view); err == nil {
-				views = append(views, view)
-			}
-		}
-		if err := rows.Err(); err != nil {
-			return
-		}
-		for _, view := range views {
-			_, _ = db.Exec(fmt.Sprintf("DROP VIEW IF EXISTS `%s`", view))
-		}
-	}
-
-	// Drop all procedures
-	rows, err = db.Query("SELECT routine_name FROM information_schema.routines WHERE routine_schema = DATABASE() AND routine_type = 'PROCEDURE'")
-	if err == nil {
-		defer func() {
-			rows.Close()
-		}()
-		var procedures []string
-		for rows.Next() {
-			var proc string
-			if err := rows.Scan(&proc); err == nil {
-				procedures = append(procedures, proc)
-			}
-		}
-		if err := rows.Err(); err != nil {
-			return
-		}
-		for _, proc := range procedures {
-			_, _ = db.Exec(fmt.Sprintf("DROP PROCEDURE IF EXISTS `%s`", proc))
-		}
-	}
-
-	// Drop all functions
-	rows, err = db.Query("SELECT routine_name FROM information_schema.routines WHERE routine_schema = DATABASE() AND routine_type = 'FUNCTION'")
-	if err == nil {
-		defer func() {
-			rows.Close()
-		}()
-		var functions []string
-		for rows.Next() {
-			var fn string
-			if err := rows.Scan(&fn); err == nil {
-				functions = append(functions, fn)
-			}
-		}
-		if err := rows.Err(); err != nil {
-			return
-		}
-		for _, fn := range functions {
-			_, _ = db.Exec(fmt.Sprintf("DROP FUNCTION IF EXISTS `%s`", fn))
-		}
-	}
-
-	// Drop all events
-	rows, err = db.Query("SELECT event_name FROM information_schema.events WHERE event_schema = DATABASE()")
-	if err == nil {
-		defer func() {
-			rows.Close()
-		}()
-		var events []string
-		for rows.Next() {
-			var event string
-			if err := rows.Scan(&event); err == nil {
-				events = append(events, event)
-			}
-		}
-		if err := rows.Err(); err != nil {
-			return
-		}
-		for _, event := range events {
-			_, _ = db.Exec(fmt.Sprintf("DROP EVENT IF EXISTS `%s`", event))
-		}
 	}
 }
 
@@ -1096,9 +1742,7 @@ func normalizeMetadataForComparison(metadata *storepb.DatabaseSchemaMetadata) {
 			for _, col := range table.Columns {
 				if col.GetDefaultExpression() == "AUTO_INCREMENT" {
 					// Keep the AUTO_INCREMENT marker but clear any current value
-					col.DefaultValue = &storepb.ColumnMetadata_DefaultExpression{
-						DefaultExpression: "AUTO_INCREMENT",
-					}
+					col.DefaultExpression = "AUTO_INCREMENT"
 				}
 			}
 

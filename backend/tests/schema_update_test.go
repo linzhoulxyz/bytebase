@@ -32,7 +32,7 @@ func TestSchemaAndDataUpdate(t *testing.T) {
 	a.NoError(err)
 
 	instanceResp, err := ctl.instanceServiceClient.CreateInstance(ctx, connect.NewRequest(&v1pb.CreateInstanceRequest{
-		InstanceId: generateRandomString("instance", 10),
+		InstanceId: generateRandomString("instance"),
 		Instance: &v1pb.Instance{
 			Title:       instanceName,
 			Engine:      v1pb.Engine_SQLITE,
@@ -172,24 +172,20 @@ func TestGetLatestSchema(t *testing.T) {
 								DataSize:  16384,
 								Columns: []*v1pb.ColumnMetadata{
 									{
-										Name:       "id",
-										Position:   1,
-										Nullable:   true,
-										HasDefault: true,
-										Default: &v1pb.ColumnMetadata_DefaultNull{
-											DefaultNull: true,
-										},
-										Type: "int",
+										Name:        "id",
+										Position:    1,
+										Nullable:    true,
+										HasDefault:  true,
+										DefaultNull: true,
+										Type:        "int",
 									},
 									{
-										Name:       "name",
-										Position:   2,
-										Nullable:   true,
-										Type:       "text",
-										HasDefault: true,
-										Default: &v1pb.ColumnMetadata_DefaultNull{
-											DefaultNull: true,
-										},
+										Name:         "name",
+										Position:     2,
+										Nullable:     true,
+										Type:         "text",
+										HasDefault:   true,
+										DefaultNull:  true,
 										CharacterSet: "utf8mb4",
 										Collation:    "utf8mb4_general_ci",
 									},
@@ -234,8 +230,9 @@ CREATE TABLE "public"."book" (
 				Collation:    "en_US.UTF-8",
 				Schemas: []*v1pb.SchemaMetadata{
 					{
-						Name:  "public",
-						Owner: "pg_database_owner",
+						Name:    "public",
+						Owner:   "pg_database_owner",
+						Comment: "standard public schema",
 						Tables: []*v1pb.TableMetadata{
 							{
 								Name:     "book",
@@ -376,7 +373,7 @@ func TestMarkTaskAsDone(t *testing.T) {
 
 	// Add an instance.
 	instanceResp, err := ctl.instanceServiceClient.CreateInstance(ctx, connect.NewRequest(&v1pb.CreateInstanceRequest{
-		InstanceId: generateRandomString("instance", 10),
+		InstanceId: generateRandomString("instance"),
 		Instance: &v1pb.Instance{
 			Title:       instanceName,
 			Engine:      v1pb.Engine_SQLITE,

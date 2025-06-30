@@ -11,6 +11,7 @@
         :project-list="list"
         :selected-project-names="selectedProjectNames"
         :show-selection="showSelection"
+        :keyword="filter.query"
         @update:selected-project-names="updateSelectedProjectNames"
       />
     </template>
@@ -34,7 +35,7 @@ const props = withDefaults(
   }>(),
   {
     selectedProjectNames: () => [],
-    showSelection: true,
+    showSelection: false,
   }
 );
 
@@ -56,7 +57,6 @@ const refresh = () => {
 };
 
 defineExpose({ refresh });
-
 
 const fetchProjects = async ({
   pageToken,
