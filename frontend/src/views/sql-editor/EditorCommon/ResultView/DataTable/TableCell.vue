@@ -56,7 +56,7 @@ import { twMerge } from "tailwind-merge";
 import { computed, ref, watchEffect } from "vue";
 import { useConnectionOfCurrentSQLEditorTab } from "@/store";
 import { Engine } from "@/types/proto-es/v1/common_pb";
-import type { QueryRow, RowValue } from "@/types/proto/v1/sql_service";
+import type { QueryRow, RowValue } from "@/types/proto-es/v1/sql_service_pb";
 import { extractSQLRowValuePlain, getHighlightHTMLByRegExp } from "@/utils";
 import { useSQLResultViewContext } from "../context";
 import {
@@ -96,9 +96,9 @@ const allowSelect = computed(() => {
   return props.allowSelect && !selectionDisabled.value;
 });
 
-// Check if the value is binary data
+// Check if the value is binary data (proto-es oneof pattern)
 const hasByteData = computed(() => {
-  return !!props.value.bytesValue;
+  return props.value.kind?.case === "bytesValue";
 });
 
 const binaryFormat = computed(() => {
@@ -114,16 +114,22 @@ watchEffect(() => {
     return;
   }
   if (!binaryFormat.value) {
-    const binaryFormat = detectBinaryFormat({
-      bytesValue: props.value.bytesValue,
-      columnType: props.columnType,
-    });
-    setBinaryFormat({
-      rowIndex: props.rowIndex,
-      colIndex: props.colIndex,
-      setIndex: props.setIndex,
-      format: binaryFormat,
-    });
+    const bytesValue =
+      props.value.kind?.case === "bytesValue"
+        ? props.value.kind.value
+        : undefined;
+    if (bytesValue) {
+      const binaryFormat = detectBinaryFormat({
+        bytesValue,
+        columnType: props.columnType,
+      });
+      setBinaryFormat({
+        rowIndex: props.rowIndex,
+        colIndex: props.colIndex,
+        setIndex: props.setIndex,
+        format: binaryFormat,
+      });
+    }
   }
 });
 
@@ -182,27 +188,39 @@ const classes = computed(() => {
   return twMerge(classes);
 });
 
-// Format the binary value based on selected format
+// Format the binary value based on selected format (proto-es oneof pattern)
 const formattedValue = computed(() => {
-  if (!props.value?.bytesValue) {
+  const bytesValue =
+    props.value.kind?.case === "bytesValue"
+      ? props.value.kind.value
+      : undefined;
+  if (!bytesValue) {
     return props.value;
   }
 
   // Determine the format to use - column override, cell override, or auto-detected format
-  const actualFormat = binaryFormat.value ?? "DEFAULT";
+  let actualFormat = binaryFormat.value ?? "DEFAULT";
 
-  // Skip formatting for DEFAULT (auto) format
+  // If format is DEFAULT, use the auto-detected format
   if (actualFormat === "DEFAULT") {
-    return props.value;
+    actualFormat = detectBinaryFormat({
+      bytesValue,
+      columnType: props.columnType,
+    });
   }
 
   const stringValue = formatBinaryValue({
-    bytesValue: props.value.bytesValue,
+    bytesValue,
     format: actualFormat,
   });
+
+  // Return proto-es oneof structure with stringValue
   return {
     ...props.value,
-    stringValue,
+    kind: {
+      case: "stringValue" as const,
+      value: stringValue,
+    },
   };
 });
 

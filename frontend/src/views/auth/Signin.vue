@@ -175,6 +175,7 @@
 
 <script lang="ts" setup>
 import { create } from "@bufbuild/protobuf";
+import type { ConnectError } from "@connectrpc/connect";
 import { EyeIcon, EyeOffIcon } from "lucide-vue-next";
 import { NButton, NCard, NTabPane, NTabs } from "naive-ui";
 import { storeToRefs } from "pinia";
@@ -192,8 +193,8 @@ import {
 } from "@/store";
 import { idpNamePrefix } from "@/store/modules/v1/common";
 import { LoginRequestSchema } from "@/types/proto-es/v1/auth_service_pb";
-import type { IdentityProvider } from "@/types/proto/v1/idp_service";
-import { IdentityProviderType } from "@/types/proto/v1/idp_service";
+import type { IdentityProvider } from "@/types/proto-es/v1/idp_service_pb";
+import { IdentityProviderType } from "@/types/proto-es/v1/idp_service_pb";
 import { openWindowForSSO } from "@/utils";
 import AuthFooter from "./AuthFooter.vue";
 
@@ -268,7 +269,7 @@ onMounted(async () => {
       module: "bytebase",
       style: "CRITICAL",
       title: `Request error occurred`,
-      description: (error as any).message,
+      description: (error as ConnectError).message,
     });
   }
   // Check if there is an identity provider in the query string and try to sign in with it.
@@ -322,7 +323,7 @@ const trySigninWithIdentityProvider = async (
       module: "bytebase",
       style: "CRITICAL",
       title: `Request error occurred`,
-      description: (error as any).message,
+      description: (error as ConnectError).message,
     });
   }
 };

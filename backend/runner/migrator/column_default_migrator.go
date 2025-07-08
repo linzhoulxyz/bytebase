@@ -2,6 +2,7 @@ package migrator
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
+	"github.com/bytebase/bytebase/backend/plugin/db/mysql"
 	"github.com/bytebase/bytebase/backend/store"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
@@ -34,6 +36,19 @@ func NewColumnDefaultMigrator(store *store.Store, supportedEngines []storepb.Eng
 		store:            store,
 		supportedEngines: supportedEngines,
 	}
+}
+
+// EnginesNeedingMigration returns the list of engines that currently need column default migration.
+// This function dynamically builds the list based on common.EngineNeedsColumnDefaultMigration.
+func EnginesNeedingMigration() []storepb.Engine {
+	var engines []storepb.Engine
+	// Check all known engines
+	for _, engine := range storepb.Engine_value {
+		if common.EngineDBSchemaReadyToMigrate(storepb.Engine(engine)) {
+			engines = append(engines, storepb.Engine(engine))
+		}
+	}
+	return engines
 }
 
 // Run starts the ColumnDefaultMigrator.
@@ -79,14 +94,36 @@ func (m *ColumnDefaultMigrator) migrate(ctx context.Context) error {
 			for _, schema := range metadata.Schemas {
 				for _, table := range schema.Tables {
 					for _, column := range table.Columns {
-						if column.DefaultNull {
-							column.Default = "NULL"
-							column.DefaultNull = false
-							changed = true
-						} else if column.DefaultExpression != "" {
-							column.Default = column.DefaultExpression
-							column.DefaultExpression = ""
-							changed = true
+						if engine == storepb.Engine_MYSQL {
+							if column.DefaultNull {
+								column.Default = "NULL"
+								column.DefaultNull = false
+								changed = true
+							} else if column.Default != "" {
+								column.Default = fmt.Sprintf("'%s'", column.Default)
+								changed = true
+							} else if column.DefaultExpression != "" {
+								if mysql.IsCurrentTimestampLike(column.DefaultExpression) {
+									column.Default = column.DefaultExpression
+									column.DefaultExpression = ""
+								} else {
+									quotedExpression := fmt.Sprintf("'%s'", column.DefaultExpression)
+									unquotedExpression := mysql.UnquoteMySQLString(quotedExpression)
+									column.Default = mysql.UnescapeExpressionDefault(unquotedExpression)
+									column.DefaultExpression = ""
+								}
+								changed = true
+							}
+						} else {
+							if column.DefaultNull {
+								column.Default = "NULL"
+								column.DefaultNull = false
+								changed = true
+							} else if column.DefaultExpression != "" {
+								column.Default = column.DefaultExpression
+								column.DefaultExpression = ""
+								changed = true
+							}
 						}
 					}
 				}
@@ -106,8 +143,9 @@ func (m *ColumnDefaultMigrator) migrate(ctx context.Context) error {
 				continue
 			}
 
-			// Update metadata and todo in a single transaction.
-			if err := m.store.UpdateDBSchemaMetadataAndTodo(ctx, dbSchema.ID, string(marshaled), false); err != nil {
+			// Update metadata and todo in a single transaction, only if todo is still true.
+			// This prevents race conditions with the sync process.
+			if err := m.store.UpdateDBSchemaMetadataIfTodo(ctx, dbSchema.ID, string(marshaled)); err != nil {
 				slog.Error("Failed to update db schema metadata and todo", slog.Int("db_schema_id", dbSchema.ID), slog.String("db_name", dbSchema.DBName), log.BBError(err))
 				continue
 			}

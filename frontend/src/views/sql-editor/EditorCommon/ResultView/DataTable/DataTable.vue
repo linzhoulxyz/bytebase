@@ -40,15 +40,14 @@
                 <br v-else class="min-h-[1rem] inline-flex" />
               </span>
 
-              <SensitiveDataIcon
-                v-if="isSensitiveColumn(header.index)"
+              <MaskingReasonPopover
+                v-if="getMaskingReason && getMaskingReason(header.index)"
+                :reason="getMaskingReason(header.index)"
                 class="ml-0.5 shrink-0"
               />
-              <FeatureBadge
-                v-else-if="isColumnMissingSensitive(header.index)"
-                :feature="PlanFeature.FEATURE_DATA_MASKING"
+              <SensitiveDataIcon
+                v-else-if="isSensitiveColumn(header.index)"
                 class="ml-0.5 shrink-0"
-                :instance="database.instanceResource"
               />
 
               <ColumnSortedIcon
@@ -141,10 +140,10 @@
 import type { Table } from "@tanstack/vue-table";
 import { NEmpty } from "naive-ui";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
-import { FeatureBadge } from "@/components/FeatureGuard";
-import { useConnectionOfCurrentSQLEditorTab } from "@/store";
-import { PlanFeature } from "@/types/proto-es/v1/subscription_service_pb";
-import { type QueryRow, type RowValue } from "@/types/proto/v1/sql_service";
+import {
+  type QueryRow,
+  type RowValue,
+} from "@/types/proto-es/v1/sql_service_pb";
 import { useSQLResultViewContext } from "../context";
 import TableCell from "./TableCell.vue";
 import {
@@ -154,6 +153,7 @@ import {
 } from "./binary-format-store";
 import BinaryFormatButton from "./common/BinaryFormatButton.vue";
 import ColumnSortedIcon from "./common/ColumnSortedIcon.vue";
+import MaskingReasonPopover from "./common/MaskingReasonPopover.vue";
 import SensitiveDataIcon from "./common/SensitiveDataIcon.vue";
 import { useSelectionContext } from "./common/selection-logic";
 import { getColumnType } from "./common/utils";
@@ -164,7 +164,7 @@ const props = defineProps<{
   setIndex: number;
   offset: number;
   isSensitiveColumn: (index: number) => boolean;
-  isColumnMissingSensitive: (index: number) => boolean;
+  getMaskingReason?: (index: number) => any;
   maxHeight?: number;
 }>();
 
@@ -187,7 +187,6 @@ const tableResize = useTableColumnWidthLogic({
 const { getBinaryFormat, setBinaryFormat } = useBinaryFormatContext();
 
 const { keyword } = useSQLResultViewContext();
-const { database } = useConnectionOfCurrentSQLEditorTab();
 
 const rows = computed(() => props.table.getRowModel().rows);
 const columns = computed(() => props.table.getFlatHeaders());
@@ -201,13 +200,13 @@ const existBinaryValue = (columnIndex: number) => {
     return false;
   }
 
-  // Check each row in the column for binary data
+  // Check each row in the column for binary data (proto-es oneof pattern)
   for (const row of rows.value) {
     const cell = row.getVisibleCells()[columnIndex];
     if (!cell) continue;
 
     const value = cell.getValue<RowValue>();
-    if (value?.bytesValue) {
+    if (value?.kind?.case === "bytesValue") {
       return true;
     }
   }

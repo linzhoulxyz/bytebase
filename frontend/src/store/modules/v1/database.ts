@@ -1,10 +1,21 @@
+import { create } from "@bufbuild/protobuf";
+import { createContextValues } from "@connectrpc/connect";
 import { uniq } from "lodash-es";
 import { defineStore } from "pinia";
 import { computed, reactive, ref, unref, watch, markRaw } from "vue";
-import { create } from "@bufbuild/protobuf";
-import { createContextValues } from "@connectrpc/connect";
 import { databaseServiceClientConnect } from "@/grpcweb";
 import { silentContextKey } from "@/grpcweb/context-key";
+import type { ComposedInstance, ComposedDatabase, MaybeRef } from "@/types";
+import {
+  isValidEnvironmentName,
+  isValidProjectName,
+  isValidInstanceName,
+  isValidDatabaseName,
+  unknownDatabase,
+  unknownEnvironment,
+  unknownInstanceResource,
+} from "@/types";
+import { Engine } from "@/types/proto-es/v1/common_pb";
 import {
   GetDatabaseRequestSchema,
   ListDatabasesRequestSchema,
@@ -16,18 +27,6 @@ import {
   GetDatabaseSchemaRequestSchema,
   DiffSchemaRequestSchema,
 } from "@/types/proto-es/v1/database_service_pb";
-import type { ComposedInstance, ComposedDatabase, MaybeRef } from "@/types";
-import {
-  isValidEnvironmentName,
-  isValidProjectName,
-  isValidInstanceName,
-  isValidDatabaseName,
-  unknownDatabase,
-  unknownEnvironment,
-  unknownInstanceResource,
-} from "@/types";
-import type { Engine } from "@/types/proto-es/v1/common_pb";
-import { convertEngineToOld } from "@/utils/v1/common-conversions";
 import type {
   Database,
   UpdateDatabaseRequest,
@@ -90,13 +89,13 @@ const getListDatabaseFilter = (filter: DatabaseFilter): string => {
     // engine filter should be:
     // engine in ["MYSQL", "POSTGRES"]
     params.push(
-      `engine in [${filter.engines.map((e) => `"${convertEngineToOld(e)}"`).join(", ")}]`
+      `engine in [${filter.engines.map((e) => `"${Engine[e]}"`).join(", ")}]`
     );
   } else if (filter.excludeEngines && filter.excludeEngines.length > 0) {
     // engine filter should be:
     // !(engine in ["REDIS", "MONGODB"])
     params.push(
-      `!(engine in [${filter.excludeEngines.map((e) => `"${convertEngineToOld(e)}"`).join(", ")}])`
+      `!(engine in [${filter.excludeEngines.map((e) => `"${Engine[e]}"`).join(", ")}])`
     );
   }
   if (!isNullOrUndefined(filter.drifted)) {
@@ -245,12 +244,9 @@ export const useDatabaseV1Store = defineStore("database_v1", () => {
     const request = create(GetDatabaseRequestSchema, {
       name,
     });
-    const database = await databaseServiceClientConnect.getDatabase(
-      request,
-      {
-        contextValues: createContextValues().set(silentContextKey, silent),
-      }
-    );
+    const database = await databaseServiceClientConnect.getDatabase(request, {
+      contextValues: createContextValues().set(silentContextKey, silent),
+    });
 
     const [composed] = await upsertDatabaseMap([database]);
 
@@ -292,7 +288,8 @@ export const useDatabaseV1Store = defineStore("database_v1", () => {
         updateMask: req.updateMask,
       })),
     });
-    const response = await databaseServiceClientConnect.batchUpdateDatabases(request);
+    const response =
+      await databaseServiceClientConnect.batchUpdateDatabases(request);
     const updatedDatabases = response.databases; // Work directly with proto-es types
     const composed = await upsertDatabaseMap(updatedDatabases);
     return composed;
@@ -315,7 +312,8 @@ export const useDatabaseV1Store = defineStore("database_v1", () => {
       name: `${database}/schema`,
       sdlFormat,
     });
-    const schema = await databaseServiceClientConnect.getDatabaseSchema(request);
+    const schema =
+      await databaseServiceClientConnect.getDatabaseSchema(request);
     return schema;
   };
   const diffSchema = async (params: DiffSchemaRequest) => {

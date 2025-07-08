@@ -66,24 +66,29 @@
 </template>
 
 <script lang="ts" setup>
+import { create } from "@bufbuild/protobuf";
 import { asyncComputed } from "@vueuse/core";
 import type { ButtonProps } from "naive-ui";
 import { NButton, NPopover } from "naive-ui";
 import { computed, onUnmounted, ref, watch } from "vue";
 import { onMounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { create } from "@bufbuild/protobuf";
 import { BBSpin } from "@/bbkit";
 import { releaseServiceClientConnect } from "@/grpcweb";
 import type { ComposedDatabase } from "@/types";
 import type { DatabaseMetadata } from "@/types/proto-es/v1/database_service_pb";
+import type { CheckReleaseResponse } from "@/types/proto-es/v1/release_service_pb";
 import {
-  CheckReleaseResponse,
+  CheckReleaseRequestSchema,
+  CheckReleaseResponseSchema,
+  ReleaseFileType,
   Release_File_ChangeType,
-} from "@/types/proto/v1/release_service";
-import { CheckReleaseRequestSchema, ReleaseFileType } from "@/types/proto-es/v1/release_service_pb";
-import { convertNewCheckReleaseResponseToOld, convertOldChangeTypeToNew } from "@/utils/v1/release-conversions";
-import { Advice, Advice_Status } from "@/types/proto/v1/sql_service";
+} from "@/types/proto-es/v1/release_service_pb";
+import type { Advice } from "@/types/proto-es/v1/sql_service_pb";
+import {
+  AdviceSchema,
+  Advice_Status,
+} from "@/types/proto-es/v1/sql_service_pb";
 import type { Defer, VueStyle } from "@/utils";
 import { defer } from "@/utils";
 import ErrorList from "../misc/ErrorList.vue";
@@ -133,6 +138,7 @@ const checkResult = ref<CheckReleaseResponse | undefined>();
 const filteredAdvices = computed(() => {
   const { adviceFilter } = props;
   const advices = checkResult.value?.results.flatMap((r) => r.advices);
+  if (!advices) return undefined;
   if (!adviceFilter) {
     return advices;
   }
@@ -165,15 +171,14 @@ const runCheckInternal = async (statement: string) => {
           type: ReleaseFileType.VERSIONED,
           statement: new TextEncoder().encode(statement),
           // Default to DDL change type.
-          changeType: convertOldChangeTypeToNew(changeType || Release_File_ChangeType.DDL),
+          changeType: changeType || Release_File_ChangeType.DDL,
         },
       ],
     },
     targets: [database.name],
   });
   const response = await releaseServiceClientConnect.checkRelease(request);
-  const result = convertNewCheckReleaseResponseToOld(response);
-  return result;
+  return response;
 };
 
 const handleButtonClick = async () => {
@@ -194,11 +199,11 @@ const runChecks = async () => {
 
   const handleErrors = (errors: string[]) => {
     // Mock the pre-check errors to advices.
-    checkResult.value = CheckReleaseResponse.fromPartial({
+    checkResult.value = create(CheckReleaseResponseSchema, {
       results: [
         {
           advices: errors.map((err) =>
-            Advice.fromPartial({
+            create(AdviceSchema, {
               title: "Pre check",
               status: Advice_Status.WARNING,
               content: err,

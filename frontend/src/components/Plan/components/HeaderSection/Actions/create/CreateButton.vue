@@ -28,12 +28,13 @@
 </template>
 
 <script setup lang="ts">
+import { create } from "@bufbuild/protobuf";
+import { includes } from "lodash-es";
 import { NTooltip, NButton } from "naive-ui";
 import { zindexable as vZindexable } from "vdirs";
 import { computed, nextTick, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { create } from "@bufbuild/protobuf";
 import {
   ErrorList,
   useSpecsValidation,
@@ -44,14 +45,16 @@ import {
 } from "@/components/Plan/logic";
 import { usePlanContext } from "@/components/Plan/logic";
 import { planServiceClientConnect } from "@/grpcweb";
-import { CreatePlanRequestSchema } from "@/types/proto-es/v1/plan_service_pb";
-import { convertOldPlanToNew, convertNewPlanToOld } from "@/utils/v1/plan-conversions";
-import { convertEngineToOld } from "@/utils/v1/common-conversions";
-import { Engine } from "@/types/proto-es/v1/common_pb";
-import { PROJECT_V1_ROUTE_PLAN_DETAIL } from "@/router/dashboard/projectV1";
+import {
+  PROJECT_V1_ROUTE_PLAN_DETAIL,
+  PROJECT_V1_ROUTE_PLAN_DETAIL_CHECK_RUNS,
+  PROJECT_V1_ROUTE_PLAN_DETAIL_SPEC_DETAIL,
+  PROJECT_V1_ROUTE_PLAN_DETAIL_SPECS,
+} from "@/router/dashboard/projectV1";
 import { useCurrentProjectV1, useSheetV1Store } from "@/store";
-import { type Plan_ChangeDatabaseConfig } from "@/types/proto/v1/plan_service";
-import type { Sheet } from "@/types/proto/v1/sheet_service";
+import { CreatePlanRequestSchema } from "@/types/proto-es/v1/plan_service_pb";
+import { type Plan_ChangeDatabaseConfig } from "@/types/proto-es/v1/plan_service_pb";
+import type { Sheet } from "@/types/proto-es/v1/sheet_service_pb";
 import {
   extractPlanUID,
   extractProjectResourceName,
@@ -88,18 +91,32 @@ const doCreatePlan = async () => {
 
   try {
     await createSheets();
-    const newPlan = convertOldPlanToNew(plan.value);
     const request = create(CreatePlanRequestSchema, {
       parent: project.value.name,
-      plan: newPlan,
+      plan: plan.value,
     });
-    const response = await planServiceClientConnect.createPlan(request);
-    const createdPlan = convertNewPlanToOld(response);
+    const createdPlan = await planServiceClientConnect.createPlan(request);
     if (!createdPlan) return;
 
     nextTick(() => {
-      router.push({
-        name: PROJECT_V1_ROUTE_PLAN_DETAIL,
+      let routeName = router.currentRoute.value.name;
+      if (routeName === PROJECT_V1_ROUTE_PLAN_DETAIL_SPEC_DETAIL) {
+        routeName = PROJECT_V1_ROUTE_PLAN_DETAIL_SPECS;
+      }
+      if (
+        !includes(
+          [
+            PROJECT_V1_ROUTE_PLAN_DETAIL,
+            PROJECT_V1_ROUTE_PLAN_DETAIL_SPECS,
+            PROJECT_V1_ROUTE_PLAN_DETAIL_CHECK_RUNS,
+          ],
+          routeName
+        )
+      ) {
+        routeName = PROJECT_V1_ROUTE_PLAN_DETAIL;
+      }
+      router.replace({
+        name: routeName,
         params: {
           projectId: extractProjectResourceName(createdPlan.name),
           planId: extractPlanUID(createdPlan.name),
@@ -121,7 +138,8 @@ const createSheets = async () => {
 
   for (let i = 0; i < specs.length; i++) {
     const spec = specs[i];
-    const config = spec.changeDatabaseConfig;
+    const config =
+      spec.config?.case === "changeDatabaseConfig" ? spec.config.value : null;
     if (!config) continue;
     configWithSheetList.push(config);
     if (pendingCreateSheetMap.has(config.sheet)) continue;
@@ -130,7 +148,7 @@ const createSheets = async () => {
       // The sheet is pending create
       const sheet = getLocalSheetByName(config.sheet);
       const engine = await databaseEngineForSpec(spec);
-      sheet.engine = convertEngineToOld((engine ?? Engine.ENGINE_UNSPECIFIED) as Engine);
+      sheet.engine = engine;
       pendingCreateSheetMap.set(sheet.name, sheet);
     }
   }

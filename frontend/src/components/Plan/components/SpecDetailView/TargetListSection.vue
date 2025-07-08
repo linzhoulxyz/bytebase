@@ -33,7 +33,7 @@
       </div>
     </div>
 
-    <div class="relative flex-1">
+    <div class="relative w-full flex-1">
       <div
         v-if="isLoadingTargets"
         class="flex items-center justify-center py-8"
@@ -42,7 +42,7 @@
       </div>
       <div
         v-else-if="targets.length > 0"
-        class="flex flex-wrap gap-2 overflow-y-auto"
+        class="w-full flex flex-wrap gap-2 overflow-y-auto"
       >
         <div
           v-for="item in tableData"
@@ -98,6 +98,7 @@
 </template>
 
 <script setup lang="ts">
+import { create } from "@bufbuild/protobuf";
 import {
   ServerIcon,
   DatabaseIcon,
@@ -111,10 +112,7 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { BBSpin } from "@/bbkit";
 import EngineIcon from "@/components/Icon/EngineIcon.vue";
-import { create } from "@bufbuild/protobuf";
 import { planServiceClientConnect } from "@/grpcweb";
-import { UpdatePlanRequestSchema } from "@/types/proto-es/v1/plan_service_pb";
-import { convertOldPlanToNew, convertNewPlanToOld } from "@/utils/v1/plan-conversions";
 import { PROJECT_V1_ROUTE_DATABASE_GROUP_DETAIL } from "@/router/dashboard/projectV1";
 import {
   useInstanceV1Store,
@@ -126,6 +124,7 @@ import {
   getProjectNameAndDatabaseGroupName,
 } from "@/store";
 import type { Engine } from "@/types/proto-es/v1/common_pb";
+import { UpdatePlanRequestSchema } from "@/types/proto-es/v1/plan_service_pb";
 import {
   extractInstanceResourceName,
   instanceV1Name,
@@ -137,7 +136,7 @@ import { usePlanContext } from "../../logic/context";
 import { targetsForSpec } from "../../logic/plan";
 import AllTargetsDrawer from "./AllTargetsDrawer.vue";
 import TargetsSelectorDrawer from "./TargetsSelectorDrawer.vue";
-import { usePlanSpecContext } from "./context";
+import { useSelectedSpec } from "./context";
 
 interface TargetRow {
   target: string;
@@ -154,8 +153,8 @@ const DEFAULT_VISIBLE_TARGETS = 20;
 
 const { t } = useI18n();
 const router = useRouter();
-const { plan, isCreating, events } = usePlanContext();
-const { selectedSpec } = usePlanSpecContext();
+const { plan, isCreating } = usePlanContext();
+const selectedSpec = useSelectedSpec();
 const instanceStore = useInstanceV1Store();
 const databaseStore = useDatabaseV1Store();
 const dbGroupStore = useDBGroupStore();
@@ -171,7 +170,7 @@ const targets = computed(() => {
 });
 
 const isCreateDatabaseSpec = computed(() => {
-  return !!selectedSpec.value?.createDatabaseConfig;
+  return selectedSpec.value?.config?.case === "createDatabaseConfig";
 });
 
 const project = computed(() => {
@@ -271,25 +270,19 @@ const handleUpdateTargets = async (targets: string[]) => {
   if (!selectedSpec.value) return;
 
   // Update the targets in the spec.
-  const config =
-    selectedSpec.value.changeDatabaseConfig ||
-    selectedSpec.value.exportDataConfig;
-  if (config) {
-    config.targets = targets;
+  if (selectedSpec.value.config?.case === "changeDatabaseConfig") {
+    selectedSpec.value.config.value.targets = targets;
+  } else if (selectedSpec.value.config?.case === "exportDataConfig") {
+    selectedSpec.value.config.value.targets = targets;
   }
 
   if (!isCreating.value) {
-    const newPlan = convertOldPlanToNew(plan.value);
     const request = create(UpdatePlanRequestSchema, {
-      plan: newPlan,
+      plan: plan.value,
       updateMask: { paths: ["specs"] },
     });
     const response = await planServiceClientConnect.updatePlan(request);
-    const updated = convertNewPlanToOld(response);
-    Object.assign(plan.value, updated);
-    events.emit("status-changed", {
-      eager: true,
-    });
+    Object.assign(plan.value, response);
     pushNotification({
       module: "bytebase",
       style: "SUCCESS",

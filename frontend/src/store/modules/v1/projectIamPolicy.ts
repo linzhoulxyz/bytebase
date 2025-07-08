@@ -1,16 +1,8 @@
+import { create } from "@bufbuild/protobuf";
 import { isUndefined, uniq } from "lodash-es";
 import { defineStore } from "pinia";
 import { computed, ref, unref, watch } from "vue";
-import { create } from "@bufbuild/protobuf";
 import { projectServiceClientConnect } from "@/grpcweb";
-import {
-  GetIamPolicyRequestSchema,
-  SetIamPolicyRequestSchema,
-} from "@/types/proto-es/v1/iam_policy_pb";
-import {
-  BatchGetIamPolicyRequestSchema,
-} from "@/types/proto-es/v1/project_service_pb";
-import { convertNewIamPolicyToOld, convertOldIamPolicyToNew } from "@/utils/v1/project-conversions";
 import {
   ALL_USERS_USER_EMAIL,
   QueryPermissionQueryAny,
@@ -19,14 +11,20 @@ import {
   type MaybeRef,
   type QueryPermission,
 } from "@/types";
-import type { Expr } from "@/types/proto/google/api/expr/v1alpha1/syntax";
-import { IamPolicy } from "@/types/proto/v1/iam_policy";
-import type { User } from "@/types/proto/v1/user_service";
+import type { Expr } from "@/types/proto-es/google/api/expr/v1alpha1/syntax_pb";
+import {
+  GetIamPolicyRequestSchema,
+  SetIamPolicyRequestSchema,
+  IamPolicySchema,
+} from "@/types/proto-es/v1/iam_policy_pb";
+import type { IamPolicy } from "@/types/proto-es/v1/iam_policy_pb";
+import { BatchGetIamPolicyRequestSchema } from "@/types/proto-es/v1/project_service_pb";
+import type { User } from "@/types/proto-es/v1/user_service_pb";
 import { getUserEmailListInBinding } from "@/utils";
 import { convertFromExpr } from "@/utils/issue/cel";
-import { useCurrentUserV1 } from "./auth";
 import { useRoleStore } from "../role";
 import { useUserStore } from "../user";
+import { useCurrentUserV1 } from "./auth";
 import { usePermissionStore } from "./permission";
 
 export const useProjectIamPolicyStore = defineStore(
@@ -66,11 +64,10 @@ export const useProjectIamPolicyStore = defineStore(
       const requestPromise = projectServiceClientConnect
         .getIamPolicy(request)
         .then((response) => {
-          const policy = convertNewIamPolicyToOld(response);
-          return setIamPolicy(project, policy);
+          return setIamPolicy(project, response);
         });
       requestCache.set(project, requestPromise);
-      return request;
+      return requestPromise;
     };
 
     const batchFetchIamPolicy = async (projectList: string[]) => {
@@ -78,11 +75,11 @@ export const useProjectIamPolicyStore = defineStore(
         scope: "projects/-",
         names: projectList,
       });
-      const response = await projectServiceClientConnect.batchGetIamPolicy(request);
+      const response =
+        await projectServiceClientConnect.batchGetIamPolicy(request);
       for (const item of response.policyResults) {
         if (item.policy) {
-          const oldPolicy = convertNewIamPolicyToOld(item.policy);
-          await setIamPolicy(item.project, oldPolicy);
+          await setIamPolicy(item.project, item.policy);
         }
       }
     };
@@ -98,18 +95,17 @@ export const useProjectIamPolicyStore = defineStore(
       });
       const request = create(SetIamPolicyRequestSchema, {
         resource: project,
-        policy: convertOldIamPolicyToNew(policy),
+        policy: policy,
         etag: policy.etag,
       });
       const response = await projectServiceClientConnect.setIamPolicy(request);
-      const updated = convertNewIamPolicyToOld(response);
-      policyMap.value.set(project, updated);
+      policyMap.value.set(project, response);
 
       usePermissionStore().invalidCacheByProject(project);
     };
 
     const getProjectIamPolicy = (project: string) => {
-      return policyMap.value.get(project) ?? IamPolicy.fromPartial({});
+      return policyMap.value.get(project) ?? create(IamPolicySchema, {});
     };
 
     const getOrFetchProjectIamPolicy = async (project: string) => {
@@ -162,7 +158,7 @@ export const useProjectIamPolicy = (project: MaybeRef<string>) => {
     { immediate: true }
   );
   const policy = computed(() => {
-    return store.policyMap.get(unref(project)) ?? IamPolicy.fromPartial({});
+    return store.policyMap.get(unref(project)) ?? create(IamPolicySchema, {});
   });
   return { policy, ready };
 };

@@ -35,7 +35,8 @@ export const PROJECT_V1_ROUTE_RELEASES = `${PROJECT_V1_ROUTE_DASHBOARD}.release`
 export const PROJECT_V1_ROUTE_RELEASE_DETAIL = `${PROJECT_V1_ROUTE_DASHBOARD}.release.detail`;
 export const PROJECT_V1_ROUTE_ROLLOUTS = `${PROJECT_V1_ROUTE_DASHBOARD}.rollout`;
 export const PROJECT_V1_ROUTE_ROLLOUT_DETAIL = `${PROJECT_V1_ROUTE_ROLLOUTS}.detail`;
-export const PROJECT_V1_ROUTE_ROLLOUT_DETAIL_TASK_DETAIL = `${PROJECT_V1_ROUTE_ROLLOUT_DETAIL}.task.detail`;
+export const PROJECT_V1_ROUTE_ROLLOUT_DETAIL_STAGE_DETAIL = `${PROJECT_V1_ROUTE_ROLLOUT_DETAIL}.stage.detail`;
+export const PROJECT_V1_ROUTE_ROLLOUT_DETAIL_TASK_DETAIL = `${PROJECT_V1_ROUTE_ROLLOUT_DETAIL_STAGE_DETAIL}.task.detail`;
 
 const cicdRoutes: RouteRecordRaw[] = [
   {
@@ -58,7 +59,7 @@ const cicdRoutes: RouteRecordRaw[] = [
           {
             path: "specs",
             name: PROJECT_V1_ROUTE_PLAN_DETAIL_SPECS,
-            component: () => import("@/views/project/PlanSpecDetailView.vue"),
+            component: () => import("@/views/project/PlanSpecsView.vue"),
           },
           {
             path: "specs/:specId",
@@ -78,7 +79,7 @@ const cicdRoutes: RouteRecordRaw[] = [
         meta: {
           requiredPermissionList: () => ["bb.issues.get"],
         },
-        component: () => import("@/views/project/IssueDetailView.vue"),
+        component: () => import("@/views/project/IssueDetailV1View.vue"),
         props: true,
       },
       {
@@ -86,16 +87,27 @@ const cicdRoutes: RouteRecordRaw[] = [
         meta: {
           title: () => t("common.rollout"),
         },
+        component: () => import("@/views/project/RolloutDetailLayout.vue"),
         props: true,
         children: [
           {
             path: "",
             name: PROJECT_V1_ROUTE_ROLLOUT_DETAIL,
-            component: () => import("@/views/project/RolloutDetailView.vue"),
+            component: () =>
+              import(
+                "@/components/Plan/components/RolloutView/RolloutView.vue"
+              ),
             props: true,
             meta: {
               requiredPermissionList: () => ["bb.rollouts.get"],
             },
+          },
+          {
+            path: "stages/:stageId",
+            name: PROJECT_V1_ROUTE_ROLLOUT_DETAIL_STAGE_DETAIL,
+            component: () =>
+              import("@/components/Plan/components/RolloutView/StageView.vue"),
+            props: true,
           },
           {
             path: "stages/:stageId/tasks/:taskId",
@@ -234,17 +246,17 @@ const projectV1Routes: RouteRecordRaw[] = [
         path: "plans",
         name: PROJECT_V1_ROUTE_PLANS,
         meta: {
-          // TODO(claude): rename title to "Plans" later.
-          title: () => t("review-center.self"),
+          title: () => t("plan.plans"),
           requiredPermissionList: () => ["bb.databases.list", "bb.plans.list"],
         },
-        component: () => import("@/views/ReviewCenter/index.vue"),
+        component: () => import("@/views/project/ProjectPlanDashboard.vue"),
         props: true,
       },
       {
         path: "rollouts",
         name: PROJECT_V1_ROUTE_ROLLOUTS,
         meta: {
+          title: () => t("rollout.rollouts"),
           requiredPermissionList: () => ["bb.rollouts.list"],
         },
         component: () => import("@/views/project/ProjectRolloutDashboard.vue"),

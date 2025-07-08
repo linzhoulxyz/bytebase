@@ -1,8 +1,10 @@
+import { create as createProto } from "@bufbuild/protobuf";
 import { EMPTY_ID, UNKNOWN_ID } from "../const";
 import { State } from "../proto-es/v1/common_pb";
-import { convertStateToOld } from "@/utils/v1/common-conversions";
-import { IamPolicy } from "../proto/v1/iam_policy";
-import { Project } from "../proto/v1/project_service";
+import type { IamPolicy } from "../proto-es/v1/iam_policy_pb";
+import { IamPolicySchema } from "../proto-es/v1/iam_policy_pb";
+import type { Project } from "../proto-es/v1/project_service_pb";
+import { ProjectSchema } from "../proto-es/v1/project_service_pb";
 
 export const DEFAULT_PROJECT_UID = 1;
 export const EMPTY_PROJECT_NAME = `projects/${EMPTY_ID}`;
@@ -15,12 +17,12 @@ export interface ComposedProject extends Project {
 
 export const emptyProject = (): ComposedProject => {
   return {
-    ...Project.fromPartial({
+    ...createProto(ProjectSchema, {
       name: EMPTY_PROJECT_NAME,
       title: "",
-      state: convertStateToOld(State.ACTIVE),
+      state: State.ACTIVE,
     }),
-    iamPolicy: IamPolicy.fromPartial({}),
+    iamPolicy: createProto(IamPolicySchema, {}),
   };
 };
 

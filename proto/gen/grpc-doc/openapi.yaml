@@ -8310,9 +8310,9 @@ components:
                 level:
                     enum:
                         - ALERT_LEVEL_UNSPECIFIED
-                        - ALERT_LEVEL_INFO
-                        - ALERT_LEVEL_WARNING
-                        - ALERT_LEVEL_CRITICAL
+                        - INFO
+                        - WARNING
+                        - CRITICAL
                     type: string
                     description: The alert level of announcemnt
                     format: enum
@@ -8482,6 +8482,10 @@ components:
                          Some fields are omitted because they are too large or contain sensitive information.
                 status:
                     $ref: '#/components/schemas/Status'
+                latency:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                    description: The latency of the RPC.
                 serviceData:
                     allOf:
                         - $ref: '#/components/schemas/GoogleProtobufAny'
@@ -10325,8 +10329,8 @@ components:
                 type:
                     enum:
                         - TYPE_UNSPECIFIED
-                        - TYPE_VIRTUAL
-                        - TYPE_STORED
+                        - VIRTUAL
+                        - STORED
                     type: string
                     format: enum
                 expression:
@@ -11304,6 +11308,30 @@ components:
         LogoutRequest:
             type: object
             properties: {}
+        MaskingReason:
+            type: object
+            properties:
+                semanticTypeId:
+                    type: string
+                    description: The semantic type that triggered masking (e.g., "SSN", "email", "phone").
+                semanticTypeTitle:
+                    type: string
+                    description: Human-readable semantic type title.
+                maskingRuleId:
+                    type: string
+                    description: The masking rule ID that matched (if applicable).
+                algorithm:
+                    type: string
+                    description: The masking algorithm used.
+                context:
+                    type: string
+                    description: 'Additional context (e.g., "Matched global rule: PII Protection").'
+                classificationLevel:
+                    type: string
+                    description: Whether masking was due to classification level.
+                semanticTypeIcon:
+                    type: string
+                    description: Icon associated with the semantic type (if any).
         OAuth2IdentityProviderConfig:
             type: object
             properties:
@@ -12020,16 +12048,6 @@ components:
                     description: Rows of the query result.
                 rowsCount:
                     type: string
-                masked:
-                    type: array
-                    items:
-                        type: boolean
-                    description: Columns are masked or not.
-                sensitive:
-                    type: array
-                    items:
-                        type: boolean
-                    description: Columns are sensitive or not.
                 error:
                     type: string
                     description: The error message if the query failed.
@@ -12052,6 +12070,11 @@ components:
                     description: |-
                         Informational or debug messages returned by the database engine during query execution.
                          Examples include PostgreSQL's RAISE NOTICE, MSSQL's PRINT, or Oracle's DBMS_OUTPUT.PUT_LINE.
+                masked:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/MaskingReason'
+                    description: Masking reasons for each column (empty for non-masked columns).
         QueryResult_Message:
             type: object
             properties:
@@ -12693,8 +12716,8 @@ components:
                 maximumResultRows:
                     type: integer
                     description: |-
-                        The return rows limit.
-                         The default value is -1, means no limit.
+                        The return rows limit. If the value <= 0, will be treated as no limit.
+                         The default value is -1.
                     format: int32
         SQLReviewRule:
             type: object
@@ -13189,8 +13212,8 @@ components:
                          creator != "users/{email}"
                          starred == true
                          starred == false
-                         visibility in ["VISIBILITY_PRIVATE", "VISIBILITY_PROJECT_READ", "VISIBILITY_PROJECT_WRITE"]
-                         visibility == "VISIBILITY_PRIVATE"
+                         visibility in ["PRIVATE", "PROJECT_READ", "PROJECT_WRITE"]
+                         visibility == "PRIVATE"
                 pageSize:
                     type: integer
                     description: |-
@@ -13255,6 +13278,9 @@ components:
                     description: the description of the semantic type, it can be empty.
                 algorithm:
                     $ref: '#/components/schemas/Algorithm'
+                icon:
+                    type: string
+                    description: icon is the icon for semantic type, it can be emoji or base64 encoded image.
         SetIamPolicyRequest:
             required:
                 - resource
@@ -14255,15 +14281,15 @@ components:
                     items:
                         enum:
                             - TYPE_UNSPECIFIED
-                            - TYPE_NOTIFY_ISSUE_APPROVED
-                            - TYPE_NOTIFY_PIPELINE_ROLLOUT
-                            - TYPE_ISSUE_CREATE
-                            - TYPE_ISSUE_COMMENT_CREATE
-                            - TYPE_ISSUE_FIELD_UPDATE
-                            - TYPE_ISSUE_STATUS_UPDATE
-                            - TYPE_ISSUE_APPROVAL_NOTIFY
-                            - TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE
-                            - TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE
+                            - NOTIFY_ISSUE_APPROVED
+                            - NOTIFY_PIPELINE_ROLLOUT
+                            - ISSUE_CREATE
+                            - ISSUE_COMMENT_CREATE
+                            - ISSUE_FIELD_UPDATE
+                            - ISSUE_STATUS_UPDATE
+                            - ISSUE_APPROVAL_NOTIFY
+                            - ISSUE_PIPELINE_STAGE_STATUS_UPDATE
+                            - ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE
                         type: string
                         format: enum
                     description: |-
@@ -14335,9 +14361,9 @@ components:
                 visibility:
                     enum:
                         - VISIBILITY_UNSPECIFIED
-                        - VISIBILITY_PROJECT_READ
-                        - VISIBILITY_PROJECT_WRITE
-                        - VISIBILITY_PRIVATE
+                        - PROJECT_READ
+                        - PROJECT_WRITE
+                        - PRIVATE
                     type: string
                     format: enum
                 starred:

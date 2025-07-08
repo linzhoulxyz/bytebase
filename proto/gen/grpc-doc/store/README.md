@@ -734,6 +734,7 @@ ANY means approving any node will proceed.
 | request | [string](#string) |  | Marshalled request. |
 | response | [string](#string) |  | Marshalled response. Some fields are omitted because they are too large or contain sensitive information. |
 | status | [google.rpc.Status](#google-rpc-Status) |  |  |
+| latency | [google.protobuf.Duration](#google-protobuf-Duration) |  | The latency of the RPC. |
 | service_data | [google.protobuf.Any](#google-protobuf-Any) |  | service-specific data about the request, response, and other activities. |
 | request_metadata | [RequestMetadata](#bytebase-store-RequestMetadata) |  | Metadata about the operation. |
 
@@ -4445,6 +4446,7 @@ RestrictIssueCreationForSQLReviewPolicy is the policy configuration for restrict
 | title | [string](#string) |  | the title of the semantic type, it should not be empty. |
 | description | [string](#string) |  | the description of the semantic type, it can be empty. |
 | algorithm | [Algorithm](#bytebase-store-Algorithm) |  |  |
+| icon | [string](#string) |  | icon is the icon for semantic type, it can be emoji or base64 encoded image. |
 
 
 

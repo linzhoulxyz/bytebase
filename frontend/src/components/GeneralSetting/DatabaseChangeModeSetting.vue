@@ -43,6 +43,8 @@
 </template>
 
 <script lang="ts" setup>
+import { create } from "@bufbuild/protobuf";
+import { FieldMaskSchema } from "@bufbuild/protobuf/wkt";
 import { NButton } from "naive-ui";
 import { computed, reactive } from "vue";
 import { BBModal } from "@/bbkit";
@@ -94,7 +96,9 @@ const onUpdate = async () => {
     payload: {
       databaseChangeMode: state.databaseChangeMode,
     },
-    updateMask: ["value.workspace_profile_setting_value.database_change_mode"],
+    updateMask: create(FieldMaskSchema, {
+      paths: ["value.workspace_profile_setting_value.database_change_mode"],
+    }),
   });
   if (
     state.databaseChangeMode === DatabaseChangeMode.EDITOR &&

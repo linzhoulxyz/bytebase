@@ -131,6 +131,7 @@
 </template>
 
 <script lang="ts" setup>
+import { create } from "@bufbuild/protobuf";
 import { cloneDeep, isEqual } from "lodash-es";
 import { Trash2Icon } from "lucide-vue-next";
 import { NButton, NInput, NTooltip } from "naive-ui";
@@ -150,11 +151,12 @@ import {
   groupNamePrefix,
   extractUserId,
 } from "@/store/modules/v1/common";
+import type { Group, GroupMember } from "@/types/proto-es/v1/group_service_pb";
 import {
-  Group,
-  GroupMember,
+  GroupSchema,
+  GroupMemberSchema,
   GroupMember_Role,
-} from "@/types/proto/v1/group_service";
+} from "@/types/proto-es/v1/group_service_pb";
 import { isValidEmail, hasWorkspacePermissionV2 } from "@/utils";
 import RemoveGroupButton from "./RemoveGroupButton.vue";
 import GroupMemberRoleSelect from "./UserDataTableByGroup/cells/GroupMemberRoleSelect.vue";
@@ -190,7 +192,7 @@ const state = reactive<LocalState>({
     description: props.group?.description ?? "",
     members: cloneDeep(
       props.group?.members ?? [
-        GroupMember.fromPartial({
+        create(GroupMemberSchema, {
           role: GroupMember_Role.OWNER,
           member: `${userNamePrefix}${currentUserV1.value.email}`,
         }),
@@ -237,7 +239,7 @@ const validGroup = computed(() => {
       memberMap.set(member.member, member);
     }
   }
-  return Group.fromPartial({
+  return create(GroupSchema, {
     name: `${groupNamePrefix}${state.group.email}`,
     title: state.group.title,
     description: state.group.description,
@@ -264,7 +266,7 @@ const allowConfirm = computed(() => {
 });
 
 const addMember = () => {
-  const member = GroupMember.fromPartial({
+  const member = create(GroupMemberSchema, {
     role:
       state.group.members.length === 0
         ? GroupMember_Role.OWNER

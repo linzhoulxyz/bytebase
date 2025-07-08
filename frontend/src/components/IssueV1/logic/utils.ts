@@ -1,3 +1,6 @@
+import { create } from "@bufbuild/protobuf";
+import { NButton } from "naive-ui";
+import { h } from "vue";
 import { t } from "@/plugins/i18n";
 import {
   useDatabaseV1Store,
@@ -14,19 +17,17 @@ import {
   unknownInstance,
 } from "@/types";
 import { State } from "@/types/proto-es/v1/common_pb";
-import { create } from "@bufbuild/protobuf";
 import { InstanceResourceSchema } from "@/types/proto-es/v1/instance_service_pb";
-import { IssueStatus } from "@/types/proto/v1/issue_service";
-import type { Plan } from "@/types/proto/v1/plan_service";
-import { Task, Task_Status, Task_Type } from "@/types/proto/v1/rollout_service";
+import { IssueStatus } from "@/types/proto-es/v1/issue_service_pb";
+import type { Plan } from "@/types/proto-es/v1/plan_service_pb";
+import type { Task } from "@/types/proto-es/v1/rollout_service_pb";
+import { Task_Status, Task_Type } from "@/types/proto-es/v1/rollout_service_pb";
 import {
   defer,
   extractDatabaseResourceName,
   flattenTaskV1List,
   isValidIssueName,
 } from "@/utils";
-import { NButton } from "naive-ui";
-import { h } from "vue";
 import type { IssueContext } from "./context";
 
 export const projectOfIssue = (issue: ComposedIssue): ComposedProject =>
@@ -111,7 +112,8 @@ export const extractCoreDatabaseInfoFromDatabaseCreateTask = (
     }
 
     const environmentStore = useEnvironmentV1Store();
-    const { instance: instanceFromStore } = useInstanceResourceByName(instanceName);
+    const { instance: instanceFromStore } =
+      useInstanceResourceByName(instanceName);
     // Create InstanceResource from the instance data
     const instanceData = instanceFromStore.value;
     const instanceResource = create(InstanceResourceSchema, {
@@ -134,13 +136,14 @@ export const extractCoreDatabaseInfoFromDatabaseCreateTask = (
       project: project.name,
       projectEntity: project,
       effectiveEnvironment: instanceResource.environment,
-      effectiveEnvironmentEntity: effectiveEnvironmentEntity ?? unknownEnvironment(),
+      effectiveEnvironmentEntity:
+        effectiveEnvironmentEntity ?? unknownEnvironment(),
       instanceResource,
     };
   };
 
-  if (task.databaseCreate) {
-    const databaseName = task.databaseCreate.database;
+  if (task.payload?.case === "databaseCreate") {
+    const databaseName = task.payload.value.database;
     const instance = task.target;
     return coreDatabaseInfo(instance, databaseName);
   }

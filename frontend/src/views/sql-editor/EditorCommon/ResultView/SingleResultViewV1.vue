@@ -128,7 +128,7 @@
         :set-index="setIndex"
         :offset="pageIndex * pageSize"
         :is-sensitive-column="isSensitiveColumn"
-        :is-column-missing-sensitive="isColumnMissingSensitive"
+        :get-masking-reason="getMaskingReason"
       />
       <DataTable
         v-else
@@ -136,7 +136,7 @@
         :set-index="setIndex"
         :offset="pageIndex * pageSize"
         :is-sensitive-column="isSensitiveColumn"
-        :is-column-missing-sensitive="isColumnMissingSensitive"
+        :get-masking-reason="getMaskingReason"
       />
     </div>
 
@@ -183,6 +183,7 @@
 </template>
 
 <script lang="ts" setup>
+import { create } from "@bufbuild/protobuf";
 import type { ColumnDef } from "@tanstack/vue-table";
 import {
   getCoreRowModel,
@@ -208,7 +209,7 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { computed, reactive } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
+import { useRouter, type LocationQueryRaw } from "vue-router";
 import { BBAttention } from "@/bbkit";
 import type {
   DownloadContent,
@@ -235,14 +236,14 @@ import {
   isValidInstanceName,
 } from "@/types";
 import { Engine, ExportFormat } from "@/types/proto-es/v1/common_pb";
-import { convertExportFormatToOld } from "@/utils/v1/common-conversions";
-import { PolicyType } from "@/types/proto/v1/org_policy_service";
+import { PolicyType } from "@/types/proto-es/v1/org_policy_service_pb";
 import { DatabaseChangeMode } from "@/types/proto-es/v1/setting_service_pb";
-import type {
-  QueryResult,
-  QueryRow,
-  RowValue,
-} from "@/types/proto/v1/sql_service";
+import {
+  ExportRequestSchema,
+  type QueryResult,
+  type QueryRow,
+  type RowValue,
+} from "@/types/proto-es/v1/sql_service_pb";
 import {
   compareQueryRowValues,
   createExplainToken,
@@ -321,7 +322,9 @@ const { policy: exportDataPolicy } = usePolicyByParentAndType(
 );
 
 const disallowExportQueryData = computed(() => {
-  return exportDataPolicy.value?.exportDataPolicy?.disable ?? false;
+  return exportDataPolicy.value?.policy?.case === "exportDataPolicy"
+    ? exportDataPolicy.value.policy.value.disable
+    : false;
 });
 
 const viewMode = computed((): ViewMode => {
@@ -418,14 +421,26 @@ const data = computed(() => {
 });
 
 const isSensitiveColumn = (columnIndex: number): boolean => {
-  return props.result.masked[columnIndex] ?? false;
+  const maskingReason = props.result.masked?.[columnIndex];
+  // Check if maskingReason exists and has actual content (not empty object)
+  return (
+    maskingReason !== null &&
+    maskingReason !== undefined &&
+    maskingReason.semanticTypeId !== undefined &&
+    maskingReason.semanticTypeId !== ""
+  );
 };
 
-const isColumnMissingSensitive = (columnIndex: number): boolean => {
-  return (
-    (props.result.sensitive[columnIndex] ?? false) &&
-    !isSensitiveColumn(columnIndex)
-  );
+const getMaskingReason = (columnIndex: number) => {
+  if (!props.result.masked || columnIndex >= props.result.masked.length) {
+    return undefined;
+  }
+  const reason = props.result.masked[columnIndex];
+  // Return undefined for empty masking reasons
+  if (!reason || !reason.semanticTypeId) {
+    return undefined;
+  }
+  return reason;
 };
 
 const table = useVueTable<QueryRow>({
@@ -479,15 +494,17 @@ const handleExportBtnClick = async ({
   const limit = options.limit ?? (admin ? 0 : editorStore.resultRowsLimit);
 
   try {
-    const content = await useSQLStore().exportData({
-      name: props.database.name,
-      dataSourceId: props.params.connection.dataSourceId ?? "",
-      format: convertExportFormatToOld(options.format),
-      statement,
-      limit,
-      admin,
-      password: options.password,
-    });
+    const content = await useSQLStore().exportData(
+      create(ExportRequestSchema, {
+        name: props.database.name,
+        dataSourceId: props.params.connection.dataSourceId ?? "",
+        format: options.format,
+        statement,
+        limit,
+        admin,
+        password: options.password,
+      })
+    );
 
     resolve([
       {
@@ -510,7 +527,7 @@ const handleRequestExport = async () => {
   const issueType = "bb.issue.database.data.export";
   const sqlStorageKey = `bb.issues.sql.${uuidv4()}`;
   useStorageStore().put(sqlStorageKey, props.result.statement);
-  const query: Record<string, any> = {
+  const query: LocationQueryRaw = {
     template: issueType,
     name: generateIssueTitle(issueType, [database.databaseName]),
     databaseList: database.name,
@@ -562,7 +579,7 @@ const queryTime = computed(() => {
   if (!latency) return "-";
 
   const { seconds, nanos } = latency;
-  const totalSeconds = seconds.toNumber() + nanos / 1e9;
+  const totalSeconds = Number(seconds) + nanos / 1e9;
   if (totalSeconds < 1) {
     const totalMS = Math.round(totalSeconds * 1000);
     return `${totalMS} ms`;

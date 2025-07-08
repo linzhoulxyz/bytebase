@@ -11,7 +11,9 @@
     >
       <span>
         {{ $t("database.revision.applied-at") }}:
-        <HumanizeDate :date="getDateForPbTimestamp(revision.createTime)" />
+        <HumanizeDate
+          :date="getDateForPbTimestampProtoEs(revision.createTime)"
+        />
       </span>
       <span v-if="relatedIssueUID">
         {{ $t("common.issue") }}:
@@ -48,17 +50,16 @@
 </template>
 
 <script lang="ts" setup>
+import { create } from "@bufbuild/protobuf";
 import { NDivider } from "naive-ui";
 import { computed, reactive, ref, watch } from "vue";
-import { create } from "@bufbuild/protobuf";
-import { GetTaskRunRequestSchema } from "@/types/proto-es/v1/rollout_service_pb";
-import { convertNewTaskRunToOld } from "@/utils/v1/rollout-conversions";
 import { MonacoEditor } from "@/components/MonacoEditor";
 import { CopyButton } from "@/components/v2";
 import { rolloutServiceClientConnect } from "@/grpcweb";
 import { useRevisionStore, useSheetV1Store } from "@/store";
-import { getDateForPbTimestamp, type ComposedDatabase } from "@/types";
-import type { TaskRun } from "@/types/proto/v1/rollout_service";
+import { getDateForPbTimestampProtoEs, type ComposedDatabase } from "@/types";
+import { GetTaskRunRequestSchema } from "@/types/proto-es/v1/rollout_service_pb";
+import type { TaskRun } from "@/types/proto-es/v1/rollout_service_pb";
 import { extractIssueUID, getSheetStatement } from "@/utils";
 import TaskRunLogTable from "../IssueV1/components/TaskRunSection/TaskRunLogTable/TaskRunLogTable.vue";
 import HumanizeDate from "../misc/HumanizeDate.vue";
@@ -94,11 +95,10 @@ watch(
         name: revision.taskRun,
       });
       const response = await rolloutServiceClientConnect.getTaskRun(request);
-      const taskRunData = convertNewTaskRunToOld(response);
-      taskRun.value = taskRunData;
+      taskRun.value = response;
       // Prepare the sheet data from task run.
-      if (taskRunData.sheet) {
-        await sheetStore.getOrFetchSheetByName(taskRunData.sheet, "FULL");
+      if (response.sheet) {
+        await sheetStore.getOrFetchSheetByName(response.sheet, "FULL");
       }
     }
     state.loading = false;

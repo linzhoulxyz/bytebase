@@ -1,3 +1,4 @@
+import { create } from "@bufbuild/protobuf";
 import { extractGroupEmail, useGroupStore, useUserStore } from "@/store";
 import {
   extractUserId,
@@ -10,10 +11,11 @@ import {
   groupBindingPrefix,
 } from "@/types";
 import { State } from "@/types/proto-es/v1/common_pb";
-import { convertStateToOld } from "@/utils/v1/common-conversions";
-import { Group } from "@/types/proto/v1/group_service";
-import { IamPolicy } from "@/types/proto/v1/iam_policy";
-import { User, UserType } from "@/types/proto/v1/user_service";
+import { GroupSchema } from "@/types/proto-es/v1/group_service_pb";
+import type { IamPolicy } from "@/types/proto-es/v1/iam_policy_pb";
+import { UserSchema } from "@/types/proto-es/v1/user_service_pb";
+import type { User } from "@/types/proto-es/v1/user_service_pb";
+import { UserType } from "@/types/proto-es/v1/user_service_pb";
 import type { MemberBinding, GroupBinding } from "./types";
 
 const getMemberBinding = async (
@@ -40,12 +42,12 @@ const getMemberBinding = async (
     if (!group) {
       const email = extractGroupEmail(member);
       group = {
-        ...Group.create({
+        ...create(GroupSchema, {
           name: `${groupNamePrefix}${email}`,
           title: email,
         }),
         deleted: true,
-      } as GroupBinding;
+      };
     }
 
     memberBinding = {
@@ -66,18 +68,18 @@ const getMemberBinding = async (
 
     if (!user) {
       const email = extractUserId(member);
-      user = User.create({
+      user = create(UserSchema, {
         title: member,
         name: `${userNamePrefix}${email}`,
         email: email,
         userType: UserType.USER,
-        state: convertStateToOld(State.DELETED),
+        state: State.DELETED,
       });
     }
     memberBinding = {
       type: "users",
       title: user.title,
-      user,
+      user: user,
       binding: getUserEmailInBinding(user.email),
       workspaceLevelRoles: new Set<string>(),
       projectRoleBindings: [],

@@ -1,11 +1,17 @@
-import { head } from "lodash-es";
 import { create } from "@bufbuild/protobuf";
 import { createContextValues } from "@connectrpc/connect";
+import { head } from "lodash-es";
 import { celServiceClientConnect } from "@/grpcweb";
 import { silentContextKey } from "@/grpcweb/context-key";
+import type { Expr as CELExpr } from "@/types/proto-es/google/api/expr/v1alpha1/syntax_pb";
+import {
+  ConstantSchema,
+  Expr_CallSchema,
+  Expr_CreateListSchema,
+  Expr_IdentSchema,
+  ExprSchema,
+} from "@/types/proto-es/google/api/expr/v1alpha1/syntax_pb";
 import { BatchParseRequestSchema } from "@/types/proto-es/v1/cel_service_pb";
-import { Expr as CELExpr } from "@/types/proto/google/api/expr/v1alpha1/syntax";
-import { convertNewExprToOld } from "@/utils/v1/cel-conversions";
 import type { ConditionExpr, ConditionGroupExpr, SimpleExpr } from "../types";
 import {
   isEqualityExpr,
@@ -42,14 +48,7 @@ export const buildCELExpr = async (
       const response = await celServiceClientConnect.batchParse(request, {
         contextValues: createContextValues().set(silentContextKey, true),
       });
-      // Convert the first expression from new to old format
-      const newExpr = head(response.expressions);
-      const celExpr = newExpr ? convertNewExprToOld(newExpr) : undefined;
-      if (celExpr) {
-        return celExpr;
-      } else {
-        return undefined;
-      }
+      return head(response.expressions);
     }
     throw new Error(`unexpected type "${String(expr)}"`);
   };
@@ -128,10 +127,10 @@ export const buildCELExpr = async (
   }
 };
 
-const wrapCELExpr = (object: any): CELExpr => {
-  return CELExpr.fromPartial({
-    id: seq.next(),
-    ...object,
+const wrapCELExpr = (object: CELExpr["exprKind"]): CELExpr => {
+  return create(ExprSchema, {
+    id: BigInt(seq.next()),
+    exprKind: object,
   });
 };
 
@@ -139,16 +138,24 @@ const wrapCELExpr = (object: any): CELExpr => {
 const wrapConstExpr = (value: number | string | Date): CELExpr => {
   if (typeof value === "string") {
     return wrapCELExpr({
-      constExpr: {
-        stringValue: value,
-      },
+      case: "constExpr",
+      value: create(ConstantSchema, {
+        constantKind: {
+          case: "stringValue",
+          value,
+        },
+      }),
     });
   }
   if (typeof value === "number") {
     return wrapCELExpr({
-      constExpr: {
-        int64Value: value,
-      },
+      case: "constExpr",
+      value: create(ConstantSchema, {
+        constantKind: {
+          case: "int64Value",
+          value: BigInt(value),
+        },
+      }),
     });
   }
   throw new Error(`unexpected value "${value}"`);
@@ -156,17 +163,19 @@ const wrapConstExpr = (value: number | string | Date): CELExpr => {
 
 const wrapListExpr = (values: string[] | number[]): CELExpr => {
   return wrapCELExpr({
-    listExpr: {
+    case: "listExpr",
+    value: create(Expr_CreateListSchema, {
       elements: values.map(wrapConstExpr),
-    },
+    }),
   });
 };
 
 const wrapIdentExpr = (name: string): CELExpr => {
   return wrapCELExpr({
-    identExpr: {
+    case: "identExpr",
+    value: create(Expr_IdentSchema, {
       name,
-    },
+    }),
   });
 };
 
@@ -175,14 +184,15 @@ const wrapCallExpr = (
   args: CELExpr[],
   target?: CELExpr
 ): CELExpr => {
-  const object: Record<string, any> = {
+  const object = create(Expr_CallSchema, {
     function: operator,
     args,
-  };
+  });
   if (target) {
     object.target = target;
   }
   return wrapCELExpr({
-    callExpr: object,
+    case: "callExpr",
+    value: object,
   });
 };

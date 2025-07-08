@@ -10,17 +10,50 @@
     <div
       class="w-full flex flex-row justify-between items-center gap-2 px-2 pt-2 pb-1"
     >
-      <p>
-        <span class="text-base font-medium">
+      <div class="flex items-center space-x-1">
+        <span
+          class="text-base font-medium"
+          :class="[isCreated && 'cursor-pointer hover:underline']"
+          @click="handleClickStageTitle"
+        >
           {{ environmentStore.getEnvironmentByName(stage.environment).title }}
         </span>
-        <NTag class="ml-2" v-if="!isCreated" round size="tiny">Preview</NTag>
-      </p>
-      <div v-if="isCreated">
-        <RunTasksButton :stage="stage" @run-tasks="showRunTasksPanel = true" />
+        <NTag v-if="!isCreated" round size="tiny">{{
+          $t("common.preview")
+        }}</NTag>
+      </div>
+      <div class="flex justify-end items-center">
+        <RunTasksButton
+          v-if="isCreated"
+          :stage="stage"
+          :disabled="!canRunTasks || runableTasks.length === 0"
+          @run-tasks="handleRunAllTasks"
+        />
+        <NPopconfirm
+          v-else-if="!isCreated && canCreateRollout"
+          :negative-text="null"
+          :positive-text="$t('common.confirm')"
+          :positive-button-props="{ size: 'tiny' }"
+          @positive-click="createRolloutToStage"
+        >
+          <template #trigger>
+            <NTooltip>
+              <template #trigger>
+                <NButton text size="small">
+                  <template #icon>
+                    <CircleFadingPlusIcon class="w-4 h-4" />
+                  </template>
+                </NButton>
+              </template>
+              {{ $t("common.create") }}
+            </NTooltip>
+          </template>
+          {{ $t("common.confirm-and-add") }}
+        </NPopconfirm>
       </div>
     </div>
     <NVirtualList
+      v-if="filteredTasks.length > 0"
       style="max-height: 80vh"
       :items="filteredTasks"
       :item-size="40"
@@ -49,37 +82,51 @@
         </div>
       </template>
     </NVirtualList>
+    <div v-else class="text-center text-zinc-500 py-2 text-sm leading-6">
+      {{ $t("task.no-tasks") }}
+    </div>
 
     <!-- Task Rollout Action Panel -->
     <TaskRolloutActionPanel
-      :action="showRunTasksPanel ? 'RUN_TASKS' : undefined"
-      :stage="stage"
-      @close="showRunTasksPanel = false"
+      :show="showRunTasksPanel"
+      action="RUN"
+      :target="{ type: 'tasks', stage, tasks: runableTasks }"
+      @close="handlePanelClose"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { NTag, NTooltip, NVirtualList } from "naive-ui";
+import { create } from "@bufbuild/protobuf";
+import { CircleFadingPlusIcon } from "lucide-vue-next";
+import { NTag, NTooltip, NVirtualList, NButton, NPopconfirm } from "naive-ui";
 import { twMerge } from "tailwind-merge";
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { semanticTaskType } from "@/components/IssueV1";
-import TaskStatus from "@/components/Rollout/RolloutDetail/Panels/kits/TaskStatus.vue";
-import { PROJECT_V1_ROUTE_ROLLOUT_DETAIL_TASK_DETAIL } from "@/router/dashboard/projectV1";
-import { useCurrentProjectV1, useEnvironmentV1Store } from "@/store";
-import { extractProjectResourceName } from "@/utils";
+import TaskStatus from "@/components/Rollout/kits/TaskStatus.vue";
+import { rolloutServiceClientConnect } from "@/grpcweb";
 import {
-  Stage,
-  type Task,
-  type Task_Status,
-} from "@/types/proto/v1/rollout_service";
+  PROJECT_V1_ROUTE_ROLLOUT_DETAIL_TASK_DETAIL,
+  PROJECT_V1_ROUTE_ROLLOUT_DETAIL_STAGE_DETAIL,
+} from "@/router/dashboard/projectV1";
+import {
+  useCurrentProjectV1,
+  useEnvironmentV1Store,
+  pushNotification,
+} from "@/store";
+import { CreateRolloutRequestSchema } from "@/types/proto-es/v1/rollout_service_pb";
+import type { Stage, Task } from "@/types/proto-es/v1/rollout_service_pb";
+import { Task_Status } from "@/types/proto-es/v1/rollout_service_pb";
+import { extractProjectResourceName } from "@/utils";
 import { extractSchemaVersionFromTask } from "@/utils";
+import { usePlanContextWithRollout } from "../../logic";
 import RunTasksButton from "./RunTasksButton.vue";
 import TaskDatabaseName from "./TaskDatabaseName.vue";
 import TaskRolloutActionPanel from "./TaskRolloutActionPanel.vue";
 import { useRolloutViewContext } from "./context";
+import { useTaskActionPermissions } from "./taskPermissions";
 
 const props = defineProps<{
   stage: Stage;
@@ -90,14 +137,13 @@ const { t: $t } = useI18n();
 const router = useRouter();
 const { project } = useCurrentProjectV1();
 const environmentStore = useEnvironmentV1Store();
+const { events } = usePlanContextWithRollout();
 const { rollout } = useRolloutViewContext();
+const { canPerformTaskAction } = useTaskActionPermissions();
 
 const showRunTasksPanel = ref(false);
 
 const isCreated = computed(() => {
-  if (!rollout.value) {
-    return false;
-  }
   return rollout.value.stages.some(
     (stage) => stage.environment === props.stage.environment
   );
@@ -112,12 +158,34 @@ const filteredTasks = computed(() => {
   );
 });
 
+const runableTasks = computed(() => {
+  return filteredTasks.value.filter(
+    (task) =>
+      task.status === Task_Status.NOT_STARTED ||
+      task.status === Task_Status.PENDING ||
+      task.status === Task_Status.FAILED ||
+      task.status === Task_Status.CANCELED
+  );
+});
+
+const canRunTasks = computed(() => {
+  return canPerformTaskAction(
+    filteredTasks.value,
+    rollout.value,
+    project.value
+  );
+});
+
+const canCreateRollout = computed(() => {
+  return canRunTasks.value;
+});
+
 // Helper function to extract IDs from task and stage names
 const getTaskRouteParams = (task: Task) => {
-  const rolloutId = rollout.value?.name.split('/').pop();
-  const stageId = props.stage.name.split('/').pop();
-  const taskId = task.name.split('/').pop();
-  
+  const rolloutId = rollout.value.name.split("/").pop();
+  const stageId = props.stage.name.split("/").pop();
+  const taskId = task.name.split("/").pop();
+
   return { rolloutId, stageId, taskId };
 };
 
@@ -135,5 +203,63 @@ const handleTaskClick = (task: Task) => {
       },
     });
   }
+};
+
+const handleRunAllTasks = () => {
+  showRunTasksPanel.value = true;
+};
+
+const handlePanelClose = () => {
+  showRunTasksPanel.value = false;
+};
+
+const createRolloutToStage = async () => {
+  try {
+    const request = create(CreateRolloutRequestSchema, {
+      parent: project.value.name,
+      rollout: {
+        plan: rollout.value.plan,
+      },
+      target: props.stage.environment,
+    });
+    await rolloutServiceClientConnect.createRollout(request);
+
+    pushNotification({
+      module: "bytebase",
+      style: "SUCCESS",
+      title: $t("common.success"),
+      description: $t("common.created"),
+    });
+
+    // Trigger immediate refresh of rollout data
+    events.emit("status-changed", { eager: true });
+  } catch (error) {
+    pushNotification({
+      module: "bytebase",
+      style: "CRITICAL",
+      title: $t("common.error"),
+      description: String(error),
+    });
+  }
+};
+
+const handleClickStageTitle = () => {
+  // Only navigate if the stage is created
+  if (!isCreated.value) return;
+
+  const rolloutId = rollout.value.name.split("/").pop();
+  const stageId = props.stage.name.split("/").pop();
+
+  if (!rolloutId || !stageId) return;
+
+  // Navigate to the stage detail route
+  router.push({
+    name: PROJECT_V1_ROUTE_ROLLOUT_DETAIL_STAGE_DETAIL,
+    params: {
+      projectId: extractProjectResourceName(project.value.name),
+      rolloutId,
+      stageId,
+    },
+  });
 };
 </script>

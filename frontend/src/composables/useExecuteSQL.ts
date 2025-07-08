@@ -1,20 +1,12 @@
+import { create } from "@bufbuild/protobuf";
+import { Code } from "@connectrpc/connect";
+import { createContextValues } from "@connectrpc/connect";
 import Emittery from "emittery";
 import { head, isEmpty, cloneDeep } from "lodash-es";
-import { Code } from "@connectrpc/connect";
-import { Status } from "nice-grpc-common";
-import { create } from "@bufbuild/protobuf";
-import { createContextValues } from "@connectrpc/connect";
 import { v4 as uuidv4 } from "uuid";
 import { markRaw, reactive } from "vue";
 import { sqlServiceClientConnect } from "@/grpcweb";
 import { ignoredCodesContextKey } from "@/grpcweb/context-key";
-import { 
-  CheckRequestSchema,
-  CheckRequest_ChangeType as NewCheckRequest_ChangeType,
-} from "@/types/proto-es/v1/sql_service_pb";
-import {
-  convertNewCheckResponseToOld,
-} from "@/utils/v1/sql-conversions";
 import { t } from "@/plugins/i18n";
 import {
   pushNotification,
@@ -39,14 +31,19 @@ import type {
   QueryDataSourceType,
 } from "@/types";
 import { isValidDatabaseName } from "@/types";
-import { PlanFeature } from "@/types/proto-es/v1/subscription_service_pb";
 import { Engine } from "@/types/proto-es/v1/common_pb";
-import { DatabaseGroupView } from "@/types/proto/v1/database_group_service";
+import { DatabaseGroupView } from "@/types/proto-es/v1/database_group_service_pb";
 import {
-  Advice,
+  CheckRequestSchema,
+  CheckRequest_ChangeType as NewCheckRequest_ChangeType,
+  QueryRequestSchema,
+} from "@/types/proto-es/v1/sql_service_pb";
+import type { Advice } from "@/types/proto-es/v1/sql_service_pb";
+import {
   Advice_Status,
-  advice_StatusToJSON,
-} from "@/types/proto/v1/sql_service";
+  QueryOptionSchema,
+} from "@/types/proto-es/v1/sql_service_pb";
+import { PlanFeature } from "@/types/proto-es/v1/subscription_service_pb";
 import {
   getValidDataSourceByPolicy,
   hasPermissionToCreateChangeDatabaseIssue,
@@ -137,13 +134,13 @@ const useExecuteSQL = () => {
       statement: params.statement,
       changeType: NewCheckRequest_ChangeType.SQL_EDITOR,
     });
-    const newResponse = await sqlServiceClientConnect.check(request, {
-      contextValues: createContextValues()
-        .set(ignoredCodesContextKey, [Code.PermissionDenied]),
+    const response = await sqlServiceClientConnect.check(request, {
+      contextValues: createContextValues().set(ignoredCodesContextKey, [
+        Code.PermissionDenied,
+      ]),
       signal: abortController?.signal,
     });
-    const response = convertNewCheckResponseToOld(newResponse);
-    const { advices } = response;
+    const advices = response.advices;
     events.emit("update:advices", { tab, params, advices });
     return { passed: advices.length === 0, advices };
   };
@@ -162,7 +159,7 @@ const useExecuteSQL = () => {
         adviceStatus = "WARNING";
       }
 
-      adviceNotifyMessage += `${advice_StatusToJSON(advice.status)}: ${
+      adviceNotifyMessage += `${Advice_Status[advice.status]}: ${
         advice.title
       }\n`;
       if (advice.content) {
@@ -247,7 +244,7 @@ const useExecuteSQL = () => {
               {
                 skipCache: false,
                 silent: true,
-                view: DatabaseGroupView.DATABASE_GROUP_VIEW_FULL,
+                view: DatabaseGroupView.FULL,
               }
             );
             for (const matchedDatabase of databaseGroup.matchedDatabases) {
@@ -341,7 +338,7 @@ const useExecuteSQL = () => {
         error,
         results: [],
         advices,
-        status: Status.ABORTED,
+        status: Code.Aborted,
       });
     };
 
@@ -386,7 +383,7 @@ const useExecuteSQL = () => {
         advices: [],
         error: t("sql-editor.no-data-source"),
         results: [],
-        status: Status.NOT_FOUND,
+        status: Code.NotFound,
       });
     }
 
@@ -397,12 +394,15 @@ const useExecuteSQL = () => {
         advices: [],
         error: t("sql-editor.request-aborted"),
         results: [],
-        status: Status.ABORTED,
+        status: Code.Aborted,
       });
     }
 
+    const queryOption = create(QueryOptionSchema, {
+      redisRunCommandsOn: sqlEditorStore.redisCommandOption,
+    });
     const resultSet = await sqlStore.query(
-      {
+      create(QueryRequestSchema, {
         name: database.name,
         dataSourceId: dataSourceId,
         statement: context.params.statement,
@@ -410,10 +410,8 @@ const useExecuteSQL = () => {
         explain: context.params.explain,
         schema: context.params.connection.schema,
         container: context.params.connection.table,
-        queryOption: {
-          redisRunCommandsOn: sqlEditorStore.redisCommandOption,
-        },
-      },
+        queryOption: queryOption,
+      }),
       abortController.signal
     );
 
@@ -474,13 +472,13 @@ const useExecuteSQL = () => {
 const isOnlySelectError = (resultSet: SQLResultSetV1) => {
   if (
     resultSet.error === "Support SELECT sql statement only" &&
-    resultSet.status === Status.INVALID_ARGUMENT
+    resultSet.status === Code.InvalidArgument
   ) {
     return true;
   }
   if (
     resultSet.error.match(/disallow execute (DML|DDL) statement/) &&
-    resultSet.status === Status.PERMISSION_DENIED
+    resultSet.status === Code.PermissionDenied
   ) {
     return true;
   }

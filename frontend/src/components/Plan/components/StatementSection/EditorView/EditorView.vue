@@ -9,7 +9,7 @@
           >
             {{ statementTitle }}
           </span>
-          <span v-if="isCreating" class="text-red-600">*</span>
+          <span v-if="isEmpty(state.statement)" class="text-red-600">*</span>
         </div>
       </div>
       <div class="flex items-center justify-end gap-x-2">
@@ -165,7 +165,8 @@
 </template>
 
 <script setup lang="ts">
-import { cloneDeep, head, isEmpty } from "lodash-es";
+import { create } from "@bufbuild/protobuf";
+import { cloneDeep, includes, isEmpty } from "lodash-es";
 import { ExpandIcon } from "lucide-vue-next";
 import { NButton, NTooltip, useDialog } from "naive-ui";
 import { v1 as uuidv1 } from "uuid";
@@ -184,12 +185,7 @@ import {
 } from "@/components/Plan/logic";
 import DownloadSheetButton from "@/components/Sheet/DownloadSheetButton.vue";
 import SQLUploadButton from "@/components/misc/SQLUploadButton.vue";
-import { create } from "@bufbuild/protobuf";
 import { planServiceClientConnect } from "@/grpcweb";
-import { UpdatePlanRequestSchema } from "@/types/proto-es/v1/plan_service_pb";
-import { convertOldPlanToNew, convertNewPlanToOld } from "@/utils/v1/plan-conversions";
-import { convertEngineToOld } from "@/utils/v1/common-conversions";
-import { Engine } from "@/types/proto-es/v1/common_pb";
 import {
   pushNotification,
   useCurrentProjectV1,
@@ -197,19 +193,22 @@ import {
 } from "@/store";
 import type { SQLDialect } from "@/types";
 import { dialectOfEngineV1 } from "@/types";
-import { Sheet } from "@/types/proto/v1/sheet_service";
+import { UpdatePlanRequestSchema } from "@/types/proto-es/v1/plan_service_pb";
+import { Task_Status } from "@/types/proto-es/v1/rollout_service_pb";
+import { SheetSchema } from "@/types/proto-es/v1/sheet_service_pb";
 import {
   getSheetStatement,
   getStatementSize,
   setSheetStatement,
   useInstanceV1EditorLanguage,
 } from "@/utils";
-import { usePlanSpecContext } from "../../SpecDetailView/context";
+import { useSelectedSpec } from "../../SpecDetailView/context";
 import { useSQLAdviceMarkers } from "../useSQLAdviceMarkers";
-import type { EditState } from "./useTempEditState";
-import { useTempEditState } from "./useTempEditState";
+import { useSpecSheet } from "../useSpecSheet";
 
-type LocalState = EditState & {
+type LocalState = {
+  isEditing: boolean;
+  statement: string;
   showEditorModal: boolean;
   isUploadingFile: boolean;
 };
@@ -217,8 +216,8 @@ type LocalState = EditState & {
 const { t } = useI18n();
 const dialog = useDialog();
 const { project } = useCurrentProjectV1();
-const { isCreating, plan, events, planCheckRunList } = usePlanContext();
-const { selectedSpec } = usePlanSpecContext();
+const { isCreating, plan, planCheckRuns, rollout, events } = usePlanContext();
+const selectedSpec = useSelectedSpec();
 const monacoEditorRef = ref<InstanceType<typeof MonacoEditor>>();
 
 const state = reactive<LocalState>({
@@ -248,7 +247,7 @@ const statementTitle = computed(() => {
   return language.value === "sql" ? t("common.sql") : t("common.statement");
 });
 const planCheckRunsForSelectedSpec = computed(() =>
-  planCheckRunListForSpec(planCheckRunList.value, selectedSpec.value)
+  planCheckRunListForSpec(planCheckRuns.value, selectedSpec.value)
 );
 const { markers } = useSQLAdviceMarkers(
   isCreating,
@@ -268,13 +267,9 @@ const isEditorReadonly = computed(() => {
   return !state.isEditing || isSheetOversize.value || false;
 });
 
-const {
-  sheet,
-  sheetName,
-  sheetReady,
-  sheetStatement,
-  reset: resetTempEditState,
-} = useTempEditState(state);
+const { sheet, sheetName, sheetReady, sheetStatement } = useSpecSheet(
+  selectedSpec.value
+);
 
 const isSheetOversize = computed(() => {
   if (isCreating.value) return false;
@@ -300,8 +295,25 @@ const shouldShowEditButton = computed(() => {
   if (state.isEditing) {
     return false;
   }
-  if (plan.value.issue) {
-    return false;
+  if (plan.value.rollout && rollout?.value) {
+    const tasks = rollout.value.stages
+      .flatMap((stage) => stage.tasks)
+      .filter((task) => task.specId === selectedSpec.value.id);
+    if (
+      tasks.some((task) =>
+        includes(
+          [
+            Task_Status.RUNNING,
+            Task_Status.PENDING,
+            Task_Status.DONE,
+            Task_Status.SKIPPED,
+          ],
+          task.status
+        )
+      )
+    ) {
+      return false;
+    }
   }
   return true;
 });
@@ -330,7 +342,6 @@ const beginEdit = () => {
 const saveEdit = async () => {
   try {
     await updateStatement(state.statement);
-    resetTempEditState();
   } finally {
     state.isEditing = false;
   }
@@ -384,7 +395,6 @@ const handleUpdateStatement = async (statement: string, filename: string) => {
     if (sheet.value) {
       sheet.value.title = filename;
     }
-    resetTempEditState();
   } finally {
     state.isUploadingFile = false;
   }
@@ -392,46 +402,41 @@ const handleUpdateStatement = async (statement: string, filename: string) => {
 
 const updateStatement = async (statement: string) => {
   const planPatch = cloneDeep(plan.value);
-  if (!planPatch) {
-    return;
-  }
-  const specsToPatch = planPatch.specs.filter(
+  const specToPatch = planPatch.specs.find(
     (spec) => spec.id === selectedSpec.value.id
   );
-  const specEngine = await databaseEngineForSpec(head(specsToPatch));
-  const sheet = Sheet.fromPartial({
+  if (!specToPatch) {
+    throw new Error(
+      `Cannot find spec to patch for plan update ${JSON.stringify(
+        selectedSpec.value
+      )}`
+    );
+  }
+  if (specToPatch.config.case !== "changeDatabaseConfig") {
+    throw new Error(
+      `Unsupported spec type for plan update ${JSON.stringify(specToPatch)}`
+    );
+  }
+  const specEngine = await databaseEngineForSpec(specToPatch);
+  const sheet = create(SheetSchema, {
     ...createEmptyLocalSheet(),
     title: plan.value.title,
-    engine: convertEngineToOld((specEngine ?? Engine.ENGINE_UNSPECIFIED) as Engine),
+    engine: specEngine,
   });
   setSheetStatement(sheet, statement);
   const createdSheet = await useSheetV1Store().createSheet(
     project.value.name,
     sheet
   );
-
-  for (const spec of specsToPatch) {
-    if (spec.changeDatabaseConfig) {
-      spec.changeDatabaseConfig.sheet = createdSheet.name;
-    } else if (spec.exportDataConfig) {
-      spec.exportDataConfig.sheet = createdSheet.name;
-    } else {
-      throw new Error(
-        `Unsupported spec type for plan update ${JSON.stringify(spec)}`
-      );
-    }
-  }
-
-  const newPlan = convertOldPlanToNew(planPatch);
+  specToPatch.config.value.sheet = createdSheet.name;
   const request = create(UpdatePlanRequestSchema, {
-    plan: newPlan,
+    plan: planPatch,
     updateMask: { paths: ["specs"] },
   });
-  const response = await planServiceClientConnect.updatePlan(request);
-  const updatedPlan = convertNewPlanToOld(response);
-
-  Object.assign(plan.value, updatedPlan);
-  events.emit("status-changed", { eager: true });
+  await planServiceClientConnect.updatePlan(request);
+  events.emit("status-changed", {
+    eager: true,
+  });
   pushNotification({
     module: "bytebase",
     style: "SUCCESS",
@@ -465,11 +470,5 @@ watch(isCreating, (curr, prev) => {
   if (!curr && prev) {
     state.isEditing = false;
   }
-});
-
-defineExpose({
-  get editor() {
-    return monacoEditorRef.value;
-  },
 });
 </script>

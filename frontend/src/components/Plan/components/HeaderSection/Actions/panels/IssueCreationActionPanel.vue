@@ -3,40 +3,24 @@
     :show="action !== undefined"
     :title="title"
     :loading="state.loading"
-    @show="resetState"
     @close="$emit('close')"
   >
     <template #default>
       <div v-if="action" class="flex flex-col gap-y-4 px-1">
         <div class="flex flex-col gap-y-1">
-          <div class="font-medium text-control">Plan</div>
-          <div class="textinfolabel">
+          <div class="text-control">{{ $t("plan.self") }}</div>
+          <div class="font-medium">
             {{ plan.title }}
           </div>
         </div>
 
         <div class="flex flex-col gap-y-1">
-          <div class="font-medium text-control">
+          <div class="text-control">
             {{ $t("common.description") }}
           </div>
-          <div class="textinfolabel">
+          <div class="textlabel">
             {{ plan.description || "No description" }}
           </div>
-        </div>
-
-        <div class="flex flex-col gap-y-1">
-          <p class="font-medium text-control">
-            {{ $t("common.comment") }}
-          </p>
-          <NInput
-            v-model:value="comment"
-            type="textarea"
-            :placeholder="$t('issue.leave-a-comment')"
-            :autosize="{
-              minRows: 3,
-              maxRows: 10,
-            }"
-          />
         </div>
       </div>
     </template>
@@ -46,7 +30,7 @@
         class="w-full flex flex-row justify-end items-center gap-2"
       >
         <div class="flex justify-end gap-x-3">
-          <NButton @click="$emit('close')">
+          <NButton @click="$emit('close')" quaternary>
             {{ $t("common.cancel") }}
           </NButton>
 
@@ -57,7 +41,7 @@
                 :disabled="confirmErrors.length > 0"
                 @click="handleConfirm"
               >
-                {{ $t("common.create") }}
+                {{ $t("common.confirm") }}
               </NButton>
             </template>
             <template #default>
@@ -73,7 +57,7 @@
 <script setup lang="ts">
 import { create } from "@bufbuild/protobuf";
 import { uniqBy } from "lodash-es";
-import { NButton, NInput, NTooltip, useDialog } from "naive-ui";
+import { NButton, NTooltip } from "naive-ui";
 import { computed, nextTick, reactive, ref, watchEffect } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -87,30 +71,32 @@ import { planCheckRunSummaryForCheckRunList } from "@/components/PlanCheckRun/co
 import {
   issueServiceClientConnect,
   rolloutServiceClientConnect,
-  planServiceClientConnect,
 } from "@/grpcweb";
-import { PROJECT_V1_ROUTE_PLAN_DETAIL } from "@/router/dashboard/projectV1";
+import {
+  PROJECT_V1_ROUTE_ISSUE_DETAIL,
+  PROJECT_V1_ROUTE_ISSUE_DETAIL_V1,
+} from "@/router/dashboard/projectV1";
 import {
   useCurrentProjectV1,
   useCurrentUserV1,
   usePolicyV1Store,
 } from "@/store";
-import { emptyIssue } from "@/types";
 import { CreateIssueRequestSchema } from "@/types/proto-es/v1/issue_service_pb";
-import { UpdatePlanRequestSchema } from "@/types/proto-es/v1/plan_service_pb";
+import {
+  IssueSchema,
+  IssueStatus,
+  Issue_Type,
+} from "@/types/proto-es/v1/issue_service_pb";
+import { PolicyType } from "@/types/proto-es/v1/org_policy_service_pb";
+import { PlanCheckRun_Result_Status } from "@/types/proto-es/v1/plan_service_pb";
 import { CreateRolloutRequestSchema } from "@/types/proto-es/v1/rollout_service_pb";
-import { Issue, IssueStatus, Issue_Type } from "@/types/proto/v1/issue_service";
-import { PolicyType } from "@/types/proto/v1/org_policy_service";
-import { PlanCheckRun_Result_Status } from "@/types/proto/v1/plan_service";
 import {
   extractProjectResourceName,
   hasProjectPermissionV2,
-  extractPlanUID,
+  extractIssueUID,
+  isDev,
+  issueV1Slug,
 } from "@/utils";
-import {
-  convertNewIssueToOld,
-  convertOldIssueToNew,
-} from "@/utils/v1/issue-conversions";
 
 type IssueCreationAction = "CREATE";
 
@@ -127,15 +113,13 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const router = useRouter();
-const dialog = useDialog();
 const state = reactive<LocalState>({
   loading: false,
 });
 const { project } = useCurrentProjectV1();
 const currentUser = useCurrentUserV1();
 const policyV1Store = usePolicyV1Store();
-const { plan, planCheckRunList, events } = usePlanContext();
-const comment = ref("");
+const { plan, planCheckRuns, events } = usePlanContext();
 const restrictIssueCreationForSqlReviewPolicy = ref(false);
 
 const title = computed(() => {
@@ -149,7 +133,7 @@ const title = computed(() => {
 const planCheckStatus = computed((): PlanCheckRun_Result_Status => {
   const planCheckList = uniqBy(
     plan.value.specs.flatMap((spec) =>
-      planCheckRunListForSpec(planCheckRunList.value, spec)
+      planCheckRunListForSpec(planCheckRuns.value, spec)
     ),
     (checkRun) => checkRun.name
   );
@@ -194,7 +178,11 @@ watchEffect(async () => {
       parentPath: "",
       policyType: PolicyType.RESTRICT_ISSUE_CREATION_FOR_SQL_REVIEW,
     });
-  if (workspaceLevelPolicy?.restrictIssueCreationForSqlReviewPolicy?.disallow) {
+  if (
+    workspaceLevelPolicy?.policy?.case ===
+      "restrictIssueCreationForSqlReviewPolicy" &&
+    workspaceLevelPolicy.policy.value.disallow
+  ) {
     restrictIssueCreationForSqlReviewPolicy.value = true;
     return;
   }
@@ -204,7 +192,11 @@ watchEffect(async () => {
       parentPath: project.value.name,
       policyType: PolicyType.RESTRICT_ISSUE_CREATION_FOR_SQL_REVIEW,
     });
-  if (projectLevelPolicy?.restrictIssueCreationForSqlReviewPolicy?.disallow) {
+  if (
+    projectLevelPolicy?.policy?.case ===
+      "restrictIssueCreationForSqlReviewPolicy" &&
+    projectLevelPolicy.policy.value.disallow
+  ) {
     restrictIssueCreationForSqlReviewPolicy.value = true;
     return;
   }
@@ -214,18 +206,7 @@ watchEffect(async () => {
 });
 
 const handleConfirm = async () => {
-  const { action } = props;
-  if (!action) return;
-
-  dialog.info({
-    title: t("common.confirm"),
-    content: t("issue.this-plan-will-be-converted-to-a-new-issue"),
-    negativeText: t("common.cancel"),
-    positiveText: t("common.create"),
-    onPositiveClick: async () => {
-      await doCreateIssue();
-    },
-  });
+  await doCreateIssue();
 };
 
 const doCreateIssue = async () => {
@@ -233,18 +214,16 @@ const doCreateIssue = async () => {
 
   try {
     const issueToCreate = {
-      ...Issue.fromPartial(buildIssue()),
+      ...buildIssue(),
       rollout: "",
       plan: plan.value.name,
     };
-    const newIssue = convertOldIssueToNew(issueToCreate);
     const issueRequest = create(CreateIssueRequestSchema, {
       parent: project.value.name,
-      issue: newIssue,
+      issue: issueToCreate,
     });
-    const newCreatedIssue =
+    const createdIssue =
       await issueServiceClientConnect.createIssue(issueRequest);
-    convertNewIssueToOld(newCreatedIssue);
 
     // Then create the rollout from the plan
     const rolloutRequest = create(CreateRolloutRequestSchema, {
@@ -254,32 +233,30 @@ const doCreateIssue = async () => {
         plan: plan.value.name,
       },
     });
-    const createdRollout = await rolloutServiceClientConnect.createRollout(rolloutRequest);
-
-    // Update the plan to include the rollout reference
-    const updatePlanRequest = create(UpdatePlanRequestSchema, {
-      plan: {
-        name: plan.value.name,
-        rollout: createdRollout.name,
-      },
-      updateMask: {
-        paths: ["rollout"],
-      },
-    });
-    await planServiceClientConnect.updatePlan(updatePlanRequest);
+    await rolloutServiceClientConnect.createRollout(rolloutRequest);
 
     // Emit status changed to refresh the UI
     events.emit("status-changed", { eager: true });
 
     nextTick(() => {
-      // Stay on the plan page to see the rollout actions
-      router.push({
-        name: PROJECT_V1_ROUTE_PLAN_DETAIL,
-        params: {
-          projectId: extractProjectResourceName(plan.value.name),
-          planId: extractPlanUID(plan.value.name),
-        },
-      });
+      if (isDev()) {
+        router.push({
+          name: PROJECT_V1_ROUTE_ISSUE_DETAIL_V1,
+          params: {
+            projectId: extractProjectResourceName(plan.value.name),
+            issueId: extractIssueUID(createdIssue.name),
+          },
+        });
+      } else {
+        // TODO(steven): remove me please.
+        router.push({
+          name: PROJECT_V1_ROUTE_ISSUE_DETAIL,
+          params: {
+            projectId: extractProjectResourceName(plan.value.name),
+            issueSlug: issueV1Slug(createdIssue.name, createdIssue.title),
+          },
+        });
+      }
     });
   } finally {
     state.loading = false;
@@ -288,16 +265,14 @@ const doCreateIssue = async () => {
 };
 
 const buildIssue = () => {
-  const issue = emptyIssue();
-  issue.creator = `users/${currentUser.value.email}`;
-  issue.title = plan.value.title;
-  issue.description = plan.value.description;
-  issue.status = IssueStatus.OPEN;
-  issue.type = Issue_Type.DATABASE_CHANGE;
-  return issue;
-};
-
-const resetState = () => {
-  comment.value = "";
+  return create(IssueSchema, {
+    name: "",
+    rollout: "",
+    creator: `users/${currentUser.value.email}`,
+    title: plan.value.title,
+    description: plan.value.description,
+    status: IssueStatus.OPEN,
+    type: Issue_Type.DATABASE_CHANGE,
+  });
 };
 </script>

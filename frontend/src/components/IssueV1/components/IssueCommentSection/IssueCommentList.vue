@@ -111,6 +111,7 @@
 </template>
 
 <script setup lang="ts">
+import { create } from "@bufbuild/protobuf";
 import { PencilIcon } from "lucide-vue-next";
 import { NButton } from "naive-ui";
 import { computed, onMounted, reactive, ref, watch, watchEffect } from "vue";
@@ -127,7 +128,7 @@ import {
 } from "@/store";
 import { isValidProjectName } from "@/types";
 import type { ComposedIssue } from "@/types";
-import { ListIssueCommentsRequest } from "@/types/proto/v1/issue_service";
+import { ListIssueCommentsRequestSchema } from "@/types/proto-es/v1/issue_service_pb";
 import { hasProjectPermissionV2 } from "@/utils";
 import { useIssueContext } from "../../logic";
 import {
@@ -181,7 +182,7 @@ const prepareIssueListForMarkdownEditor = async () => {
 
 const prepareIssueComments = async () => {
   await issueCommentStore.listIssueComments(
-    ListIssueCommentsRequest.fromPartial({
+    create(ListIssueCommentsRequestSchema, {
       parent: issue.value.name,
       // Try to get all comments at once with max page size.
       pageSize: 1000,

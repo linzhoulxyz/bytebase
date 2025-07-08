@@ -129,6 +129,8 @@
     "delete": "Eliminar",
     "history": "Historial",
     "loading": "Cargando",
+    "just-now": "En este momento",
+    "n-seconds-ago": "Hace {count} segundos",
     "copy": "Copiar",
     "copied": "Copiado",
     "click-to-copy": "Haga clic para copiar",
@@ -172,6 +174,7 @@
     "will-override-current-data": "Se sobrescribirán los datos actuales.",
     "rollout": "Implementar",
     "upload": "Subir",
+    "clear": "Limpiar",
     "added": "Agregado",
     "revoke": "Revocar",
     "cannot-undo-this-action": "No se puede deshacer esta acción",
@@ -278,6 +281,14 @@
     "cancel-task": "Cancelar tarea | Cancelar tareas",
     "created": "Creado",
     "run-immediately": "Ejecutar tarea inmediatamente",
+    "selected-n-tasks": "{n} tarea seleccionada | {n} tareas seleccionadas",
+    "no-tasks": "Sin tareas",
+    "no-tasks-selected": "No hay tareas seleccionadas",
+    "no-runnable-tasks": "No hay tareas ejecutables",
+    "no-skippable-tasks": "No hay tareas que se puedan omitir",
+    "no-cancellable-tasks": "No hay tareas cancelables",
+    "cross-stage-not-supported": "No se admiten operaciones entre etapas",
+    "no-permission": "No hay permiso para realizar esta acción",
     "scheduled-time": "Hora programada",
     "select-scheduled-time": "Seleccionar hora programada",
     "error": {
@@ -571,6 +582,7 @@
           },
           "rows": {
             "self": "Máximo de filas de resultados de SQL",
+            "rows": "Filas",
             "description": "Limite las filas de salida en el resultado de la consulta SQL, el valor <= 0 significa que no hay límite."
           }
         },
@@ -579,7 +591,8 @@
             "self": "Tiempo máximo de consulta",
             "description": "El tiempo máximo permitido para ejecutar una consulta en el Editor SQL.",
             "no-time-limit": "No hay límite de tiempo para las consultas cuando se establece en 0."
-          }
+          },
+          "seconds": "Artículos de segunda clase"
         },
         "domain-restriction": {
           "self": "Dominio de espacio de trabajo",
@@ -682,6 +695,7 @@
         "use-predefined-type": "Utiliza el Tipo Predefinido",
         "add-from-template": "Agregar desde plantilla",
         "table": {
+          "icon": "Icono",
           "semantic-type": "Tipo Semántico",
           "description": "Descripción",
           "masking-algorithm": "Algoritmo de enmascaramiento",
@@ -960,7 +974,6 @@
       "sql-review-violations": "Infracciones de revisión de SQL"
     },
     "error": {
-      "issue-is-not-open": "El tema no está abierto.",
       "you-don-have-privilege-to-edit-this-issue": "No tienes privilegios para editar este número.",
       "you-are-not-allowed-to-perform-this-action": "No tienes permiso para realizar esta acción.",
       "cannot-close-issue-with-running-tasks": "No se puede cerrar el problema con las tareas en ejecución"
@@ -1009,7 +1022,6 @@
       }
     },
     "sql-review-only": "Sólo revisión de SQL",
-    "this-plan-will-be-converted-to-a-new-issue": "Este plan se convertirá en una nueva edición.",
     "title": {
       "edit-schema": "Editar esquema",
       "change-data": "Cambiar datos",
@@ -1027,9 +1039,15 @@
       "rejected": "Rechazado",
       "under-review": "Bajo revisión"
     },
-    "expermental-page": {
-      "self": "Página de problemas experimentales"
-    }
+    "approval": {
+      "rejected-title": "Aprobación de emisión rechazada",
+      "pending-title": "Aprobación de emisión pendiente",
+      "rejected-description": "Este problema ha sido rechazado por los aprobadores. Se requiere una implementación forzada para continuar.",
+      "pending-description": "Este problema está pendiente de aprobación. Se requiere una implementación forzada para continuar.",
+      "rejected-error": "Se ha rechazado la aprobación del problema. Habilite la implementación forzada para continuar.",
+      "pending-error": "La aprobación del problema está pendiente. Habilite la implementación forzada para continuar."
+    },
+    "new-layout": "Nuevo diseño de CI/CD"
   },
   "plan": {
     "self": "Plan",
@@ -1047,7 +1065,6 @@
       "description": "Ver y administrar todas las especificaciones de este plan",
       "total-specs": "Especificaciones totales",
       "total-targets": "Objetivos totales",
-      "check-status": "Verificar estado",
       "no-checks": "Sin controles",
       "affected-resources": "Recursos afectados"
     },
@@ -1103,10 +1120,14 @@
     },
     "checks": {
       "self": "Cheques"
+    },
+    "refresh-indicator": {
+      "last-refresh": "Última actualización: {time}"
     }
   },
   "rollout": {
-    "rollouts": "Despliegues"
+    "rollouts": "Despliegues",
+    "force-rollout": "Despliegue de fuerza"
   },
   "quick-action": {
     "create-db": "Crear base de datos",
@@ -1755,7 +1776,7 @@
         },
         "max-retries": {
           "self": "Los reintentos máximos cuentan para el tiempo de espera de bloqueo",
-          "description": "Las reintentos máximas cuentan para el tiempo de espera de bloqueo al ejecutar la tarea. El valor predeterminado es 0."
+          "description": "Las reintentos máximas cuentan para el tiempo de espera de bloqueo al ejecutar la tarea. \nEl valor predeterminado es 0. Solo aplicable a Postgres."
         },
         "ci-sampling-size": {
           "self": "Tamaño de muestreo de datos de CI",
@@ -2059,7 +2080,8 @@
       "no-default": "Sin valor predeterminado",
       "expression": "Expresión",
       "null": "NULL",
-      "value": "Valor"
+      "value": "Valor",
+      "placeholder": "Introduzca un valor predeterminado o déjelo vacío si no hay ningún valor predeterminado"
     },
     "message": {
       "invalid-schema-name": "Nombre de esquema inválido",
@@ -2188,7 +2210,7 @@
         "title": "Gratis"
       },
       "team": {
-        "title": "Equipo"
+        "title": "Pro"
       },
       "enterprise": {
         "title": "Empresa"
@@ -2289,6 +2311,7 @@
       "request": "Pedido",
       "response": "Respuesta",
       "status": "Estatus",
+      "latency": "Estado latente",
       "service-data": "Datos del Servicio"
     },
     "advanced-search": {
@@ -2653,9 +2676,6 @@
     "self": "centro de exportacion",
     "permission-denied": "Permiso denegado"
   },
-  "review-center": {
-    "self": "Centro de revisión"
-  },
   "schema-designer": {
     "use-tips": "Selecciona las tablas a diseñar"
   },
@@ -2790,6 +2810,16 @@
       "built-in": "Utilice la muestra incorporada",
       "built-in-desc": "Generar proyecto de muestra e instancias"
     }
+  },
+  "masking": {
+    "reason": {
+      "title": "¿Por qué están enmascarados estos datos?",
+      "semantic-type": "Tipo semántico",
+      "algorithm": "Método de enmascaramiento",
+      "context": "Regla",
+      "classification": "Nivel de clasificación"
+    },
+    "algorithms": {}
   },
   "landing": {
     "quick-link": {

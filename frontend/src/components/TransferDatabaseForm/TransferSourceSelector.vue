@@ -1,5 +1,5 @@
 <template>
-  <div class="textlabel">
+  <div>
     <div
       class="flex flex-col md:flex-row md:items-center gap-y-2 justify-between"
     >
@@ -98,6 +98,9 @@ const changeInstanceFilter = (name: string | undefined) => {
     return emit("update:instance", undefined);
   }
 
-  emit("update:instance", useInstanceResourceByName(name).instance.value as InstanceResource);
+  emit(
+    "update:instance",
+    useInstanceResourceByName(name).instance.value as InstanceResource
+  );
 };
 </script>

@@ -112,6 +112,7 @@
 </template>
 
 <script lang="ts" setup>
+import { Code } from "@connectrpc/connect";
 import { Info } from "lucide-vue-next";
 import {
   darkTheme,
@@ -120,7 +121,6 @@ import {
   NTabs,
   NTooltip,
 } from "naive-ui";
-import { Status } from "nice-grpc-common";
 import { computed, ref, toRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { darkThemeOverrides } from "@/../naive-ui.config";
@@ -139,7 +139,7 @@ import type {
   SQLEditorQueryParams,
   SQLResultSetV1,
 } from "@/types";
-import { PolicyType } from "@/types/proto/v1/org_policy_service";
+import { PolicyType } from "@/types/proto-es/v1/org_policy_service_pb";
 import { hasWorkspacePermissionV2 } from "@/utils";
 import { provideBinaryFormatContext } from "./DataTable/binary-format-store";
 import DetailPanel from "./DetailPanel";
@@ -186,7 +186,7 @@ const detail: SQLResultViewContext["detail"] = ref(undefined);
 provideBinaryFormatContext(computed(() => props.contextId));
 
 const missingResource = computed((): DatabaseResource | undefined => {
-  if (props.resultSet?.status !== Status.PERMISSION_DENIED) {
+  if (props.resultSet?.status !== Code.PermissionDenied) {
     return;
   }
   const prefix = "permission denied to access resource: ";
@@ -252,7 +252,10 @@ const disallowCopyingData = computed(() => {
       parentPath: props.database?.project,
       policyType: PolicyType.DISABLE_COPY_DATA,
     });
-    if (projectLevelPolicy?.disableCopyDataPolicy?.active) {
+    if (
+      projectLevelPolicy?.policy?.case === "disableCopyDataPolicy" &&
+      projectLevelPolicy.policy.value.active
+    ) {
       return true;
     }
     // If the database is provided, use its effective environment.
@@ -264,7 +267,10 @@ const disallowCopyingData = computed(() => {
     parentPath: environment,
     policyType: PolicyType.DISABLE_COPY_DATA,
   });
-  if (policy?.disableCopyDataPolicy?.active) {
+  if (
+    policy?.policy?.case === "disableCopyDataPolicy" &&
+    policy.policy.value.active
+  ) {
     return true;
   }
   return false;

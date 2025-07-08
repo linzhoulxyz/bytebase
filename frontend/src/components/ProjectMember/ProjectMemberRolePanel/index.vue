@@ -125,7 +125,7 @@
     v-if="state.showAddMemberPanel"
     :project="project"
     :bindings="[
-      Binding.fromPartial({
+      create(BindingSchema, {
         members: [binding.binding],
       }),
     ]"
@@ -134,6 +134,7 @@
 </template>
 
 <script lang="tsx" setup>
+import { create } from "@bufbuild/protobuf";
 import { cloneDeep, isEqual } from "lodash-es";
 import { Building2Icon, PenIcon, TrashIcon } from "lucide-vue-next";
 import { NButton, NTag, NTooltip, NDataTable, useDialog } from "naive-ui";
@@ -158,8 +159,8 @@ import {
 import type { ComposedProject, DatabaseResource } from "@/types";
 import { PresetRoleType, PRESET_ROLES } from "@/types";
 import { State } from "@/types/proto-es/v1/common_pb";
-import { Binding } from "@/types/proto/v1/iam_policy";
-import { convertStateToOld } from "@/utils/v1/common-conversions";
+import type { Binding } from "@/types/proto-es/v1/iam_policy_pb";
+import { BindingSchema } from "@/types/proto-es/v1/iam_policy_pb";
 import {
   displayRoleTitle,
   hasProjectPermissionV2,
@@ -323,7 +324,7 @@ const getDataTableColumns = (
             text
             class="cursor-pointer opacity-60 hover:opacity-100"
             onClick={() => {
-              editingBinding.value = Binding.fromPartial({
+              editingBinding.value = create(BindingSchema, {
                 role: role,
                 members: [props.binding.binding],
                 condition: singleBinding.rawBinding.condition,
@@ -373,7 +374,7 @@ const getDataTableColumns = (
 // 1. Disallow removing the last OWNER.
 // 2. Allow workspace roles who can manage project. This helps when the project OWNER is no longer available.
 const allowRemoveRole = (role: string) => {
-  if (props.project.state === convertStateToOld(State.DELETED)) {
+  if (props.project.state === State.DELETED) {
     return false;
   }
   if (props.binding.type === "groups") {
@@ -479,7 +480,7 @@ const handleDeleteCondition = async (
           .map((b) => b.databaseResource) as DatabaseResource[];
 
         policy.bindings.push(
-          Binding.fromPartial({
+          create(BindingSchema, {
             role: item.role,
             members: [props.binding.binding],
             condition: buildConditionExpr({

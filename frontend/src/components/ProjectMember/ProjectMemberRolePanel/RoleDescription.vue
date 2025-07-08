@@ -12,14 +12,13 @@
 </template>
 
 <script lang="ts" setup>
+import { create } from "@bufbuild/protobuf";
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { create } from "@bufbuild/protobuf";
 import { issueServiceClientConnect } from "@/grpcweb";
-import { GetIssueRequestSchema } from "@/types/proto-es/v1/issue_service_pb";
-import { convertNewIssueToOld } from "@/utils/v1/issue-conversions";
 import { pushNotification } from "@/store";
 import { UNKNOWN_ID } from "@/types";
+import { GetIssueRequestSchema } from "@/types/proto-es/v1/issue_service_pb";
 import { isValidIssueName } from "@/utils";
 
 type DescriptionType = "TEXT" | "ISSUE";
@@ -44,8 +43,7 @@ const gotoIssuePage = async () => {
   const request = create(GetIssueRequestSchema, {
     name: `projects/-/issues/${issueUID.value}`,
   });
-  const newIssue = await issueServiceClientConnect.getIssue(request);
-  const issue = convertNewIssueToOld(newIssue);
+  const issue = await issueServiceClientConnect.getIssue(request);
   if (!isValidIssueName(issue.name)) {
     pushNotification({
       module: "bytebase",

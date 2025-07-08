@@ -1,6 +1,6 @@
 <template>
   <template v-if="initialized">
-    <ArchiveBanner v-if="convertStateToNew(project.state) === State.DELETED" class="py-2" />
+    <ArchiveBanner v-if="project.state === State.DELETED" class="py-2" />
     <template v-if="isDefaultProject">
       <h1 class="mb-4 text-xl font-bold leading-6 text-main truncate">
         {{ $t("database.unassigned-databases") }}
@@ -60,9 +60,9 @@
 </template>
 
 <script lang="tsx" setup>
+import type { ConnectError } from "@connectrpc/connect";
 import { UsersIcon } from "lucide-vue-next";
 import { NButton, NEllipsis, NSpin } from "naive-ui";
-import type { ClientError } from "nice-grpc-web";
 import { computed, reactive, watchEffect } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
@@ -93,9 +93,8 @@ import {
   PresetRoleType,
   UNKNOWN_PROJECT_NAME,
 } from "@/types";
-import { PlanFeature } from "@/types/proto-es/v1/subscription_service_pb";
 import { State } from "@/types/proto-es/v1/common_pb";
-import { convertStateToNew } from "@/utils/v1/common-conversions";
+import { PlanFeature } from "@/types/proto-es/v1/subscription_service_pb";
 import { hasProjectPermissionV2 } from "@/utils";
 import { useBodyLayoutContext } from "./common";
 
@@ -133,7 +132,7 @@ watchEffect(async () => {
       module: "bytebase",
       style: "CRITICAL",
       title: `Failed to fetch project ${props.projectId}`,
-      description: (err as ClientError).details,
+      description: (err as ConnectError).message,
     });
 
     const projectRoute = router.resolve({
@@ -178,7 +177,7 @@ const hasPermission = computed(() => {
 });
 
 const allowEdit = computed(() => {
-  if (convertStateToNew(project.value.state) === State.DELETED) {
+  if (project.value.state === State.DELETED) {
     return false;
   }
 
@@ -195,7 +194,7 @@ const hasRequestRoleFeature = featureToRef(
 );
 
 const quickActionListForDatabase = computed(() => {
-  if (convertStateToNew(project.value.state) !== State.ACTIVE) {
+  if (project.value.state !== State.ACTIVE) {
     return [];
   }
 

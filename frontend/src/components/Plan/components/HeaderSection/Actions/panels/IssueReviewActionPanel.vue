@@ -78,6 +78,7 @@
 </template>
 
 <script setup lang="ts">
+import { create } from "@bufbuild/protobuf";
 import { NButton, NCheckbox, NInput, NTooltip } from "naive-ui";
 import { computed, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -85,13 +86,13 @@ import CommonDrawer from "@/components/IssueV1/components/Panel/CommonDrawer.vue
 import { ErrorList } from "@/components/IssueV1/components/common";
 import { usePlanContextWithIssue } from "@/components/Plan/logic";
 import RequiredStar from "@/components/RequiredStar.vue";
-import { create } from "@bufbuild/protobuf";
 import { issueServiceClientConnect } from "@/grpcweb";
-import { 
+import {
   ApproveIssueRequestSchema,
   RejectIssueRequestSchema,
-  RequestIssueRequestSchema
+  RequestIssueRequestSchema,
 } from "@/types/proto-es/v1/issue_service_pb";
+import { PlanCheckRun_Status } from "@/types/proto-es/v1/plan_service_pb";
 import type { IssueReviewAction } from "../unified";
 
 type LocalState = {
@@ -109,7 +110,7 @@ const { t } = useI18n();
 const state = reactive<LocalState>({
   loading: false,
 });
-const { issue, planCheckRunList, events } = usePlanContextWithIssue();
+const { issue, planCheckRuns, events } = usePlanContextWithIssue();
 const comment = ref("");
 const performActionAnyway = ref(false);
 
@@ -144,11 +145,11 @@ const planCheckErrors = computed(() => {
   const errors: string[] = [];
   if (props.action === "APPROVE") {
     // Check plan check runs for errors
-    const failedRuns = planCheckRunList.value.filter(
-      (run) => run.status === "FAILED"
+    const failedRuns = planCheckRuns.value.filter(
+      (run) => run.status === PlanCheckRun_Status.FAILED
     );
-    const runningRuns = planCheckRunList.value.filter(
-      (run) => run.status === "RUNNING"
+    const runningRuns = planCheckRuns.value.filter(
+      (run) => run.status === PlanCheckRun_Status.RUNNING
     );
 
     if (failedRuns.length > 0) {

@@ -70,6 +70,7 @@
 </template>
 
 <script lang="tsx" setup>
+import { create } from "@bufbuild/protobuf";
 import { ShieldCheckIcon } from "lucide-vue-next";
 import { NButton } from "naive-ui";
 import { computed, reactive, watch } from "vue";
@@ -85,12 +86,13 @@ import { isCurrentColumnException } from "@/components/SensitiveData/utils";
 import { SearchBox } from "@/components/v2";
 import { featureToRef, usePolicyV1Store, useDatabaseCatalog } from "@/store";
 import { type ComposedDatabase } from "@/types";
-import { PlanFeature } from "@/types/proto-es/v1/subscription_service_pb";
 import {
   ObjectSchema_Type,
   type ObjectSchema,
 } from "@/types/proto-es/v1/database_catalog_service_pb";
-import { PolicyType } from "@/types/proto/v1/org_policy_service";
+import { MaskingExceptionPolicySchema } from "@/types/proto-es/v1/org_policy_service_pb";
+import { PolicyType } from "@/types/proto-es/v1/org_policy_service_pb";
+import { PlanFeature } from "@/types/proto-es/v1/subscription_service_pb";
 import { hasProjectPermissionV2, instanceV1MaskingForNoSQL } from "@/utils";
 
 const props = defineProps<{
@@ -171,7 +173,10 @@ const flattenObjectSchema = (
       }
       return resp;
     case ObjectSchema_Type.ARRAY:
-      if (objectSchema.kind?.case === "arrayKind" && objectSchema.kind.value.kind) {
+      if (
+        objectSchema.kind?.case === "arrayKind" &&
+        objectSchema.kind.value.kind
+      ) {
         return flattenObjectSchema(parentPath, objectSchema.kind.value.kind);
       }
       return [];
@@ -273,7 +278,9 @@ const removeMaskingExceptions = async (sensitiveColumn: MaskData) => {
   }
 
   const exceptions = (
-    policy.maskingExceptionPolicy?.maskingExceptions ?? []
+    policy.policy?.case === "maskingExceptionPolicy"
+      ? policy.policy.value.maskingExceptions
+      : []
   ).filter(
     (exception) =>
       !isCurrentColumnException(exception, {
@@ -282,9 +289,11 @@ const removeMaskingExceptions = async (sensitiveColumn: MaskData) => {
       })
   );
 
-  policy.maskingExceptionPolicy = {
-    ...(policy.maskingExceptionPolicy ?? {}),
-    maskingExceptions: exceptions,
+  policy.policy = {
+    case: "maskingExceptionPolicy",
+    value: create(MaskingExceptionPolicySchema, {
+      maskingExceptions: exceptions,
+    }),
   };
   await policyStore.upsertPolicy({
     parentPath: props.database.project,

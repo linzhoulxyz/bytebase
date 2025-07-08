@@ -9,12 +9,12 @@
     />
 
     <!-- Panels -->
+    <IssueCreationActionPanel
+      :action="pendingIssueCreationAction"
+      @close="pendingIssueCreationAction = undefined"
+    />
 
     <template v-if="issue">
-      <IssueCreationActionPanel
-        :action="pendingIssueCreationAction"
-        @close="pendingIssueCreationAction = undefined"
-      />
       <IssueReviewActionPanel
         :action="pendingReviewAction"
         @close="pendingReviewAction = undefined"
@@ -41,7 +41,7 @@ import {
 import {
   IssueStatus,
   Issue_Approver_Status,
-} from "@/types/proto/v1/issue_service";
+} from "@/types/proto-es/v1/issue_service_pb";
 import { isUserIncludedInList, hasProjectPermissionV2 } from "@/utils";
 import { CreateButton } from "./create";
 import {
@@ -160,8 +160,6 @@ const availableActions = computed(() => {
   if (canClose) {
     actions.push("CLOSE");
   }
-
-  // No separate rollout creation - handled when creating issue
 
   return actions;
 });

@@ -129,6 +129,8 @@
     "delete": "消去",
     "history": "履歴",
     "loading": "読み込み中",
+    "just-now": "ちょうど今",
+    "n-seconds-ago": "{count} 秒前",
     "copy": "コピー",
     "copied": "コピーされました",
     "click-to-copy": "クリックしてコピー",
@@ -172,6 +174,7 @@
     "will-override-current-data": "現在のデータは上書きされます。",
     "rollout": "リリース",
     "upload": "アップロード",
+    "clear": "クリア",
     "added": "作成した",
     "revoke": "キャンセル",
     "cannot-undo-this-action": "この操作は元に戻せません",
@@ -278,6 +281,14 @@
     "cancel-task": "タスクをキャンセルする",
     "created": "内蔵",
     "run-immediately": "すぐに実行",
+    "selected-n-tasks": "{n} 個のタスクが選択されました | {n} 個のタスクが選択されました",
+    "no-tasks": "タスクなし",
+    "no-tasks-selected": "タスクが選択されていません",
+    "no-runnable-tasks": "実行可能なタスクはありません",
+    "no-skippable-tasks": "スキップ可能なタスクはありません",
+    "no-cancellable-tasks": "キャンセル可能なタスクはありません",
+    "cross-stage-not-supported": "ステージ間の操作はサポートされていません",
+    "no-permission": "この操作を実行する権限がありません",
     "scheduled-time": "予定時刻",
     "select-scheduled-time": "予定時刻を選択してください",
     "error": {
@@ -571,6 +582,7 @@
           },
           "rows": {
             "self": "最大SQL結果行数",
+            "rows": "行",
             "description": "SQL クエリ結果の出力行を制限します。値 <= 0 は制限がないことを意味します。"
           }
         },
@@ -579,7 +591,8 @@
             "self": "最大クエリ時間",
             "description": "SQL エディターでクエリを実行するために許可される最大時間。",
             "no-time-limit": "0 に設定すると、クエリに時間制限はありません。"
-          }
+          },
+          "seconds": "秒"
         },
         "domain-restriction": {
           "self": "ワークスペースドメイン",
@@ -682,6 +695,7 @@
         "use-predefined-type": "事前定義されたタイプを使用する",
         "add-from-template": "テンプレートから追加",
         "table": {
+          "icon": "アイコン",
           "semantic-type": "セマンティックタイプ",
           "description": "説明",
           "masking-algorithm": "マスキングアルゴリズム",
@@ -960,7 +974,6 @@
       "sql-review-violations": "SQL監査ルール違反"
     },
     "error": {
-      "issue-is-not-open": "イシューはオープンになっていません",
       "you-don-have-privilege-to-edit-this-issue": "このイシューを編集する権限がありません",
       "you-are-not-allowed-to-perform-this-action": "このアクションを実行する権限がありません",
       "cannot-close-issue-with-running-tasks": "実行中のタスクに関する問題を解決できません"
@@ -1009,7 +1022,6 @@
       }
     },
     "sql-review-only": "SQLレビューのみ",
-    "this-plan-will-be-converted-to-a-new-issue": "この計画は新しい問題に変換されます",
     "title": {
       "edit-schema": "スキーマを編集",
       "change-data": "データの変更",
@@ -1027,9 +1039,15 @@
       "rejected": "拒否",
       "under-review": "審査中"
     },
-    "expermental-page": {
-      "self": "実験問題ページ"
-    }
+    "approval": {
+      "rejected-title": "問題の承認が拒否されました",
+      "pending-title": "問題の承認が保留中",
+      "rejected-description": "この問題は承認者によって拒否されました。続行するには強制ロールアウトが必要です。",
+      "pending-description": "この問題は承認待ちです。続行するには強制ロールアウトが必要です。",
+      "rejected-error": "問題の承認が拒否されました。続行するには強制ロールアウトを有効にしてください。",
+      "pending-error": "問題の承認が保留中です。続行するには強制ロールアウトを有効にしてください。"
+    },
+    "new-layout": "新しいCI/CDレイアウト"
   },
   "plan": {
     "self": "プラン",
@@ -1047,7 +1065,6 @@
       "description": "このプランのすべての仕様を表示および管理します",
       "total-specs": "合計スペック",
       "total-targets": "合計ターゲット",
-      "check-status": "ステータスを確認する",
       "no-checks": "チェックなし",
       "affected-resources": "影響を受けるリソース"
     },
@@ -1103,10 +1120,14 @@
     },
     "checks": {
       "self": "小切手"
+    },
+    "refresh-indicator": {
+      "last-refresh": "最終更新: {time}"
     }
   },
   "rollout": {
-    "rollouts": "ロールアウト"
+    "rollouts": "ロールアウト",
+    "force-rollout": "強制展開"
   },
   "quick-action": {
     "create-db": "データベースの作成",
@@ -1755,7 +1776,7 @@
         },
         "max-retries": {
           "self": "ロックタイムアウトの最大レトリカウント",
-          "description": "タスクを実行するときのロックタイムアウトの最大再試行カウント。デフォルト値は0です。"
+          "description": "タスクを実行するときのロックタイムアウトの最大再試行カウント。\nデフォルト値は0です。ポストグレスにのみ適用できます。"
         },
         "ci-sampling-size": {
           "self": "CIデータサンプリングサイズ",
@@ -2059,7 +2080,8 @@
       "no-default": "デフォルト値なし",
       "expression": "式",
       "null": "NULL",
-      "value": "値"
+      "value": "値",
+      "placeholder": "デフォルト値を入力するか、デフォルト値がない場合は空白のままにします"
     },
     "message": {
       "invalid-schema-name": "無効なスキーマ名",
@@ -2188,7 +2210,7 @@
         "title": "無料"
       },
       "team": {
-        "title": "チーム"
+        "title": "プロ"
       },
       "enterprise": {
         "title": "エンタープライズ"
@@ -2289,6 +2311,7 @@
       "request": "リクエスト",
       "response": "応答",
       "status": "ポジション",
+      "latency": "遅延",
       "service-data": "サービスデータ"
     },
     "advanced-search": {
@@ -2653,9 +2676,6 @@
     "self": "エクスポートセンター",
     "permission-denied": "この操作を実行する権限がありません"
   },
-  "review-center": {
-    "self": "レビューセンター"
-  },
   "schema-designer": {
     "use-tips": "デザインするテーブルを選択してください"
   },
@@ -2790,6 +2810,16 @@
       "built-in": "組み込みサンプルを使用する",
       "built-in-desc": "サンプルプロジェクトとインスタンスを生成する"
     }
+  },
+  "masking": {
+    "reason": {
+      "title": "なぜこのデータはマスクされていますか？",
+      "semantic-type": "セマンティックタイプ",
+      "algorithm": "マスキング方法",
+      "context": "ルール",
+      "classification": "分類レベル"
+    },
+    "algorithms": {}
   },
   "landing": {
     "quick-link": {

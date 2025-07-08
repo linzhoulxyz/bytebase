@@ -129,6 +129,8 @@
     "delete": "Delete",
     "history": "History",
     "loading": "Loading",
+    "just-now": "just now",
+    "n-seconds-ago": "{count} seconds ago",
     "copy": "Copy",
     "copied": "Copied",
     "click-to-copy": "Click to copy",
@@ -172,6 +174,7 @@
     "will-override-current-data": "Will override current data.",
     "rollout": "Rollout",
     "upload": "Upload",
+    "clear": "Clear",
     "added": "Added",
     "revoke": "Revoke",
     "cannot-undo-this-action": "You cannot undo this action",
@@ -278,6 +281,14 @@
     "cancel-task": "Cancel task | Cancel tasks",
     "created": "Created",
     "run-immediately": "Run task immediately | Run tasks immediately",
+    "selected-n-tasks": "{n} task selected | {n} tasks selected",
+    "no-tasks": "No tasks",
+    "no-tasks-selected": "No tasks selected",
+    "no-runnable-tasks": "No runnable tasks",
+    "no-skippable-tasks": "No skippable tasks",
+    "no-cancellable-tasks": "No cancellable tasks",
+    "cross-stage-not-supported": "Cross-stage operations not supported",
+    "no-permission": "No permission to perform this action",
     "scheduled-time": "Scheduled time",
     "select-scheduled-time": "Select scheduled time",
     "error": {
@@ -571,6 +582,7 @@
           },
           "rows": {
             "self": "Maximum SQL result rows",
+            "rows": "Rows",
             "description": "Limit the output rows in SQL query result, the value <= 0 means no limit."
           }
         },
@@ -579,7 +591,8 @@
             "self": "Maximum query time",
             "description": "The maximum time allowed for a query to run in SQL Editor.",
             "no-time-limit": "No time limit for queries when set to 0."
-          }
+          },
+          "seconds": "Seconds"
         },
         "domain-restriction": {
           "self": "Workspace Domain",
@@ -682,6 +695,7 @@
         "use-predefined-type": "Use Predefined Type",
         "add-from-template": "Add from template",
         "table": {
+          "icon": "Icon",
           "semantic-type": "Semantic Type",
           "description": "Description",
           "masking-algorithm": "Masking Algorithm",
@@ -849,8 +863,7 @@
           "title": "Creator",
           "description": "Search by the issue creator"
         },
-        "subscriber": {
-        },
+        "subscriber": {},
         "approver": {
           "title": "Approver",
           "description": "Search by the issue approver"
@@ -961,7 +974,6 @@
       "sql-review-violations": "SQL Review Violations"
     },
     "error": {
-      "issue-is-not-open": "The issue is not open",
       "you-don-have-privilege-to-edit-this-issue": "You don't have privilege to edit this issue",
       "you-are-not-allowed-to-perform-this-action": "You are not allowed to perform this action",
       "cannot-close-issue-with-running-tasks": "Cannot close issue with running tasks"
@@ -1010,7 +1022,6 @@
       }
     },
     "sql-review-only": "SQL Review Only",
-    "this-plan-will-be-converted-to-a-new-issue": "This plan will be converted to a new issue",
     "title": {
       "edit-schema": "Edit schema",
       "change-data": "Change data",
@@ -1028,9 +1039,15 @@
       "rejected": "Rejected",
       "under-review": "Under review"
     },
-    "expermental-page": {
-      "self": "Experimental issue page"
-    }
+    "approval": {
+      "rejected-title": "Issue Approval Rejected",
+      "pending-title": "Issue Approval Pending",
+      "rejected-description": "This issue has been rejected by approvers. Force rollout is required to proceed.",
+      "pending-description": "This issue is waiting for approval. Force rollout is required to proceed.",
+      "rejected-error": "Issue approval has been rejected. Please enable force rollout to proceed.",
+      "pending-error": "Issue approval is pending. Please enable force rollout to proceed."
+    },
+    "new-layout": "New CI/CD Layout"
   },
   "plan": {
     "self": "Plan",
@@ -1048,7 +1065,6 @@
       "description": "View and manage all specifications in this plan",
       "total-specs": "Total Specs",
       "total-targets": "Total Targets",
-      "check-status": "Check Status",
       "no-checks": "No checks",
       "affected-resources": "Affected Resources"
     },
@@ -1104,10 +1120,14 @@
     },
     "checks": {
       "self": "Checks"
+    },
+    "refresh-indicator": {
+      "last-refresh": "Last refresh: {time}"
     }
   },
   "rollout": {
-    "rollouts": "Rollouts"
+    "rollouts": "Rollouts",
+    "force-rollout": "Force rollout"
   },
   "quick-action": {
     "create-db": "Create database",
@@ -1756,7 +1776,7 @@
         },
         "max-retries": {
           "self": "Maximum retries count for lock timeout",
-          "description": "The maximum retries count for lock timeout when running the task. The default value is 0."
+          "description": "The maximum retries count for lock timeout when running the task. The default value is 0. Only applicable to Postgres."
         },
         "ci-sampling-size": {
           "self": "CI Data Sampling Size",
@@ -2060,7 +2080,8 @@
       "no-default": "No default",
       "expression": "Expression",
       "null": "NULL",
-      "value": "Value"
+      "value": "Value",
+      "placeholder": "Enter default value or leave empty for no default"
     },
     "message": {
       "invalid-schema-name": "Invalid schema name",
@@ -2189,7 +2210,7 @@
         "title": "Free"
       },
       "team": {
-        "title": "Team"
+        "title": "Pro"
       },
       "enterprise": {
         "title": "Enterprise"
@@ -2290,6 +2311,7 @@
       "request": "Request",
       "response": "Response",
       "status": "Status",
+      "latency": "Latency",
       "service-data": "Service Data"
     },
     "advanced-search": {
@@ -2654,9 +2676,6 @@
     "self": "Export Center",
     "permission-denied": "Permission denied"
   },
-  "review-center": {
-    "self": "Review Center"
-  },
   "schema-designer": {
     "use-tips": "Click a table to start."
   },
@@ -2791,6 +2810,16 @@
       "built-in": "Use built-in sample",
       "built-in-desc": "Generate sample project and instances"
     }
+  },
+  "masking": {
+    "reason": {
+      "title": "Why is this data masked?",
+      "semantic-type": "Semantic type",
+      "algorithm": "Masking method",
+      "context": "Rule",
+      "classification": "Classification level"
+    },
+    "algorithms": {}
   },
   "landing": {
     "quick-link": {

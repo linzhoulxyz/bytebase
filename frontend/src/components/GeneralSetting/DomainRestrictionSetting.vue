@@ -72,6 +72,8 @@
 </template>
 
 <script lang="ts" setup>
+import { create } from "@bufbuild/protobuf";
+import { FieldMaskSchema } from "@bufbuild/protobuf/wkt";
 import { isEqual, cloneDeep } from "lodash-es";
 import { PlusIcon, XIcon } from "lucide-vue-next";
 import { NCheckbox, NInput, NButton } from "naive-ui";
@@ -160,7 +162,7 @@ defineExpose({
           domains: validDomains.value,
           enforceIdentityDomain: state.enableRestriction,
         },
-        updateMask,
+        updateMask: create(FieldMaskSchema, { paths: updateMask }),
       });
     }
   },

@@ -55,20 +55,15 @@ import { issueServiceClientConnect } from "@/grpcweb";
 import { useCurrentUserV1, useProjectV1Store } from "@/store";
 import type { DatabaseResource } from "@/types";
 import { getUserEmailInBinding } from "@/types";
+import type { Binding } from "@/types/proto-es/v1/iam_policy_pb";
+import { BindingSchema } from "@/types/proto-es/v1/iam_policy_pb";
 import {
   CreateIssueRequestSchema,
   IssueSchema,
   Issue_Type as NewIssue_Type,
+  GrantRequestSchema,
 } from "@/types/proto-es/v1/issue_service_pb";
-import { Binding } from "@/types/proto/v1/iam_policy";
-import {
-  GrantRequest,
-  Issue,
-  Issue_Type,
-} from "@/types/proto/v1/issue_service";
 import { generateIssueTitle, displayRoleTitle } from "@/utils";
-import { convertDurationToOld } from "@/utils/v1/common-conversions";
-import { convertNewIssueToOld } from "@/utils/v1/issue-conversions";
 
 interface LocalState {
   binding: Binding;
@@ -99,7 +94,7 @@ const currentUser = useCurrentUserV1();
 const projectStore = useProjectV1Store();
 
 const state = reactive<LocalState>({
-  binding: Binding.fromPartial({
+  binding: create(BindingSchema, {
     role: props.role,
     members: [getUserEmailInBinding(currentUser.value.email)],
   }),
@@ -119,7 +114,20 @@ const doCreateIssue = async () => {
     return;
   }
 
-  const newIssue = Issue.fromPartial({
+  const grantRequest = create(GrantRequestSchema, {
+    role: state.binding.role,
+    user: `users/${currentUser.value.email}`,
+    condition: state.binding.condition,
+    expiration: formRef.value?.expirationTimestampInMS
+      ? create(DurationSchema, {
+          seconds: BigInt(
+            dayjs(formRef.value.expirationTimestampInMS).unix() - dayjs().unix()
+          ),
+        })
+      : undefined,
+  });
+
+  const newIssue = create(IssueSchema, {
     title: project.value.enforceIssueTitle
       ? `[${t("issue.title.request-role")}] ${formRef.value?.reason}`
       : generateIssueTitle(
@@ -134,55 +142,18 @@ const doCreateIssue = async () => {
           })
         ),
     description: state.binding.condition?.description,
-    type: Issue_Type.GRANT_REQUEST,
-    grantRequest: {},
+    type: NewIssue_Type.GRANT_REQUEST,
+    grantRequest,
   });
-
-  newIssue.grantRequest = GrantRequest.fromPartial({
-    role: state.binding.role,
-    user: `users/${currentUser.value.email}`,
-  });
-  if (state.binding.condition) {
-    newIssue.grantRequest.condition = state.binding.condition;
-  }
-  if (formRef.value?.expirationTimestampInMS) {
-    newIssue.grantRequest.expiration = convertDurationToOld(
-      create(DurationSchema, {
-        seconds: BigInt(
-          dayjs(formRef.value.expirationTimestampInMS).unix() - dayjs().unix()
-        ),
-      })
-    );
-  }
 
   const request = create(CreateIssueRequestSchema, {
     parent: props.projectName,
-    issue: create(IssueSchema, {
-      title: newIssue.title,
-      description: newIssue.description,
-      type: NewIssue_Type.DATABASE_CHANGE,
-      grantRequest: newIssue.grantRequest
-        ? {
-            role: newIssue.grantRequest.role,
-            user: newIssue.grantRequest.user,
-            condition: newIssue.grantRequest.condition,
-            expiration: newIssue.grantRequest.expiration
-              ? {
-                  seconds: BigInt(
-                    newIssue.grantRequest.expiration.seconds.toString()
-                  ),
-                  nanos: newIssue.grantRequest.expiration.nanos,
-                }
-              : undefined,
-          }
-        : undefined,
-    }),
+    issue: newIssue,
   });
   const response = await issueServiceClientConnect.createIssue(request);
-  const createdIssue = convertNewIssueToOld(response);
 
   // TODO(ed): handle no permission
-  const path = `/${createdIssue.name}`;
+  const path = `/${response.name}`;
 
   window.open(path, "_blank");
 

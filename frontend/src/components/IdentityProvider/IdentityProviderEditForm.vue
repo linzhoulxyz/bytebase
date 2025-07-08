@@ -239,6 +239,7 @@
 </template>
 
 <script setup lang="ts">
+import { create as createProto } from "@bufbuild/protobuf";
 import { cloneDeep, isEqual } from "lodash-es";
 import {
   ArrowRightIcon,
@@ -257,15 +258,22 @@ import { WORKSPACE_ROUTE_IDENTITY_PROVIDERS } from "@/router/dashboard/workspace
 import { pushNotification } from "@/store";
 import { useIdentityProviderStore } from "@/store/modules/idp";
 import { getIdentityProviderResourceId } from "@/store/modules/v1/common";
-import {
+import type {
   FieldMapping,
   IdentityProvider,
-  IdentityProviderType,
   OAuth2IdentityProviderConfig,
   OIDCIdentityProviderConfig,
   LDAPIdentityProviderConfig,
-  IdentityProviderConfig,
-} from "@/types/proto/v1/idp_service";
+} from "@/types/proto-es/v1/idp_service_pb";
+import {
+  FieldMappingSchema,
+  IdentityProviderSchema,
+  IdentityProviderType,
+  OAuth2IdentityProviderConfigSchema,
+  OIDCIdentityProviderConfigSchema,
+  LDAPIdentityProviderConfigSchema,
+  IdentityProviderConfigSchema,
+} from "@/types/proto-es/v1/idp_service_pb";
 import {
   hasWorkspacePermissionV2,
   identityProviderTypeToString,
@@ -294,22 +302,33 @@ const localIdentityProvider = ref<IdentityProvider>(
   cloneDeep(props.identityProvider)
 );
 const configForOAuth2 = ref<OAuth2IdentityProviderConfig>(
-  OAuth2IdentityProviderConfig.fromPartial(
-    props.identityProvider.config?.oauth2Config || {}
+  createProto(
+    OAuth2IdentityProviderConfigSchema,
+    props.identityProvider.config?.config?.case === "oauth2Config"
+      ? props.identityProvider.config.config.value
+      : {}
   )
 );
 const configForOIDC = ref<OIDCIdentityProviderConfig>(
-  OIDCIdentityProviderConfig.fromPartial(
-    props.identityProvider.config?.oidcConfig || {}
+  createProto(
+    OIDCIdentityProviderConfigSchema,
+    props.identityProvider.config?.config?.case === "oidcConfig"
+      ? props.identityProvider.config.config.value
+      : {}
   )
 );
 const configForLDAP = ref<LDAPIdentityProviderConfig>(
-  LDAPIdentityProviderConfig.fromPartial(
-    props.identityProvider.config?.ldapConfig || {}
+  createProto(
+    LDAPIdentityProviderConfigSchema,
+    props.identityProvider.config?.config?.case === "ldapConfig"
+      ? props.identityProvider.config.config.value
+      : {}
   )
 );
 const scopesStringOfConfig = ref<string>("");
-const fieldMapping = reactive<FieldMapping>(FieldMapping.fromPartial({}));
+const fieldMapping = reactive<FieldMapping>(
+  createProto(FieldMappingSchema, {})
+);
 
 // Computed
 const resourceId = computed(() => {
@@ -399,34 +418,49 @@ const getProviderIcon = (type: IdentityProviderType) => {
 };
 
 const buildUpdatedIdentityProvider = (): IdentityProvider => {
-  const result: any = IdentityProvider.fromPartial({
+  const result = createProto(IdentityProviderSchema, {
     ...localIdentityProvider.value,
-    config: IdentityProviderConfig.fromPartial({}),
+    config: createProto(IdentityProviderConfigSchema, {}),
   });
 
   if (localIdentityProvider.value.type === IdentityProviderType.OAUTH2) {
-    const oauth2Config: any = {
+    const oauth2Config = {
       ...configForOAuth2.value,
       scopes: scopesStringOfConfig.value.split(" ").filter(Boolean),
-      fieldMapping,
+      fieldMapping: createProto(FieldMappingSchema, fieldMapping),
     };
 
-    result.config.oauth2Config = oauth2Config;
+    result.config = createProto(IdentityProviderConfigSchema, {
+      config: {
+        case: "oauth2Config",
+        value: oauth2Config,
+      },
+    });
   } else if (localIdentityProvider.value.type === IdentityProviderType.OIDC) {
-    const oidcConfig: any = {
+    const oidcConfig = {
       ...configForOIDC.value,
       scopes: scopesStringOfConfig.value.split(" ").filter(Boolean),
-      fieldMapping,
+      fieldMapping: createProto(FieldMappingSchema, fieldMapping),
     };
 
-    result.config.oidcConfig = oidcConfig;
+    result.config = createProto(IdentityProviderConfigSchema, {
+      config: {
+        case: "oidcConfig",
+        value: oidcConfig,
+      },
+    });
   } else if (localIdentityProvider.value.type === IdentityProviderType.LDAP) {
-    const ldapConfig: any = {
+    const ldapConfig = {
       ...configForLDAP.value,
-      fieldMapping,
+      fieldMapping: createProto(FieldMappingSchema, fieldMapping),
     };
 
-    result.config.ldapConfig = ldapConfig;
+    result.config = createProto(IdentityProviderConfigSchema, {
+      config: {
+        case: "ldapConfig",
+        value: ldapConfig,
+      },
+    });
   }
 
   return result as IdentityProvider;
@@ -439,36 +473,29 @@ const initializeFromProps = () => {
   isClientSecretModified.value = false;
   isBindPasswordModified.value = false;
 
-  if (props.identityProvider.config?.oauth2Config) {
-    configForOAuth2.value = OAuth2IdentityProviderConfig.fromPartial(
-      props.identityProvider.config.oauth2Config
+  if (props.identityProvider.config?.config?.case === "oauth2Config") {
+    const oauth2Config = props.identityProvider.config.config.value;
+    configForOAuth2.value = createProto(
+      OAuth2IdentityProviderConfigSchema,
+      oauth2Config
     );
-    Object.assign(
-      fieldMapping,
-      props.identityProvider.config.oauth2Config.fieldMapping || {}
+    Object.assign(fieldMapping, oauth2Config.fieldMapping || {});
+    scopesStringOfConfig.value = (oauth2Config.scopes || []).join(" ");
+  } else if (props.identityProvider.config?.config?.case === "oidcConfig") {
+    const oidcConfig = props.identityProvider.config.config.value;
+    configForOIDC.value = createProto(
+      OIDCIdentityProviderConfigSchema,
+      oidcConfig
     );
-    scopesStringOfConfig.value = (
-      props.identityProvider.config.oauth2Config.scopes || []
-    ).join(" ");
-  } else if (props.identityProvider.config?.oidcConfig) {
-    configForOIDC.value = OIDCIdentityProviderConfig.fromPartial(
-      props.identityProvider.config.oidcConfig
+    Object.assign(fieldMapping, oidcConfig.fieldMapping || {});
+    scopesStringOfConfig.value = (oidcConfig.scopes || []).join(" ");
+  } else if (props.identityProvider.config?.config?.case === "ldapConfig") {
+    const ldapConfig = props.identityProvider.config.config.value;
+    configForLDAP.value = createProto(
+      LDAPIdentityProviderConfigSchema,
+      ldapConfig
     );
-    Object.assign(
-      fieldMapping,
-      props.identityProvider.config.oidcConfig.fieldMapping || {}
-    );
-    scopesStringOfConfig.value = (
-      props.identityProvider.config.oidcConfig.scopes || []
-    ).join(" ");
-  } else if (props.identityProvider.config?.ldapConfig) {
-    configForLDAP.value = LDAPIdentityProviderConfig.fromPartial(
-      props.identityProvider.config.ldapConfig
-    );
-    Object.assign(
-      fieldMapping,
-      props.identityProvider.config.ldapConfig.fieldMapping || {}
-    );
+    Object.assign(fieldMapping, ldapConfig.fieldMapping || {});
   }
 };
 

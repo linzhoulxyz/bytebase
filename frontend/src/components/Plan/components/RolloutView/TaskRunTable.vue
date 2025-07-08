@@ -7,26 +7,58 @@
     :striped="true"
     :bordered="true"
   />
+
+  <Drawer v-model:show="taskRunDetailContext.show">
+    <DrawerContent
+      :title="$t('common.detail')"
+      style="width: calc(100vw - 14rem)"
+    >
+      <TaskRunDetail
+        v-if="taskRunDetailContext.taskRun"
+        :key="taskRunDetailContext.taskRun.name"
+        :task-run="taskRunDetailContext.taskRun"
+        :database="databaseForTask(project, task)"
+      />
+    </DrawerContent>
+  </Drawer>
 </template>
 
 <script lang="tsx" setup>
+import { create } from "@bufbuild/protobuf";
+import type { Duration } from "@bufbuild/protobuf/wkt";
+import { DurationSchema } from "@bufbuild/protobuf/wkt";
 import type { DataTableColumn } from "naive-ui";
-import { NDataTable, NTag } from "naive-ui";
-import { computed } from "vue";
+import { NButton, NDataTable, NTag } from "naive-ui";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import TaskRunDetail from "@/components/IssueV1/components/TaskRunSection/TaskRunDetail.vue";
 import HumanizeDate from "@/components/misc/HumanizeDate.vue";
-import { getDateForPbTimestamp, getTimeForPbTimestamp } from "@/types";
-import { Duration } from "@/types/proto/google/protobuf/duration";
-import type { TaskRun } from "@/types/proto/v1/rollout_service";
-import { TaskRun_Status } from "@/types/proto/v1/rollout_service";
+import { Drawer, DrawerContent } from "@/components/v2";
+import { useCurrentProjectV1 } from "@/store";
+import {
+  getDateForPbTimestampProtoEs,
+  getTimeForPbTimestampProtoEs,
+} from "@/types";
+import type { Task, TaskRun } from "@/types/proto-es/v1/rollout_service_pb";
+import { TaskRun_Status } from "@/types/proto-es/v1/rollout_service_pb";
+import { databaseForTask } from "@/utils";
 import { humanizeDurationV1 } from "@/utils";
-import { convertDurationToNew } from "@/utils/v1/common-conversions";
+import TaskRunComment from "./TaskRunComment.vue";
 
 defineProps<{
+  task: Task;
   taskRuns: TaskRun[];
 }>();
 
 const { t } = useI18n();
+const { project } = useCurrentProjectV1();
+
+const taskRunDetailContext = ref<{
+  show: boolean;
+  taskRun?: TaskRun;
+}>({
+  show: false,
+});
 
 const rowKey = (taskRun: TaskRun) => {
   return taskRun.name;
@@ -49,11 +81,18 @@ const columnList = computed((): DataTableColumn<TaskRun>[] => {
       },
     },
     {
+      key: "comment",
+      title: t("common.comment"),
+      render: (taskRun: TaskRun) => {
+        return <TaskRunComment taskRun={taskRun} />;
+      },
+    },
+    {
       key: "createTime",
       title: t("task.created"),
       width: 140,
       render: (taskRun: TaskRun) => (
-        <HumanizeDate date={getDateForPbTimestamp(taskRun.createTime)} />
+        <HumanizeDate date={getDateForPbTimestampProtoEs(taskRun.createTime)} />
       ),
     },
     {
@@ -62,18 +101,9 @@ const columnList = computed((): DataTableColumn<TaskRun>[] => {
       width: 140,
       render: (taskRun: TaskRun) =>
         taskRun.startTime ? (
-          <HumanizeDate date={getDateForPbTimestamp(taskRun.startTime)} />
-        ) : (
-          "-"
-        ),
-    },
-    {
-      key: "updateTime",
-      title: "Update Time",
-      width: 140,
-      render: (taskRun: TaskRun) =>
-        taskRun.updateTime ? (
-          <HumanizeDate date={getDateForPbTimestamp(taskRun.updateTime)} />
+          <HumanizeDate
+            date={getDateForPbTimestampProtoEs(taskRun.startTime)}
+          />
         ) : (
           "-"
         ),
@@ -84,15 +114,19 @@ const columnList = computed((): DataTableColumn<TaskRun>[] => {
       width: 120,
       render: (taskRun: TaskRun) => {
         const duration = executionDurationOfTaskRun(taskRun);
-        return duration ? humanizeDurationV1(convertDurationToNew(duration)) : "-";
+        return duration ? humanizeDurationV1(duration) : "-";
       },
     },
     {
-      key: "executionSummary",
-      title: "Summary",
-      render: (taskRun: TaskRun) => {
-        return getExecutionSummary(taskRun);
-      },
+      key: "actions",
+      title: "",
+      width: 80,
+      render: (taskRun: TaskRun) =>
+        shouldShowDetailButton(taskRun) ? (
+          <NButton size="tiny" onClick={() => showDetail(taskRun)}>
+            {t("common.detail")}
+          </NButton>
+        ) : null,
     },
   ];
 });
@@ -114,7 +148,7 @@ const getStatusType = (status: TaskRun_Status) => {
 };
 
 const getStatusText = (status: TaskRun_Status) => {
-  return status.replace("_", " ");
+  return TaskRun_Status[status].replace("_", " ");
 };
 
 const executionDurationOfTaskRun = (taskRun: TaskRun): Duration | undefined => {
@@ -122,41 +156,38 @@ const executionDurationOfTaskRun = (taskRun: TaskRun): Duration | undefined => {
   if (!startTime || !updateTime) {
     return undefined;
   }
-  if (startTime.seconds.toString() === "0") {
+  if (Number(startTime.seconds) === 0) {
     return undefined;
   }
   if (taskRun.status === TaskRun_Status.RUNNING) {
-    const elapsedMS = Date.now() - getTimeForPbTimestamp(startTime);
-    return Duration.fromPartial({
-      seconds: Math.floor(elapsedMS / 1000),
+    const elapsedMS = Date.now() - getTimeForPbTimestampProtoEs(startTime);
+    return create(DurationSchema, {
+      seconds: BigInt(Math.floor(elapsedMS / 1000)),
       nanos: (elapsedMS % 1000) * 1e6,
     });
   }
-  const startMS = getTimeForPbTimestamp(startTime);
-  const updateMS = getTimeForPbTimestamp(updateTime);
+  const startMS = getTimeForPbTimestampProtoEs(startTime);
+  const updateMS = getTimeForPbTimestampProtoEs(updateTime);
   const elapsedMS = updateMS - startMS;
-  return Duration.fromPartial({
-    seconds: Math.floor(elapsedMS / 1000),
+  return create(DurationSchema, {
+    seconds: BigInt(Math.floor(elapsedMS / 1000)),
     nanos: (elapsedMS % 1000) * 1e6,
   });
 };
 
-const getExecutionSummary = (taskRun: TaskRun) => {
-  if (taskRun.status === TaskRun_Status.DONE) {
-    return "Completed successfully";
-  }
-  if (taskRun.status === TaskRun_Status.FAILED) {
-    return "Failed";
-  }
-  if (taskRun.status === TaskRun_Status.CANCELED) {
-    return "Canceled";
-  }
-  if (taskRun.status === TaskRun_Status.RUNNING) {
-    return "Running...";
-  }
-  if (taskRun.status === TaskRun_Status.PENDING) {
-    return "Pending";
-  }
-  return "Unknown";
+const shouldShowDetailButton = (taskRun: TaskRun) => {
+  return [
+    TaskRun_Status.RUNNING,
+    TaskRun_Status.DONE,
+    TaskRun_Status.FAILED,
+    TaskRun_Status.CANCELED,
+  ].includes(taskRun.status);
+};
+
+const showDetail = (taskRun: TaskRun) => {
+  taskRunDetailContext.value = {
+    show: true,
+    taskRun,
+  };
 };
 </script>

@@ -79,13 +79,14 @@ import { useCurrentUserV1, useUserStore, useCurrentProjectV1 } from "@/store";
 import { userNamePrefix } from "@/store/modules/v1/common";
 import { SYSTEM_BOT_EMAIL } from "@/types";
 import { State } from "@/types/proto-es/v1/common_pb";
+import { ApprovalNode_Type } from "@/types/proto-es/v1/issue_service_pb";
+import { Issue_Approver_Status } from "@/types/proto-es/v1/issue_service_pb";
 import type {
   ApprovalStep,
   Issue,
   Issue_Approver,
-} from "@/types/proto/v1/issue_service";
-import type { User as UserType } from "@/types/proto/v1/user_service";
-import { convertStateToOld } from "@/utils/v1/common-conversions";
+} from "@/types/proto-es/v1/issue_service_pb";
+import type { User as UserType } from "@/types/proto-es/v1/user_service_pb";
 import { memberMapToRolesInProjectIAM } from "@/utils";
 import ApprovalUserView from "./ApprovalUserView.vue";
 import PotentialApprovers from "./PotentialApprovers.vue";
@@ -109,11 +110,11 @@ const stepApprover = computed(
 );
 
 const status = computed((): "approved" | "rejected" | "current" | "pending" => {
-  if (stepApprover.value?.status === "APPROVED") {
+  if (stepApprover.value?.status === Issue_Approver_Status.APPROVED) {
     return "approved";
   }
 
-  if (stepApprover.value?.status === "REJECTED") {
+  if (stepApprover.value?.status === Issue_Approver_Status.REJECTED) {
     return "rejected";
   }
 
@@ -122,12 +123,13 @@ const status = computed((): "approved" | "rejected" | "current" | "pending" => {
     const prevApprover = props.issue.approvers[i];
     if (
       !prevApprover ||
-      (prevApprover.status !== "APPROVED" && prevApprover.status !== "REJECTED")
+      (prevApprover.status !== Issue_Approver_Status.APPROVED &&
+        prevApprover.status !== Issue_Approver_Status.REJECTED)
     ) {
       return "pending";
     }
     // If any previous step is rejected, subsequent steps are pending
-    if (prevApprover.status === "REJECTED") {
+    if (prevApprover.status === Issue_Approver_Status.REJECTED) {
       return "pending";
     }
   }
@@ -181,7 +183,7 @@ const candidateEmails = computed(() => {
   const candidates: string[] = [];
 
   for (const node of props.step.nodes) {
-    if (node.type !== "ANY_IN_GROUP") continue;
+    if (node.type !== ApprovalNode_Type.ANY_IN_GROUP) continue;
 
     const role = node.role;
     if (!role) continue;
@@ -247,7 +249,7 @@ const potentialApprovers = computedAsync(async () => {
   const users: UserType[] = [];
   for (const email of filteredCandidateEmails.value) {
     const user = await userStore.getOrFetchUserByIdentifier(email);
-    if (user && user.state === convertStateToOld(State.ACTIVE)) {
+    if (user && user.state === State.ACTIVE) {
       users.push(user);
     }
   }

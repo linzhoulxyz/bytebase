@@ -22,30 +22,33 @@
 </template>
 
 <script setup lang="ts">
+import { create } from "@bufbuild/protobuf";
 import dayjs from "dayjs";
 import { head, last } from "lodash-es";
 import { DownloadIcon, CircleCheckBigIcon } from "lucide-vue-next";
 import { NButton } from "naive-ui";
 import { computed, reactive } from "vue";
 import { watchEffect } from "vue";
-import { create } from "@bufbuild/protobuf";
 import { useIssueContext } from "@/components/IssueV1";
 import { issueServiceClientConnect } from "@/grpcweb";
-import { BatchUpdateIssuesStatusRequestSchema, IssueStatus as NewIssueStatus } from "@/types/proto-es/v1/issue_service_pb";
 import { useSQLStore } from "@/store";
-import { IssueStatus } from "@/types/proto/v1/issue_service";
 import { ExportFormat } from "@/types/proto-es/v1/common_pb";
 import {
-  Plan_ExportDataConfig,
-  Plan_Spec,
-} from "@/types/proto/v1/plan_service";
+  BatchUpdateIssuesStatusRequestSchema,
+  IssueStatus as NewIssueStatus,
+} from "@/types/proto-es/v1/issue_service_pb";
+import { IssueStatus } from "@/types/proto-es/v1/issue_service_pb";
+import {
+  Plan_ExportDataConfigSchema,
+  Plan_SpecSchema,
+  type Plan_ExportDataConfig,
+} from "@/types/proto-es/v1/plan_service_pb";
 import {
   TaskRun_ExportArchiveStatus,
   Task_Status,
-} from "@/types/proto/v1/rollout_service";
-import { ExportRequest } from "@/types/proto/v1/sql_service";
+} from "@/types/proto-es/v1/rollout_service_pb";
+import { ExportRequestSchema } from "@/types/proto-es/v1/sql_service_pb";
 import { flattenTaskV1List } from "@/utils";
-import { convertExportFormatToNew } from "@/utils/v1/common-conversions";
 
 interface LocalState {
   isExporting: boolean;
@@ -61,9 +64,11 @@ const taskRun = computed(() => {
 });
 
 const exportDataConfig = computed(() => {
+  const spec =
+    head(issue.value.planEntity?.specs) || create(Plan_SpecSchema, {});
   return (
-    (head(issue.value.planEntity?.specs) || Plan_Spec.fromPartial({}))
-      .exportDataConfig || Plan_ExportDataConfig.fromPartial({})
+    (spec.config?.value as Plan_ExportDataConfig) ||
+    create(Plan_ExportDataConfigSchema, {})
   );
 });
 
@@ -87,7 +92,7 @@ watchEffect(async () => {
 const downloadExportArchive = async () => {
   state.isExporting = true;
   const content = await useSQLStore().exportData(
-    ExportRequest.fromPartial({
+    create(ExportRequestSchema, {
       name: selectedStage.value.name,
     })
   );
@@ -111,7 +116,7 @@ const getExportFileType = (exportDataConfig: Plan_ExportDataConfig) => {
   if (exportDataConfig.password) {
     return "application/zip";
   }
-  switch (convertExportFormatToNew(exportDataConfig.format)) {
+  switch (exportDataConfig.format) {
     case ExportFormat.CSV:
       return "text/csv";
     case ExportFormat.JSON:

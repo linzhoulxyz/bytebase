@@ -1,34 +1,38 @@
 <template>
   <div class="relative overflow-x-hidden h-full">
     <template v-if="ready">
-      <div class="h-full flex flex-col">
-        <HeaderSection />
-        <NTabs
-          type="line"
-          :value="tabKey"
-          tab-class="first:ml-4"
-          @update-value="handleTabChange"
-        >
-          <NTab
-            v-for="tab in availableTabs"
-            :key="tab"
-            :name="tab"
-            :tab="tabRender(tab)"
-            @click="handleTabChange(tab)"
-          />
+      <PollerProvider>
+        <div class="h-full flex flex-col">
+          <HeaderSection />
+          <NTabs
+            type="line"
+            :value="tabKey"
+            tab-class="first:ml-4"
+            @update-value="handleTabChange"
+          >
+            <NTab
+              v-for="tab in availableTabs"
+              class="select-none"
+              :key="tab"
+              :name="tab"
+              :tab="tabRender(tab)"
+              @click="handleTabChange(tab)"
+            />
 
-          <!-- Suffix slot for Specifications tab -->
-          <template v-if="tabKey === TabKey.Specifications" #suffix>
-            <div class="pr-4 flex flex-row justify-end items-center">
-              <CurrentSpecSelector />
-            </div>
-          </template>
-        </NTabs>
+            <!-- Suffix slot -->
+            <template #suffix>
+              <div class="pr-4 flex flex-row justify-end items-center gap-4">
+                <CurrentSpecSelector v-if="tabKey === TabKey.Specifications" />
+                <RefreshIndicator v-if="!isCreating" />
+              </div>
+            </template>
+          </NTabs>
 
-        <div class="flex-1 flex">
-          <router-view />
+          <div class="flex-1 flex">
+            <router-view />
+          </div>
         </div>
-      </div>
+      </PollerProvider>
     </template>
     <div v-else class="w-full h-full flex flex-col items-center justify-center">
       <NSpin />
@@ -38,7 +42,6 @@
 
 <script lang="tsx" setup>
 import { useTitle } from "@vueuse/core";
-import { head } from "lodash-es";
 import { NSpin, NTab, NTabs } from "naive-ui";
 import { computed, toRef } from "vue";
 import { useI18n } from "vue-i18n";
@@ -48,10 +51,11 @@ import {
   useBasePlanContext,
   useInitializePlan,
 } from "@/components/Plan";
+import PollerProvider from "@/components/Plan/PollerProvider.vue";
 import { HeaderSection } from "@/components/Plan/components";
 import CurrentSpecSelector from "@/components/Plan/components/CurrentSpecSelector.vue";
+import RefreshIndicator from "@/components/Plan/components/RefreshIndicator.vue";
 import { useSpecsValidation } from "@/components/Plan/components/common";
-import { gotoSpec } from "@/components/Plan/components/common/utils";
 import { provideIssueReviewContext } from "@/components/Plan/logic/issue-review";
 import { useBodyLayoutContext } from "@/layouts/common";
 import {
@@ -61,6 +65,7 @@ import {
   PROJECT_V1_ROUTE_PLAN_DETAIL_SPEC_DETAIL,
   PROJECT_V1_ROUTE_PLAN_DETAIL_SPECS,
   PROJECT_V1_ROUTE_ROLLOUT_DETAIL,
+  PROJECT_V1_ROUTE_ROLLOUT_DETAIL_STAGE_DETAIL,
   PROJECT_V1_ROUTE_ROLLOUT_DETAIL_TASK_DETAIL,
 } from "@/router/dashboard/projectV1";
 import {
@@ -86,7 +91,7 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18n();
-const { isCreating, plan, planCheckRunList, issue, rollout, isInitializing } =
+const { isCreating, plan, planCheckRuns, issue, rollout, isInitializing } =
   useInitializePlan(
     toRef(props, "projectId"),
     toRef(props, "planId"),
@@ -105,17 +110,14 @@ const ready = computed(() => {
 const route = useRoute();
 const router = useRouter();
 
-providePlanContext(
-  {
-    isCreating,
-    plan,
-    planCheckRunList,
-    issue,
-    rollout,
-    ...planBaseContext,
-  },
-  true /* root */
-);
+providePlanContext({
+  isCreating,
+  plan,
+  planCheckRuns,
+  issue,
+  rollout,
+  ...planBaseContext,
+});
 
 provideIssueReviewContext(issue);
 
@@ -144,6 +146,7 @@ const tabKey = computed(() => {
   } else if (
     [
       PROJECT_V1_ROUTE_ROLLOUT_DETAIL,
+      PROJECT_V1_ROUTE_ROLLOUT_DETAIL_STAGE_DETAIL,
       PROJECT_V1_ROUTE_ROLLOUT_DETAIL_TASK_DETAIL,
     ].includes(routeName)
   ) {
@@ -158,7 +161,9 @@ const availableTabs = computed<TabKey[]>(() => {
   if (!isCreating.value) {
     if (
       plan.value.specs.some(
-        (spec) => !isNullOrUndefined(spec.changeDatabaseConfig)
+        (spec) =>
+          !isNullOrUndefined(spec.config) &&
+          spec.config.case === "changeDatabaseConfig"
       )
     ) {
       tabs.push(TabKey.Checks);
@@ -211,7 +216,12 @@ const tabRender = (tab: TabKey) => {
 };
 
 const handleTabChange = (tab: TabKey) => {
-  const params = route.params;
+  if (!route || !route.params) {
+    console.warn("Route or route.params is undefined");
+    return;
+  }
+
+  const params = { ...route.params };
   if (isCreating.value) {
     params.planId = "create";
   } else {
@@ -224,41 +234,37 @@ const handleTabChange = (tab: TabKey) => {
     }
   }
 
+  const query = route.query || {};
+
   if (tab === TabKey.Overview) {
     router.push({
       name: PROJECT_V1_ROUTE_PLAN_DETAIL,
       params: params,
-      query: route.query,
+      query: query,
     });
   } else if (tab === TabKey.Specifications) {
-    // Auto select the first spec when switching to Specifications tab.
-    const spec = head(plan.value.specs);
-    if (spec) {
-      gotoSpec(router, spec.id);
-    } else {
-      router.push({
-        name: PROJECT_V1_ROUTE_PLAN_DETAIL_SPECS,
-        params: params,
-        query: route.query,
-      });
-    }
+    router.push({
+      name: PROJECT_V1_ROUTE_PLAN_DETAIL_SPECS,
+      params: params,
+      query: query,
+    });
   } else if (tab === TabKey.Checks) {
     router.push({
       name: PROJECT_V1_ROUTE_PLAN_DETAIL_CHECK_RUNS,
       params: params,
-      query: route.query,
+      query: query,
     });
   } else if (tab === TabKey.Review) {
     router.push({
       name: PROJECT_V1_ROUTE_ISSUE_DETAIL_V1,
       params: params,
-      query: route.query,
+      query: query,
     });
   } else if (tab === TabKey.Rollout) {
     router.push({
       name: PROJECT_V1_ROUTE_ROLLOUT_DETAIL,
       params: params,
-      query: route.query,
+      query: query,
     });
   }
 };

@@ -58,28 +58,11 @@
       <PreBackupSection ref="preBackupSectionRef" />
       <GhostSection v-if="shouldShowGhostSection" />
     </div>
-
-    <router-link
-      v-if="shouldShowExperimentalIssuePageLink"
-      :to="{
-        name: PROJECT_V1_ROUTE_ISSUE_DETAIL_V1,
-        params: {
-          projectId: extractProjectResourceName(project.name),
-          issueId: extractIssueUID(issue.name),
-        },
-      }"
-      class="text-sm font-normal text-gray-500 hover:text-blue-600 hover:underline flex items-center"
-      target="_blank"
-    >
-      <span>{{ $t("issue.expermental-page.self") }}</span>
-      <ExternalLinkIcon class="inline w-4 h-4 ml-1" />
-    </router-link>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { create } from "@bufbuild/protobuf";
-import { ExternalLinkIcon } from "lucide-vue-next";
 import { NTooltip } from "naive-ui";
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -89,17 +72,11 @@ import { GhostSection } from "@/components/Plan/components/Configuration";
 import { provideGhostSettingContext } from "@/components/Plan/components/Configuration/GhostSection/context";
 import { ApprovalFlowSection } from "@/components/Plan/components/IssueReviewView/Sidebar/ApprovalFlowSection";
 import { issueServiceClientConnect } from "@/grpcweb";
-import { PROJECT_V1_ROUTE_ISSUE_DETAIL_V1 } from "@/router/dashboard/projectV1";
 import { pushNotification, useCurrentProjectV1 } from "@/store";
 import { UpdateIssueRequestSchema } from "@/types/proto-es/v1/issue_service_pb";
+import { IssueSchema } from "@/types/proto-es/v1/issue_service_pb";
+import type { Plan } from "@/types/proto-es/v1/plan_service_pb";
 import { PlanFeature } from "@/types/proto-es/v1/subscription_service_pb";
-import { Issue, Issue_Type } from "@/types/proto/v1/issue_service";
-import type { Plan } from "@/types/proto/v1/plan_service";
-import { extractIssueUID, extractProjectResourceName, isDev } from "@/utils";
-import {
-  convertNewIssueToOld,
-  convertOldIssueToNew,
-} from "@/utils/v1/issue-conversions";
 import { specForTask, useIssueContext } from "../../logic";
 import IssueLabels from "./IssueLabels.vue";
 import PreBackupSection from "./PreBackupSection";
@@ -138,29 +115,19 @@ const shouldShowPreBackupSection = computed(() => {
   return preBackupSectionRef.value?.shouldShow ?? false;
 });
 
-const shouldShowExperimentalIssuePageLink = computed(() => {
-  return (
-    !isCreating.value &&
-    isDev() &&
-    issue.value.type === Issue_Type.DATABASE_CHANGE
-  );
-});
-
 const onIssueLabelsUpdate = async (labels: string[]) => {
   if (isCreating.value) {
     issue.value.labels = labels;
   } else {
-    const issuePatch = Issue.fromPartial({
+    const issuePatch = create(IssueSchema, {
       ...issue.value,
       labels,
     });
-    const newIssuePatch = convertOldIssueToNew(issuePatch);
     const request = create(UpdateIssueRequestSchema, {
-      issue: newIssuePatch,
+      issue: issuePatch,
       updateMask: { paths: ["labels"] },
     });
-    const newUpdated = await issueServiceClientConnect.updateIssue(request);
-    const updated = convertNewIssueToOld(newUpdated);
+    const updated = await issueServiceClientConnect.updateIssue(request);
     Object.assign(issue.value, updated);
     pushNotification({
       module: "bytebase",

@@ -88,25 +88,22 @@
 </template>
 
 <script lang="ts" setup>
+import { create } from "@bufbuild/protobuf";
+import type { ConnectError } from "@connectrpc/connect";
 import { NButton, NModal } from "naive-ui";
 import { ref, onUnmounted, watch } from "vue";
-import { create } from "@bufbuild/protobuf";
 import { identityProviderServiceClientConnect } from "@/grpcweb";
 import { pushNotification } from "@/store";
 import type { OAuthWindowEventPayload } from "@/types";
-import {
-  IdentityProviderType,
+import type {
+  IdentityProvider,
   TestIdentityProviderResponse,
-  type IdentityProvider,
-} from "@/types/proto/v1/idp_service";
+} from "@/types/proto-es/v1/idp_service_pb";
+import { IdentityProviderType } from "@/types/proto-es/v1/idp_service_pb";
 import {
   TestIdentityProviderRequestSchema,
   CreateIdentityProviderRequestSchema,
 } from "@/types/proto-es/v1/idp_service_pb";
-import {
-  convertOldIdentityProviderToNew,
-  convertNewIdentityProviderToOld,
-} from "@/utils/v1/idp-conversions";
 import { openWindowForSSO } from "@/utils";
 
 const props = defineProps<{
@@ -147,7 +144,7 @@ const loginWithIdentityProviderEventListener = async (event: Event) => {
   try {
     isTestingInProgress.value = true;
     const request = create(TestIdentityProviderRequestSchema, {
-      identityProvider: convertOldIdentityProviderToNew(props.idp),
+      identityProvider: props.idp,
       context: {
         case: "oauth2Context",
         value: {
@@ -155,7 +152,8 @@ const loginWithIdentityProviderEventListener = async (event: Event) => {
         },
       },
     });
-    const response = await identityProviderServiceClientConnect.testIdentityProvider(request);
+    const response =
+      await identityProviderServiceClientConnect.testIdentityProvider(request);
 
     testIdentityProviderResponse.value = response;
     showClaimsDialog.value = true;
@@ -164,7 +162,7 @@ const loginWithIdentityProviderEventListener = async (event: Event) => {
       module: "bytebase",
       style: "CRITICAL",
       title: `Request error occurred`,
-      description: (error as any).details,
+      description: (error as ConnectError).message,
     });
   } finally {
     isTestingInProgress.value = false;
@@ -182,16 +180,19 @@ const testConnection = async () => {
     idp.type === IdentityProviderType.OAUTH2 ||
     idp.type === IdentityProviderType.OIDC
   ) {
-    let idpForTesting = idp;
+    let idpForTesting: IdentityProvider = idp;
     // For OIDC, we need to obtain the auth endpoint from the issuer in backend.
     if (isCreating && idp.type === IdentityProviderType.OIDC) {
       const request = create(CreateIdentityProviderRequestSchema, {
         identityProviderId: idp.name,
-        identityProvider: convertOldIdentityProviderToNew(idp),
+        identityProvider: idp,
         validateOnly: true,
       });
-      const response = await identityProviderServiceClientConnect.createIdentityProvider(request);
-      idpForTesting = convertNewIdentityProviderToOld(response);
+      const response =
+        await identityProviderServiceClientConnect.createIdentityProvider(
+          request
+        );
+      idpForTesting = response;
     }
 
     // Ensure event listener is set up for the correct IDP name
@@ -220,16 +221,19 @@ const testConnection = async () => {
         module: "bytebase",
         style: "CRITICAL",
         title: `Request error occurred`,
-        description: (error as any).message,
+        description: (error as ConnectError).message,
       });
     }
   } else if (idp.type === IdentityProviderType.LDAP) {
     try {
       isTestingInProgress.value = true;
       const request = create(TestIdentityProviderRequestSchema, {
-        identityProvider: convertOldIdentityProviderToNew(idp),
+        identityProvider: idp,
       });
-      const response = await identityProviderServiceClientConnect.testIdentityProvider(request);
+      const response =
+        await identityProviderServiceClientConnect.testIdentityProvider(
+          request
+        );
 
       // Show claims in dialog (LDAP will have empty claims)
       testIdentityProviderResponse.value = response;
@@ -239,7 +243,7 @@ const testConnection = async () => {
         module: "bytebase",
         style: "CRITICAL",
         title: `Request error occurred`,
-        description: (error as any).details,
+        description: (error as ConnectError).message,
       });
     } finally {
       isTestingInProgress.value = false;

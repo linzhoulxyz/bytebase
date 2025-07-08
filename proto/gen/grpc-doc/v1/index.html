@@ -2106,6 +2106,10 @@
                 </li>
               
                 <li>
+                  <a href="#bytebase.v1.MaskingReason"><span class="badge">M</span>MaskingReason</a>
+                </li>
+              
+                <li>
                   <a href="#bytebase.v1.ParseMyBatisMapperRequest"><span class="badge">M</span>ParseMyBatisMapperRequest</a>
                 </li>
               
@@ -9476,13 +9480,13 @@ The API will default to the BASIC view.</p></td>
               </tr>
             
               <tr>
-                <td>TYPE_VIRTUAL</td>
+                <td>VIRTUAL</td>
                 <td>1</td>
                 <td><p></p></td>
               </tr>
             
               <tr>
-                <td>TYPE_STORED</td>
+                <td>STORED</td>
                 <td>2</td>
                 <td><p></p></td>
               </tr>
@@ -9570,19 +9574,19 @@ The API will default to the BASIC view.</p></td>
               </tr>
             
               <tr>
-                <td>MODE_DEFAULT</td>
+                <td>DEFAULT</td>
                 <td>1</td>
                 <td><p></p></td>
               </tr>
             
               <tr>
-                <td>MODE_APPEND_ONLY</td>
+                <td>APPEND_ONLY</td>
                 <td>2</td>
                 <td><p></p></td>
               </tr>
             
               <tr>
-                <td>MODE_INSERT_ONLY</td>
+                <td>INSERT_ONLY</td>
                 <td>3</td>
                 <td><p></p></td>
               </tr>
@@ -9605,7 +9609,7 @@ The API will default to the BASIC view.</p></td>
               </tr>
             
               <tr>
-                <td>TYPE_DELTA</td>
+                <td>DELTA</td>
                 <td>1</td>
                 <td><p></p></td>
               </tr>
@@ -9693,13 +9697,13 @@ The API will default to the BASIC view.</p></td>
               </tr>
             
               <tr>
-                <td>STATE_STARTED</td>
+                <td>STARTED</td>
                 <td>1</td>
                 <td><p></p></td>
               </tr>
             
               <tr>
-                <td>STATE_SUSPENDED</td>
+                <td>SUSPENDED</td>
                 <td>2</td>
                 <td><p></p></td>
               </tr>
@@ -13018,8 +13022,8 @@ The default value is 100MB, we will use the default value if the setting not exi
                   <td>maximum_result_rows</td>
                   <td><a href="#int32">int32</a></td>
                   <td></td>
-                  <td><p>The return rows limit.
-The default value is -1, means no limit. </p></td>
+                  <td><p>The return rows limit. If the value &lt;= 0, will be treated as no limit.
+The default value is -1. </p></td>
                 </tr>
               
             </tbody>
@@ -13269,6 +13273,13 @@ The default value is -1, means no limit. </p></td>
                   <td><a href="#bytebase.v1.Algorithm">Algorithm</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>icon</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>icon is the icon for semantic type, it can be emoji or base64 encoded image. </p></td>
                 </tr>
               
             </tbody>
@@ -13696,19 +13707,19 @@ For examples:
               </tr>
             
               <tr>
-                <td>ALERT_LEVEL_INFO</td>
+                <td>INFO</td>
                 <td>1</td>
                 <td><p></p></td>
               </tr>
             
               <tr>
-                <td>ALERT_LEVEL_WARNING</td>
+                <td>WARNING</td>
                 <td>2</td>
                 <td><p></p></td>
               </tr>
             
               <tr>
-                <td>ALERT_LEVEL_CRITICAL</td>
+                <td>CRITICAL</td>
                 <td>3</td>
                 <td><p></p></td>
               </tr>
@@ -15434,6 +15445,13 @@ Some fields are omitted because they are too large or contain sensitive informat
                   <td><a href="#google.rpc.Status">google.rpc.Status</a></td>
                   <td></td>
                   <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>latency</td>
+                  <td><a href="#google.protobuf.Duration">google.protobuf.Duration</a></td>
+                  <td></td>
+                  <td><p>The latency of the RPC. </p></td>
                 </tr>
               
                 <tr>
@@ -22245,61 +22263,61 @@ It should not be empty, and should be a subset of the following:
               </tr>
             
               <tr>
-                <td>TYPE_NOTIFY_ISSUE_APPROVED</td>
+                <td>NOTIFY_ISSUE_APPROVED</td>
                 <td>23</td>
                 <td><p>Notifications via webhooks.
 
-TYPE_NOTIFY_ISSUE_APPROVED represents the issue approved notification.</p></td>
+NOTIFY_ISSUE_APPROVED represents the issue approved notification.</p></td>
               </tr>
             
               <tr>
-                <td>TYPE_NOTIFY_PIPELINE_ROLLOUT</td>
+                <td>NOTIFY_PIPELINE_ROLLOUT</td>
                 <td>24</td>
-                <td><p>TYPE_NOTIFY_PIPELINE_ROLLOUT represents the pipeline rollout notification.</p></td>
+                <td><p>NOTIFY_PIPELINE_ROLLOUT represents the pipeline rollout notification.</p></td>
               </tr>
             
               <tr>
-                <td>TYPE_ISSUE_CREATE</td>
+                <td>ISSUE_CREATE</td>
                 <td>1</td>
                 <td><p>Issue related activity types.
 
-TYPE_ISSUE_CREATE represents creating an issue.</p></td>
+ISSUE_CREATE represents creating an issue.</p></td>
               </tr>
             
               <tr>
-                <td>TYPE_ISSUE_COMMENT_CREATE</td>
+                <td>ISSUE_COMMENT_CREATE</td>
                 <td>2</td>
-                <td><p>TYPE_ISSUE_COMMENT_CREATE represents commenting on an issue.</p></td>
+                <td><p>ISSUE_COMMENT_CREATE represents commenting on an issue.</p></td>
               </tr>
             
               <tr>
-                <td>TYPE_ISSUE_FIELD_UPDATE</td>
+                <td>ISSUE_FIELD_UPDATE</td>
                 <td>3</td>
-                <td><p>TYPE_ISSUE_FIELD_UPDATE represents updating the issue field, likes title, description, etc.</p></td>
+                <td><p>ISSUE_FIELD_UPDATE represents updating the issue field, likes title, description, etc.</p></td>
               </tr>
             
               <tr>
-                <td>TYPE_ISSUE_STATUS_UPDATE</td>
+                <td>ISSUE_STATUS_UPDATE</td>
                 <td>4</td>
-                <td><p>TYPE_ISSUE_STATUS_UPDATE represents the issue status change, including OPEN, CLOSE, CANCEL fow now.</p></td>
+                <td><p>ISSUE_STATUS_UPDATE represents the issue status change, including OPEN, CLOSE, CANCEL fow now.</p></td>
               </tr>
             
               <tr>
-                <td>TYPE_ISSUE_APPROVAL_NOTIFY</td>
+                <td>ISSUE_APPROVAL_NOTIFY</td>
                 <td>21</td>
-                <td><p>TYPE_ISSUE_APPROVAL_NOTIFY is the type for notifying issue approval.</p></td>
+                <td><p>ISSUE_APPROVAL_NOTIFY is the type for notifying issue approval.</p></td>
               </tr>
             
               <tr>
-                <td>TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE</td>
+                <td>ISSUE_PIPELINE_STAGE_STATUS_UPDATE</td>
                 <td>5</td>
-                <td><p>TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE represents the pipeline stage status change, including BEGIN, END for now.</p></td>
+                <td><p>ISSUE_PIPELINE_STAGE_STATUS_UPDATE represents the pipeline stage status change, including BEGIN, END for now.</p></td>
               </tr>
             
               <tr>
-                <td>TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE</td>
+                <td>ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE</td>
                 <td>22</td>
-                <td><p>TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE represents the pipeline task run status change, including PENDING, RUNNING, DONE, FAILED, CANCELED.</p></td>
+                <td><p>ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE represents the pipeline task run status change, including PENDING, RUNNING, DONE, FAILED, CANCELED.</p></td>
               </tr>
             
           </tbody>
@@ -23205,6 +23223,72 @@ data source. </p></td>
 
         
       
+        <h3 id="bytebase.v1.MaskingReason">MaskingReason</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>semantic_type_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The semantic type that triggered masking (e.g., &#34;SSN&#34;, &#34;email&#34;, &#34;phone&#34;). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>semantic_type_title</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Human-readable semantic type title. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>masking_rule_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The masking rule ID that matched (if applicable). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>algorithm</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The masking algorithm used. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>context</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Additional context (e.g., &#34;Matched global rule: PII Protection&#34;). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>classification_level</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Whether masking was due to classification level. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>semantic_type_icon</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Icon associated with the semantic type (if any). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="bytebase.v1.ParseMyBatisMapperRequest">ParseMyBatisMapperRequest</h3>
         <p></p>
 
@@ -23567,20 +23651,6 @@ The types come from the Golang SQL driver. </p></td>
                 </tr>
               
                 <tr>
-                  <td>masked</td>
-                  <td><a href="#bool">bool</a></td>
-                  <td>repeated</td>
-                  <td><p>Columns are masked or not. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>sensitive</td>
-                  <td><a href="#bool">bool</a></td>
-                  <td>repeated</td>
-                  <td><p>Columns are sensitive or not. </p></td>
-                </tr>
-              
-                <tr>
                   <td>error</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
@@ -23621,6 +23691,13 @@ The types come from the Golang SQL driver. </p></td>
                   <td>repeated</td>
                   <td><p>Informational or debug messages returned by the database engine during query execution.
 Examples include PostgreSQL&#39;s RAISE NOTICE, MSSQL&#39;s PRINT, or Oracle&#39;s DBMS_OUTPUT.PUT_LINE. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>masked</td>
+                  <td><a href="#bytebase.v1.MaskingReason">MaskingReason</a></td>
+                  <td>repeated</td>
+                  <td><p>Masking reasons for each column (empty for non-masked columns). </p></td>
                 </tr>
               
             </tbody>
@@ -30705,8 +30782,8 @@ creator == &#34;users/{email}&#34;
 creator != &#34;users/{email}&#34;
 starred == true
 starred == false
-visibility in [&#34;VISIBILITY_PRIVATE&#34;, &#34;VISIBILITY_PROJECT_READ&#34;, &#34;VISIBILITY_PROJECT_WRITE&#34;]
-visibility == &#34;VISIBILITY_PRIVATE&#34; </p></td>
+visibility in [&#34;PRIVATE&#34;, &#34;PROJECT_READ&#34;, &#34;PROJECT_WRITE&#34;]
+visibility == &#34;PRIVATE&#34; </p></td>
                 </tr>
               
                 <tr>
@@ -31000,19 +31077,19 @@ Format: worksheets/{worksheet} </p></td>
               </tr>
             
               <tr>
-                <td>VISIBILITY_PROJECT_READ</td>
+                <td>PROJECT_READ</td>
                 <td>1</td>
                 <td><p>Read access in project scope, worksheet OWNER/DBA and project OWNER can read/write, other project members can read.</p></td>
               </tr>
             
               <tr>
-                <td>VISIBILITY_PROJECT_WRITE</td>
+                <td>PROJECT_WRITE</td>
                 <td>2</td>
                 <td><p>Write access in project scope, worksheet OWNER/DBA and all members in the project can write the worksheet.</p></td>
               </tr>
             
               <tr>
-                <td>VISIBILITY_PRIVATE</td>
+                <td>PRIVATE</td>
                 <td>3</td>
                 <td><p>Private, only worksheet OWNER can read/write.</p></td>
               </tr>

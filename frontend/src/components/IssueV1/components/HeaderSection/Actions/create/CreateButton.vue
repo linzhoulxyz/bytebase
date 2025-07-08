@@ -66,7 +66,6 @@ import {
 } from "@/components/Plan";
 import { getSpecChangeType } from "@/components/Plan/components/SQLCheckSection/common";
 import { usePlanSQLCheckContext } from "@/components/Plan/components/SQLCheckSection/context";
-import { databaseForTask } from "@/components/Rollout/RolloutDetail";
 import { SQLCheckPanel } from "@/components/SQLCheck";
 import { STATEMENT_SKIP_CHECK_THRESHOLD } from "@/components/SQLCheck/common";
 import {
@@ -79,19 +78,21 @@ import { emitWindowEvent } from "@/plugins";
 import { PROJECT_V1_ROUTE_ISSUE_DETAIL } from "@/router/dashboard/projectV1";
 import { useSheetV1Store, useCurrentProjectV1 } from "@/store";
 import { dialectOfEngineV1, languageOfEngineV1 } from "@/types";
+import type { Engine } from "@/types/proto-es/v1/common_pb";
 import { CreateIssueRequestSchema } from "@/types/proto-es/v1/issue_service_pb";
+import type { Issue } from "@/types/proto-es/v1/issue_service_pb";
+import { IssueSchema, Issue_Type } from "@/types/proto-es/v1/issue_service_pb";
 import { CreatePlanRequestSchema } from "@/types/proto-es/v1/plan_service_pb";
+import type { Plan_ExportDataConfig } from "@/types/proto-es/v1/plan_service_pb";
+import { type Plan_ChangeDatabaseConfig } from "@/types/proto-es/v1/plan_service_pb";
 import {
   CheckReleaseRequestSchema,
   ReleaseFileType,
 } from "@/types/proto-es/v1/release_service_pb";
 import { CreateRolloutRequestSchema } from "@/types/proto-es/v1/rollout_service_pb";
-import type { Engine } from "@/types/proto-es/v1/common_pb";
-import { Issue, Issue_Type } from "@/types/proto/v1/issue_service";
-import type { Plan_ExportDataConfig } from "@/types/proto/v1/plan_service";
-import { type Plan_ChangeDatabaseConfig } from "@/types/proto/v1/plan_service";
-import type { Sheet } from "@/types/proto/v1/sheet_service";
-import { Advice_Status } from "@/types/proto/v1/sql_service";
+import type { Sheet } from "@/types/proto-es/v1/sheet_service_pb";
+import { Advice_Status } from "@/types/proto-es/v1/sql_service_pb";
+import { databaseForTask } from "@/utils";
 import {
   defer,
   extractIssueUID,
@@ -105,19 +106,6 @@ import {
   sheetNameOfTaskV1,
   type Defer,
 } from "@/utils";
-import {
-  convertOldIssueToNew,
-  convertNewIssueToOld,
-} from "@/utils/v1/issue-conversions";
-import {
-  convertOldPlanToNew,
-  convertNewPlanToOld,
-} from "@/utils/v1/plan-conversions";
-import { convertEngineToOld } from "@/utils/v1/common-conversions";
-import {
-  convertNewCheckReleaseResponseToOld,
-  convertOldChangeTypeToNew,
-} from "@/utils/v1/release-conversions";
 
 const MAX_FORMATTABLE_STATEMENT_SIZE = 10000; // 10K characters
 
@@ -186,16 +174,15 @@ const doCreateIssue = async () => {
     issue.value.plan = createdPlan.name;
     issue.value.planEntity = createdPlan;
 
-    const issueCreate = {
-      ...Issue.fromPartial(issue.value),
+    const issueCreate = create(IssueSchema, {
+      ...issue.value,
       rollout: "",
-    };
+    });
     const request = create(CreateIssueRequestSchema, {
       parent: issue.value.project,
-      issue: convertOldIssueToNew(issueCreate),
+      issue: issueCreate,
     });
-    const response = await issueServiceClientConnect.createIssue(request);
-    const createdIssue = convertNewIssueToOld(response);
+    const createdIssue = await issueServiceClientConnect.createIssue(request);
 
     const rolloutRequest = create(CreateRolloutRequestSchema, {
       parent: issue.value.project,
@@ -228,7 +215,12 @@ const createSheets = async () => {
 
   const specList = issue.value.planEntity?.specs ?? [];
   for (const spec of specList) {
-    const config = spec.changeDatabaseConfig || spec.exportDataConfig;
+    const config =
+      spec.config?.case === "changeDatabaseConfig"
+        ? spec.config.value
+        : spec.config?.case === "exportDataConfig"
+          ? spec.config.value
+          : null;
     if (!config) continue;
     configWithSheetList.push(config);
     if (pendingCreateSheetMap.has(config.sheet)) continue;
@@ -237,7 +229,7 @@ const createSheets = async () => {
       // The sheet is pending create
       const sheet = getLocalSheetByName(config.sheet);
       const engine = await databaseEngineForSpec(spec);
-      sheet.engine = convertEngineToOld(engine as Engine);
+      sheet.engine = engine;
       pendingCreateSheetMap.set(sheet.name, sheet);
       await maybeFormatSQL(sheet, engine as Engine);
     }
@@ -264,13 +256,12 @@ const createSheets = async () => {
 const createPlan = async () => {
   const plan = issue.value.planEntity;
   if (!plan) return;
-  const newPlan = convertOldPlanToNew(plan);
   const request = create(CreatePlanRequestSchema, {
     parent: issue.value.project,
-    plan: newPlan,
+    plan: plan,
   });
   const response = await planServiceClientConnect.createPlan(request);
-  return convertNewPlanToOld(response);
+  return response;
 };
 
 const maybeFormatSQL = async (sheet: Sheet, engine: Engine) => {
@@ -350,10 +341,8 @@ const runSQLCheckForIssue = async () => {
             version: "0",
             type: ReleaseFileType.VERSIONED,
             statement: new TextEncoder().encode(statement),
-            changeType: convertOldChangeTypeToNew(
-              getSpecChangeType(
-                specForTask(issue.value.planEntity, selectedTask.value)
-              )
+            changeType: getSpecChangeType(
+              specForTask(issue.value.planEntity, selectedTask.value)
             ),
           },
         ],
@@ -361,9 +350,8 @@ const runSQLCheckForIssue = async () => {
       targets: targets,
     });
     const response = await releaseServiceClientConnect.checkRelease(request);
-    const result = convertNewCheckReleaseResponseToOld(response);
     // Upsert check result for each target.
-    for (const r of result?.results || []) {
+    for (const r of response.results) {
       upsertCheckResult(r.target, r);
     }
   }

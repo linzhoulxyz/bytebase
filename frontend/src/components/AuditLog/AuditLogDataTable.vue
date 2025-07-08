@@ -20,8 +20,12 @@ import { useProjectV1Store, useUserStore } from "@/store";
 import { projectNamePrefix } from "@/store/modules/v1/common";
 import { getDateForPbTimestampProtoEs } from "@/types";
 import type { AuditLog } from "@/types/proto-es/v1/audit_log_service_pb";
-import { AuditDataSchema } from "@/types/proto-es/v1/audit_log_service_pb";
+import {
+  AuditDataSchema,
+  AuditLog_Severity,
+} from "@/types/proto-es/v1/audit_log_service_pb";
 import { SettingSchema } from "@/types/proto-es/v1/setting_service_pb";
+import { humanizeDurationV1 } from "@/utils";
 import { extractProjectResourceName } from "@/utils";
 import JSONStringView from "./JSONStringView.vue";
 
@@ -61,7 +65,7 @@ const columnList = computed((): AuditDataTableColumn[] => {
         key: "severity",
         width: 96,
         title: t("audit-log.table.level"),
-        render: (auditLog) => auditLog.severity,
+        render: (auditLog) => AuditLog_Severity[auditLog.severity],
       },
       {
         key: "project",
@@ -132,8 +136,7 @@ const columnList = computed((): AuditDataTableColumn[] => {
       {
         key: "status",
         resizable: true,
-        minWidth: 256,
-        width: 256,
+        width: 96,
         title: t("audit-log.table.status"),
         render: (auditLog) =>
           auditLog.status ? (
@@ -141,6 +144,14 @@ const columnList = computed((): AuditDataTableColumn[] => {
           ) : (
             "-"
           ),
+      },
+      {
+        key: "latency",
+        width: 96,
+        title: t("audit-log.table.latency"),
+        render: (auditLog) => {
+          return <span>{humanizeDurationV1(auditLog.latency)}</span>;
+        },
       },
       {
         key: "service-data",

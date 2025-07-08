@@ -129,6 +129,8 @@
     "delete": "Xóa",
     "history": "Lịch sử",
     "loading": "Đang tải",
+    "just-now": "ngay bây giờ",
+    "n-seconds-ago": "{count} giây trước",
     "copy": "Sao chép",
     "copied": "Đã sao chép",
     "click-to-copy": "Nhấp để sao chép",
@@ -172,6 +174,7 @@
     "will-override-current-data": "Sẽ ghi đè dữ liệu hiện tại.",
     "rollout": "Triển khai",
     "upload": "Tải lên",
+    "clear": "Xóa",
     "added": "Đã thêm",
     "revoke": "Thu hồi",
     "cannot-undo-this-action": "Bạn không thể hoàn tác hành động này.",
@@ -278,6 +281,14 @@
     "cancel-task": "Hủy tác vụ | Hủy các tác vụ",
     "created": "Đã tạo",
     "run-immediately": "Chạy nhiệm vụ ngay lập tức",
+    "selected-n-tasks": "{n} nhiệm vụ đã chọn | {n} nhiệm vụ đã chọn",
+    "no-tasks": "Không có nhiệm vụ",
+    "no-tasks-selected": "Không có nhiệm vụ nào được chọn",
+    "no-runnable-tasks": "Không có tác vụ nào có thể chạy được",
+    "no-skippable-tasks": "Không có nhiệm vụ nào có thể bỏ qua",
+    "no-cancellable-tasks": "Không có nhiệm vụ nào có thể hủy bỏ",
+    "cross-stage-not-supported": "Hoạt động liên giai đoạn không được hỗ trợ",
+    "no-permission": "Không có quyền thực hiện hành động này",
     "scheduled-time": "Thời gian đã lên lịch",
     "select-scheduled-time": "Chọn thời gian đã lên lịch",
     "error": {
@@ -571,6 +582,7 @@
           },
           "rows": {
             "self": "Số lượng hàng kết quả SQL tối đa",
+            "rows": "Hàng",
             "description": "Giới hạn số hàng đầu ra trong kết quả truy vấn SQL, giá trị <= 0 nghĩa là không giới hạn."
           }
         },
@@ -579,7 +591,8 @@
             "self": "Thời gian truy vấn tối đa",
             "description": "Thời gian tối đa được phép chạy truy vấn trong SQL Editor.",
             "no-time-limit": "Không giới hạn thời gian cho truy vấn khi đặt thành 0."
-          }
+          },
+          "seconds": "Giây"
         },
         "domain-restriction": {
           "self": "Tên miền không gian làm việc",
@@ -682,6 +695,7 @@
         "use-predefined-type": "Sử dụng Loại định nghĩa trước",
         "add-from-template": "Thêm từ mẫu",
         "table": {
+          "icon": "Biểu tượng",
           "semantic-type": "Loại ngữ nghĩa",
           "description": "Mô tả",
           "masking-algorithm": "Thuật toán che",
@@ -960,7 +974,6 @@
       "sql-review-violations": "Vi phạm đánh giá SQL"
     },
     "error": {
-      "issue-is-not-open": "Vấn đề không mở",
       "you-don-have-privilege-to-edit-this-issue": "Bạn không có quyền chỉnh sửa vấn đề này",
       "you-are-not-allowed-to-perform-this-action": "Bạn không được phép thực hiện hành động này",
       "cannot-close-issue-with-running-tasks": "Không thể đóng vấn đề với các tác vụ đang chạy"
@@ -1009,7 +1022,6 @@
       }
     },
     "sql-review-only": "Chỉ đánh giá SQL",
-    "this-plan-will-be-converted-to-a-new-issue": "Kế hoạch này sẽ được chuyển đổi thành một vấn đề mới",
     "title": {
       "edit-schema": "Chỉnh sửa lược đồ",
       "change-data": "Thay đổi dữ liệu",
@@ -1027,9 +1039,15 @@
       "rejected": "Vật bị loại bỏ",
       "under-review": "Đang xem xét"
     },
-    "expermental-page": {
-      "self": "Trang vấn đề thử nghiệm"
-    }
+    "approval": {
+      "rejected-title": "Vấn đề phê duyệt bị từ chối",
+      "pending-title": "Đang chờ phê duyệt vấn đề",
+      "rejected-description": "Vấn đề này đã bị người phê duyệt từ chối. Cần phải triển khai bắt buộc để tiếp tục.",
+      "pending-description": "Sự cố này đang chờ phê duyệt. Cần phải triển khai bắt buộc để tiếp tục.",
+      "rejected-error": "Đã từ chối phê duyệt vấn đề. Vui lòng bật triển khai bắt buộc để tiếp tục.",
+      "pending-error": "Đang chờ phê duyệt vấn đề. Vui lòng bật triển khai bắt buộc để tiếp tục."
+    },
+    "new-layout": "Bố cục CI/CD mới"
   },
   "plan": {
     "self": "Kế hoạch",
@@ -1047,7 +1065,6 @@
       "description": "Xem và quản lý tất cả các thông số kỹ thuật trong kế hoạch này",
       "total-specs": "Tổng số thông số kỹ thuật",
       "total-targets": "Tổng số mục tiêu",
-      "check-status": "Kiểm tra trạng thái",
       "no-checks": "Không kiểm tra",
       "affected-resources": "Tài nguyên bị ảnh hưởng"
     },
@@ -1103,10 +1120,14 @@
     },
     "checks": {
       "self": "Kiểm tra"
+    },
+    "refresh-indicator": {
+      "last-refresh": "Làm mới lần cuối: {time}"
     }
   },
   "rollout": {
-    "rollouts": "Triển khai"
+    "rollouts": "Triển khai",
+    "force-rollout": "Buộc triển khai"
   },
   "quick-action": {
     "create-db": "Tạo cơ sở dữ liệu",
@@ -1755,7 +1776,7 @@
         },
         "max-retries": {
           "self": "Số lần thử lại tối đa cho thời gian chờ khóa",
-          "description": "Tối đa nhớ lại số lượng thời gian chờ khóa khi chạy tác vụ. Giá trị mặc định là 0."
+          "description": "Tối đa nhớ lại số lượng thời gian chờ khóa khi chạy tác vụ. \nGiá trị mặc định là 0. Chỉ áp dụng cho Postgres."
         },
         "ci-sampling-size": {
           "self": "Kích thước lấy mẫu dữ liệu CI",
@@ -2059,7 +2080,8 @@
       "no-default": "Không mặc định",
       "expression": "Biểu thức",
       "null": "NULL",
-      "value": "Giá trị"
+      "value": "Giá trị",
+      "placeholder": "Nhập giá trị mặc định hoặc để trống nếu không có giá trị mặc định"
     },
     "message": {
       "invalid-schema-name": "Tên lược đồ không hợp lệ",
@@ -2188,7 +2210,7 @@
         "title": "Miễn phí"
       },
       "team": {
-        "title": "Nhóm"
+        "title": "Chuyên nghiệp"
       },
       "enterprise": {
         "title": "Doanh nghiệp"
@@ -2289,6 +2311,7 @@
       "request": "Yêu cầu",
       "response": "Phản hồi",
       "status": "Trạng thái",
+      "latency": "Độ trễ",
       "service-data": "Dữ liệu dịch vụ"
     },
     "advanced-search": {
@@ -2653,9 +2676,6 @@
     "self": "Trung tâm xuất",
     "permission-denied": "Quyền bị từ chối"
   },
-  "review-center": {
-    "self": "Trung tâm đánh giá"
-  },
   "schema-designer": {
     "use-tips": "Nhấp vào một bảng để bắt đầu."
   },
@@ -2790,6 +2810,16 @@
       "built-in": "Sử dụng mẫu tích hợp",
       "built-in-desc": "Tạo dự án mẫu và các trường hợp"
     }
+  },
+  "masking": {
+    "reason": {
+      "title": "Tại sao dữ liệu này bị che?",
+      "semantic-type": "Loại ngữ nghĩa",
+      "algorithm": "Phương pháp che dữ liệu",
+      "context": "Quy tắc",
+      "classification": "Mức phân loại"
+    },
+    "algorithms": {}
   },
   "landing": {
     "quick-link": {

@@ -1,17 +1,18 @@
+import { create } from "@bufbuild/protobuf";
 import { t } from "@/plugins/i18n";
 import { SYSTEM_BOT_ID } from "../common";
 import { EMPTY_ID, UNKNOWN_ID } from "../const";
 import { State } from "../proto-es/v1/common_pb";
-import { convertStateToOld } from "@/utils/v1/common-conversions";
-import { User, UserType } from "../proto/v1/user_service";
+import type { User } from "../proto-es/v1/user_service_pb";
+import { UserType, UserSchema } from "../proto-es/v1/user_service_pb";
 
 export const UNKNOWN_USER_NAME = `users/${UNKNOWN_ID}`;
 export const SYSTEM_BOT_USER_NAME = `users/${SYSTEM_BOT_ID}`;
 
 export const emptyUser = (): User => {
-  return User.fromPartial({
+  return create(UserSchema, {
     name: `users/${EMPTY_ID}`,
-    state: convertStateToOld(State.ACTIVE),
+    state: State.ACTIVE,
     email: "",
     title: "",
     userType: UserType.USER,

@@ -1,14 +1,13 @@
+import { create as createProto } from "@bufbuild/protobuf";
 import { head, uniq, values } from "lodash-es";
 import { computed, reactive, ref } from "vue";
-
 import { hashCode } from "@/bbkit/BBUtil";
 import { sqlServiceClientConnect } from "@/grpcweb";
-
 import {
-  convertOldAICompletionRequestToNew,
-  convertNewAICompletionResponseToOld,
-} from "@/utils/v1/sql-conversions";
-import { type AICompletionRequest_Message } from "@/types/proto/v1/sql_service";
+  type AICompletionRequest_Message,
+  AICompletionRequest_MessageSchema,
+  AICompletionRequestSchema,
+} from "@/types/proto-es/v1/sql_service_pb";
 import { WebStorageHelper } from "@/utils";
 import { useAIContext } from "./context";
 import * as promptUtils from "./prompt";
@@ -49,10 +48,8 @@ export const useDynamicSuggestions = () => {
   const requestAI = async (messages: AICompletionRequest_Message[]) => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     try {
-      const oldRequest = { messages };
-      const newRequest = convertOldAICompletionRequestToNew(oldRequest);
-      const newResponse = await sqlServiceClientConnect.aICompletion(newRequest);
-      const response = convertNewAICompletionResponseToOld(newResponse);
+      const request = createProto(AICompletionRequestSchema, { messages });
+      const response = await sqlServiceClientConnect.aICompletion(request);
       const text =
         head(head(response.candidates)?.content?.parts)?.text?.trim() ?? "";
       const card = JSON.parse(text) as Record<string, string>;
@@ -94,14 +91,14 @@ export const useDynamicSuggestions = () => {
           new Set([...used.values(), ...suggestions])
         );
         const messages: AICompletionRequest_Message[] = [
-          {
+          createProto(AICompletionRequest_MessageSchema, {
             role: "system",
             content: command,
-          },
-          {
+          }),
+          createProto(AICompletionRequest_MessageSchema, {
             role: "user",
             content: prompt,
-          },
+          }),
         ];
         console.debug("[DynamicSuggestions]");
         console.debug(command);

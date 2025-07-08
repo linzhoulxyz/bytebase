@@ -2,7 +2,6 @@ package mysql
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	parserbase "github.com/bytebase/bytebase/backend/plugin/parser/base"
@@ -13,7 +12,7 @@ import (
 // tableDrop holds drop operations for deduplication
 type tableDrop struct {
 	checkConstraints map[string]string
-	indexes          map[string]string
+	indexes          map[string]*storepb.IndexMetadata
 	columns          map[string]string
 }
 
@@ -144,7 +143,7 @@ func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
 			if _, exists := dropsPerTable[tableName]; !exists {
 				dropsPerTable[tableName] = &tableDrop{
 					checkConstraints: make(map[string]string),
-					indexes:          make(map[string]string),
+					indexes:          make(map[string]*storepb.IndexMetadata),
 					columns:          make(map[string]string),
 				}
 			}
@@ -159,7 +158,7 @@ func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
 			// Collect indexes to drop
 			for _, indexDiff := range tableDiff.IndexChanges {
 				if indexDiff.Action == schema.MetadataDiffActionDrop {
-					dropsPerTable[tableName].indexes[indexDiff.OldIndex.Name] = indexDiff.OldIndex.Name
+					dropsPerTable[tableName].indexes[indexDiff.OldIndex.Name] = indexDiff.OldIndex
 				}
 			}
 
@@ -181,10 +180,16 @@ func dropObjectsInOrder(diff *schema.MetadataDiff, buf *strings.Builder) error {
 			}
 		}
 
-		// Drop indexes
-		for indexName := range drops.indexes {
-			if err := writeDropIndex(buf, tableName, indexName); err != nil {
-				return err
+		// Drop indexes (handle primary key specially)
+		for _, index := range drops.indexes {
+			if index.Primary {
+				if err := writeDropPrimaryKey(buf, tableName); err != nil {
+					return err
+				}
+			} else {
+				if err := writeDropIndex(buf, tableName, index.Name); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -479,7 +484,7 @@ func writeDropTable(buf *strings.Builder, table string) error {
 func writeDropCheckConstraint(buf *strings.Builder, table, constraint string) error {
 	_, _ = buf.WriteString("ALTER TABLE `")
 	_, _ = buf.WriteString(table)
-	_, _ = buf.WriteString("` DROP CHECK `")
+	_, _ = buf.WriteString("` DROP CONSTRAINT `")
 	_, _ = buf.WriteString(constraint)
 	_, _ = buf.WriteString("`;\n\n")
 	return nil
@@ -491,6 +496,13 @@ func writeDropIndex(buf *strings.Builder, table, index string) error {
 	_, _ = buf.WriteString("` ON `")
 	_, _ = buf.WriteString(table)
 	_, _ = buf.WriteString("`;\n\n")
+	return nil
+}
+
+func writeDropPrimaryKey(buf *strings.Builder, table string) error {
+	_, _ = buf.WriteString("ALTER TABLE `")
+	_, _ = buf.WriteString(table)
+	_, _ = buf.WriteString("` DROP PRIMARY KEY;\n\n")
 	return nil
 }
 
@@ -536,8 +548,10 @@ func writeCreateTableWithoutForeignKeys(buf *strings.Builder, tableName string, 
 			_, _ = buf.WriteString(" AUTO_INCREMENT")
 		} else if hasDefaultValue(col) && !hasAutoIncrement(col) && col.Generation == nil {
 			// Don't add DEFAULT if this is a generated column
-			_, _ = buf.WriteString(" DEFAULT ")
-			_, _ = buf.WriteString(getDefaultExpression(col))
+			if e := getDefaultExpression(col); e != "" {
+				_, _ = buf.WriteString(" DEFAULT ")
+				_, _ = buf.WriteString(e)
+			}
 		}
 
 		// Handle ON UPDATE
@@ -871,9 +885,10 @@ func writeAddCheckConstraint(buf *strings.Builder, table string, check *storepb.
 	_, _ = buf.WriteString(table)
 	_, _ = buf.WriteString("` ADD CONSTRAINT `")
 	_, _ = buf.WriteString(check.Name)
-	_, _ = buf.WriteString("` CHECK (")
+	_, _ = buf.WriteString("` CHECK ")
+	// The expression already includes parentheses from the parser
 	_, _ = buf.WriteString(check.Expression)
-	_, _ = buf.WriteString(");\n")
+	_, _ = buf.WriteString(";\n")
 	return nil
 }
 
@@ -1036,18 +1051,14 @@ func getDefaultExpression(column *storepb.ColumnMetadata) string {
 		return column.DefaultExpression
 	}
 
-	// Check for string default value
-	if column.Default != "" {
-		// Check if it's a numeric value or needs quotes
-		if isNumeric(column.Default) || isKeyword(column.Default) {
-			return column.Default
-		}
-		return fmt.Sprintf("'%s'", escapeString(column.Default))
-	}
-
 	// Check for NULL default
 	if column.DefaultNull {
 		return "NULL"
+	}
+
+	// Check for string default value
+	if column.Default != "" {
+		return column.Default
 	}
 
 	return ""
@@ -1057,6 +1068,10 @@ func hasDefaultValue(column *storepb.ColumnMetadata) bool {
 	if column == nil {
 		return false
 	}
+	// Don't treat AUTO_INCREMENT as a default value
+	if strings.EqualFold(column.GetDefault(), "AUTO_INCREMENT") {
+		return false
+	}
 	return column.DefaultNull || column.DefaultExpression != "" || (column.Default != "")
 }
 
@@ -1064,8 +1079,8 @@ func hasAutoIncrement(column *storepb.ColumnMetadata) bool {
 	if column == nil {
 		return false
 	}
-	// Check if column has AUTO_INCREMENT in default expression
-	return strings.EqualFold(column.GetDefaultExpression(), "AUTO_INCREMENT")
+	// Check if column has AUTO_INCREMENT in default field (new logic) or default expression (old logic)
+	return strings.EqualFold(column.GetDefault(), "AUTO_INCREMENT") || strings.EqualFold(column.GetDefaultExpression(), "AUTO_INCREMENT")
 }
 
 func escapeString(s string) string {
@@ -1122,19 +1137,6 @@ func writeCreateTemporaryView(buf *strings.Builder, viewName string, view *store
 
 	_, _ = buf.WriteString(";\n")
 	return nil
-}
-
-func isNumeric(s string) bool {
-	// Simple check for numeric values
-	_, err := fmt.Sscanf(s, "%f", new(float64))
-	return err == nil
-}
-
-func isKeyword(s string) bool {
-	// Check for common MySQL keywords that don't need quotes
-	keywords := []string{"CURRENT_TIMESTAMP", "CURRENT_DATE", "CURRENT_TIME", "NULL"}
-	upper := strings.ToUpper(s)
-	return slices.Contains(keywords, upper)
 }
 
 func writeCreateTrigger(buf *strings.Builder, tableName string, trigger *storepb.TriggerMetadata) error {

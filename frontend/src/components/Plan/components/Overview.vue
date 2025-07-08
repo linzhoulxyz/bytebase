@@ -45,14 +45,14 @@
           <div class="flex items-center justify-between">
             <div>
               <p class="text-sm text-control-light">
-                {{ $t("plan.overview.check-status") }}
+                {{ $t("plan.navigator.checks") }}
               </p>
               <div class="flex items-center gap-3 mt-1">
                 <div
                   v-if="statistics.checkStatus.error > 0"
                   class="flex items-center gap-1"
                 >
-                  <XCircleIcon class="w-6 h-6 text-error" />
+                  <XCircleIcon class="w-5 h-5 text-error" />
                   <span class="text-xl font-semibold text-error">{{
                     statistics.checkStatus.error
                   }}</span>
@@ -61,7 +61,7 @@
                   v-if="statistics.checkStatus.warning > 0"
                   class="flex items-center gap-1"
                 >
-                  <AlertCircleIcon class="w-6 h-6 text-warning" />
+                  <AlertCircleIcon class="w-5 h-5 text-warning" />
                   <span class="text-xl font-semibold text-warning">{{
                     statistics.checkStatus.warning
                   }}</span>
@@ -70,7 +70,7 @@
                   v-if="statistics.checkStatus.success > 0"
                   class="flex items-center gap-1"
                 >
-                  <CheckCircleIcon class="w-6 h-6 text-success" />
+                  <CheckCircleIcon class="w-5 h-5 text-success" />
                   <span class="text-xl font-semibold text-success">{{
                     statistics.checkStatus.success
                   }}</span>
@@ -173,7 +173,8 @@ import { computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { InstanceV1EngineIcon } from "@/components/v2/Model/Instance";
 import { useInstanceV1Store, useDBGroupStore } from "@/store";
-import { PlanCheckRun_Result_Status } from "@/types/proto/v1/plan_service";
+import type { ComposedDatabaseGroup, ComposedInstance } from "@/types";
+import { PlanCheckRun_Result_Status } from "@/types/proto-es/v1/plan_service_pb";
 import { instanceV1Name, extractDatabaseResourceName } from "@/utils";
 import { usePlanContext } from "../logic/context";
 import { targetsForSpec } from "../logic/plan";
@@ -190,16 +191,20 @@ const statistics = computed(() => {
   const checkStatus = {
     total: 0,
     success:
-      plan.value.planCheckRunStatusCount[PlanCheckRun_Result_Status.SUCCESS] ||
-      0,
+      plan.value.planCheckRunStatusCount[
+        PlanCheckRun_Result_Status[PlanCheckRun_Result_Status.SUCCESS]
+      ] || 0,
     warning:
-      plan.value.planCheckRunStatusCount[PlanCheckRun_Result_Status.WARNING] ||
-      0,
+      plan.value.planCheckRunStatusCount[
+        PlanCheckRun_Result_Status[PlanCheckRun_Result_Status.WARNING]
+      ] || 0,
     error:
-      plan.value.planCheckRunStatusCount[PlanCheckRun_Result_Status.ERROR] || 0,
+      plan.value.planCheckRunStatusCount[
+        PlanCheckRun_Result_Status[PlanCheckRun_Result_Status.ERROR]
+      ] || 0,
   };
   checkStatus.total =
-    checkStatus.success + checkStatus.warning + checkStatus.error || 0;
+    checkStatus.success + checkStatus.warning + checkStatus.error;
   for (const spec of plan.value.specs) {
     totalTargets += targetsForSpec(spec).length;
   }
@@ -213,13 +218,20 @@ const statistics = computed(() => {
 // Get affected resources
 const affectedResources = computed(() => {
   const specs = plan.value?.specs || [];
-  const resourceList: Array<{
-    type: "instance" | "databaseGroup";
-    name: string;
-    instance?: any;
-    databaseGroup?: any;
-    databases: string[];
-  }> = [];
+  const resourceList: Array<
+    | {
+        type: "instance";
+        name: string;
+        instance: ComposedInstance;
+        databases: string[];
+      }
+    | {
+        type: "databaseGroup";
+        name: string;
+        databaseGroup?: ComposedDatabaseGroup;
+        databases: string[];
+      }
+  > = [];
 
   const instanceMap = new Map<string, Set<string>>();
   const dbGroupSet = new Set<string>();

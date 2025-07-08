@@ -1,14 +1,15 @@
 import { create } from "@bufbuild/protobuf";
 import { createContextValues } from "@connectrpc/connect";
 import type { ComputedRef, InjectionKey, Ref } from "vue";
-import { computed, inject, provide, ref } from "vue";
-import { useProgressivePoll } from "@/composables/useProgressivePoll";
+import { computed, inject, provide, ref, onUnmounted } from "vue";
 import { rolloutServiceClientConnect } from "@/grpcweb";
 import { silentContextKey } from "@/grpcweb/context-key";
 import { useCurrentProjectV1 } from "@/store";
-import { PreviewRolloutRequestSchema } from "@/types/proto-es/v1/rollout_service_pb";
-import { Rollout, type Stage } from "@/types/proto/v1/rollout_service";
-import { convertNewRolloutToOld, convertOldPlanToNew } from "@/utils/v1/rollout-conversions";
+import {
+  PreviewRolloutRequestSchema,
+  RolloutSchema,
+} from "@/types/proto-es/v1/rollout_service_pb";
+import type { Rollout, Stage } from "@/types/proto-es/v1/rollout_service_pb";
 import { usePlanContextWithRollout } from "../../logic";
 
 export type RolloutViewContext = {
@@ -26,10 +27,10 @@ export const useRolloutViewContext = () => {
 };
 
 export const provideRolloutViewContext = () => {
-  const { plan, rollout } = usePlanContextWithRollout();
+  const { events, plan, rollout } = usePlanContextWithRollout();
   const { project } = useCurrentProjectV1();
 
-  const rolloutPreview = ref<Rollout>(Rollout.fromPartial({}));
+  const rolloutPreview = ref<Rollout>(create(RolloutSchema, {}));
 
   const mergedStages = computed(() => {
     // Merge preview stages with created rollout stages
@@ -55,37 +56,41 @@ export const provideRolloutViewContext = () => {
   const fetchRolloutPreview = async () => {
     const request = create(PreviewRolloutRequestSchema, {
       project: project.value.name,
-      plan: convertOldPlanToNew(plan.value),
+      plan: plan.value,
     });
 
     try {
-      const rolloutPreviewNew = await rolloutServiceClientConnect.previewRollout(
-        request,
-        {
+      const rolloutPreviewNew =
+        await rolloutServiceClientConnect.previewRollout(request, {
           contextValues: createContextValues().set(silentContextKey, true),
-        }
-      );
-      rolloutPreview.value = convertNewRolloutToOld(rolloutPreviewNew);
+        });
+      rolloutPreview.value = rolloutPreviewNew;
     } catch (error) {
       // Handle preview errors gracefully
       console.error("Failed to fetch rollout preview:", error);
-      rolloutPreview.value = Rollout.fromPartial({});
+      rolloutPreview.value = create(RolloutSchema, {});
+    } finally {
     }
   };
 
   // Initial fetch
   fetchRolloutPreview();
 
-  // Poll for updates
-  const poller = useProgressivePoll(fetchRolloutPreview, {
-    interval: {
-      min: 2000,
-      max: 10000,
-      growth: 2,
-      jitter: 500,
-    },
+  // Listen for resource refresh completion
+  const unsubscribe = events.on(
+    "resource-refresh-completed",
+    async ({ resources }) => {
+      // Refresh rollout preview if rollout was refreshed
+      if (resources.includes("rollout")) {
+        await fetchRolloutPreview();
+      }
+    }
+  );
+
+  // Clean up event listener when component unmounts.
+  onUnmounted(() => {
+    unsubscribe();
   });
-  poller.start();
 
   const context: RolloutViewContext = {
     rollout,

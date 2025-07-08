@@ -429,6 +429,7 @@
 </template>
 
 <script setup lang="ts">
+import { create as createProto } from "@bufbuild/protobuf";
 import { head } from "lodash-es";
 import {
   KeyIcon,
@@ -465,15 +466,23 @@ import {
 } from "@/store";
 import { useIdentityProviderStore } from "@/store/modules/idp";
 import { idpNamePrefix } from "@/store/modules/v1/common";
-import {
+import type {
   FieldMapping,
   IdentityProvider,
-  IdentityProviderType,
-  OAuth2AuthStyle,
   OAuth2IdentityProviderConfig,
   OIDCIdentityProviderConfig,
   LDAPIdentityProviderConfig,
-} from "@/types/proto/v1/idp_service";
+} from "@/types/proto-es/v1/idp_service_pb";
+import {
+  FieldMappingSchema,
+  IdentityProviderSchema,
+  IdentityProviderConfigSchema,
+  IdentityProviderType,
+  OAuth2AuthStyle,
+  OAuth2IdentityProviderConfigSchema,
+  OIDCIdentityProviderConfigSchema,
+  LDAPIdentityProviderConfigSchema,
+} from "@/types/proto-es/v1/idp_service_pb";
 import { PlanFeature } from "@/types/proto-es/v1/subscription_service_pb";
 import type { OAuth2IdentityProviderTemplate } from "@/utils";
 import { identityProviderTypeToString } from "@/utils";
@@ -506,60 +515,76 @@ const selectedTemplate = ref<IdentityProviderTemplate>();
 const isCreating = ref(false);
 
 const identityProvider = ref<IdentityProvider>(
-  IdentityProvider.fromPartial({})
+  createProto(IdentityProviderSchema, {})
 );
 const configForOAuth2 = ref<OAuth2IdentityProviderConfig>(
-  OAuth2IdentityProviderConfig.fromPartial({
+  createProto(OAuth2IdentityProviderConfigSchema, {
     authStyle: OAuth2AuthStyle.IN_PARAMS,
   })
 );
 const configForOIDC = ref<OIDCIdentityProviderConfig>(
-  OIDCIdentityProviderConfig.fromPartial({
+  createProto(OIDCIdentityProviderConfigSchema, {
     authStyle: OAuth2AuthStyle.IN_PARAMS,
   })
 );
 const configForLDAP = ref<LDAPIdentityProviderConfig>(
-  LDAPIdentityProviderConfig.fromPartial({
+  createProto(LDAPIdentityProviderConfigSchema, {
     port: 389,
   })
 );
 const scopesStringOfConfig = ref<string>("");
-const fieldMapping = reactive<FieldMapping>(FieldMapping.fromPartial({}));
+const fieldMapping = reactive<FieldMapping>(
+  createProto(FieldMappingSchema, {})
+);
 
 const resourceIdField = ref<InstanceType<typeof ResourceIdField>>();
 const resourceIdValue = ref<string>("");
 
 // Computed
-const idpToCreate = computed(
-  (): IdentityProvider => ({
+const idpToCreate = computed((): IdentityProvider => {
+  const base = createProto(IdentityProviderSchema, {
     name: resourceIdField.value?.resourceId || resourceIdValue.value,
     title: identityProvider.value.title,
     domain: identityProvider.value.domain,
     type: selectedType.value,
-    config: {
-      ...(selectedType.value === IdentityProviderType.OAUTH2 && {
-        oauth2Config: {
+  });
+
+  if (selectedType.value === IdentityProviderType.OAUTH2) {
+    base.config = createProto(IdentityProviderConfigSchema, {
+      config: {
+        case: "oauth2Config",
+        value: createProto(OAuth2IdentityProviderConfigSchema, {
           ...configForOAuth2.value,
           scopes: scopesStringOfConfig.value.split(" ").filter(Boolean),
-          fieldMapping,
-        },
-      }),
-      ...(selectedType.value === IdentityProviderType.OIDC && {
-        oidcConfig: {
+          fieldMapping: createProto(FieldMappingSchema, fieldMapping),
+        }),
+      },
+    });
+  } else if (selectedType.value === IdentityProviderType.OIDC) {
+    base.config = createProto(IdentityProviderConfigSchema, {
+      config: {
+        case: "oidcConfig",
+        value: createProto(OIDCIdentityProviderConfigSchema, {
           ...configForOIDC.value,
           scopes: scopesStringOfConfig.value.split(" ").filter(Boolean),
-          fieldMapping,
-        },
-      }),
-      ...(selectedType.value === IdentityProviderType.LDAP && {
-        ldapConfig: {
+          fieldMapping: createProto(FieldMappingSchema, fieldMapping),
+        }),
+      },
+    });
+  } else if (selectedType.value === IdentityProviderType.LDAP) {
+    base.config = createProto(IdentityProviderConfigSchema, {
+      config: {
+        case: "ldapConfig",
+        value: createProto(LDAPIdentityProviderConfigSchema, {
           ...configForLDAP.value,
-          fieldMapping,
-        },
-      }),
-    },
-  })
-);
+          fieldMapping: createProto(FieldMappingSchema, fieldMapping),
+        }),
+      },
+    });
+  }
+
+  return base;
+});
 
 const externalUrl = computed(
   () => useActuatorV1Store().serverInfo?.externalUrl ?? ""
@@ -594,7 +619,7 @@ const templateList = computed((): IdentityProviderTemplate[] => {
       domain: "google.com",
       type: IdentityProviderType.OAUTH2,
       feature: PlanFeature.FEATURE_GOOGLE_AND_GITHUB_SSO,
-      config: {
+      config: createProto(OAuth2IdentityProviderConfigSchema, {
         clientId: "",
         clientSecret: "",
         authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
@@ -606,13 +631,13 @@ const templateList = computed((): IdentityProviderTemplate[] => {
         ],
         skipTlsVerify: false,
         authStyle: OAuth2AuthStyle.IN_PARAMS,
-        fieldMapping: {
+        fieldMapping: createProto(FieldMappingSchema, {
           identifier: "email",
           displayName: "name",
           phone: "",
           groups: "",
-        },
-      },
+        }),
+      }),
     },
     {
       title: "GitHub",
@@ -620,7 +645,7 @@ const templateList = computed((): IdentityProviderTemplate[] => {
       domain: "github.com",
       type: IdentityProviderType.OAUTH2,
       feature: PlanFeature.FEATURE_GOOGLE_AND_GITHUB_SSO,
-      config: {
+      config: createProto(OAuth2IdentityProviderConfigSchema, {
         clientId: "",
         clientSecret: "",
         authUrl: "https://github.com/login/oauth/authorize",
@@ -629,13 +654,13 @@ const templateList = computed((): IdentityProviderTemplate[] => {
         scopes: ["user"],
         skipTlsVerify: false,
         authStyle: OAuth2AuthStyle.IN_PARAMS,
-        fieldMapping: {
+        fieldMapping: createProto(FieldMappingSchema, {
           identifier: "email",
           displayName: "name",
           phone: "",
           groups: "",
-        },
-      },
+        }),
+      }),
     },
     {
       title: "GitLab",
@@ -643,7 +668,7 @@ const templateList = computed((): IdentityProviderTemplate[] => {
       domain: "gitlab.com",
       type: IdentityProviderType.OAUTH2,
       feature: PlanFeature.FEATURE_ENTERPRISE_SSO,
-      config: {
+      config: createProto(OAuth2IdentityProviderConfigSchema, {
         clientId: "",
         clientSecret: "",
         authUrl: "https://gitlab.com/oauth/authorize",
@@ -652,13 +677,13 @@ const templateList = computed((): IdentityProviderTemplate[] => {
         scopes: ["read_user"],
         skipTlsVerify: false,
         authStyle: OAuth2AuthStyle.IN_PARAMS,
-        fieldMapping: {
+        fieldMapping: createProto(FieldMappingSchema, {
           identifier: "email",
           displayName: "name",
           phone: "",
           groups: "",
-        },
-      },
+        }),
+      }),
     },
     {
       title: "Microsoft Entra",
@@ -666,7 +691,7 @@ const templateList = computed((): IdentityProviderTemplate[] => {
       domain: "",
       type: IdentityProviderType.OAUTH2,
       feature: PlanFeature.FEATURE_ENTERPRISE_SSO,
-      config: {
+      config: createProto(OAuth2IdentityProviderConfigSchema, {
         clientId: "",
         clientSecret: "",
         authUrl:
@@ -676,13 +701,13 @@ const templateList = computed((): IdentityProviderTemplate[] => {
         scopes: ["user.read"],
         skipTlsVerify: false,
         authStyle: OAuth2AuthStyle.IN_PARAMS,
-        fieldMapping: {
+        fieldMapping: createProto(FieldMappingSchema, {
           identifier: "userPrincipalName",
           displayName: "displayName",
           phone: "",
           groups: "",
-        },
-      },
+        }),
+      }),
     },
     {
       title: "Custom",
@@ -690,7 +715,7 @@ const templateList = computed((): IdentityProviderTemplate[] => {
       domain: "",
       type: IdentityProviderType.OAUTH2,
       feature: PlanFeature.FEATURE_ENTERPRISE_SSO,
-      config: {
+      config: createProto(OAuth2IdentityProviderConfigSchema, {
         clientId: "",
         clientSecret: "",
         authUrl: "",
@@ -699,13 +724,13 @@ const templateList = computed((): IdentityProviderTemplate[] => {
         scopes: [],
         skipTlsVerify: false,
         authStyle: OAuth2AuthStyle.IN_PARAMS,
-        fieldMapping: {
+        fieldMapping: createProto(FieldMappingSchema, {
           identifier: "",
           displayName: "",
           phone: "",
           groups: "",
-        },
-      },
+        }),
+      }),
     },
   ];
 });
@@ -860,7 +885,7 @@ const handleTemplateSelect = (template: IdentityProviderTemplate) => {
 
   if (template.type === IdentityProviderType.OAUTH2) {
     // Create a completely new object to ensure reactivity
-    const newConfig = OAuth2IdentityProviderConfig.fromPartial({
+    const newConfig = createProto(OAuth2IdentityProviderConfigSchema, {
       clientId: template.config.clientId || "",
       clientSecret: template.config.clientSecret || "",
       authUrl: template.config.authUrl || "",
@@ -869,7 +894,8 @@ const handleTemplateSelect = (template: IdentityProviderTemplate) => {
       scopes: template.config.scopes || [],
       skipTlsVerify: template.config.skipTlsVerify || false,
       authStyle: template.config.authStyle || OAuth2AuthStyle.IN_PARAMS,
-      fieldMapping: template.config.fieldMapping || {},
+      fieldMapping:
+        template.config.fieldMapping || createProto(FieldMappingSchema, {}),
     });
     configForOAuth2.value = newConfig;
 

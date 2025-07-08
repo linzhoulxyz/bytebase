@@ -109,6 +109,8 @@
 </template>
 
 <script lang="ts" setup>
+import { create } from "@bufbuild/protobuf";
+import { FieldMaskSchema } from "@bufbuild/protobuf/wkt";
 import dayjs from "dayjs";
 import saveAs from "file-saver";
 import JSZip from "jszip";
@@ -133,7 +135,6 @@ import {
 } from "@/store";
 import type { ComposedDatabase, Table, SearchChangeLogParams } from "@/types";
 import { DEFAULT_PROJECT_NAME } from "@/types";
-import { create } from "@bufbuild/protobuf";
 import {
   Changelog_Status,
   Changelog_Type,
@@ -176,7 +177,9 @@ const state = reactive<LocalState>({
 const searchChangeLogParams = computed(
   (): SearchChangeLogParams => ({
     tables: state.selectedAffectedTables,
-    types: state.selectedChangeType ? [Changelog_Type[state.selectedChangeType]] : undefined,
+    types: state.selectedChangeType
+      ? [Changelog_Type[state.selectedChangeType]]
+      : undefined,
   })
 );
 
@@ -186,7 +189,9 @@ const searchChangelogFilter = computed(() => {
     searchChangeLogParams.value.types &&
     searchChangeLogParams.value.types.length > 0
   ) {
-    filter.push(`type = "${searchChangeLogParams.value.types.map(Number).join(" | ")}"`);
+    filter.push(
+      `type = "${searchChangeLogParams.value.types.map(Number).join(" | ")}"`
+    );
   }
   if (
     searchChangeLogParams.value.tables &&
@@ -278,7 +283,9 @@ const handleExportChangelogs = async () => {
       }
 
       const filePathPrefix = dayjs(
-        changelog.createTime ? new Date(Number(changelog.createTime.seconds) * 1000) : new Date()
+        changelog.createTime
+          ? new Date(Number(changelog.createTime.seconds) * 1000)
+          : new Date()
       ).format("YYYY-MM-DDTHH-mm-ss");
       if (
         changelog.type === Changelog_Type.MIGRATE ||
@@ -309,15 +316,17 @@ const handleExportChangelogs = async () => {
 };
 
 const updateDatabaseDrift = async () => {
-  const updatedDatabase = create(DatabaseSchema$,{
+  const updatedDatabase = create(DatabaseSchema$, {
     ...props.database,
     drifted: false,
   });
-  
-  await databaseStore.updateDatabase(create(UpdateDatabaseRequestSchema, {
-    database: updatedDatabase,
-    updateMask: { paths: ["drifted"] },
-  }));
+
+  await databaseStore.updateDatabase(
+    create(UpdateDatabaseRequestSchema, {
+      database: updatedDatabase,
+      updateMask: create(FieldMaskSchema, { paths: ["drifted"] }),
+    })
+  );
   pushNotification({
     module: "bytebase",
     style: "SUCCESS",

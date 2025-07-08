@@ -13,22 +13,19 @@ import type {
   ComposedDatabase,
 } from "@/types";
 import {
+  PolicyType,
+  TagPolicySchema,
+  SQLReviewRuleSchema,
+} from "@/types/proto-es/v1/org_policy_service_pb";
+import {
   DeleteReviewConfigRequestSchema,
   UpdateReviewConfigRequestSchema,
   ListReviewConfigsRequestSchema,
   GetReviewConfigRequestSchema,
 } from "@/types/proto-es/v1/review_config_service_pb";
-import {
-  PolicyType,
-  policyTypeToJSON,
-} from "@/types/proto/v1/org_policy_service";
-import { ReviewConfig } from "@/types/proto/v1/review_config_service";
-import {
-  convertNewReviewConfigToOld,
-  convertOldReviewConfigToNew,
-} from "@/utils/v1/review-config-conversions";
+import type { ReviewConfig } from "@/types/proto-es/v1/review_config_service_pb";
+import { ReviewConfigSchema } from "@/types/proto-es/v1/review_config_service_pb";
 import { usePolicyV1Store } from "./v1/policy";
-import { convertEngineToNew, convertEngineToOld } from "@/utils/v1/common-conversions";
 
 const reviewConfigTagName = "bb.tag.review_config";
 
@@ -44,10 +41,13 @@ const upsertReviewConfigTag = async (
         policy: {
           name: getTagPolicyName(resourcePath),
           type: PolicyType.TAG,
-          tagPolicy: {
-            tags: {
-              [reviewConfigTagName]: configName,
-            },
+          policy: {
+            case: "tagPolicy",
+            value: create(TagPolicySchema, {
+              tags: {
+                [reviewConfigTagName]: configName,
+              },
+            }),
           },
         },
       });
@@ -72,7 +72,7 @@ const convertToSQLReviewPolicy = (
     const rule: SchemaPolicyRule = {
       type: r.type,
       level: r.level,
-      engine: convertEngineToNew(r.engine),
+      engine: r.engine,
       comment: r.comment,
     };
     if (r.payload && r.payload !== "{}") {
@@ -95,9 +95,7 @@ interface SQLReviewState {
 }
 
 const getTagPolicyName = (environmentPath: string): string => {
-  return `${environmentPath}/${policyNamePrefix}${policyTypeToJSON(
-    PolicyType.TAG
-  ).toLowerCase()}`;
+  return `${environmentPath}/${policyNamePrefix}tag`;
 };
 
 export const useSQLReviewStore = defineStore("sqlReview", {
@@ -181,7 +179,7 @@ export const useSQLReviewStore = defineStore("sqlReview", {
       ruleList?: SchemaPolicyRule[];
       resources?: string[];
     }) {
-      const patch: ReviewConfig = ReviewConfig.fromPartial({
+      const patch: ReviewConfig = create(ReviewConfigSchema, {
         name: id,
       });
       const updateMask: string[] = [];
@@ -196,18 +194,18 @@ export const useSQLReviewStore = defineStore("sqlReview", {
       if (ruleList) {
         updateMask.push("rules");
         patch.rules = ruleList.map((r) => {
-          return {
+          return create(SQLReviewRuleSchema, {
             type: r.type as string,
             level: r.level,
-            engine: convertEngineToOld(r.engine),
+            engine: r.engine,
             comment: r.comment,
             payload: r.payload ? JSON.stringify(r.payload) : "{}",
-          };
+          });
         });
       }
 
       const request = create(UpdateReviewConfigRequestSchema, {
-        reviewConfig: convertOldReviewConfigToNew(patch),
+        reviewConfig: patch,
         updateMask: { paths: updateMask },
         allowMissing: true,
       });
@@ -223,8 +221,7 @@ export const useSQLReviewStore = defineStore("sqlReview", {
         updated.resources = resources;
       }
 
-      const oldUpdated = convertNewReviewConfigToOld(updated);
-      const reviewPolicy = convertToSQLReviewPolicy(oldUpdated);
+      const reviewPolicy = convertToSQLReviewPolicy(updated);
       if (!reviewPolicy) {
         throw new Error(`invalid review config ${JSON.stringify(updated)}`);
       }
@@ -249,8 +246,7 @@ export const useSQLReviewStore = defineStore("sqlReview", {
 
       const reviewPolicyList: SQLReviewPolicy[] = [];
       for (const config of reviewConfigs) {
-        const oldConfig = convertNewReviewConfigToOld(config);
-        const reviewPolicy = convertToSQLReviewPolicy(oldConfig);
+        const reviewPolicy = convertToSQLReviewPolicy(config);
         if (reviewPolicy) {
           reviewPolicyList.push(reviewPolicy);
         }
@@ -273,8 +269,7 @@ export const useSQLReviewStore = defineStore("sqlReview", {
       if (!reviewConfig) {
         return;
       }
-      const oldReviewConfig = convertNewReviewConfigToOld(reviewConfig);
-      const reviewPolicy = convertToSQLReviewPolicy(oldReviewConfig);
+      const reviewPolicy = convertToSQLReviewPolicy(reviewConfig);
       if (reviewPolicy) {
         this.setReviewPolicy(reviewPolicy);
       }
@@ -307,7 +302,10 @@ export const useSQLReviewStore = defineStore("sqlReview", {
       if (!policy) {
         return;
       }
-      const sqlReviewName = policy.tagPolicy?.tags[reviewConfigTagName];
+      const sqlReviewName =
+        policy.policy?.case === "tagPolicy"
+          ? policy.policy.value.tags[reviewConfigTagName]
+          : undefined;
       if (!sqlReviewName) {
         return;
       }

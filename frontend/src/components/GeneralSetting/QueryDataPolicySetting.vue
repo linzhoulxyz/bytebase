@@ -20,7 +20,9 @@
         :precision="0"
         @update:value="handleInput"
       >
-        <template #suffix>Seconds</template>
+        <template #suffix>{{
+          $t("settings.general.workspace.query-data-policy.seconds")
+        }}</template>
       </NInputNumber>
     </div>
     <p class="text-sm textinfolabel mt-1" v-if="seconds <= 0">
@@ -41,13 +43,13 @@ import {
   usePolicyByParentAndType,
   usePolicyV1Store,
 } from "@/store";
-import { PlanFeature } from "@/types/proto-es/v1/subscription_service_pb";
 import {
   PolicyResourceType,
   PolicyType,
-} from "@/types/proto/v1/org_policy_service";
+  QueryDataPolicySchema,
+} from "@/types/proto-es/v1/org_policy_service_pb";
+import { PlanFeature } from "@/types/proto-es/v1/subscription_service_pb";
 import { hasWorkspacePermissionV2 } from "@/utils";
-import { convertDurationToOld } from "@/utils/v1/common-conversions";
 import { FeatureBadge } from "../FeatureGuard";
 
 const policyV1Store = usePolicyV1Store();
@@ -67,9 +69,13 @@ const allowEdit = computed(
 );
 
 const initialState = () => {
-  return (
-    queryDataPolicy.value?.queryDataPolicy?.timeout?.seconds.toNumber() ?? 0
-  );
+  if (
+    queryDataPolicy.value?.policy.case === "queryDataPolicy" &&
+    queryDataPolicy.value.policy.value.timeout
+  ) {
+    return Number(queryDataPolicy.value.policy.value.timeout.seconds);
+  }
+  return 0;
 };
 
 // limit in seconds.
@@ -85,10 +91,11 @@ const updateChange = async () => {
     policy: {
       type: PolicyType.DATA_QUERY,
       resourceType: PolicyResourceType.WORKSPACE,
-      queryDataPolicy: {
-        timeout: convertDurationToOld(
-          create(DurationSchema, { seconds: BigInt(seconds.value) })
-        ),
+      policy: {
+        case: "queryDataPolicy",
+        value: create(QueryDataPolicySchema, {
+          timeout: create(DurationSchema, { seconds: BigInt(seconds.value) }),
+        }),
       },
     },
   });

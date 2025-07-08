@@ -26,13 +26,16 @@ import {
   LoginRequestSchema,
   type LoginRequest,
 } from "@/types/proto-es/v1/auth_service_pb";
-import { CreateUserRequestSchema } from "@/types/proto-es/v1/user_service_pb";
 import {
   DatabaseChangeMode,
   Setting_SettingName,
 } from "@/types/proto-es/v1/setting_service_pb";
-import { User, UserType } from "@/types/proto/v1/user_service";
-import { convertOldUserToNew } from "@/utils/v1/user-conversions";
+import {
+  CreateUserRequestSchema,
+  UserSchema,
+} from "@/types/proto-es/v1/user_service_pb";
+import type { User } from "@/types/proto-es/v1/user_service_pb";
+import { UserType } from "@/types/proto-es/v1/user_service_pb";
 
 export const useAuthStore = defineStore("auth_v1", () => {
   const userStore = useUserStore();
@@ -135,15 +138,14 @@ export const useAuthStore = defineStore("auth_v1", () => {
   };
 
   const signup = async (request: Partial<User>) => {
-    const user = {
+    const user = create(UserSchema, {
       email: request.email,
       title: request.name,
       password: request.password,
       userType: UserType.USER,
-    };
-    const newUser = convertOldUserToNew(user as User);
+    });
     const createRequest = create(CreateUserRequestSchema, {
-      user: newUser,
+      user: user,
     });
     await userServiceClientConnect.createUser(createRequest);
     await login(

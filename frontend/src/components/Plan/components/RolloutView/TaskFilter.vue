@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-row justify-start items-center gap-4">
     <div class="flex items-center justify-between">
-      <h3 class="text-base font-medium">
+      <h3 class="text-base">
         {{ $t("common.tasks") }}
       </h3>
     </div>
@@ -44,15 +44,20 @@
 import { flatten } from "lodash-es";
 import { NTag } from "naive-ui";
 import { computed } from "vue";
-import TaskStatus from "@/components/Rollout/RolloutDetail/Panels/kits/TaskStatus.vue";
-import type { Rollout, Task_Status } from "@/types/proto/v1/rollout_service";
-import { Task_Status as TaskStatusEnum } from "@/types/proto/v1/rollout_service";
+import TaskStatus from "@/components/Rollout/kits/TaskStatus.vue";
+import type {
+  Rollout,
+  Task_Status,
+  Stage,
+} from "@/types/proto-es/v1/rollout_service_pb";
+import { Task_Status as TaskStatusEnum } from "@/types/proto-es/v1/rollout_service_pb";
 import { stringifyTaskStatus } from "@/utils";
 import { useRolloutViewContext } from "./context";
 
-defineProps<{
+const props = defineProps<{
   rollout: Rollout;
   taskStatusList: Task_Status[];
+  stage?: Stage;
 }>();
 
 const emit = defineEmits<{
@@ -72,6 +77,11 @@ const TASK_STATUS_FILTERS: Task_Status[] = [
 ];
 
 const allTasks = computed(() => {
+  if (props.stage) {
+    // If a specific stage is provided, use only its tasks
+    return props.stage.tasks;
+  }
+  // Otherwise, use all tasks from all stages
   return flatten(mergedStages.value.map((stage) => stage.tasks));
 });
 

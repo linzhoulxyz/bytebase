@@ -1,27 +1,25 @@
+import { create } from "@bufbuild/protobuf";
+import { createContextValues } from "@connectrpc/connect";
 import dayjs from "dayjs";
 import { uniq } from "lodash-es";
 import { defineStore } from "pinia";
 import type { WatchCallback } from "vue";
 import { ref, watch } from "vue";
-import { create } from "@bufbuild/protobuf";
-import { createContextValues } from "@connectrpc/connect";
 import { issueServiceClientConnect } from "@/grpcweb";
 import { silentContextKey } from "@/grpcweb/context-key";
+import { SYSTEM_BOT_EMAIL, type IssueFilter } from "@/types";
 import {
   GetIssueRequestSchema,
+  Issue_Type,
   IssueSchema,
   SearchIssuesRequestSchema,
   UpdateIssueRequestSchema,
 } from "@/types/proto-es/v1/issue_service_pb";
+import type { ApprovalStep, Issue } from "@/types/proto-es/v1/issue_service_pb";
 import {
-  convertNewIssueToOld,
-} from "@/utils/v1/issue-conversions";
-import { SYSTEM_BOT_EMAIL, type IssueFilter } from "@/types";
-import type { ApprovalStep, Issue } from "@/types/proto/v1/issue_service";
-import {
-  issueStatusToJSON,
+  IssueStatus,
   ApprovalNode_Type,
-} from "@/types/proto/v1/issue_service";
+} from "@/types/proto-es/v1/issue_service_pb";
 import {
   extractProjectResourceName,
   memberMapToRolesInProjectIAM,
@@ -47,7 +45,7 @@ export const buildIssueFilter = (find: IssueFilter): string => {
   }
   if (find.statusList && find.statusList.length > 0) {
     filter.push(
-      `status in [${find.statusList.map((s) => `"${issueStatusToJSON(s)}"`).join(",")}]`
+      `status in [${find.statusList.map((s) => `"${IssueStatus[s]}"`).join(",")}]`
     );
   }
   if (find.createdTsAfter) {
@@ -61,7 +59,7 @@ export const buildIssueFilter = (find: IssueFilter): string => {
     );
   }
   if (find.type) {
-    filter.push(`type == "${find.type}"`);
+    filter.push(`type == "${Issue_Type[find.type]}"`);
   }
   if (find.taskType) {
     filter.push(`task_type == "${find.taskType}"`);
@@ -105,7 +103,7 @@ export const useIssueV1Store = defineStore("issue_v1", () => {
       pageToken,
     });
     const resp = await issueServiceClientConnect.searchIssues(request);
-    const issues = resp.issues.map((newIssue) => convertNewIssueToOld(newIssue));
+    const issues = resp.issues;
     const composedIssues = await Promise.all(
       issues.map((issue) => shallowComposeIssue(issue, composeIssueConfig))
     );
@@ -127,7 +125,7 @@ export const useIssueV1Store = defineStore("issue_v1", () => {
     const newIssue = await issueServiceClientConnect.getIssue(request, {
       contextValues: createContextValues().set(silentContextKey, silent),
     });
-    const issue = convertNewIssueToOld(newIssue);
+    const issue = newIssue;
     return shallowComposeIssue(issue, composeIssueConfig);
   };
 
