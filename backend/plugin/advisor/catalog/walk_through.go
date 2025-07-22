@@ -11,7 +11,7 @@ import (
 	"github.com/pingcap/tidb/pkg/types"
 	"github.com/pkg/errors"
 
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
 )
 
 // WalkThroughErrorType is the type of WalkThroughError.
@@ -759,22 +759,32 @@ func (t *TableState) completeTableChangeColumn(ctx *FinderContext, oldName strin
 	pos := *column.position
 
 	// generate Position struct for creating new column
+	// Create a local copy to avoid modifying the input parameter
+	var localPosition *tidbast.ColumnPosition
 	if position == nil {
-		position = &tidbast.ColumnPosition{Tp: tidbast.ColumnPositionNone}
+		localPosition = &tidbast.ColumnPosition{Tp: tidbast.ColumnPositionNone}
+	} else {
+		// Create a copy of the position to avoid modifying the original
+		localPosition = &tidbast.ColumnPosition{
+			Tp:             position.Tp,
+			RelativeColumn: position.RelativeColumn,
+		}
 	}
-	if position.Tp == tidbast.ColumnPositionNone {
+
+	if localPosition.Tp == tidbast.ColumnPositionNone {
 		if pos == 1 {
-			position.Tp = tidbast.ColumnPositionFirst
+			localPosition.Tp = tidbast.ColumnPositionFirst
 		} else {
 			for _, col := range t.columnSet {
 				if *col.position == pos-1 {
-					position.Tp = tidbast.ColumnPositionAfter
-					position.RelativeColumn = &tidbast.ColumnName{Name: model.NewCIStr(col.name)}
+					localPosition.Tp = tidbast.ColumnPositionAfter
+					localPosition.RelativeColumn = &tidbast.ColumnName{Name: model.NewCIStr(col.name)}
 					break
 				}
 			}
 		}
 	}
+	position = localPosition
 
 	// drop column from columnSet
 	for _, col := range t.columnSet {

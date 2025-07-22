@@ -1,16 +1,16 @@
 package command
 
 import (
-	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
-	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
+	"github.com/bytebase/bytebase/action/world"
+	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
 )
 
-func getReleaseFiles(pattern string) ([]*v1pb.Release_File, error) {
+func getReleaseFiles(w *world.World, pattern string) ([]*v1pb.Release_File, error) {
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
 		return nil, err
@@ -33,13 +33,13 @@ func getReleaseFiles(pattern string) ([]*v1pb.Release_File, error) {
 
 		version := extractVersion(base)
 		if version == "" {
-			slog.Warn("version not found. ignore the file", "file", m)
+			w.Logger.Warn("version not found. ignore the file", "file", m)
 			continue
 		}
 
 		files = append(files, &v1pb.Release_File{
 			Path:       m,
-			Type:       v1pb.ReleaseFileType_VERSIONED,
+			Type:       v1pb.Release_File_VERSIONED,
 			Version:    version,
 			ChangeType: t,
 			Statement:  content,

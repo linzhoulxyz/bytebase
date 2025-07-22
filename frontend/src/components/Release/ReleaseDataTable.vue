@@ -61,7 +61,13 @@ const columnList = computed(
         render: (release) => {
           return (
             <p class="inline-flex w-full">
-              <span class="shrink truncate">{release.title}</span>
+              {release.title ? (
+                <span class="shrink truncate">{release.title}</span>
+              ) : (
+                <span class="shrink truncate italic opacity-60">
+                  {t("common.untitled")}
+                </span>
+              )}
               {release.state === State.DELETED && (
                 <NTag class="shrink-0" type="warning" size="small" round>
                   {t("common.archived")}
@@ -97,6 +103,15 @@ const columnList = computed(
         },
       },
       {
+        key: "createTime",
+        title: t("common.created-at"),
+        width: 128,
+        render: (release) =>
+          humanizeTs(
+            getTimeForPbTimestampProtoEs(release.createTime, 0) / 1000
+          ),
+      },
+      {
         key: "creator",
         title: t("common.creator"),
         width: 128,
@@ -106,15 +121,6 @@ const columnList = computed(
             <span class="truncate">{release.creatorEntity.title}</span>
           </div>
         ),
-      },
-      {
-        key: "createTime",
-        title: t("common.created-at"),
-        width: 128,
-        render: (release) =>
-          humanizeTs(
-            getTimeForPbTimestampProtoEs(release.createTime, 0) / 1000
-          ),
       },
     ];
     return columns.filter((column) => !column.hide);

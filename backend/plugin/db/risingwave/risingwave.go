@@ -22,12 +22,12 @@ import (
 
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
+	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	"github.com/bytebase/bytebase/backend/plugin/db/util"
 	"github.com/bytebase/bytebase/backend/plugin/parser/base"
 	pgparser "github.com/bytebase/bytebase/backend/plugin/parser/pg"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
-	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
 var (
@@ -202,6 +202,15 @@ func (d *Driver) Execute(ctx context.Context, statement string, opts db.ExecuteO
 		return 0, nil
 	}
 
+	// Parse transaction mode from the script
+	transactionMode, cleanedStatement := base.ParseTransactionMode(statement)
+	statement = cleanedStatement
+
+	// Apply default when transaction mode is not specified
+	if transactionMode == common.TransactionModeUnspecified {
+		transactionMode = common.GetDefaultTransactionMode()
+	}
+
 	var commands []base.SingleSQL
 	oneshot := true
 	if len(statement) <= common.MaxSheetCheckSize {
@@ -221,36 +230,89 @@ func (d *Driver) Execute(ctx context.Context, statement string, opts db.ExecuteO
 			},
 		}
 	}
-	totalRowsAffected := int64(0)
-	if len(commands) != 0 {
-		tx, err := d.db.BeginTx(ctx, nil)
-		if err != nil {
-			return 0, err
-		}
-		defer tx.Rollback()
+	// Execute based on transaction mode
+	if transactionMode == common.TransactionModeOff {
+		return d.executeInAutoCommitMode(ctx, commands, opts)
+	}
+	return d.executeInTransactionMode(ctx, commands, opts)
+}
 
-		for _, command := range commands {
-			sqlResult, err := tx.ExecContext(ctx, command.Text)
-			if err != nil {
-				return 0, &db.ErrorWithPosition{
-					Err:   errors.Wrapf(err, "failed to execute context in a transaction"),
-					Start: command.Start,
-					End:   command.End,
-				}
-			}
-			rowsAffected, err := sqlResult.RowsAffected()
-			if err != nil {
-				// Since we cannot differentiate DDL and DML yet, we have to ignore the error.
-				slog.Debug("rowsAffected returns error", log.BBError(err))
-			}
-			totalRowsAffected += rowsAffected
-		}
-
-		if err := tx.Commit(); err != nil {
-			return 0, err
-		}
+func (d *Driver) executeInTransactionMode(ctx context.Context, commands []base.SingleSQL, opts db.ExecuteOptions) (int64, error) {
+	if len(commands) == 0 {
+		return 0, nil
 	}
 
+	tx, err := d.db.BeginTx(ctx, nil)
+	if err != nil {
+		opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_BEGIN, err.Error())
+		return 0, err
+	}
+	opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_BEGIN, "")
+
+	committed := false
+	defer func() {
+		if !committed {
+			err := tx.Rollback()
+			var rerr string
+			if err != nil && !errors.Is(err, sql.ErrTxDone) {
+				rerr = err.Error()
+				slog.Debug("failed to rollback transaction", log.BBError(err))
+			}
+			opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_ROLLBACK, rerr)
+		}
+	}()
+
+	totalRowsAffected := int64(0)
+	for i, command := range commands {
+		opts.LogCommandExecute([]int32{int32(i)})
+		sqlResult, err := tx.ExecContext(ctx, command.Text)
+		if err != nil {
+			opts.LogCommandResponse([]int32{int32(i)}, 0, nil, err.Error())
+			return 0, &db.ErrorWithPosition{
+				Err:   errors.Wrapf(err, "failed to execute context in a transaction"),
+				Start: command.Start,
+				End:   command.End,
+			}
+		}
+		rowsAffected, err := sqlResult.RowsAffected()
+		if err != nil {
+			// Since we cannot differentiate DDL and DML yet, we have to ignore the error.
+			slog.Debug("rowsAffected returns error", log.BBError(err))
+		}
+		opts.LogCommandResponse([]int32{int32(i)}, int32(rowsAffected), nil, "")
+		totalRowsAffected += rowsAffected
+	}
+
+	if err := tx.Commit(); err != nil {
+		opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_COMMIT, err.Error())
+		return 0, err
+	}
+	opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_COMMIT, "")
+	committed = true
+	return totalRowsAffected, nil
+}
+
+func (d *Driver) executeInAutoCommitMode(ctx context.Context, commands []base.SingleSQL, opts db.ExecuteOptions) (int64, error) {
+	totalRowsAffected := int64(0)
+	for i, command := range commands {
+		opts.LogCommandExecute([]int32{int32(i)})
+		sqlResult, err := d.db.ExecContext(ctx, command.Text)
+		if err != nil {
+			opts.LogCommandResponse([]int32{int32(i)}, 0, nil, err.Error())
+			return totalRowsAffected, &db.ErrorWithPosition{
+				Err:   errors.Wrapf(err, "failed to execute context in auto-commit mode"),
+				Start: command.Start,
+				End:   command.End,
+			}
+		}
+		rowsAffected, err := sqlResult.RowsAffected()
+		if err != nil {
+			// Since we cannot differentiate DDL and DML yet, we have to ignore the error.
+			slog.Debug("rowsAffected returns error", log.BBError(err))
+		}
+		opts.LogCommandResponse([]int32{int32(i)}, int32(rowsAffected), nil, "")
+		totalRowsAffected += rowsAffected
+	}
 	return totalRowsAffected, nil
 }
 

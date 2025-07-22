@@ -68,8 +68,9 @@
 
     <!-- Results List -->
     <div class="flex-1 overflow-y-auto">
+      <!-- Empty state -->
       <div
-        v-if="filteredResults.length === 0"
+        v-if="filteredCheckRuns.length === 0"
         class="flex flex-col items-center justify-center py-12"
       >
         <CheckCircleIcon class="w-12 h-12 text-control-light opacity-50 mb-4" />
@@ -79,7 +80,6 @@
           }}
         </div>
       </div>
-
       <div v-else class="divide-y">
         <!-- Group by check run -->
         <div
@@ -198,26 +198,8 @@ const filteredCheckRuns = computed(() => {
         return false;
       }
     }
-
     return true;
   });
-});
-
-const filteredResults = computed(() => {
-  const results = [];
-
-  for (const checkRun of filteredCheckRuns.value) {
-    for (const result of checkRun.results) {
-      if (
-        selectedStatus.value === undefined ||
-        result.status === selectedStatus.value
-      ) {
-        results.push({ checkRun, result });
-      }
-    }
-  }
-
-  return results;
 });
 
 const statusCounts = computed(() => {

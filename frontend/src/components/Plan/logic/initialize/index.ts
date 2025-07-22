@@ -5,14 +5,16 @@ import {
   issueServiceClientConnect,
   rolloutServiceClientConnect,
 } from "@/grpcweb";
+import { PROJECT_V1_ROUTE_ISSUE_DETAIL } from "@/router/dashboard/projectV1";
 import { projectNamePrefix, usePlanStore } from "@/store";
 import { EMPTY_ID, UNKNOWN_ID } from "@/types";
 import { GetIssueRequestSchema } from "@/types/proto-es/v1/issue_service_pb";
 import type { Issue } from "@/types/proto-es/v1/issue_service_pb";
 import type { Plan, PlanCheckRun } from "@/types/proto-es/v1/plan_service_pb";
 import { GetRolloutRequestSchema } from "@/types/proto-es/v1/rollout_service_pb";
-import type { Rollout } from "@/types/proto-es/v1/rollout_service_pb";
+import type { Rollout, TaskRun } from "@/types/proto-es/v1/rollout_service_pb";
 import { emptyPlan } from "@/types/v1/issue/plan";
+import { issueV1Slug } from "@/utils";
 import { createPlanSkeleton } from "./create";
 
 export * from "./create";
@@ -65,6 +67,7 @@ export function useInitializePlan(
   const planCheckRuns = ref<PlanCheckRun[]>([]);
   const issue = ref<Issue | undefined>(undefined);
   const rollout = ref<Rollout | undefined>(undefined);
+  const taskRuns = ref<TaskRun[]>([]);
 
   const runner = async (uid: string, projectId: string, url: string) => {
     let planResult: Plan;
@@ -119,12 +122,38 @@ export function useInitializePlan(
       issueResult = newIssue;
 
       if (!issueResult.plan) {
-        // Should not happen, but handle gracefully
-        throw new Error(`Issue ${issueUid} does not have an associated plan`);
+        // Redirect to legacy issue page for issues without plans.
+        router.replace({
+          name: PROJECT_V1_ROUTE_ISSUE_DETAIL,
+          params: {
+            projectId,
+            issueSlug: issueV1Slug(issueResult.name, issueResult.title),
+          },
+        });
+        return {
+          plan: emptyPlan(),
+          issue: issueResult,
+          rollout: undefined,
+          url,
+        };
       }
 
       // Fetch the plan using the issue's plan reference
       planResult = await planStore.fetchPlanByName(issueResult.plan);
+
+      // Fetch the associated rollout if it exists
+      if (issueResult.rollout) {
+        try {
+          const rolloutRequest = create(GetRolloutRequestSchema, {
+            name: issueResult.rollout,
+          });
+          const newRollout =
+            await rolloutServiceClientConnect.getRollout(rolloutRequest);
+          rolloutResult = newRollout;
+        } catch {
+          // Rollout might not exist or we don't have permission, that's ok
+        }
+      }
     } else {
       // Direct plan ID
       planResult = await planStore.fetchPlanByName(
@@ -194,6 +223,7 @@ export function useInitializePlan(
     isCreating,
     plan,
     planCheckRuns,
+    taskRuns,
     issue,
     rollout,
     isInitializing,

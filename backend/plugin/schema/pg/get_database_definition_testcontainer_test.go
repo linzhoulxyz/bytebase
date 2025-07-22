@@ -12,10 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/bytebase/bytebase/backend/common/testcontainer"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	pgdb "github.com/bytebase/bytebase/backend/plugin/db/pg"
 	"github.com/bytebase/bytebase/backend/plugin/schema"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 // TestGetDatabaseDefinitionWithTestcontainer tests the get_database_definition function
@@ -639,8 +639,8 @@ func compareColumnsDef(t *testing.T, tableName string, colsA, colsB []*storepb.C
 		require.Equal(t, colA.Comment, colB.Comment, "table %s, column %s: comment should match", tableName, colB.Name)
 
 		// Compare default values if both exist
-		hasDefaultA := colA.DefaultNull || colA.DefaultExpression != "" || colA.Default != ""
-		hasDefaultB := colB.DefaultNull || colB.DefaultExpression != "" || colB.Default != ""
+		hasDefaultA := colA.Default != ""
+		hasDefaultB := colB.Default != ""
 		if hasDefaultA && hasDefaultB {
 			// Default values might be represented differently, so we just check they exist
 			t.Logf("table %s, column %s: default values exist in both", tableName, colB.Name)

@@ -2139,149 +2139,6 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
-    /v1/instances/{instance}/databases/{database}/secrets:
-        get:
-            tags:
-                - DatabaseService
-            description: 'Permissions required: bb.databaseSecrets.list'
-            operationId: DatabaseService_ListSecrets
-            parameters:
-                - name: instance
-                  in: path
-                  description: The instance id.
-                  required: true
-                  schema:
-                    type: string
-                - name: database
-                  in: path
-                  description: The database id.
-                  required: true
-                  schema:
-                    type: string
-                - name: pageSize
-                  in: query
-                  description: |-
-                    Not used.
-                     The maximum number of secrets to return. The service may return fewer than
-                     this value.
-                     If unspecified, at most 10 secrets will be returned.
-                     The maximum value is 1000; values above 1000 will be coerced to 1000.
-                  schema:
-                    type: integer
-                    format: int32
-                - name: pageToken
-                  in: query
-                  description: |-
-                    Not used.
-                     A page token, received from a previous `ListSecrets` call.
-                     Provide this to retrieve the subsequent page.
-
-                     When paginating, all other parameters provided to `ListSecrets` must match
-                     the call that provided the page token.
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ListSecretsResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
-    /v1/instances/{instance}/databases/{database}/secrets/{secret}:
-        delete:
-            tags:
-                - DatabaseService
-            description: 'Permissions required: bb.databaseSecrets.delete'
-            operationId: DatabaseService_DeleteSecret
-            parameters:
-                - name: instance
-                  in: path
-                  description: The instance id.
-                  required: true
-                  schema:
-                    type: string
-                - name: database
-                  in: path
-                  description: The database id.
-                  required: true
-                  schema:
-                    type: string
-                - name: secret
-                  in: path
-                  description: The secret id.
-                  required: true
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content: {}
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
-        patch:
-            tags:
-                - DatabaseService
-            description: 'Permissions required: bb.databaseSecrets.update'
-            operationId: DatabaseService_UpdateSecret
-            parameters:
-                - name: instance
-                  in: path
-                  description: The instance id.
-                  required: true
-                  schema:
-                    type: string
-                - name: database
-                  in: path
-                  description: The database id.
-                  required: true
-                  schema:
-                    type: string
-                - name: secret
-                  in: path
-                  description: The secret id.
-                  required: true
-                  schema:
-                    type: string
-                - name: updateMask
-                  in: query
-                  description: The mask of the fields to be updated.
-                  schema:
-                    type: string
-                    format: field-mask
-                - name: allowMissing
-                  in: query
-                  description: If true, the secret will be created if it does not exist.
-                  schema:
-                    type: boolean
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/Secret'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Secret'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
     /v1/instances/{instance}/databases/{database}:diffSchema:
         post:
             tags:
@@ -2761,7 +2618,7 @@ paths:
         get:
             tags:
                 - InstanceRoleService
-            description: 'Permissions required: bb.instanceRoles.get'
+            description: 'Permissions required: bb.instanceRoles.list'
             operationId: InstanceRoleService_ListInstanceRoles
             parameters:
                 - name: instance
@@ -3079,11 +2936,22 @@ paths:
                   required: true
                   schema:
                     type: string
+                - name: updateMask
+                  in: query
+                  description: The list of fields to update.
+                  schema:
+                    type: string
+                    format: field-mask
+                - name: validateOnly
+                  in: query
+                  description: Validate only also tests the data source connection.
+                  schema:
+                    type: boolean
             requestBody:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/UpdateDataSourceRequest'
+                            $ref: '#/components/schemas/DataSource'
                 required: true
             responses:
                 "200":
@@ -5495,6 +5363,23 @@ paths:
                      the call that provided the page token.
                   schema:
                     type: string
+                - name: filter
+                  in: query
+                  description: |-
+                    Filter is used to filter rollouts returned in the list.
+                     The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+
+                     Supported filters:
+                     - creator: the rollout creator full name in "users/{email or id}" format, support "==" operator.
+                     - update_time: rollout update time in "2006-01-02T15:04:05Z07:00" format, support ">=" or "<=" operator.
+                     - task_type: the task type, support "==" and "in" operators, check the Task.Type enum for the values.
+
+                     For example:
+                     creator == "users/ed@bytebase.com" && update_time >= "2025-01-02T15:04:05Z07:00"
+                     task_type == "DATABASE_SCHEMA_UPDATE"
+                     task_type in ["DATABASE_SCHEMA_UPDATE", "DATABASE_DATA_UPDATE"]
+                  schema:
+                    type: string
             responses:
                 "200":
                     description: OK
@@ -6268,7 +6153,7 @@ paths:
                             schema:
                                 $ref: '#/components/schemas/Status'
     /v1/projects/{project}/webhooks/{webhook}:updateWebhook:
-        post:
+        patch:
             tags:
                 - ProjectService
             description: 'Permissions required: bb.projects.update'
@@ -6286,11 +6171,17 @@ paths:
                   required: true
                   schema:
                     type: string
+                - name: updateMask
+                  in: query
+                  description: The list of fields to update.
+                  schema:
+                    type: string
+                    format: field-mask
             requestBody:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/UpdateWebhookRequest'
+                            $ref: '#/components/schemas/Webhook'
                 required: true
             responses:
                 "200":
@@ -8857,6 +8748,22 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/Expr'
                     description: The parsed expression of the condition.
+        BoundingBox:
+            type: object
+            properties:
+                xmin:
+                    type: number
+                    format: double
+                ymin:
+                    type: number
+                    format: double
+                xmax:
+                    type: number
+                    format: double
+                ymax:
+                    type: number
+                    format: double
+            description: BoundingBox defines the bounding box for spatial indexes.
         Candidate_Content:
             type: object
             properties:
@@ -9169,13 +9076,9 @@ components:
                     format: int32
                 hasDefault:
                     type: boolean
-                defaultNull:
-                    type: boolean
+                default:
+                    type: string
                     description: The default value of column.
-                defaultString:
-                    type: string
-                defaultExpression:
-                    type: string
                 defaultOnNull:
                     type: boolean
                     description: |-
@@ -9304,7 +9207,8 @@ components:
                  primitives.
 
                  Lists and structs are not included as constants as these aggregate types may
-                 contain [Expr][google.api.expr.v1alpha1.Expr] elements which require evaluation and are thus not constant.
+                 contain [Expr][google.api.expr.v1alpha1.Expr] elements which require
+                 evaluation and are thus not constant.
 
                  Examples of literals include: `"hello"`, `b'bytes'`, `1u`, `4.2`, `-2`,
                  `true`, `null`.
@@ -9794,10 +9698,6 @@ components:
                     type: boolean
                 datashare:
                     type: boolean
-                secrets:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/Secret'
                 drifted:
                     type: boolean
                     description: The schema is drifted from the source of truth.
@@ -9915,6 +9815,32 @@ components:
             properties:
                 diff:
                     type: string
+        DimensionalConfig:
+            type: object
+            properties:
+                dimensions:
+                    type: integer
+                    description: Number of dimensions (2-4, default 2)
+                    format: int32
+                dataType:
+                    type: string
+                    description: |-
+                        Spatial data type
+                         Examples: GEOMETRY, GEOGRAPHY, POINT, POLYGON, etc.
+                operatorClass:
+                    type: string
+                    description: |-
+                        PostgreSQL operator class
+                         Examples: gist_geometry_ops_2d, gist_geometry_ops_nd, etc.
+                layerGtype:
+                    type: string
+                    description: |-
+                        Oracle geometry type constraint
+                         Examples: POINT, LINE, POLYGON, COLLECTION
+                parallelBuild:
+                    type: boolean
+                    description: Parallel index creation
+            description: DimensionalConfig defines dimensional and constraint parameters for spatial indexes.
         EnvironmentSetting:
             type: object
             properties:
@@ -10090,14 +10016,16 @@ components:
                  operators with the exception of the '.' operator are modelled as function
                  calls. This makes it easy to represent new operators into the existing AST.
 
-                 All references within expressions must resolve to a [Decl][google.api.expr.v1alpha1.Decl] provided at
-                 type-check for an expression to be valid. A reference may either be a bare
-                 identifier `name` or a qualified identifier `google.api.name`. References
-                 may either refer to a value or a function declaration.
+                 All references within expressions must resolve to a
+                 [Decl][google.api.expr.v1alpha1.Decl] provided at type-check for an
+                 expression to be valid. A reference may either be a bare identifier `name` or
+                 a qualified identifier `google.api.name`. References may either refer to a
+                 value or a function declaration.
 
                  For example, the expression `google.api.name.startsWith('expr')` references
-                 the declaration `google.api.name` within a [Expr.Select][google.api.expr.v1alpha1.Expr.Select] expression, and
-                 the function declaration `startsWith`.
+                 the declaration `google.api.name` within a
+                 [Expr.Select][google.api.expr.v1alpha1.Expr.Select] expression, and the
+                 function declaration `startsWith`.
         Expr_Call:
             type: object
             properties:
@@ -10124,11 +10052,21 @@ components:
             properties:
                 iterVar:
                     type: string
-                    description: The name of the iteration variable.
+                    description: |-
+                        The name of the first iteration variable.
+                         When the iter_range is a list, this variable is the list element.
+                         When the iter_range is a map, this variable is the map entry key.
+                iterVar2:
+                    type: string
+                    description: |-
+                        The name of the second iteration variable, empty if not set.
+                         When the iter_range is a list, this variable is the integer index.
+                         When the iter_range is a map, this variable is the map entry value.
+                         This field is only set for comprehension v2 macros.
                 iterRange:
                     allOf:
                         - $ref: '#/components/schemas/Expr'
-                    description: The range over which var iterates.
+                    description: The range over which the comprehension iterates.
                 accuVar:
                     type: string
                     description: The name of the variable used for accumulation of the result.
@@ -10140,7 +10078,7 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/Expr'
                     description: |-
-                        An expression which can contain iter_var and accu_var.
+                        An expression which can contain iter_var, iter_var2, and accu_var.
 
                          Returns false when the result has been computed and may be used as
                          a hint to short-circuit the remainder of the comprehension.
@@ -10148,7 +10086,7 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/Expr'
                     description: |-
-                        An expression which can contain iter_var and accu_var.
+                        An expression which can contain iter_var, iter_var2, and accu_var.
 
                          Computes the next value of accu_var.
                 result:
@@ -10185,6 +10123,36 @@ components:
                  messages `has(m.x)` is defined as 'defined, but not set`. For proto3, the
                  macro tests whether the property is set to its default. For map and struct
                  types, the macro tests whether the property `x` is defined on `m`.
+
+                 Comprehensions for the standard environment macros evaluation can be best
+                 visualized as the following pseudocode:
+
+                 ```
+                 let `accu_var` = `accu_init`
+                 for (let `iter_var` in `iter_range`) {
+                   if (!`loop_condition`) {
+                     break
+                   }
+                   `accu_var` = `loop_step`
+                 }
+                 return `result`
+                 ```
+
+                 Comprehensions for the optional V2 macros which support map-to-map
+                 translation differ slightly from the standard environment macros in that
+                 they expose both the key or index in addition to the value for each list
+                 or map entry:
+
+                 ```
+                 let `accu_var` = `accu_init`
+                 for (let `iter_var`, `iter_var2` in `iter_range`) {
+                   if (!`loop_condition`) {
+                     break
+                   }
+                   `accu_var` = `loop_step`
+                 }
+                 return `result`
+                 ```
         Expr_CreateList:
             type: object
             properties:
@@ -10238,7 +10206,8 @@ components:
                         Required. Holds a single, unqualified identifier, possibly preceded by a
                          '.'.
 
-                         Qualified names are represented by the [Expr.Select][google.api.expr.v1alpha1.Expr.Select] expression.
+                         Qualified names are represented by the
+                         [Expr.Select][google.api.expr.v1alpha1.Expr.Select] expression.
             description: An identifier expression. e.g. `request`.
         Expr_Select:
             type: object
@@ -10368,6 +10337,15 @@ components:
                 expiration:
                     pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
                     type: string
+        GridLevel:
+            type: object
+            properties:
+                level:
+                    type: integer
+                    format: int32
+                density:
+                    type: string
+            description: GridLevel defines a grid level for spatial tessellation.
         Group:
             type: object
             properties:
@@ -10509,6 +10487,10 @@ components:
                     description: |-
                         It's a PostgreSQL specific field.
                          The unique constraint and unique index are not the same thing in PostgreSQL.
+                spatialConfig:
+                    allOf:
+                        - $ref: '#/components/schemas/SpatialIndexConfig'
+                    description: Spatial index configuration for spatial databases like SQL Server, PostgreSQL with PostGIS, etc.
             description: IndexMetadata is the metadata for indexes.
         Instance:
             type: object
@@ -11212,19 +11194,6 @@ components:
                     description: |-
                         A token, which can be sent as `page_token` to retrieve the next page.
                          If this field is omitted, there are no subsequent pages.
-        ListSecretsResponse:
-            type: object
-            properties:
-                secrets:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/Secret'
-                    description: The list of secrets.
-                nextPageToken:
-                    type: string
-                    description: |-
-                        Not used. A token, which can be sent as `page_token` to retrieve the next
-                         page. If this field is omitted, there are no subsequent pages.
         ListSettingsResponse:
             type: object
             properties:
@@ -11475,6 +11444,14 @@ components:
                         The name of the plan.
                          `plan` is a system generated ID.
                          Format: projects/{project}/plans/{plan}
+                state:
+                    enum:
+                        - STATE_UNSPECIFIED
+                        - ACTIVE
+                        - DELETED
+                    type: string
+                    description: The state of the plan.
+                    format: enum
                 issue:
                     readOnly: true
                     type: string
@@ -12222,6 +12199,7 @@ components:
                         - TYPE_UNSPECIFIED
                         - VERSIONED
                     type: string
+                    description: The type of the file.
                     format: enum
                 version:
                     type: string
@@ -12232,6 +12210,10 @@ components:
                         - DDL_GHOST
                         - DML
                     type: string
+                    description: |-
+                        The change type of the file.
+                         For versioned files, it is the change type of the file.
+                         For declarative files, this field is always DDL, thus meaningless.
                     format: enum
                 sheet:
                     type: string
@@ -12586,6 +12568,10 @@ components:
                     type: string
                     description: 'Format: users/hello@world.com'
                 createTime:
+                    readOnly: true
+                    type: string
+                    format: date-time
+                updateTime:
                     readOnly: true
                     type: string
                     format: date-time
@@ -13064,13 +13050,20 @@ components:
 
                          Supported filters:
                          - creator: the plan creator full name in "users/{email or id}" format, support "==" operator.
-                         - create_time: issue create time in "2006-01-02T15:04:05Z07:00" format, support ">=" or "<=" operator.
+                         - create_time: the plan create time in "2006-01-02T15:04:05Z07:00" format, support ">=" or "<=" operator.
                          - has_pipeline: the plan has pipeline or not, support "==" operator, the value should be "true" or "false".
                          - has_issue: the plan has issue or not, support "==" operator, the value should be "true" or "false".
+                         - title: the plan title, support "==" operator for exact match and ".matches()" operator for case-insensitive substring match.
+                         - spec_type: the plan spec config type, support "==" operator, the value should be "create_database_config", "change_database_config", or "export_data_config".
+                         - state: the plan state, support "==" operator, the value should be "ACTIVE" or "DELETED".
 
                          For example:
                          creator == "users/ed@bytebase.com" && create_time >= "2025-01-02T15:04:05Z07:00"
                          has_pipeline == false && has_issue == true
+                         title == "My Plan"
+                         title.matches("database migration")
+                         spec_type == "change_database_config"
+                         state == "ACTIVE"
         SearchPlansResponse:
             type: object
             properties:
@@ -13245,18 +13238,6 @@ components:
                     description: |-
                         Not used. A token, which can be sent as `page_token` to retrieve the next page.
                          If this field is omitted, there are no subsequent pages.
-        Secret:
-            type: object
-            properties:
-                name:
-                    type: string
-                    description: The name is the name of the secret.
-                value:
-                    type: string
-                    description: The value is the value of the secret.
-                description:
-                    type: string
-                    description: The description is the description of the secret.
         SemanticTypeSetting:
             type: object
             properties:
@@ -13411,6 +13392,32 @@ components:
                     items:
                         $ref: '#/components/schemas/SheetCommand'
                     description: The start and end position of each command in the sheet statement.
+        SpatialIndexConfig:
+            type: object
+            properties:
+                method:
+                    type: string
+                    description: |-
+                        Index method/type (database-specific)
+                         Examples: "SPATIAL" (MySQL/SQL Server), "GIST"/"SPGIST" (PostgreSQL), "MDSYS.SPATIAL_INDEX_V2" (Oracle)
+                tessellation:
+                    allOf:
+                        - $ref: '#/components/schemas/TessellationConfig'
+                    description: Tessellation configuration (primarily SQL Server)
+                storage:
+                    allOf:
+                        - $ref: '#/components/schemas/StorageConfig'
+                    description: Storage and performance parameters
+                dimensional:
+                    allOf:
+                        - $ref: '#/components/schemas/DimensionalConfig'
+                    description: Dimensional and constraint parameters
+                engineSpecific:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: Database-specific parameters (stored as key-value pairs for extensibility)
+            description: SpatialIndexConfig is the configuration for spatial indexes across different database engines.
         Stage:
             type: object
             properties:
@@ -13448,6 +13455,45 @@ components:
                         $ref: '#/components/schemas/GoogleProtobufAny'
                     description: A list of messages that carry the error details.  There is a common set of message types for APIs to use.
             description: 'The `Status` type defines a logical error model that is suitable for different programming environments, including REST APIs and RPC APIs. It is used by [gRPC](https://github.com/grpc). Each `Status` message contains three pieces of data: error code, error message, and error details. You can find out more about this error model and how to work with it in the [API Design Guide](https://cloud.google.com/apis/design/errors).'
+        StorageConfig:
+            type: object
+            properties:
+                fillfactor:
+                    type: integer
+                    description: PostgreSQL parameters
+                    format: int32
+                buffering:
+                    type: string
+                tablespace:
+                    type: string
+                    description: Oracle parameters
+                workTablespace:
+                    type: string
+                sdoLevel:
+                    type: integer
+                    format: int32
+                commitInterval:
+                    type: integer
+                    format: int32
+                padIndex:
+                    type: boolean
+                    description: SQL Server parameters
+                sortInTempdb:
+                    type: string
+                dropExisting:
+                    type: boolean
+                online:
+                    type: boolean
+                allowRowLocks:
+                    type: boolean
+                allowPageLocks:
+                    type: boolean
+                maxdop:
+                    type: integer
+                    format: int32
+                dataCompression:
+                    type: string
+            description: StorageConfig defines storage and performance parameters for spatial indexes.
         Subscription:
             type: object
             properties:
@@ -13739,6 +13785,20 @@ components:
                     $ref: '#/components/schemas/Task_DatabaseDataUpdate'
                 databaseDataExport:
                     $ref: '#/components/schemas/Task_DatabaseDataExport'
+                updateTime:
+                    readOnly: true
+                    type: string
+                    description: |-
+                        The update_time is the update time of latest task run.
+                         If there are no task runs, it will be empty.
+                    format: date-time
+                runTime:
+                    readOnly: true
+                    type: string
+                    description: |-
+                        The run_time is the scheduled run time of latest task run.
+                         If there are no task runs or the task run is not scheduled, it will be empty.
+                    format: date-time
         TaskPriorBackup_Table:
             type: object
             properties:
@@ -13975,6 +14035,28 @@ components:
                     description: 'Format: projects/{project}/sheets/{sheet}'
                 schemaVersion:
                     type: string
+        TessellationConfig:
+            type: object
+            properties:
+                scheme:
+                    type: string
+                    description: |-
+                        Tessellation scheme
+                         Examples: GEOMETRY_GRID, GEOGRAPHY_GRID, GEOMETRY_AUTO_GRID, GEOGRAPHY_AUTO_GRID
+                boundingBox:
+                    allOf:
+                        - $ref: '#/components/schemas/BoundingBox'
+                    description: Bounding box for GEOMETRY indexes (SQL Server)
+                gridLevels:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/GridLevel'
+                    description: Grid level configuration (SQL Server)
+                cellsPerObject:
+                    type: integer
+                    description: Cells per object (SQL Server)
+                    format: int32
+            description: TessellationConfig defines tessellation parameters for spatial indexes.
         TestIdentityProviderRequest:
             type: object
             properties:
@@ -14075,28 +14157,6 @@ components:
                     description: |-
                         The name of the deleted user.
                          Format: users/{user}
-        UpdateDataSourceRequest:
-            required:
-                - name
-                - dataSource
-            type: object
-            properties:
-                name:
-                    type: string
-                    description: |-
-                        The name of the instance to update a data source.
-                         Format: instances/{instance}
-                dataSource:
-                    allOf:
-                        - $ref: '#/components/schemas/DataSource'
-                    description: Identified by data source ID.
-                updateMask:
-                    type: string
-                    description: The list of fields to update.
-                    format: field-mask
-                validateOnly:
-                    type: boolean
-                    description: Validate only also tests the data source connection.
         UpdateDatabaseRequest:
             required:
                 - database
@@ -14127,19 +14187,6 @@ components:
 
                          The instance's `name` field is used to identify the instance to update.
                          Format: instances/{instance}
-                updateMask:
-                    type: string
-                    description: The list of fields to update.
-                    format: field-mask
-        UpdateWebhookRequest:
-            required:
-                - webhook
-            type: object
-            properties:
-                webhook:
-                    allOf:
-                        - $ref: '#/components/schemas/Webhook'
-                    description: The webhook to modify.
                 updateMask:
                     type: string
                     description: The list of fields to update.

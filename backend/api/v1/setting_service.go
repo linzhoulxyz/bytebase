@@ -20,6 +20,9 @@ import (
 	"github.com/bytebase/bytebase/backend/component/config"
 	"github.com/bytebase/bytebase/backend/component/state"
 	"github.com/bytebase/bytebase/backend/enterprise"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
+	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
+	"github.com/bytebase/bytebase/backend/generated-go/v1/v1connect"
 	"github.com/bytebase/bytebase/backend/plugin/schema"
 	"github.com/bytebase/bytebase/backend/plugin/webhook/dingtalk"
 	"github.com/bytebase/bytebase/backend/plugin/webhook/feishu"
@@ -27,9 +30,6 @@ import (
 	"github.com/bytebase/bytebase/backend/plugin/webhook/slack"
 	"github.com/bytebase/bytebase/backend/plugin/webhook/wecom"
 	"github.com/bytebase/bytebase/backend/store"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
-	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
-	"github.com/bytebase/bytebase/proto/generated-go/v1/v1connect"
 )
 
 // SettingService implements the setting service.
@@ -175,10 +175,7 @@ func (s *SettingService) UpdateSetting(ctx context.Context, request *connect.Req
 		if request.Msg.UpdateMask == nil {
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("update mask is required"))
 		}
-		payload := new(storepb.WorkspaceProfileSetting)
-		if err := convertProtoToProto(request.Msg.Setting.Value.GetWorkspaceProfileSettingValue(), payload); err != nil {
-			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to unmarshal setting value for %s with error: %v", apiSettingName, err))
-		}
+		payload := convertV1WorkspaceProfileSettingToStore(request.Msg.Setting.Value.GetWorkspaceProfileSettingValue())
 		oldSetting, err := s.store.GetWorkspaceGeneralSetting(ctx)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to find setting %s with error: %v", apiSettingName, err))
@@ -514,7 +511,7 @@ func (s *SettingService) UpdateSetting(ctx context.Context, request *connect.Req
 		}
 		storeSettingValue = string(bytes)
 	case storepb.SettingName_ENVIRONMENT:
-		if serr := validateEnvironments(request.Msg.Setting.Value.GetEnvironmentSetting().GetEnvironments()); serr != nil {
+		if serr := s.validateEnvironments(request.Msg.Setting.Value.GetEnvironmentSetting().GetEnvironments()); serr != nil {
 			return nil, serr
 		}
 
@@ -634,10 +631,11 @@ func convertToSettingMessage(setting *store.SettingMessage, profile *config.Prof
 			},
 		}, nil
 	case storepb.SettingName_WORKSPACE_PROFILE:
-		v1Value := new(v1pb.WorkspaceProfileSetting)
-		if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(setting.Value), v1Value); err != nil {
+		storeValue := new(storepb.WorkspaceProfileSetting)
+		if err := common.ProtojsonUnmarshaler.Unmarshal([]byte(setting.Value), storeValue); err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to unmarshal setting value for %s with error: %v", setting.Name, err))
 		}
+		v1Value := convertStoreWorkspaceProfileSettingToV1(storeValue)
 		v1Value.DisallowSignup = v1Value.DisallowSignup || profile.SaaS
 		return &v1pb.Setting{
 			Name: settingName,
@@ -1140,7 +1138,7 @@ func validateDomains(domains []string) error {
 	return nil
 }
 
-func validateEnvironments(envs []*v1pb.EnvironmentSetting_Environment) error {
+func (s *SettingService) validateEnvironments(envs []*v1pb.EnvironmentSetting_Environment) error {
 	used := map[string]bool{}
 	for _, env := range envs {
 		if env.Title == "" {
@@ -1151,6 +1149,11 @@ func validateEnvironments(envs []*v1pb.EnvironmentSetting_Environment) error {
 		}
 		if used[env.Id] {
 			return connect.NewError(connect.CodeInvalidArgument, errors.Errorf("duplicate environment ID %v", env.Id))
+		}
+		if v, ok := env.Tags["protected"]; ok && v == "protected" {
+			if err := s.licenseService.IsFeatureEnabled(v1pb.PlanFeature_FEATURE_ENVIRONMENT_TIERS); err != nil {
+				return connect.NewError(connect.CodePermissionDenied, err)
+			}
 		}
 		used[env.Id] = true
 	}
@@ -1195,4 +1198,84 @@ func convertEnvironmentSetting(e *v1pb.EnvironmentSetting) *storepb.EnvironmentS
 	return &storepb.EnvironmentSetting{
 		Environments: environments,
 	}
+}
+
+// convertV1WorkspaceProfileSettingToStore converts v1pb.WorkspaceProfileSetting to storepb.WorkspaceProfileSetting.
+func convertV1WorkspaceProfileSettingToStore(v1Setting *v1pb.WorkspaceProfileSetting) *storepb.WorkspaceProfileSetting {
+	if v1Setting == nil {
+		return nil
+	}
+
+	storeSetting := &storepb.WorkspaceProfileSetting{
+		ExternalUrl:            v1Setting.ExternalUrl,
+		DisallowSignup:         v1Setting.DisallowSignup,
+		Require_2Fa:            v1Setting.Require_2Fa,
+		TokenDuration:          v1Setting.TokenDuration,
+		MaximumRoleExpiration:  v1Setting.MaximumRoleExpiration,
+		Domains:                v1Setting.Domains,
+		EnforceIdentityDomain:  v1Setting.EnforceIdentityDomain,
+		DatabaseChangeMode:     storepb.DatabaseChangeMode(v1Setting.DatabaseChangeMode),
+		DisallowPasswordSignin: v1Setting.DisallowPasswordSignin,
+	}
+
+	// Convert announcement if present
+	if v1Setting.Announcement != nil {
+		storeSetting.Announcement = &storepb.Announcement{
+			Text: v1Setting.Announcement.Text,
+			Link: v1Setting.Announcement.Link,
+		}
+		// Convert alert level
+		switch v1Setting.Announcement.Level {
+		case v1pb.Announcement_ALERT_LEVEL_UNSPECIFIED:
+			storeSetting.Announcement.Level = storepb.Announcement_ALERT_LEVEL_UNSPECIFIED
+		case v1pb.Announcement_INFO:
+			storeSetting.Announcement.Level = storepb.Announcement_ALERT_LEVEL_INFO
+		case v1pb.Announcement_WARNING:
+			storeSetting.Announcement.Level = storepb.Announcement_ALERT_LEVEL_WARNING
+		case v1pb.Announcement_CRITICAL:
+			storeSetting.Announcement.Level = storepb.Announcement_ALERT_LEVEL_CRITICAL
+		}
+	}
+
+	return storeSetting
+}
+
+// convertStoreWorkspaceProfileSettingToV1 converts storepb.WorkspaceProfileSetting to v1pb.WorkspaceProfileSetting.
+func convertStoreWorkspaceProfileSettingToV1(storeSetting *storepb.WorkspaceProfileSetting) *v1pb.WorkspaceProfileSetting {
+	if storeSetting == nil {
+		return nil
+	}
+
+	v1Setting := &v1pb.WorkspaceProfileSetting{
+		ExternalUrl:            storeSetting.ExternalUrl,
+		DisallowSignup:         storeSetting.DisallowSignup,
+		Require_2Fa:            storeSetting.Require_2Fa,
+		TokenDuration:          storeSetting.TokenDuration,
+		MaximumRoleExpiration:  storeSetting.MaximumRoleExpiration,
+		Domains:                storeSetting.Domains,
+		EnforceIdentityDomain:  storeSetting.EnforceIdentityDomain,
+		DatabaseChangeMode:     v1pb.DatabaseChangeMode(storeSetting.DatabaseChangeMode),
+		DisallowPasswordSignin: storeSetting.DisallowPasswordSignin,
+	}
+
+	// Convert announcement if present
+	if storeSetting.Announcement != nil {
+		v1Setting.Announcement = &v1pb.Announcement{
+			Text: storeSetting.Announcement.Text,
+			Link: storeSetting.Announcement.Link,
+		}
+		// Convert alert level
+		switch storeSetting.Announcement.Level {
+		case storepb.Announcement_ALERT_LEVEL_UNSPECIFIED:
+			v1Setting.Announcement.Level = v1pb.Announcement_ALERT_LEVEL_UNSPECIFIED
+		case storepb.Announcement_ALERT_LEVEL_INFO:
+			v1Setting.Announcement.Level = v1pb.Announcement_INFO
+		case storepb.Announcement_ALERT_LEVEL_WARNING:
+			v1Setting.Announcement.Level = v1pb.Announcement_WARNING
+		case storepb.Announcement_ALERT_LEVEL_CRITICAL:
+			v1Setting.Announcement.Level = v1pb.Announcement_CRITICAL
+		}
+	}
+
+	return v1Setting
 }

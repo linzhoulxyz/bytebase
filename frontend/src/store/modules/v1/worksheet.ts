@@ -314,7 +314,7 @@ export const useWorkSheetAndTabStore = defineStore("worksheet_and_tab", () => {
 
     // Incomplete sheets should be read-only. e.g. 100MB sheet from issue task.、
     const statement = getSheetStatement(worksheet);
-    if (getStatementSize(statement).ne(worksheet.contentSize)) {
+    if (getStatementSize(statement) !== worksheet.contentSize) {
       return true;
     }
 

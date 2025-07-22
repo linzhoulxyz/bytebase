@@ -16,12 +16,12 @@ import (
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/component/dbfactory"
 	"github.com/bytebase/bytebase/backend/component/sheet"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
+	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
+	"github.com/bytebase/bytebase/backend/generated-go/v1/v1connect"
 	"github.com/bytebase/bytebase/backend/runner/schemasync"
 	"github.com/bytebase/bytebase/backend/store"
 	"github.com/bytebase/bytebase/backend/store/model"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
-	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
-	"github.com/bytebase/bytebase/proto/generated-go/v1/v1connect"
 )
 
 type ReleaseService struct {
@@ -349,7 +349,7 @@ func convertToReleaseFiles(ctx context.Context, s *store.Store, files []*storepb
 			Path:          f.Path,
 			Sheet:         f.Sheet,
 			SheetSha256:   f.SheetSha256,
-			Type:          v1pb.ReleaseFileType(f.Type),
+			Type:          v1pb.Release_File_Type(f.Type),
 			Version:       f.Version,
 			Statement:     []byte(sheet.Statement),
 			StatementSize: sheet.Size,
@@ -395,7 +395,7 @@ func convertReleaseFiles(ctx context.Context, s *store.Store, files []*v1pb.Rele
 			Path:        f.Path,
 			Sheet:       f.Sheet,
 			SheetSha256: sheet.GetSha256Hex(),
-			Type:        storepb.ReleaseFileType(f.Type),
+			Type:        storepb.ReleasePayload_File_Type(f.Type),
 			Version:     f.Version,
 			ChangeType:  storepb.ReleasePayload_File_ChangeType(f.ChangeType),
 		})
@@ -459,7 +459,7 @@ func validateAndSanitizeReleaseFiles(ctx context.Context, s *store.Store, files 
 		}
 
 		switch f.Type {
-		case v1pb.ReleaseFileType_VERSIONED:
+		case v1pb.Release_File_VERSIONED:
 		default:
 			return nil, errors.Errorf("unexpected file type %q", f.Type.String())
 		}

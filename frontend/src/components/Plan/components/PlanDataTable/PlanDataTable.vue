@@ -14,20 +14,19 @@
 
 <script lang="tsx" setup>
 import type { DataTableColumn } from "naive-ui";
-import { NPerformantEllipsis, NDataTable } from "naive-ui";
+import { NPerformantEllipsis, NDataTable, NTag } from "naive-ui";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { BBAvatar } from "@/bbkit";
+import Timestamp from "@/components/misc/Timestamp.vue";
+import { useIssueLayoutVersion } from "@/composables/useIssueLayoutVersion";
 import { PROJECT_V1_ROUTE_PLAN_DETAIL } from "@/router/dashboard/projectV1";
 import { useUserStore } from "@/store";
-import { getTimeForPbTimestampProtoEs, unknownUser } from "@/types";
+import { unknownUser } from "@/types";
+import { State } from "@/types/proto-es/v1/common_pb";
 import type { Plan } from "@/types/proto-es/v1/plan_service_pb";
-import {
-  extractPlanUID,
-  extractProjectResourceName,
-  humanizeTs,
-} from "@/utils";
+import { extractPlanUID, extractProjectResourceName } from "@/utils";
 import PlanCheckRunStatusIcon from "../PlanCheckRunStatusIcon.vue";
 
 withDefaults(
@@ -41,6 +40,7 @@ withDefaults(
 const { t } = useI18n();
 const router = useRouter();
 const userStore = useUserStore();
+const { enabledNewLayout } = useIssueLayoutVersion();
 
 const columnList = computed((): DataTableColumn<Plan>[] => {
   const columns: (DataTableColumn<Plan> & { hide?: boolean })[] = [
@@ -53,23 +53,41 @@ const columnList = computed((): DataTableColumn<Plan>[] => {
     {
       key: "title",
       title: t("issue.table.name"),
-      resizable: true,
       render: (plan) => {
+        const showDraftTag =
+          enabledNewLayout.value && plan.issue === "" && plan.rollout === "";
+        const isDeleted = plan.state === State.DELETED;
         return (
-          <div class="flex items-center overflow-hidden space-x-2">
+          <div
+            class={`flex items-center overflow-hidden space-x-2 ${isDeleted ? "opacity-60" : ""}`}
+          >
             <div class="whitespace-nowrap text-control opacity-60">
               {extractPlanUID(plan.name)}
             </div>
-            <NPerformantEllipsis class="flex-1 truncate">
-              {{
-                default: () => <span>{plan.title}</span>,
-                tooltip: () => (
-                  <div class="whitespace-pre-wrap break-words break-all">
-                    {plan.title}
-                  </div>
-                ),
-              }}
-            </NPerformantEllipsis>
+            {plan.title ? (
+              <NPerformantEllipsis class="truncate">
+                {{
+                  default: () => <span>{plan.title}</span>,
+                  tooltip: () => (
+                    <div class="whitespace-pre-wrap break-words break-all">
+                      {plan.title}
+                    </div>
+                  ),
+                }}
+              </NPerformantEllipsis>
+            ) : (
+              <span class="opacity-60 italic">{t("common.untitled")}</span>
+            )}
+            {isDeleted && (
+              <NTag type="warning" round size="small">
+                {t("common.closed")}
+              </NTag>
+            )}
+            {showDraftTag && !isDeleted && (
+              <NTag round size="small">
+                {t("common.draft")}
+              </NTag>
+            )}
           </div>
         );
       },
@@ -77,14 +95,13 @@ const columnList = computed((): DataTableColumn<Plan>[] => {
     {
       key: "updateTime",
       title: t("issue.table.updated"),
-      width: 150,
-      render: (plan) =>
-        humanizeTs(getTimeForPbTimestampProtoEs(plan.updateTime, 0) / 1000),
+      width: 128,
+      render: (plan) => <Timestamp timestamp={plan.updateTime} />,
     },
     {
       key: "creator",
-      width: 150,
       title: t("issue.table.creator"),
+      width: 128,
       render: (plan) => {
         const creator =
           userStore.getUserByIdentifier(plan.creator) || unknownUser();
@@ -101,8 +118,9 @@ const columnList = computed((): DataTableColumn<Plan>[] => {
 });
 
 const rowProps = (plan: Plan) => {
+  const isDeleted = plan.state === State.DELETED;
   return {
-    style: "cursor: pointer;",
+    style: isDeleted ? "cursor: pointer; opacity: 0.7;" : "cursor: pointer;",
     onClick: (e: MouseEvent) => {
       const route = router.resolve({
         name: PROJECT_V1_ROUTE_PLAN_DETAIL,

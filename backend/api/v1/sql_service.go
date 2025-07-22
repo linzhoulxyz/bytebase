@@ -30,6 +30,9 @@ import (
 	"github.com/bytebase/bytebase/backend/component/iam"
 	"github.com/bytebase/bytebase/backend/component/sheet"
 	"github.com/bytebase/bytebase/backend/enterprise"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
+	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
+	"github.com/bytebase/bytebase/backend/generated-go/v1/v1connect"
 	"github.com/bytebase/bytebase/backend/plugin/advisor"
 	"github.com/bytebase/bytebase/backend/plugin/advisor/catalog"
 	"github.com/bytebase/bytebase/backend/plugin/db"
@@ -41,9 +44,6 @@ import (
 	"github.com/bytebase/bytebase/backend/store"
 	"github.com/bytebase/bytebase/backend/store/model"
 	"github.com/bytebase/bytebase/backend/utils"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
-	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
-	"github.com/bytebase/bytebase/proto/generated-go/v1/v1connect"
 )
 
 // SQLService is the service for SQL.
@@ -774,7 +774,6 @@ func (s *SQLService) doExportFromIssue(ctx context.Context, requestName string) 
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("rollout %d has no task", rollout.ID))
 	}
 
-	exportArchiveUIDs := []int{}
 	contents := []*exportData{}
 	targetTaskRunStatus := []storepb.TaskRun_Status{storepb.TaskRun_DONE}
 
@@ -799,9 +798,8 @@ func (s *SQLService) doExportFromIssue(ctx context.Context, requestName string) 
 			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to get export archive: %v", err))
 		}
 		if exportArchive == nil {
-			return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("export archive %d not found", exportArchiveUID))
+			return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("export not found or expired, please request a new export"))
 		}
-		exportArchiveUIDs = append(exportArchiveUIDs, exportArchiveUID)
 		contents = append(contents, &exportData{
 			Content:  exportArchive.Bytes,
 			Database: task.GetDatabaseName(),
@@ -814,13 +812,6 @@ func (s *SQLService) doExportFromIssue(ctx context.Context, requestName string) 
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to encrypt data: %v", err))
-	}
-
-	for _, exportArchiveUID := range exportArchiveUIDs {
-		// Delete the export archive after it's fetched.
-		if err := s.store.DeleteExportArchive(ctx, exportArchiveUID); err != nil {
-			slog.Error("failed to delete export archive", log.BBError(err), slog.String("rollout", requestName), slog.Int("archive", exportArchiveUID))
-		}
 	}
 
 	return &v1pb.ExportResponse{
@@ -1843,16 +1834,15 @@ func (*SQLService) Pretty(_ context.Context, req *connect.Request[v1pb.PrettyReq
 
 // GetQueriableDataSource try to returns the RO data source, and will returns the admin data source if not exist the RO data source.
 func GetQueriableDataSource(instance *store.InstanceMessage) *storepb.DataSource {
-	var adminDataSource *storepb.DataSource
+	if len(instance.Metadata.GetDataSources()) == 0 {
+		return nil
+	}
 	for _, ds := range instance.Metadata.GetDataSources() {
 		if ds.GetType() == storepb.DataSourceType_READ_ONLY {
 			return ds
 		}
-		if ds.GetType() == storepb.DataSourceType_ADMIN && adminDataSource == nil {
-			adminDataSource = ds
-		}
 	}
-	return adminDataSource
+	return instance.Metadata.DataSources[0]
 }
 
 func checkAndGetDataSourceQueriable(

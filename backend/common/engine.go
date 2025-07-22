@@ -1,7 +1,7 @@
 package common
 
 import (
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
 )
 
 func EngineSupportSQLReview(engine storepb.Engine) bool {
@@ -468,13 +468,11 @@ func EngineDBSchemaReadyToMigrate(e storepb.Engine) bool {
 	//exhaustive:enforce
 	switch e {
 	case
-		storepb.Engine_POSTGRES, storepb.Engine_MYSQL, storepb.Engine_MSSQL:
-		return true
-	case
-
-		storepb.Engine_TIDB,
-		storepb.Engine_MARIADB,
+		storepb.Engine_POSTGRES,
+		storepb.Engine_MYSQL,
+		storepb.Engine_MSSQL,
 		storepb.Engine_ORACLE,
+		storepb.Engine_MARIADB,
 		storepb.Engine_OCEANBASE_ORACLE,
 		storepb.Engine_OCEANBASE,
 		storepb.Engine_SNOWFLAKE,
@@ -487,8 +485,8 @@ func EngineDBSchemaReadyToMigrate(e storepb.Engine) bool {
 		storepb.Engine_RISINGWAVE,
 		storepb.Engine_STARROCKS,
 		storepb.Engine_DORIS:
-		// These engines still need migration as their sync.go hasn't been updated yet.
-		return false
+		// These engines have been migrated to use the Default field
+		return true
 	case
 		storepb.Engine_ENGINE_UNSPECIFIED,
 		storepb.Engine_CASSANDRA,
@@ -500,10 +498,31 @@ func EngineDBSchemaReadyToMigrate(e storepb.Engine) bool {
 		storepb.Engine_ELASTICSEARCH,
 		storepb.Engine_DATABRICKS,
 		storepb.Engine_COSMOSDB,
+		storepb.Engine_TIDB,
 		storepb.Engine_TRINO:
 		// These engines don't have traditional column defaults or are NoSQL databases.
 		return true
 	default:
 		return true
 	}
+}
+
+// TransactionMode represents the transaction execution mode for a migration script.
+type TransactionMode string
+
+const (
+	// TransactionModeOn wraps the script in a single transaction.
+	TransactionModeOn TransactionMode = "on"
+	// TransactionModeOff executes the script's statements sequentially in auto-commit mode.
+	TransactionModeOff TransactionMode = "off"
+	// TransactionModeUnspecified means no explicit mode was specified.
+	TransactionModeUnspecified TransactionMode = ""
+)
+
+// GetDefaultTransactionMode returns the default transaction mode.
+// All engines default to "on" (transactional) for safety and backward compatibility.
+// Users can explicitly set "-- txn-mode = off" when needed for engines with limited transactional DDL support.
+func GetDefaultTransactionMode() TransactionMode {
+	// All engines default to "on" for safety and backward compatibility
+	return TransactionModeOn
 }

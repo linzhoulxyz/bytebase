@@ -5,7 +5,7 @@
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
 import type { FieldMask, Timestamp } from "@bufbuild/protobuf/wkt";
-import type { ExportFormat, Position } from "./common_pb";
+import type { ExportFormat, Position, State } from "./common_pb";
 import type { ChangedResources } from "./database_service_pb";
 
 /**
@@ -139,13 +139,20 @@ export declare type SearchPlansRequest = Message<"bytebase.v1.SearchPlansRequest
    *
    * Supported filters:
    * - creator: the plan creator full name in "users/{email or id}" format, support "==" operator.
-   * - create_time: issue create time in "2006-01-02T15:04:05Z07:00" format, support ">=" or "<=" operator.
+   * - create_time: the plan create time in "2006-01-02T15:04:05Z07:00" format, support ">=" or "<=" operator.
    * - has_pipeline: the plan has pipeline or not, support "==" operator, the value should be "true" or "false".
    * - has_issue: the plan has issue or not, support "==" operator, the value should be "true" or "false".
+   * - title: the plan title, support "==" operator for exact match and ".matches()" operator for case-insensitive substring match.
+   * - spec_type: the plan spec config type, support "==" operator, the value should be "create_database_config", "change_database_config", or "export_data_config".
+   * - state: the plan state, support "==" operator, the value should be "ACTIVE" or "DELETED".
    *
    * For example:
    * creator == "users/ed@bytebase.com" && create_time >= "2025-01-02T15:04:05Z07:00"
    * has_pipeline == false && has_issue == true
+   * title == "My Plan"
+   * title.matches("database migration")
+   * spec_type == "change_database_config"
+   * state == "ACTIVE"
    *
    * @generated from field: string filter = 4;
    */
@@ -250,6 +257,13 @@ export declare type Plan = Message<"bytebase.v1.Plan"> & {
    * @generated from field: string name = 1;
    */
   name: string;
+
+  /**
+   * The state of the plan.
+   *
+   * @generated from field: bytebase.v1.State state = 2;
+   */
+  state: State;
 
   /**
    * The issue associated with the plan.

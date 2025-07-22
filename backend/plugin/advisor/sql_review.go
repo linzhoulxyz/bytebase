@@ -13,9 +13,9 @@ import (
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
 	"github.com/bytebase/bytebase/backend/component/sheet"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
 	"github.com/bytebase/bytebase/backend/plugin/advisor/catalog"
 	"github.com/bytebase/bytebase/backend/plugin/parser/base"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 // How to add a SQL review rule:
@@ -987,8 +987,10 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 		}
 	case SchemaRuleColumnSetDefaultForNotNull:
 		switch engine {
-		case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE, storepb.Engine_OCEANBASE_ORACLE, storepb.Engine_ORACLE:
+		case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
 			return MySQLColumnSetDefaultForNotNull, nil
+		case storepb.Engine_OCEANBASE_ORACLE, storepb.Engine_ORACLE, storepb.Engine_DM:
+			return OracleAddNotNullColumnRequireDefault, nil
 		}
 	case SchemaRuleColumnDisallowChange:
 		switch engine {

@@ -203,9 +203,7 @@ const changelogStatement = computed(() => {
   }
   let statement = changelog.value.statement;
   if (
-    getStatementSize(changelog.value.statement).lt(
-      changelog.value.statementSize
-    )
+    getStatementSize(changelog.value.statement) < changelog.value.statementSize
   ) {
     statement = `${statement}${statement.endsWith("\n") ? "" : "\n"}...`;
   }

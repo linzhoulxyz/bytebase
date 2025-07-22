@@ -9,9 +9,9 @@ import (
 	parser "github.com/bytebase/postgresql-parser"
 	"github.com/pkg/errors"
 
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
 	pgparser "github.com/bytebase/bytebase/backend/plugin/parser/pg"
 	"github.com/bytebase/bytebase/backend/plugin/schema"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 func init() {
@@ -567,7 +567,7 @@ func (e *metadataExtractor) extractColumnConstraint(ctx parser.IColconstraintele
 		column.Nullable = true
 	case ctx.DEFAULT() != nil:
 		if expr := ctx.B_expr(); expr != nil {
-			column.DefaultExpression = ctx.GetParser().GetTokenStream().GetTextFromRuleContext(expr)
+			column.Default = ctx.GetParser().GetTokenStream().GetTextFromRuleContext(expr)
 		}
 	case ctx.PRIMARY() != nil && ctx.KEY() != nil:
 		column.Nullable = false

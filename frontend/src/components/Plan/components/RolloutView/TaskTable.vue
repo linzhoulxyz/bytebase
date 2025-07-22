@@ -16,66 +16,58 @@
 </template>
 
 <script lang="tsx" setup>
-import { flatten } from "lodash-es";
-import { ChevronRightIcon } from "lucide-vue-next";
+import { head } from "lodash-es";
+import { CalendarClockIcon } from "lucide-vue-next";
 import type { DataTableColumn } from "naive-ui";
-import { NDataTable } from "naive-ui";
-import { computed } from "vue";
+import { NDataTable, NTag, NTooltip } from "naive-ui";
+import { computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { semanticTaskType } from "@/components/IssueV1";
+import DatabaseDisplay from "@/components/Plan/components/common/DatabaseDisplay.vue";
 import TaskStatus from "@/components/Rollout/kits/TaskStatus.vue";
-import { InstanceV1EngineIcon } from "@/components/v2";
+import Timestamp from "@/components/misc/Timestamp.vue";
 import { PROJECT_V1_ROUTE_ROLLOUT_DETAIL_TASK_DETAIL } from "@/router/dashboard/projectV1";
-import { useCurrentProjectV1, useEnvironmentV1Store } from "@/store";
-import type {
-  Task,
-  Task_Status,
-  Stage,
-} from "@/types/proto-es/v1/rollout_service_pb";
-import { databaseForTask } from "@/utils";
+import { useCurrentProjectV1, batchGetOrFetchDatabases } from "@/store";
+import { getTimeForPbTimestampProtoEs } from "@/types";
+import type { Task } from "@/types/proto-es/v1/rollout_service_pb";
+import { Task_Status } from "@/types/proto-es/v1/rollout_service_pb";
 import {
   extractProjectResourceName,
   extractSchemaVersionFromTask,
+  humanizeTs,
 } from "@/utils";
+import { usePlanContextWithRollout } from "../../logic";
 import { useRolloutViewContext } from "./context";
 
 const props = withDefaults(
   defineProps<{
     taskStatusFilter: Task_Status[];
+    tasks: Task[];
     selectedTasks?: Task[];
-    stage?: Stage;
+    taskSelectable?: (task: Task) => boolean;
   }>(),
   {
     selectedTasks: () => [],
+    taskSelectable: () => () => true,
   }
 );
 
 const emit = defineEmits<{
   (event: "update:selected-tasks", tasks: Task[]): void;
-  (event: "refresh"): void;
 }>();
 
 const { t } = useI18n();
 const router = useRouter();
 const { project } = useCurrentProjectV1();
-const environmentStore = useEnvironmentV1Store();
 const { rollout, mergedStages } = useRolloutViewContext();
+const { taskRuns } = usePlanContextWithRollout();
 
 const taskList = computed(() => {
-  let allTasks: Task[];
-  if (props.stage) {
-    // If a specific stage is provided, use only its tasks
-    allTasks = props.stage.tasks;
-  } else {
-    // Otherwise, use all tasks from all stages
-    allTasks = flatten(rollout.value.stages.map((stage) => stage.tasks));
-  }
-
   if (props.taskStatusFilter.length === 0) {
-    return allTasks;
+    return props.tasks;
   }
-  return allTasks.filter((task) =>
+  return props.tasks.filter((task) =>
     props.taskStatusFilter.includes(task.status)
   );
 });
@@ -107,6 +99,25 @@ const stageMap = computed(() => {
   });
   return map;
 });
+
+const prepareDatabases = async () => {
+  if (taskList.value.length > 0) {
+    try {
+      await batchGetOrFetchDatabases(taskList.value.map((task) => task.target));
+    } catch {
+      // Ignore errors - this is just for pre-loading data
+    }
+  }
+};
+
+// Watch for task list changes and load database data
+watch(
+  taskList,
+  () => {
+    prepareDatabases();
+  },
+  { immediate: true }
+);
 
 // Helper function to extract IDs from task and stage names
 const getTaskRouteParams = (task: Task) => {
@@ -144,11 +155,22 @@ const rowProps = (task: Task) => {
   };
 };
 
+// Get the latest TaskRun for a given task
+const getLatestTaskRun = (task: Task) => {
+  const relatedTaskRuns = taskRuns.value.filter((taskRun) =>
+    taskRun.name.startsWith(task.name + "/taskRuns/")
+  );
+  return head(relatedTaskRuns);
+};
+
 const columnList = computed((): DataTableColumn<Task>[] => {
   return [
     {
       type: "selection",
       width: 50,
+      disabled: (task: Task) => {
+        return !props.taskSelectable(task);
+      },
       cellProps: () => {
         return {
           onClick: (e: MouseEvent) => {
@@ -159,65 +181,67 @@ const columnList = computed((): DataTableColumn<Task>[] => {
     },
     {
       key: "status",
-      width: 80,
-      title: t("common.status"),
-      render: (task) => {
-        return <TaskStatus status={task.status} size="small" />;
-      },
-    },
-    // Only show stage column if not already filtering by stage
-    ...(!props.stage
-      ? [
-          {
-            key: "stage",
-            title: t("common.stage"),
-            width: 120,
-            render: (task: Task) => {
-              const stage = stageMap.value.get(task.name);
-              if (stage) {
-                const environment = environmentStore.getEnvironmentByName(
-                  stage.environment
-                );
-                return environment.title;
-              }
-              return "-";
-            },
-          },
-        ]
-      : []),
-    {
-      key: "type",
-      width: 120,
-      title: t("common.type"),
-      render: (task) => {
-        return semanticTaskType(task.type);
-      },
+      title: "",
+      width: "36px",
+      render: (task) => <TaskStatus status={task.status} size="small" />,
     },
     {
       key: "database",
       title: t("common.database"),
+      resizable: true,
       render: (task) => {
-        const database = databaseForTask(project.value, task);
+        const schemaVersion = extractSchemaVersionFromTask(task);
+
         return (
-          <div class="w-auto flex flex-row items-center truncate">
-            <InstanceV1EngineIcon
-              class="inline-block mr-1"
-              instance={database.instanceResource}
-            />
-            <span class="truncate">{database.instanceResource.title}</span>
-            <ChevronRightIcon class="inline opacity-60 w-4 shrink-0 mx-1" />
-            <span class="truncate">{database.databaseName}</span>
+          <div class="flex items-center gap-2">
+            <DatabaseDisplay database={task.target} />
+            <NTag round size="small">
+              {semanticTaskType(task.type)}
+            </NTag>
+            {schemaVersion && (
+              <NTag round size="small">
+                {schemaVersion}
+              </NTag>
+            )}
+            {task.runTime && (
+              <NTooltip>
+                {{
+                  trigger: () => (
+                    <NTag round size="small">
+                      <div class="flex items-center gap-1">
+                        <CalendarClockIcon class="w-3.5 h-3.5" />
+                        {humanizeTs(
+                          getTimeForPbTimestampProtoEs(task.runTime, 0) / 1000
+                        )}
+                      </div>
+                    </NTag>
+                  ),
+                  default: () => t("task.scheduled-time"),
+                }}
+              </NTooltip>
+            )}
           </div>
         );
       },
     },
     {
-      key: "version",
-      title: t("common.version"),
-      width: 100,
+      key: "detail",
+      title: t("common.detail"),
+      ellipsis: true,
+      resizable: true,
       render: (task) => {
-        return extractSchemaVersionFromTask(task) || "-";
+        const latestTaskRun = getLatestTaskRun(task);
+        if (!latestTaskRun || !latestTaskRun.detail) {
+          return "-";
+        }
+        return latestTaskRun.detail;
       },
+    },
+    {
+      key: "updateTime",
+      title: t("common.updated-at"),
+      width: 128,
+      render: (task) => <Timestamp timestamp={task.updateTime} />,
     },
   ];
 });

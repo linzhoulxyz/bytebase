@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/bytebase/bytebase/backend/common/testcontainer"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	mysqldb "github.com/bytebase/bytebase/backend/plugin/db/mysql"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 // TestGetDatabaseMetadataWithTestcontainer tests the get_database_metadata function
@@ -21,7 +21,7 @@ func TestGetDatabaseMetadataWithTestcontainer(t *testing.T) {
 	ctx := context.Background()
 
 	// Start MySQL container
-	container, err := testcontainer.GetMySQLContainer(ctx)
+	container, err := testcontainer.GetTestMySQLContainer(ctx)
 	require.NoError(t, err)
 	defer container.Close(ctx)
 
@@ -643,23 +643,15 @@ func compareDefaultValues(t *testing.T, dbDefault, parsedDefault any, tableName,
 
 	// Handle database default
 	if dbCol, ok := dbDefault.(*storepb.ColumnMetadata); ok {
-		if dbCol.DefaultExpression != "" {
-			dbExpr = dbCol.DefaultExpression
-		} else if dbCol.Default != "" {
+		if dbCol.Default != "" {
 			dbExpr = dbCol.Default
-		} else if dbCol.DefaultNull {
-			dbExpr = "NULL"
 		}
 	}
 
 	// Handle parsed default
 	if parsedCol, ok := parsedDefault.(*storepb.ColumnMetadata); ok {
-		if parsedCol.DefaultExpression != "" {
-			parsedExpr = parsedCol.DefaultExpression
-		} else if parsedCol.Default != "" {
+		if parsedCol.Default != "" {
 			parsedExpr = parsedCol.Default
-		} else if parsedCol.DefaultNull {
-			parsedExpr = "NULL"
 		}
 	}
 

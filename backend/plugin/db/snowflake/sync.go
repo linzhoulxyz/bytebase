@@ -11,9 +11,9 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/bytebase/bytebase/backend/common"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	"github.com/bytebase/bytebase/backend/plugin/db/util"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 var (
@@ -451,8 +451,8 @@ func (d *Driver) getTableSchema(ctx context.Context, database string) (map[strin
 			return nil, nil, err
 		}
 		if defaultStr.Valid {
-			// TODO: use correct default type
-			column.DefaultExpression = defaultStr.String
+			// Store in Default field (migration from DefaultExpression to Default)
+			column.Default = defaultStr.String
 		}
 		isNullBool, err := util.ConvertYesNo(nullable)
 		if err != nil {

@@ -36,9 +36,7 @@ export const ComparableColumnFields: (keyof ColumnMetadata)[] = [
   "userComment",
   "type",
   "hasDefault",
-  "defaultExpression",
-  "defaultNull",
-  "defaultString",
+  "default",
   "onUpdate",
   "nullable",
 ];

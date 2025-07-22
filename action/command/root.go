@@ -1,6 +1,7 @@
 package command
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/url"
@@ -18,14 +19,14 @@ func NewRootCommand(w *world.World) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                "bytebase-action",
 		Short:              "Bytebase action",
-		PersistentPreRunE:  validateSharedFlagsWithWorld(w),
+		PersistentPreRunE:  rootPreRun(w),
 		PersistentPostRunE: writeOutputJSON(w),
 	}
 	// bytebase-action flags
 	cmd.PersistentFlags().StringVar(&w.Output, "output", "", "Output file location. The output file is a JSON file with the created resource names")
 	cmd.PersistentFlags().StringVar(&w.URL, "url", "https://demo.bytebase.com", "Bytebase URL")
 	cmd.PersistentFlags().StringVar(&w.ServiceAccount, "service-account", "api@service.bytebase.com", "Bytebase Service account")
-	cmd.PersistentFlags().StringVar(&w.ServiceAccountSecret, "service-account-secret", os.Getenv("BYTEBASE_SERVICE_ACCOUNT_SECRET"), "Bytebase Service account secret")
+	cmd.PersistentFlags().StringVar(&w.ServiceAccountSecret, "service-account-secret", "", "Bytebase Service account secret")
 	cmd.PersistentFlags().StringVar(&w.Project, "project", "projects/hr", "Bytebase project")
 	cmd.PersistentFlags().StringSliceVar(&w.Targets, "targets", []string{"instances/test-sample-instance/databases/hr_test", "instances/prod-sample-instance/databases/hr_prod"}, "Bytebase targets")
 	cmd.PersistentFlags().StringVar(&w.FilePattern, "file-pattern", "", "File pattern to glob migration files")
@@ -35,8 +36,17 @@ func NewRootCommand(w *world.World) *cobra.Command {
 	return cmd
 }
 
-func validateSharedFlagsWithWorld(w *world.World) func(cmd *cobra.Command, args []string) error {
-	return func(*cobra.Command, []string) error {
+func rootPreRun(w *world.World) func(cmd *cobra.Command, args []string) error {
+	return func(cmd *cobra.Command, _ []string) error {
+		w.Logger = slog.New(slog.NewTextHandler(cmd.ErrOrStderr(), nil))
+		if w.ServiceAccountSecret == "" {
+			w.ServiceAccountSecret = os.Getenv("BYTEBASE_SERVICE_ACCOUNT_SECRET")
+		}
+
+		if w.Platform == world.UnspecifiedPlatform {
+			w.Platform = world.GetJobPlatform()
+		}
+
 		if w.ServiceAccount == "" {
 			return errors.Errorf("service-account is required and cannot be empty")
 		}
@@ -73,7 +83,7 @@ func writeOutputJSON(w *world.World) func(cmd *cobra.Command, args []string) err
 			return nil
 		}
 
-		slog.Info("writing output to file", "file", w.Output)
+		w.Logger.Info("writing output to file", "file", w.Output)
 
 		// Create parent directory if not exists
 		if dir := filepath.Dir(w.Output); dir != "" {
@@ -100,32 +110,32 @@ func writeOutputJSON(w *world.World) func(cmd *cobra.Command, args []string) err
 	}
 }
 
-func checkVersionCompatibility(client *Client, cliVersion string) {
+func checkVersionCompatibility(w *world.World, client *Client, cliVersion string) {
 	if cliVersion == "unknown" {
-		slog.Warn("CLI version unknown, unable to check compatibility")
+		w.Logger.Warn("CLI version unknown, unable to check compatibility")
 		return
 	}
 
-	actuatorInfo, err := client.getActuatorInfo()
+	actuatorInfo, err := client.GetActuatorInfo(context.Background())
 	if err != nil {
-		slog.Warn("Unable to get server version for compatibility check", "error", err)
+		w.Logger.Warn("Unable to get server version for compatibility check", "error", err)
 		return
 	}
 
 	serverVersion := actuatorInfo.Version
 	if serverVersion == "" {
-		slog.Warn("Server version is empty, unable to check compatibility")
+		w.Logger.Warn("Server version is empty, unable to check compatibility")
 		return
 	}
 
 	if cliVersion == "latest" {
-		slog.Warn("Using 'latest' CLI version. It is recommended to use a specific version like bytebase-action:" + serverVersion + " to match your Bytebase server version " + serverVersion)
+		w.Logger.Warn("Using 'latest' CLI version. It is recommended to use a specific version like bytebase-action:" + serverVersion + " to match your Bytebase server version " + serverVersion)
 		return
 	}
 
 	if cliVersion != serverVersion {
-		slog.Warn("CLI version mismatch", "cliVersion", cliVersion, "serverVersion", serverVersion, "recommendation", "use bytebase-action:"+serverVersion+" to match your Bytebase server")
+		w.Logger.Warn("CLI version mismatch", "cliVersion", cliVersion, "serverVersion", serverVersion, "recommendation", "use bytebase-action:"+serverVersion+" to match your Bytebase server")
 	} else {
-		slog.Info("CLI version matches server version", "version", cliVersion)
+		w.Logger.Info("CLI version matches server version", "version", cliVersion)
 	}
 }

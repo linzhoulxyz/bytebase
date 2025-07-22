@@ -23,7 +23,9 @@ export const AllSearchScopeIdList = [
   "database",
   "creator",
   "created",
+  "updated",
   "status",
+  "state",
   // database related search scopes.
   "engine",
   "database-label",

@@ -4,7 +4,7 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
-import type { EmptySchema, FieldMask, Timestamp } from "@bufbuild/protobuf/wkt";
+import type { FieldMask, Timestamp } from "@bufbuild/protobuf/wkt";
 import type { Range, State } from "./common_pb";
 import type { InstanceResource } from "./instance_service_pb";
 
@@ -1401,19 +1401,9 @@ export declare type ColumnMetadata = Message<"bytebase.v1.ColumnMetadata"> & {
   /**
    * The default value of column.
    *
-   * @generated from field: bool default_null = 4;
+   * @generated from field: string default = 23;
    */
-  defaultNull: boolean;
-
-  /**
-   * @generated from field: string default_string = 5;
-   */
-  defaultString: string;
-
-  /**
-   * @generated from field: string default_expression = 6;
-   */
-  defaultExpression: string;
+  default: string;
 
   /**
    * Oracle specific metadata.
@@ -2188,6 +2178,333 @@ export enum StreamMetadata_Mode {
 export declare const StreamMetadata_ModeSchema: GenEnum<StreamMetadata_Mode>;
 
 /**
+ * SpatialIndexConfig defines the spatial index configuration for spatial databases.
+ *
+ * @generated from message bytebase.v1.SpatialIndexConfig
+ */
+export declare type SpatialIndexConfig = Message<"bytebase.v1.SpatialIndexConfig"> & {
+  /**
+   * Spatial indexing method (e.g., "SPATIAL", "R-TREE", "GIST")
+   *
+   * @generated from field: string method = 1;
+   */
+  method: string;
+
+  /**
+   * Tessellation configuration for grid-based spatial indexes
+   *
+   * @generated from field: bytebase.v1.TessellationConfig tessellation = 2;
+   */
+  tessellation?: TessellationConfig;
+
+  /**
+   * Storage and performance configuration
+   *
+   * @generated from field: bytebase.v1.StorageConfig storage = 3;
+   */
+  storage?: StorageConfig;
+
+  /**
+   * Dimensional configuration
+   *
+   * @generated from field: bytebase.v1.DimensionalConfig dimensional = 4;
+   */
+  dimensional?: DimensionalConfig;
+};
+
+/**
+ * Describes the message bytebase.v1.SpatialIndexConfig.
+ * Use `create(SpatialIndexConfigSchema)` to create a new message.
+ */
+export declare const SpatialIndexConfigSchema: GenMessage<SpatialIndexConfig>;
+
+/**
+ * TessellationConfig defines tessellation parameters for spatial indexes.
+ *
+ * @generated from message bytebase.v1.TessellationConfig
+ */
+export declare type TessellationConfig = Message<"bytebase.v1.TessellationConfig"> & {
+  /**
+   * Tessellation scheme (e.g., "GEOMETRY_GRID", "GEOGRAPHY_GRID", "GEOMETRY_AUTO_GRID")
+   *
+   * @generated from field: string scheme = 1;
+   */
+  scheme: string;
+
+  /**
+   * Grid levels and densities for multi-level tessellation
+   *
+   * @generated from field: repeated bytebase.v1.GridLevel grid_levels = 2;
+   */
+  gridLevels: GridLevel[];
+
+  /**
+   * Number of cells per object (1-8192 for SQL Server)
+   *
+   * @generated from field: int32 cells_per_object = 3;
+   */
+  cellsPerObject: number;
+
+  /**
+   * Bounding box for GEOMETRY tessellation (not used for GEOGRAPHY)
+   *
+   * @generated from field: bytebase.v1.BoundingBox bounding_box = 4;
+   */
+  boundingBox?: BoundingBox;
+};
+
+/**
+ * Describes the message bytebase.v1.TessellationConfig.
+ * Use `create(TessellationConfigSchema)` to create a new message.
+ */
+export declare const TessellationConfigSchema: GenMessage<TessellationConfig>;
+
+/**
+ * GridLevel defines a tessellation grid level with its density.
+ *
+ * @generated from message bytebase.v1.GridLevel
+ */
+export declare type GridLevel = Message<"bytebase.v1.GridLevel"> & {
+  /**
+   * Grid level number (1-4 for SQL Server)
+   *
+   * @generated from field: int32 level = 1;
+   */
+  level: number;
+
+  /**
+   * Grid density (LOW, MEDIUM, HIGH)
+   *
+   * @generated from field: string density = 2;
+   */
+  density: string;
+};
+
+/**
+ * Describes the message bytebase.v1.GridLevel.
+ * Use `create(GridLevelSchema)` to create a new message.
+ */
+export declare const GridLevelSchema: GenMessage<GridLevel>;
+
+/**
+ * BoundingBox defines the spatial bounds for GEOMETRY spatial indexes.
+ *
+ * @generated from message bytebase.v1.BoundingBox
+ */
+export declare type BoundingBox = Message<"bytebase.v1.BoundingBox"> & {
+  /**
+   * Minimum X coordinate
+   *
+   * @generated from field: double xmin = 1;
+   */
+  xmin: number;
+
+  /**
+   * Minimum Y coordinate
+   *
+   * @generated from field: double ymin = 2;
+   */
+  ymin: number;
+
+  /**
+   * Maximum X coordinate
+   *
+   * @generated from field: double xmax = 3;
+   */
+  xmax: number;
+
+  /**
+   * Maximum Y coordinate
+   *
+   * @generated from field: double ymax = 4;
+   */
+  ymax: number;
+};
+
+/**
+ * Describes the message bytebase.v1.BoundingBox.
+ * Use `create(BoundingBoxSchema)` to create a new message.
+ */
+export declare const BoundingBoxSchema: GenMessage<BoundingBox>;
+
+/**
+ * StorageConfig defines storage and performance parameters for spatial indexes.
+ *
+ * @generated from message bytebase.v1.StorageConfig
+ */
+export declare type StorageConfig = Message<"bytebase.v1.StorageConfig"> & {
+  /**
+   * Fill factor percentage (1-100)
+   *
+   * @generated from field: int32 fillfactor = 1;
+   */
+  fillfactor: number;
+
+  /**
+   * Buffering mode for PostgreSQL (auto, on, off)
+   *
+   * @generated from field: string buffering = 2;
+   */
+  buffering: string;
+
+  /**
+   * Tablespace configuration for Oracle
+   *
+   * @generated from field: string tablespace = 3;
+   */
+  tablespace: string;
+
+  /**
+   * @generated from field: string work_tablespace = 4;
+   */
+  workTablespace: string;
+
+  /**
+   * @generated from field: int32 sdo_level = 5;
+   */
+  sdoLevel: number;
+
+  /**
+   * @generated from field: int32 commit_interval = 6;
+   */
+  commitInterval: number;
+
+  /**
+   * SQL Server specific parameters
+   *
+   * @generated from field: bool pad_index = 7;
+   */
+  padIndex: boolean;
+
+  /**
+   * ON, OFF
+   *
+   * @generated from field: string sort_in_tempdb = 8;
+   */
+  sortInTempdb: string;
+
+  /**
+   * @generated from field: bool drop_existing = 9;
+   */
+  dropExisting: boolean;
+
+  /**
+   * @generated from field: bool online = 10;
+   */
+  online: boolean;
+
+  /**
+   * @generated from field: bool allow_row_locks = 11;
+   */
+  allowRowLocks: boolean;
+
+  /**
+   * @generated from field: bool allow_page_locks = 12;
+   */
+  allowPageLocks: boolean;
+
+  /**
+   * @generated from field: int32 maxdop = 13;
+   */
+  maxdop: number;
+
+  /**
+   * NONE, ROW, PAGE
+   *
+   * @generated from field: string data_compression = 14;
+   */
+  dataCompression: string;
+};
+
+/**
+ * Describes the message bytebase.v1.StorageConfig.
+ * Use `create(StorageConfigSchema)` to create a new message.
+ */
+export declare const StorageConfigSchema: GenMessage<StorageConfig>;
+
+/**
+ * DimensionalConfig defines dimensional and constraint parameters for spatial indexes.
+ *
+ * @generated from message bytebase.v1.DimensionalConfig
+ */
+export declare type DimensionalConfig = Message<"bytebase.v1.DimensionalConfig"> & {
+  /**
+   * Number of dimensions (2-4, default 2)
+   *
+   * @generated from field: int32 dimensions = 1;
+   */
+  dimensions: number;
+
+  /**
+   * Spatial data type (GEOMETRY, GEOGRAPHY, POINT, POLYGON, etc.)
+   *
+   * @generated from field: string data_type = 2;
+   */
+  dataType: string;
+
+  /**
+   * Spatial reference system identifier (SRID)
+   *
+   * @generated from field: int32 srid = 3;
+   */
+  srid: number;
+
+  /**
+   * Coordinate system constraints
+   *
+   * @generated from field: repeated bytebase.v1.DimensionConstraint constraints = 4;
+   */
+  constraints: DimensionConstraint[];
+};
+
+/**
+ * Describes the message bytebase.v1.DimensionalConfig.
+ * Use `create(DimensionalConfigSchema)` to create a new message.
+ */
+export declare const DimensionalConfigSchema: GenMessage<DimensionalConfig>;
+
+/**
+ * DimensionConstraint defines constraints for a spatial dimension.
+ *
+ * @generated from message bytebase.v1.DimensionConstraint
+ */
+export declare type DimensionConstraint = Message<"bytebase.v1.DimensionConstraint"> & {
+  /**
+   * Dimension name/type (X, Y, Z, M, etc.)
+   *
+   * @generated from field: string dimension = 1;
+   */
+  dimension: string;
+
+  /**
+   * Minimum value for this dimension
+   *
+   * @generated from field: double min_value = 2;
+   */
+  minValue: number;
+
+  /**
+   * Maximum value for this dimension
+   *
+   * @generated from field: double max_value = 3;
+   */
+  maxValue: number;
+
+  /**
+   * Tolerance for this dimension
+   *
+   * @generated from field: double tolerance = 4;
+   */
+  tolerance: number;
+};
+
+/**
+ * Describes the message bytebase.v1.DimensionConstraint.
+ * Use `create(DimensionConstraintSchema)` to create a new message.
+ */
+export declare const DimensionConstraintSchema: GenMessage<DimensionConstraint>;
+
+/**
  * IndexMetadata is the metadata for indexes.
  *
  * @generated from message bytebase.v1.IndexMetadata
@@ -2293,6 +2610,13 @@ export declare type IndexMetadata = Message<"bytebase.v1.IndexMetadata"> & {
    * @generated from field: bool is_constraint = 14;
    */
   isConstraint: boolean;
+
+  /**
+   * Spatial index configuration for spatial databases like SQL Server, PostgreSQL with PostGIS, etc.
+   *
+   * @generated from field: bytebase.v1.SpatialIndexConfig spatial_config = 15;
+   */
+  spatialConfig?: SpatialIndexConfig;
 };
 
 /**
@@ -2434,176 +2758,6 @@ export declare type DatabaseSchema = Message<"bytebase.v1.DatabaseSchema"> & {
  * Use `create(DatabaseSchemaSchema)` to create a new message.
  */
 export declare const DatabaseSchemaSchema: GenMessage<DatabaseSchema>;
-
-/**
- * @generated from message bytebase.v1.ListSecretsRequest
- */
-export declare type ListSecretsRequest = Message<"bytebase.v1.ListSecretsRequest"> & {
-  /**
-   * The parent of the secret.
-   * Format: instances/{instance}/databases/{database}
-   *
-   * @generated from field: string parent = 1;
-   */
-  parent: string;
-
-  /**
-   * Not used.
-   * The maximum number of secrets to return. The service may return fewer than
-   * this value.
-   * If unspecified, at most 10 secrets will be returned.
-   * The maximum value is 1000; values above 1000 will be coerced to 1000.
-   *
-   * @generated from field: int32 page_size = 2;
-   */
-  pageSize: number;
-
-  /**
-   * Not used.
-   * A page token, received from a previous `ListSecrets` call.
-   * Provide this to retrieve the subsequent page.
-   *
-   * When paginating, all other parameters provided to `ListSecrets` must match
-   * the call that provided the page token.
-   *
-   * @generated from field: string page_token = 3;
-   */
-  pageToken: string;
-};
-
-/**
- * Describes the message bytebase.v1.ListSecretsRequest.
- * Use `create(ListSecretsRequestSchema)` to create a new message.
- */
-export declare const ListSecretsRequestSchema: GenMessage<ListSecretsRequest>;
-
-/**
- * @generated from message bytebase.v1.ListSecretsResponse
- */
-export declare type ListSecretsResponse = Message<"bytebase.v1.ListSecretsResponse"> & {
-  /**
-   * The list of secrets.
-   *
-   * @generated from field: repeated bytebase.v1.Secret secrets = 1;
-   */
-  secrets: Secret[];
-
-  /**
-   * Not used. A token, which can be sent as `page_token` to retrieve the next
-   * page. If this field is omitted, there are no subsequent pages.
-   *
-   * @generated from field: string next_page_token = 2;
-   */
-  nextPageToken: string;
-};
-
-/**
- * Describes the message bytebase.v1.ListSecretsResponse.
- * Use `create(ListSecretsResponseSchema)` to create a new message.
- */
-export declare const ListSecretsResponseSchema: GenMessage<ListSecretsResponse>;
-
-/**
- * @generated from message bytebase.v1.UpdateSecretRequest
- */
-export declare type UpdateSecretRequest = Message<"bytebase.v1.UpdateSecretRequest"> & {
-  /**
-   * The secret to be created or updated.
-   *
-   * @generated from field: bytebase.v1.Secret secret = 1;
-   */
-  secret?: Secret;
-
-  /**
-   * The mask of the fields to be updated.
-   *
-   * @generated from field: google.protobuf.FieldMask update_mask = 2;
-   */
-  updateMask?: FieldMask;
-
-  /**
-   * If true, the secret will be created if it does not exist.
-   *
-   * @generated from field: bool allow_missing = 3;
-   */
-  allowMissing: boolean;
-};
-
-/**
- * Describes the message bytebase.v1.UpdateSecretRequest.
- * Use `create(UpdateSecretRequestSchema)` to create a new message.
- */
-export declare const UpdateSecretRequestSchema: GenMessage<UpdateSecretRequest>;
-
-/**
- * @generated from message bytebase.v1.DeleteSecretRequest
- */
-export declare type DeleteSecretRequest = Message<"bytebase.v1.DeleteSecretRequest"> & {
-  /**
-   * The name of the secret to be deleted.
-   * Format:
-   * instances/{instance}/databases/{database}/secrets/{secret}
-   *
-   * @generated from field: string name = 1;
-   */
-  name: string;
-};
-
-/**
- * Describes the message bytebase.v1.DeleteSecretRequest.
- * Use `create(DeleteSecretRequestSchema)` to create a new message.
- */
-export declare const DeleteSecretRequestSchema: GenMessage<DeleteSecretRequest>;
-
-/**
- * Secret is the secret of the database now.
- *
- * @generated from message bytebase.v1.Secret
- */
-export declare type Secret = Message<"bytebase.v1.Secret"> & {
-  /**
-   * name is the unique name of the secret, which is specified by the client.
-   * Format:
-   * instances/{instance}/databases/{database}/secrets/{secret}
-   *
-   * @generated from field: string name = 1;
-   */
-  name: string;
-
-  /**
-   * Not used. The timestamp when the secret resource was created initially.
-   *
-   * @generated from field: google.protobuf.Timestamp created_time = 2;
-   */
-  createdTime?: Timestamp;
-
-  /**
-   * Not used. The timestamp when the secret resource was updated.
-   *
-   * @generated from field: google.protobuf.Timestamp updated_time = 3;
-   */
-  updatedTime?: Timestamp;
-
-  /**
-   * The value of the secret.
-   *
-   * @generated from field: string value = 4;
-   */
-  value: string;
-
-  /**
-   * The description of the secret.
-   *
-   * @generated from field: string description = 5;
-   */
-  description: string;
-};
-
-/**
- * Describes the message bytebase.v1.Secret.
- * Use `create(SecretSchema)` to create a new message.
- */
-export declare const SecretSchema: GenMessage<Secret>;
 
 /**
  * @generated from message bytebase.v1.ChangedResources
@@ -3332,36 +3486,6 @@ export declare const DatabaseService: GenService<{
     methodKind: "unary";
     input: typeof DiffSchemaRequestSchema;
     output: typeof DiffSchemaResponseSchema;
-  },
-  /**
-   * Permissions required: bb.databaseSecrets.list
-   *
-   * @generated from rpc bytebase.v1.DatabaseService.ListSecrets
-   */
-  listSecrets: {
-    methodKind: "unary";
-    input: typeof ListSecretsRequestSchema;
-    output: typeof ListSecretsResponseSchema;
-  },
-  /**
-   * Permissions required: bb.databaseSecrets.update
-   *
-   * @generated from rpc bytebase.v1.DatabaseService.UpdateSecret
-   */
-  updateSecret: {
-    methodKind: "unary";
-    input: typeof UpdateSecretRequestSchema;
-    output: typeof SecretSchema;
-  },
-  /**
-   * Permissions required: bb.databaseSecrets.delete
-   *
-   * @generated from rpc bytebase.v1.DatabaseService.DeleteSecret
-   */
-  deleteSecret: {
-    methodKind: "unary";
-    input: typeof DeleteSecretRequestSchema;
-    output: typeof EmptySchema;
   },
   /**
    * Permissions required: bb.changelogs.list

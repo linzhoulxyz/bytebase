@@ -106,12 +106,10 @@ const focused = ref(false);
 const inputRef = ref<InputInst>();
 
 const dropdownValue = computed(() => {
-  const { hasDefault, defaultNull, defaultString, defaultExpression } =
-    props.column;
+  const { hasDefault, default: defaultString } = props.column;
   if (!hasDefault) return "no-default";
-  if (defaultNull) return "null";
+  if (defaultString === "NULL") return "null";
   if (typeof defaultString === "string") return "string";
-  if (typeof defaultExpression === "string") return "expression";
   return null;
 });
 
@@ -123,24 +121,53 @@ const placeholder = computed(() => {
   return getColumnDefaultValuePlaceholder(props.column);
 });
 
-// Computed property for engines that use simple input (PostgreSQL, MySQL, and MSSQL)
+// Computed property for engines that use simple input (all migrated engines)
 const useSimpleInput = computed(() => {
   return (
     props.engine === Engine.POSTGRES ||
     props.engine === Engine.MYSQL ||
-    props.engine === Engine.MSSQL
+    props.engine === Engine.MSSQL ||
+    props.engine === Engine.ORACLE ||
+    props.engine === Engine.TIDB ||
+    props.engine === Engine.MARIADB ||
+    props.engine === Engine.OCEANBASE_ORACLE ||
+    props.engine === Engine.OCEANBASE ||
+    props.engine === Engine.SNOWFLAKE ||
+    props.engine === Engine.DM ||
+    props.engine === Engine.CLICKHOUSE ||
+    props.engine === Engine.COCKROACHDB ||
+    props.engine === Engine.SPANNER ||
+    props.engine === Engine.BIGQUERY ||
+    props.engine === Engine.REDSHIFT ||
+    props.engine === Engine.RISINGWAVE ||
+    props.engine === Engine.STARROCKS ||
+    props.engine === Engine.DORIS
   );
 });
 
 const simpleInputValue = computed(() => {
-  // For PostgreSQL, we use defaultString field which contains the schema-qualified expression
-  // For MySQL and MSSQL, we also use defaultString for now (until proto types are updated)
+  // For all migrated engines, we use defaultString field which contains the properly formatted expression
   if (
     props.engine === Engine.POSTGRES ||
     props.engine === Engine.MYSQL ||
-    props.engine === Engine.MSSQL
+    props.engine === Engine.MSSQL ||
+    props.engine === Engine.ORACLE ||
+    props.engine === Engine.TIDB ||
+    props.engine === Engine.MARIADB ||
+    props.engine === Engine.OCEANBASE_ORACLE ||
+    props.engine === Engine.OCEANBASE ||
+    props.engine === Engine.SNOWFLAKE ||
+    props.engine === Engine.DM ||
+    props.engine === Engine.CLICKHOUSE ||
+    props.engine === Engine.COCKROACHDB ||
+    props.engine === Engine.SPANNER ||
+    props.engine === Engine.BIGQUERY ||
+    props.engine === Engine.REDSHIFT ||
+    props.engine === Engine.RISINGWAVE ||
+    props.engine === Engine.STARROCKS ||
+    props.engine === Engine.DORIS
   ) {
-    return props.column.defaultString || "";
+    return props.column.default || "";
   }
   return "";
 });
@@ -212,10 +239,7 @@ const handleSelect = (value: string) => {
   const { defaults } = option;
   emit("select", defaults);
 
-  if (
-    typeof defaults.value.defaultExpression === "string" ||
-    typeof defaults.value.defaultString === "string"
-  ) {
+  if (typeof defaults.value.default === "string") {
     requestAnimationFrame(() => {
       inputRef.value?.focus();
     });
@@ -238,9 +262,7 @@ const handleSimpleInput = (value: string) => {
     key: value.trim() ? "string" : "no-default",
     value: {
       hasDefault: !!value.trim(),
-      defaultNull: false,
-      defaultString: value.trim(), // Both PostgreSQL and MySQL use defaultString for now
-      defaultExpression: "",
+      default: value.trim(), // Both PostgreSQL and MySQL use default for now
     },
   };
   emit("select", defaultOption);
@@ -267,7 +289,7 @@ const inputStyle = computed(() => {
 watch(
   () => props.column.nullable,
   (nullable) => {
-    if (!nullable && props.column.defaultNull) {
+    if (!nullable && props.column.default === "NULL") {
       handleSelect(NO_DEFAULT_OPTION.key);
     }
   }

@@ -12,7 +12,7 @@ import "v1/annotation.proto";
 import "v1/common.proto";
 import "v1/iam_policy.proto";
 
-option go_package = "github.com/bytebase/bytebase/proto/generated-go/v1";
+option go_package = "github.com/bytebase/bytebase/backend/generated-go/v1";
 
 service ProjectService {
   // GetProject retrieves a project by name.
@@ -133,8 +133,8 @@ service ProjectService {
   // Permissions required: bb.projects.update
   rpc UpdateWebhook(UpdateWebhookRequest) returns (Project) {
     option (google.api.http) = {
-      post: "/v1/{webhook.name=projects/*/webhooks/*}:updateWebhook"
-      body: "*"
+      patch: "/v1/{webhook.name=projects/*/webhooks/*}:updateWebhook"
+      body: "webhook"
     };
     option (google.api.method_signature) = "webhook,update_mask";
     option (bytebase.v1.permission) = "bb.projects.update";

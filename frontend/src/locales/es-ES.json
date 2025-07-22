@@ -83,7 +83,6 @@
     "status": "Estado",
     "stage": "Etapa",
     "task": "Tarea",
-    "tasks": "Tareas",
     "blocking-task": "Tarea de bloqueo",
     "sql": "SQL",
     "unassigned": "No asignado",
@@ -171,6 +170,8 @@
     "download": "Descargar",
     "will-lose-unsaved-data": "Se perderán los datos no guardados.",
     "deleted": "Eliminado",
+    "active": "Activo",
+    "reopen": "Reabrir",
     "will-override-current-data": "Se sobrescribirán los datos actuales.",
     "rollout": "Implementar",
     "upload": "Subir",
@@ -233,7 +234,9 @@
     "summary": "Resumen",
     "errors": "Errores",
     "removed": "Remoto",
-    "submit": "Entregar"
+    "submit": "Entregar",
+    "start": "Comenzar",
+    "draft": "Borrador"
   },
   "error-page": {
     "go-back-home": "Volver al inicio"
@@ -281,13 +284,12 @@
     "cancel-task": "Cancelar tarea | Cancelar tareas",
     "created": "Creado",
     "run-immediately": "Ejecutar tarea inmediatamente",
+    "select-task": "Seleccionar tarea | Seleccionar tareas",
     "selected-n-tasks": "{n} tarea seleccionada | {n} tareas seleccionadas",
-    "no-tasks": "Sin tareas",
     "no-tasks-selected": "No hay tareas seleccionadas",
     "no-runnable-tasks": "No hay tareas ejecutables",
     "no-skippable-tasks": "No hay tareas que se puedan omitir",
     "no-cancellable-tasks": "No hay tareas cancelables",
-    "cross-stage-not-supported": "No se admiten operaciones entre etapas",
     "no-permission": "No hay permiso para realizar esta acción",
     "scheduled-time": "Hora programada",
     "select-scheduled-time": "Seleccionar hora programada",
@@ -314,12 +316,22 @@
     }
   },
   "task-run": {
+    "history": "Historial de ejecución de tareas",
+    "latest-logs": "Últimos registros",
     "status": {
       "enqueued": "Esperando a ser ejecutada.",
       "enqueued-with-rollout-time": "Esperando para ejecutar, {time} para ejecutar.",
       "waiting-connection": "Esperando conexiones de instancias disponibles. El recuento de conexión de instancia ha alcanzado el límite establecido en Bytebase. Último informe a las {time}.",
       "waiting-task": "Esperando a que termine otra tarea. Último informe a las {time}.",
       "waiting-max-tasks-per-rollout": "Esperando a que terminen otras tareas. Se ha alcanzado el límite máximo de tareas en ejecución por despliegue. Último informe a las {time}."
+    },
+    "rollback": {
+      "available": "Reversión disponible para {n} tarea | Reversión disponible para {n} tareas",
+      "preview-statement": {
+        "self": "Declaración de vista previa",
+        "description": "Bytebase genera una sentencia de reversión según la ejecución de la tarea. Puede revisar la sentencia antes de ejecutar la reversión."
+      },
+      "no-statement-generated": "No se generó ninguna declaración de reversión"
     }
   },
   "banner": {
@@ -861,7 +873,7 @@
         },
         "creator": {
           "title": "Creador",
-          "description": "Búsqueda por tema creador"
+          "description": "Búsqueda por creador"
         },
         "subscriber": {},
         "approver": {
@@ -919,6 +931,13 @@
     "statement-from-sheet-warning": "Debido a que el SQL es demasiado grande, se ha truncado para mostrarlo y la edición está deshabilitada. Puede cargar un nuevo archivo SQL para sobrescribirlo.",
     "overwrite-current-statement": "Sobrescribir la declaración SQL actual",
     "upload-sql-file-max-size-exceeded": "Se ha excedido el tamaño máximo del archivo ({size}).",
+    "transaction-mode": {
+      "label": "Modo de transacción",
+      "on": "Activado",
+      "off": "Desactivado",
+      "on-tooltip": "Envuelve todas las declaraciones en una sola transacción (BEGIN/COMMIT).",
+      "off-tooltip": "Ejecuta declaraciones individualmente en modo de confirmación automática. Las declaraciones se confirman inmediatamente y no se pueden revertir si una declaración posterior falla."
+    },
     "waiting-earliest-allowed-time": "Se ejecutará después de {time}",
     "batch-transition": {
       "not-allowed-tips": "Algunos de las incidencias seleccionadas no se pueden {operation}",
@@ -976,7 +995,8 @@
     "error": {
       "you-don-have-privilege-to-edit-this-issue": "No tienes privilegios para editar este número.",
       "you-are-not-allowed-to-perform-this-action": "No tienes permiso para realizar esta acción.",
-      "cannot-close-issue-with-running-tasks": "No se puede cerrar el problema con las tareas en ejecución"
+      "cannot-close-issue-with-running-tasks": "No se puede cerrar el problema con las tareas en ejecución",
+      "statement-cannot-be-modified": "La declaración no se puede modificar una vez creado el problema"
     },
     "unfinished-resolved-issue-tips": "Este problema está marcado como \"Listo\", pero algunas de sus tareas no se ejecutan correctamente.",
     "some-tasks-are-not-executed-successfully": "(Algunas tareas no se ejecutan correctamente)",
@@ -986,7 +1006,8 @@
       "options": "Opciones de exportación",
       "format": "Formato",
       "encrypt": "Cifrar",
-      "file-downloaded": "Archivo Descargado"
+      "file-downloaded": "Archivo Descargado",
+      "download-tooltip": "Disponible por 24 horas"
     },
     "task-run": {
       "logs": "Registros",
@@ -1021,7 +1042,6 @@
         "no-session-found": "No se encontró ninguna sesión."
       }
     },
-    "sql-review-only": "Sólo revisión de SQL",
     "title": {
       "edit-schema": "Editar esquema",
       "change-data": "Cambiar datos",
@@ -1050,7 +1070,6 @@
     "new-layout": "Nuevo diseño de CI/CD"
   },
   "plan": {
-    "self": "Plan",
     "plans": "Planes",
     "new-plan": "Nuevo plan",
     "add-spec": "Agregar especificación",
@@ -1062,16 +1081,13 @@
     "select-targets": "Seleccionar objetivos",
     "ready-for-review": "Listo para revisión",
     "overview": {
-      "description": "Ver y administrar todas las especificaciones de este plan",
-      "total-specs": "Especificaciones totales",
+      "total-changes": "Cambios totales",
       "total-targets": "Objetivos totales",
-      "no-checks": "Sin controles",
-      "affected-resources": "Recursos afectados"
+      "no-checks": "Sin controles"
     },
     "navigator": {
-      "specifications": "Presupuesto",
+      "changes": "Cambios",
       "checks": "Cheques",
-      "review": "Revisar",
       "rollout": "Despliegue",
       "statement-empty": "La declaración está vacía"
     },
@@ -1089,13 +1105,7 @@
     "targets": {
       "title": "Objetivos",
       "no-targets-found": "No se encontraron objetivos",
-      "one-database": "1 base de datos",
-      "multiple-databases": "{count} bases de datos",
-      "database-group": "Grupo de bases de datos",
-      "database-not-found": "Base de datos no encontrada",
       "type": {
-        "instance": "Instancia",
-        "database": "Base de datos",
         "database-group": "Grupo de bases de datos"
       },
       "view-all": "Ver todo ({count})"
@@ -1123,11 +1133,30 @@
     },
     "refresh-indicator": {
       "last-refresh": "Última actualización: {time}"
+    },
+    "state": {
+      "description": "Filtrar planes por estado",
+      "close-confirm": "¿Estás seguro de que deseas cerrar este plan?",
+      "reopen-confirm": "¿Estás seguro de que deseas reabrir este plan?"
     }
   },
   "rollout": {
     "rollouts": "Despliegues",
-    "force-rollout": "Despliegue de fuerza"
+    "force-rollout": "Ejecución forzada",
+    "stage": {
+      "self": "Escenario | Escenarios",
+      "start-stage": "Etapa de inicio",
+      "no-stages": {
+        "self": "Sin etapas",
+        "description": "No se definen etapas para este lanzamiento."
+      }
+    },
+    "message": {
+      "pervious-stages-incomplete": {
+        "title": "Las etapas anteriores están incompletas",
+        "description": "Algunas etapas anteriores no se han completado. Activa la ejecución forzada para continuar."
+      }
+    }
   },
   "quick-action": {
     "create-db": "Crear base de datos",
@@ -1572,25 +1601,6 @@
     },
     "all": "Todas las bases de datos",
     "show-schemaless-databases": "Mostrar bases de datos sin esquema. (Editar Schema no se aplica a las bases de datos sin esquema.)",
-    "secret": {
-      "self": "Secreto",
-      "new": "Nuevo secreto",
-      "edit": "Editar secreto",
-      "name-placeholder": "Ingrese nombre del secreto",
-      "validation": {
-        "cannot-be-changed-later": "No se puede cambiar más tarde",
-        "duplicated-name": "Nombre secreto duplicado",
-        "name-is-required": "Se requiere nombre secreto",
-        "name-pattern-mismatch": "El nombre secreto debe contener solo letras mayúsculas, dígitos o _ (guion bajo)",
-        "name-cannot-prefix-with-bytebase": "El nombre secreto no puede tener el prefijo 'BYTEBASE_'",
-        "name-cannot-start-with-number": "El nombre secreto no puede comenzar con un número"
-      },
-      "description-placeholder": "Ingrese descripción",
-      "value": "Valor",
-      "value-placeholder": "Valor de entrada (solo escritura)",
-      "delete-tips": "Eliminar secreto",
-      "description": "Puede usar secreto en su secuencia de comandos de cambio para ocultar información confidencial, consulte nuestra {guide}"
-    },
     "transfer": {
       "errors": {
         "select-target-project": "Seleccionar proyecto de destino",
@@ -1619,7 +1629,6 @@
       "reference": "Referencia"
     },
     "checks": "Cheques",
-    "backup-unavailable-for-databases": "La copia de seguridad no está disponible para las bases de datos: {databases}",
     "engine-not-supported-for-backup": "No se admite la copia de seguridad previa para: {databases}",
     "revision": {
       "self": "Revisión",
@@ -1981,6 +1990,7 @@
     "sync-in-progress": "Sincronización en progreso",
     "create-a-worksheet": "Crear una hoja de trabajo",
     "select-a-database-to-start": "Seleccione una base de datos para comenzar",
+    "show-empty-environments": "Mostrar entornos vacíos",
     "select-encoding": "Seleccionar codificación",
     "redis-command": {
       "self": "Ejecute el comando redis en",
@@ -2030,8 +2040,6 @@
     "sync-sql-from-schema-editor": "Sincronizar SQL desde el Editor de esquema",
     "raw-sql": "SQL sin procesar",
     "search-database-and-table": "Buscar base de datos y tabla",
-    "search-table": "Buscar tabla",
-    "search-column": "Buscar columna",
     "nothing-changed-for-database": "Nada cambió para la base de datos {database}",
     "actions": {
       "create-schema": "Crear esquema",
@@ -2151,7 +2159,6 @@
     "request-with-qr": "Escanear código QR",
     "require-subscription": "Esta función requiere una suscripción a {requiredPlan}. Compre una licencia de Bytebase para desbloquearla.",
     "required-plan-with-trial": "Esta función requiere {requiredPlan}. {startTrial}",
-    "trial-for-plan": "Puedes iniciar una prueba gratuita de {plan} por {days} días - no se requiere tarjeta de crédito.",
     "trial-for-days": "Puedes iniciar una prueba gratuita por {days} días - no se requiere tarjeta de crédito.",
     "contact-to-upgrade": "Contacta al administrador de tu espacio de trabajo para actualizar el plan.",
     "upgrade-now": "Actualizar ahora",

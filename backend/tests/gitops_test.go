@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
-	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
+	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
 )
 
 func TestGitOpsCheck(t *testing.T) {
@@ -82,7 +82,7 @@ func TestGitOpsCheck(t *testing.T) {
 		Files: []*v1pb.Release_File{
 			{
 				Path:       "migrations/001__create_users_table.sql",
-				Type:       v1pb.ReleaseFileType_VERSIONED,
+				Type:       v1pb.Release_File_VERSIONED,
 				Version:    "001",
 				ChangeType: v1pb.Release_File_DDL,
 				Statement: []byte(`CREATE TABLE users (
@@ -94,7 +94,7 @@ func TestGitOpsCheck(t *testing.T) {
 			},
 			{
 				Path:       "migrations/002__add_email_index.sql",
-				Type:       v1pb.ReleaseFileType_VERSIONED,
+				Type:       v1pb.Release_File_VERSIONED,
 				Version:    "002",
 				ChangeType: v1pb.Release_File_DDL,
 				Statement:  []byte(`CREATE INDEX idx_users_email ON users(email);`),
@@ -203,7 +203,7 @@ func TestGitOpsRollout(t *testing.T) {
 			Files: []*v1pb.Release_File{
 				{
 					Path:       "migrations/001__create_products_table.sql",
-					Type:       v1pb.ReleaseFileType_VERSIONED,
+					Type:       v1pb.Release_File_VERSIONED,
 					Version:    "001",
 					ChangeType: v1pb.Release_File_DDL,
 					Statement: []byte(`CREATE TABLE products (
@@ -306,6 +306,31 @@ func TestGitOpsRollout(t *testing.T) {
 	a.Equal(createReleaseResp.Msg.Name, revision.Release, "Revision should reference the correct release")
 	a.NotEmpty(revision.Version, "Revision should have a version")
 	a.NotNil(revision.CreateTime, "Revision should have a create time")
+
+	// Call CreateRollout on the finished plan.
+	// the rollout name is the same as the rollout created above.
+	rolloutResp2, err := ctl.rolloutServiceClient.CreateRollout(ctx, connect.NewRequest(&v1pb.CreateRolloutRequest{
+		Parent: project.Name,
+		Rollout: &v1pb.Rollout{
+			Plan: plan.Name,
+		},
+	}))
+	a.NoError(err)
+	a.NotNil(rolloutResp2)
+	a.Equal(rollout.Name, rolloutResp2.Msg.Name)
+
+	// Call CreateRollout with ValidateOnly on the finished plan.
+	// the rollout should contain zero stages.
+	rolloutResp3, err := ctl.rolloutServiceClient.CreateRollout(ctx, connect.NewRequest(&v1pb.CreateRolloutRequest{
+		Parent: project.Name,
+		Rollout: &v1pb.Rollout{
+			Plan: plan.Name,
+		},
+		ValidateOnly: true,
+	}))
+	a.NoError(err)
+	a.NotNil(rolloutResp3)
+	a.Empty(rolloutResp3.Msg.Stages)
 }
 
 // TestGitOpsRolloutMultiTarget tests a more complex GitOps scenario:
@@ -384,7 +409,7 @@ func TestGitOpsRolloutMultiTarget(t *testing.T) {
 			Files: []*v1pb.Release_File{
 				{
 					Path:       "migrations/1.0.0__create_table_one.sql",
-					Type:       v1pb.ReleaseFileType_VERSIONED,
+					Type:       v1pb.Release_File_VERSIONED,
 					Version:    "1.0.0",
 					ChangeType: v1pb.Release_File_DDL,
 					Statement: []byte(`CREATE TABLE table_one (
@@ -394,7 +419,7 @@ func TestGitOpsRolloutMultiTarget(t *testing.T) {
 				},
 				{
 					Path:       "migrations/1.0.1__create_table_two.sql",
-					Type:       v1pb.ReleaseFileType_VERSIONED,
+					Type:       v1pb.Release_File_VERSIONED,
 					Version:    "1.0.1",
 					ChangeType: v1pb.Release_File_DDL,
 					Statement: []byte(`CREATE TABLE table_two (
@@ -404,7 +429,7 @@ func TestGitOpsRolloutMultiTarget(t *testing.T) {
 				},
 				{
 					Path:       "migrations/1.0.2__create_table_three.sql",
-					Type:       v1pb.ReleaseFileType_VERSIONED,
+					Type:       v1pb.Release_File_VERSIONED,
 					Version:    "1.0.2",
 					ChangeType: v1pb.Release_File_DDL,
 					Statement: []byte(`CREATE TABLE table_three (
@@ -558,6 +583,31 @@ func TestGitOpsRolloutMultiTarget(t *testing.T) {
 	expectedVersions := []string{"1.0.0", "1.0.1", "1.0.2"}
 	a.ElementsMatch(testVersions, expectedVersions, "Test database should have the expected migration versions")
 	a.ElementsMatch(prodVersions, expectedVersions, "Prod database should have the expected migration versions")
+
+	// Call CreateRollout on the finished plan.
+	// the rollout name is the same as the rollout created above.
+	rolloutResp2, err := ctl.rolloutServiceClient.CreateRollout(ctx, connect.NewRequest(&v1pb.CreateRolloutRequest{
+		Parent: project.Name,
+		Rollout: &v1pb.Rollout{
+			Plan: plan.Name,
+		},
+	}))
+	a.NoError(err)
+	a.NotNil(rolloutResp2)
+	a.Equal(rollout.Name, rolloutResp2.Msg.Name)
+
+	// Call CreateRollout with ValidateOnly on the finished plan.
+	// the rollout should contain zero stages.
+	rolloutResp3, err := ctl.rolloutServiceClient.CreateRollout(ctx, connect.NewRequest(&v1pb.CreateRolloutRequest{
+		Parent: project.Name,
+		Rollout: &v1pb.Rollout{
+			Plan: plan.Name,
+		},
+		ValidateOnly: true,
+	}))
+	a.NoError(err)
+	a.NotNil(rolloutResp3)
+	a.Empty(rolloutResp3.Msg.Stages)
 }
 
 // TestGitOpsCheckAppliedButChanged tests that CheckRelease detects files that have been applied but with different content.
@@ -612,7 +662,7 @@ func TestGitOpsCheckAppliedButChanged(t *testing.T) {
 		Files: []*v1pb.Release_File{
 			{
 				Path:       "migrations/1.0.0__create_users_table.sql",
-				Type:       v1pb.ReleaseFileType_VERSIONED,
+				Type:       v1pb.Release_File_VERSIONED,
 				Version:    "1.0.0",
 				ChangeType: v1pb.Release_File_DDL,
 				Statement: []byte(`CREATE TABLE users (
@@ -687,7 +737,7 @@ func TestGitOpsCheckAppliedButChanged(t *testing.T) {
 		Files: []*v1pb.Release_File{
 			{
 				Path:       "migrations/1.0.0__create_users_table.sql",
-				Type:       v1pb.ReleaseFileType_VERSIONED,
+				Type:       v1pb.Release_File_VERSIONED,
 				Version:    "1.0.0",
 				ChangeType: v1pb.Release_File_DDL,
 				Statement: []byte(`CREATE TABLE users (

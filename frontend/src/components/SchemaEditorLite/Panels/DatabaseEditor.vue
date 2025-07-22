@@ -6,12 +6,12 @@
           v-if="state.selectedSubTab === 'table-list'"
           class="w-full flex justify-between items-center space-x-2"
         >
-          <div class="flex flex-row justify-start items-center gap-x-3">
+          <div class="flex flex-row justify-start items-center gap-x-2">
             <div
               v-if="shouldShowSchemaSelector"
-              class="pl-1 flex flex-row justify-start items-center text-sm gap-x-2"
+              class="pl-1 flex flex-row justify-start items-center text-sm gap-x-2 overflow-auto"
             >
-              <span>Schema:</span>
+              <span class="shrink-0">Schema:</span>
               <NSelect
                 :value="selectedSchemaName"
                 :options="schemaSelectorOptionList"
@@ -181,7 +181,7 @@ const props = withDefaults(
     db: ComposedDatabase;
     database: DatabaseMetadata;
     selectedSchemaName: string | undefined;
-    searchPattern: string;
+    searchPattern?: string;
   }>(),
   {
     searchPattern: "",
@@ -214,9 +214,7 @@ const convertNewColumnToOld = (
     name: newColumn.name,
     position: newColumn.position,
     hasDefault: newColumn.hasDefault,
-    defaultNull: newColumn.defaultNull,
-    defaultString: newColumn.defaultString,
-    defaultExpression: newColumn.defaultExpression,
+    default: newColumn.default,
     onUpdate: newColumn.onUpdate,
     nullable: newColumn.nullable,
     type: newColumn.type,

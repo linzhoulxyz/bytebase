@@ -205,6 +205,24 @@ export declare type ListRolloutsRequest = Message<"bytebase.v1.ListRolloutsReque
    * @generated from field: string page_token = 3;
    */
   pageToken: string;
+
+  /**
+   * Filter is used to filter rollouts returned in the list.
+   * The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+   *
+   * Supported filters:
+   * - creator: the rollout creator full name in "users/{email or id}" format, support "==" operator.
+   * - update_time: rollout update time in "2006-01-02T15:04:05Z07:00" format, support ">=" or "<=" operator.
+   * - task_type: the task type, support "==" and "in" operators, check the Task.Type enum for the values.
+   *
+   * For example:
+   * creator == "users/ed@bytebase.com" && update_time >= "2025-01-02T15:04:05Z07:00"
+   * task_type == "DATABASE_SCHEMA_UPDATE"
+   * task_type in ["DATABASE_SCHEMA_UPDATE", "DATABASE_DATA_UPDATE"]
+   *
+   * @generated from field: string filter = 4;
+   */
+  filter: string;
 };
 
 /**
@@ -460,6 +478,11 @@ export declare type Rollout = Message<"bytebase.v1.Rollout"> & {
   createTime?: Timestamp;
 
   /**
+   * @generated from field: google.protobuf.Timestamp update_time = 8;
+   */
+  updateTime?: Timestamp;
+
+  /**
    * The issue associated with the rollout. Could be empty.
    * Format: projects/{project}/issues/{issue}
    *
@@ -585,6 +608,22 @@ export declare type Task = Message<"bytebase.v1.Task"> & {
     value: Task_DatabaseDataExport;
     case: "databaseDataExport";
   } | { case: undefined; value?: undefined };
+
+  /**
+   * The update_time is the update time of latest task run.
+   * If there are no task runs, it will be empty.
+   *
+   * @generated from field: optional google.protobuf.Timestamp update_time = 13;
+   */
+  updateTime?: Timestamp;
+
+  /**
+   * The run_time is the scheduled run time of latest task run.
+   * If there are no task runs or the task run is not scheduled, it will be empty.
+   *
+   * @generated from field: optional google.protobuf.Timestamp run_time = 21;
+   */
+  runTime?: Timestamp;
 };
 
 /**

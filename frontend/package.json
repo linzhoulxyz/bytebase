@@ -13,7 +13,7 @@
     "type-check": "export NODE_OPTIONS=--max_old_space_size=8000 && vue-tsc --build --force",
     "test": "vitest run --passWithNoTests",
     "coverage": "vitest --coverage",
-    "i18n": "TS_NODE_PROJECT='./tsconfig.i18n.json' ts-node i18n.ts"
+    "i18n": "TS_NODE_PROJECT='./tsconfig.i18n.json' ts-node i18n.ts && eslint --cache src --fix"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.5.1",
@@ -68,7 +68,7 @@
     "scrollparent": "^2.1.0",
     "semver": "7.7.2",
     "slug": "9.1.0",
-    "splitpanes": "4.0.4",
+    "splitpanes": "3.2.0",
     "sql-formatter": "15.6.2",
     "string-width": "^7.2.0",
     "tailwind-merge": "^3.3.0",
@@ -129,12 +129,9 @@
     "events": "^3.3.0",
     "jquery": "3.7.1",
     "jsdom": "25.0.1",
-    "long": "^5.3.2",
-    "micromark": "^4.0.2",
     "micromark-util-sanitize-uri": "^2.0.1",
     "postcss": "8.5.4",
     "prettier": "3.5.3",
-    "protobufjs": "^7.5.3",
     "remark-gfm": "^4.0.1",
     "remark-parse": "^11.0.0",
     "rollup": "4.41.1",
@@ -150,7 +147,7 @@
     "vscode-oniguruma": "^2.0.1",
     "vscode-textmate": "^9.2.0",
     "vue-component-type-helpers": "^2.2.10",
-    "vue-i18n": "11.1.5",
+    "vue-i18n": "11.1.10",
     "vue-router": "4.5.1",
     "vue-tsc": "2.2.10",
     "ws": "^8.18.2"

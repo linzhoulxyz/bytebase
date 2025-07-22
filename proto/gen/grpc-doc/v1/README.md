@@ -94,6 +94,7 @@
     - [BatchSyncDatabasesResponse](#bytebase-v1-BatchSyncDatabasesResponse)
     - [BatchUpdateDatabasesRequest](#bytebase-v1-BatchUpdateDatabasesRequest)
     - [BatchUpdateDatabasesResponse](#bytebase-v1-BatchUpdateDatabasesResponse)
+    - [BoundingBox](#bytebase-v1-BoundingBox)
     - [ChangedResourceDatabase](#bytebase-v1-ChangedResourceDatabase)
     - [ChangedResourceFunction](#bytebase-v1-ChangedResourceFunction)
     - [ChangedResourceProcedure](#bytebase-v1-ChangedResourceProcedure)
@@ -108,11 +109,12 @@
     - [Database.LabelsEntry](#bytebase-v1-Database-LabelsEntry)
     - [DatabaseMetadata](#bytebase-v1-DatabaseMetadata)
     - [DatabaseSchema](#bytebase-v1-DatabaseSchema)
-    - [DeleteSecretRequest](#bytebase-v1-DeleteSecretRequest)
     - [DependencyColumn](#bytebase-v1-DependencyColumn)
     - [DependencyTable](#bytebase-v1-DependencyTable)
     - [DiffSchemaRequest](#bytebase-v1-DiffSchemaRequest)
     - [DiffSchemaResponse](#bytebase-v1-DiffSchemaResponse)
+    - [DimensionConstraint](#bytebase-v1-DimensionConstraint)
+    - [DimensionalConfig](#bytebase-v1-DimensionalConfig)
     - [EnumTypeMetadata](#bytebase-v1-EnumTypeMetadata)
     - [EventMetadata](#bytebase-v1-EventMetadata)
     - [ExtensionMetadata](#bytebase-v1-ExtensionMetadata)
@@ -126,28 +128,28 @@
     - [GetDatabaseSchemaRequest](#bytebase-v1-GetDatabaseSchemaRequest)
     - [GetSchemaStringRequest](#bytebase-v1-GetSchemaStringRequest)
     - [GetSchemaStringResponse](#bytebase-v1-GetSchemaStringResponse)
+    - [GridLevel](#bytebase-v1-GridLevel)
     - [IndexMetadata](#bytebase-v1-IndexMetadata)
     - [ListChangelogsRequest](#bytebase-v1-ListChangelogsRequest)
     - [ListChangelogsResponse](#bytebase-v1-ListChangelogsResponse)
     - [ListDatabasesRequest](#bytebase-v1-ListDatabasesRequest)
     - [ListDatabasesResponse](#bytebase-v1-ListDatabasesResponse)
-    - [ListSecretsRequest](#bytebase-v1-ListSecretsRequest)
-    - [ListSecretsResponse](#bytebase-v1-ListSecretsResponse)
     - [MaterializedViewMetadata](#bytebase-v1-MaterializedViewMetadata)
     - [PackageMetadata](#bytebase-v1-PackageMetadata)
     - [ProcedureMetadata](#bytebase-v1-ProcedureMetadata)
     - [SchemaMetadata](#bytebase-v1-SchemaMetadata)
-    - [Secret](#bytebase-v1-Secret)
     - [SequenceMetadata](#bytebase-v1-SequenceMetadata)
+    - [SpatialIndexConfig](#bytebase-v1-SpatialIndexConfig)
+    - [StorageConfig](#bytebase-v1-StorageConfig)
     - [StreamMetadata](#bytebase-v1-StreamMetadata)
     - [SyncDatabaseRequest](#bytebase-v1-SyncDatabaseRequest)
     - [SyncDatabaseResponse](#bytebase-v1-SyncDatabaseResponse)
     - [TableMetadata](#bytebase-v1-TableMetadata)
     - [TablePartitionMetadata](#bytebase-v1-TablePartitionMetadata)
     - [TaskMetadata](#bytebase-v1-TaskMetadata)
+    - [TessellationConfig](#bytebase-v1-TessellationConfig)
     - [TriggerMetadata](#bytebase-v1-TriggerMetadata)
     - [UpdateDatabaseRequest](#bytebase-v1-UpdateDatabaseRequest)
-    - [UpdateSecretRequest](#bytebase-v1-UpdateSecretRequest)
     - [ViewMetadata](#bytebase-v1-ViewMetadata)
   
     - [Changelog.Status](#bytebase-v1-Changelog-Status)
@@ -548,7 +550,7 @@
   
     - [CheckReleaseResponse.RiskLevel](#bytebase-v1-CheckReleaseResponse-RiskLevel)
     - [Release.File.ChangeType](#bytebase-v1-Release-File-ChangeType)
-    - [ReleaseFileType](#bytebase-v1-ReleaseFileType)
+    - [Release.File.Type](#bytebase-v1-Release-File-Type)
   
     - [ReleaseService](#bytebase-v1-ReleaseService)
   
@@ -1208,7 +1210,7 @@ When paginating, all other parameters provided to `ListInstanceRoles` must match
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | GetInstanceRole | [GetInstanceRoleRequest](#bytebase-v1-GetInstanceRoleRequest) | [InstanceRole](#bytebase-v1-InstanceRole) | Permissions required: bb.instanceRoles.get |
-| ListInstanceRoles | [ListInstanceRolesRequest](#bytebase-v1-ListInstanceRolesRequest) | [ListInstanceRolesResponse](#bytebase-v1-ListInstanceRolesResponse) | Permissions required: bb.instanceRoles.get |
+| ListInstanceRoles | [ListInstanceRolesRequest](#bytebase-v1-ListInstanceRolesRequest) | [ListInstanceRolesResponse](#bytebase-v1-ListInstanceRolesResponse) | Permissions required: bb.instanceRoles.list |
 
  
 
@@ -1978,6 +1980,24 @@ The instance&#39;s `name` field is used to identify the instance to update. Form
 
 
 
+<a name="bytebase-v1-BoundingBox"></a>
+
+### BoundingBox
+BoundingBox defines the spatial bounds for GEOMETRY spatial indexes.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| xmin | [double](#double) |  | Minimum X coordinate |
+| ymin | [double](#double) |  | Minimum Y coordinate |
+| xmax | [double](#double) |  | Maximum X coordinate |
+| ymax | [double](#double) |  | Maximum Y coordinate |
+
+
+
+
+
+
 <a name="bytebase-v1-ChangedResourceDatabase"></a>
 
 ### ChangedResourceDatabase
@@ -2149,9 +2169,7 @@ ColumnMetadata is the metadata for columns.
 | name | [string](#string) |  | The name is the name of a column. |
 | position | [int32](#int32) |  | The position is the position in columns. |
 | has_default | [bool](#bool) |  |  |
-| default_null | [bool](#bool) |  | The default value of column. |
-| default_string | [string](#string) |  |  |
-| default_expression | [string](#string) |  |  |
+| default | [string](#string) |  | The default value of column. |
 | default_on_null | [bool](#bool) |  | Oracle specific metadata. The default_on_null is the default on null of a column. |
 | on_update | [string](#string) |  | The on_update is the on update action of a column. For MySQL like databases, it&#39;s only supported for TIMESTAMP columns with CURRENT_TIMESTAMP as on update value. |
 | nullable | [bool](#bool) |  | The nullable is the nullable of a column. |
@@ -2259,21 +2277,6 @@ DatabaseSchema is the metadata for databases.
 
 
 
-<a name="bytebase-v1-DeleteSecretRequest"></a>
-
-### DeleteSecretRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | The name of the secret to be deleted. Format: instances/{instance}/databases/{database}/secrets/{secret} |
-
-
-
-
-
-
 <a name="bytebase-v1-DependencyColumn"></a>
 
 ### DependencyColumn
@@ -2334,6 +2337,42 @@ DependencyColumn is the metadata for dependency columns.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | diff | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-DimensionConstraint"></a>
+
+### DimensionConstraint
+DimensionConstraint defines constraints for a spatial dimension.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| dimension | [string](#string) |  | Dimension name/type (X, Y, Z, M, etc.) |
+| min_value | [double](#double) |  | Minimum value for this dimension |
+| max_value | [double](#double) |  | Maximum value for this dimension |
+| tolerance | [double](#double) |  | Tolerance for this dimension |
+
+
+
+
+
+
+<a name="bytebase-v1-DimensionalConfig"></a>
+
+### DimensionalConfig
+DimensionalConfig defines dimensional and constraint parameters for spatial indexes.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| dimensions | [int32](#int32) |  | Number of dimensions (2-4, default 2) |
+| data_type | [string](#string) |  | Spatial data type (GEOMETRY, GEOGRAPHY, POINT, POLYGON, etc.) |
+| srid | [int32](#int32) |  | Spatial reference system identifier (SRID) |
+| constraints | [DimensionConstraint](#bytebase-v1-DimensionConstraint) | repeated | Coordinate system constraints |
 
 
 
@@ -2579,6 +2618,22 @@ For example: schema == &#34;schema-a&#34; table == &#34;table-a&#34; schema == &
 
 
 
+<a name="bytebase-v1-GridLevel"></a>
+
+### GridLevel
+GridLevel defines a tessellation grid level with its density.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| level | [int32](#int32) |  | Grid level number (1-4 for SQL Server) |
+| density | [string](#string) |  | Grid density (LOW, MEDIUM, HIGH) |
+
+
+
+
+
+
 <a name="bytebase-v1-IndexMetadata"></a>
 
 ### IndexMetadata
@@ -2601,6 +2656,7 @@ IndexMetadata is the metadata for indexes.
 | parent_index_name | [string](#string) |  | The index name of the parent index. |
 | granularity | [int64](#int64) |  | The number of granules in the block. It&#39;s a ClickHouse specific field. |
 | is_constraint | [bool](#bool) |  | It&#39;s a PostgreSQL specific field. The unique constraint and unique index are not the same thing in PostgreSQL. |
+| spatial_config | [SpatialIndexConfig](#bytebase-v1-SpatialIndexConfig) |  | Spatial index configuration for spatial databases like SQL Server, PostgreSQL with PostGIS, etc. |
 
 
 
@@ -2687,41 +2743,6 @@ You can combine filter conditions like: environment == &#34;environments/prod&#3
 | ----- | ---- | ----- | ----------- |
 | databases | [Database](#bytebase-v1-Database) | repeated | The databases from the specified request. |
 | next_page_token | [string](#string) |  | A token, which can be sent as `page_token` to retrieve the next page. If this field is omitted, there are no subsequent pages. |
-
-
-
-
-
-
-<a name="bytebase-v1-ListSecretsRequest"></a>
-
-### ListSecretsRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| parent | [string](#string) |  | The parent of the secret. Format: instances/{instance}/databases/{database} |
-| page_size | [int32](#int32) |  | Not used. The maximum number of secrets to return. The service may return fewer than this value. If unspecified, at most 10 secrets will be returned. The maximum value is 1000; values above 1000 will be coerced to 1000. |
-| page_token | [string](#string) |  | Not used. A page token, received from a previous `ListSecrets` call. Provide this to retrieve the subsequent page.
-
-When paginating, all other parameters provided to `ListSecrets` must match the call that provided the page token. |
-
-
-
-
-
-
-<a name="bytebase-v1-ListSecretsResponse"></a>
-
-### ListSecretsResponse
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| secrets | [Secret](#bytebase-v1-Secret) | repeated | The list of secrets. |
-| next_page_token | [string](#string) |  | Not used. A token, which can be sent as `page_token` to retrieve the next page. If this field is omitted, there are no subsequent pages. |
 
 
 
@@ -2819,25 +2840,6 @@ This is the concept of schema in Postgres, but it&#39;s a no-op for MySQL.
 
 
 
-<a name="bytebase-v1-Secret"></a>
-
-### Secret
-Secret is the secret of the database now.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| name | [string](#string) |  | name is the unique name of the secret, which is specified by the client. Format: instances/{instance}/databases/{database}/secrets/{secret} |
-| created_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | Not used. The timestamp when the secret resource was created initially. |
-| updated_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | Not used. The timestamp when the secret resource was updated. |
-| value | [string](#string) |  | The value of the secret. |
-| description | [string](#string) |  | The description of the secret. |
-
-
-
-
-
-
 <a name="bytebase-v1-SequenceMetadata"></a>
 
 ### SequenceMetadata
@@ -2859,6 +2861,52 @@ Secret is the secret of the database now.
 | owner_column | [string](#string) |  | The owner column of the sequence. |
 | comment | [string](#string) |  |  |
 | skip_dump | [bool](#bool) |  |  |
+
+
+
+
+
+
+<a name="bytebase-v1-SpatialIndexConfig"></a>
+
+### SpatialIndexConfig
+SpatialIndexConfig defines the spatial index configuration for spatial databases.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| method | [string](#string) |  | Spatial indexing method (e.g., &#34;SPATIAL&#34;, &#34;R-TREE&#34;, &#34;GIST&#34;) |
+| tessellation | [TessellationConfig](#bytebase-v1-TessellationConfig) |  | Tessellation configuration for grid-based spatial indexes |
+| storage | [StorageConfig](#bytebase-v1-StorageConfig) |  | Storage and performance configuration |
+| dimensional | [DimensionalConfig](#bytebase-v1-DimensionalConfig) |  | Dimensional configuration |
+
+
+
+
+
+
+<a name="bytebase-v1-StorageConfig"></a>
+
+### StorageConfig
+StorageConfig defines storage and performance parameters for spatial indexes.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| fillfactor | [int32](#int32) |  | Fill factor percentage (1-100) |
+| buffering | [string](#string) |  | Buffering mode for PostgreSQL (auto, on, off) |
+| tablespace | [string](#string) |  | Tablespace configuration for Oracle |
+| work_tablespace | [string](#string) |  |  |
+| sdo_level | [int32](#int32) |  |  |
+| commit_interval | [int32](#int32) |  |  |
+| pad_index | [bool](#bool) |  | SQL Server specific parameters |
+| sort_in_tempdb | [string](#string) |  | ON, OFF |
+| drop_existing | [bool](#bool) |  |  |
+| online | [bool](#bool) |  |  |
+| allow_row_locks | [bool](#bool) |  |  |
+| allow_page_locks | [bool](#bool) |  |  |
+| maxdop | [int32](#int32) |  |  |
+| data_compression | [string](#string) |  | NONE, ROW, PAGE |
 
 
 
@@ -2994,6 +3042,24 @@ TablePartitionMetadata is the metadata for table partitions.
 
 
 
+<a name="bytebase-v1-TessellationConfig"></a>
+
+### TessellationConfig
+TessellationConfig defines tessellation parameters for spatial indexes.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| scheme | [string](#string) |  | Tessellation scheme (e.g., &#34;GEOMETRY_GRID&#34;, &#34;GEOGRAPHY_GRID&#34;, &#34;GEOMETRY_AUTO_GRID&#34;) |
+| grid_levels | [GridLevel](#bytebase-v1-GridLevel) | repeated | Grid levels and densities for multi-level tessellation |
+| cells_per_object | [int32](#int32) |  | Number of cells per object (1-8192 for SQL Server) |
+| bounding_box | [BoundingBox](#bytebase-v1-BoundingBox) |  | Bounding box for GEOMETRY tessellation (not used for GEOGRAPHY) |
+
+
+
+
+
+
 <a name="bytebase-v1-TriggerMetadata"></a>
 
 ### TriggerMetadata
@@ -3029,23 +3095,6 @@ TablePartitionMetadata is the metadata for table partitions.
 
 The database&#39;s `name` field is used to identify the database to update. Format: instances/{instance}/databases/{database} |
 | update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | The list of fields to update. |
-
-
-
-
-
-
-<a name="bytebase-v1-UpdateSecretRequest"></a>
-
-### UpdateSecretRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| secret | [Secret](#bytebase-v1-Secret) |  | The secret to be created or updated. |
-| update_mask | [google.protobuf.FieldMask](#google-protobuf-FieldMask) |  | The mask of the fields to be updated. |
-| allow_missing | [bool](#bool) |  | If true, the secret will be created if it does not exist. |
 
 
 
@@ -3248,9 +3297,6 @@ LIST, HASH (https://www.postgresql.org/docs/current/ddl-partitioning.html)
 | GetDatabaseMetadata | [GetDatabaseMetadataRequest](#bytebase-v1-GetDatabaseMetadataRequest) | [DatabaseMetadata](#bytebase-v1-DatabaseMetadata) | Permissions required: bb.databases.getSchema |
 | GetDatabaseSchema | [GetDatabaseSchemaRequest](#bytebase-v1-GetDatabaseSchemaRequest) | [DatabaseSchema](#bytebase-v1-DatabaseSchema) | Permissions required: bb.databases.getSchema |
 | DiffSchema | [DiffSchemaRequest](#bytebase-v1-DiffSchemaRequest) | [DiffSchemaResponse](#bytebase-v1-DiffSchemaResponse) | Permissions required: bb.databases.get |
-| ListSecrets | [ListSecretsRequest](#bytebase-v1-ListSecretsRequest) | [ListSecretsResponse](#bytebase-v1-ListSecretsResponse) | Permissions required: bb.databaseSecrets.list |
-| UpdateSecret | [UpdateSecretRequest](#bytebase-v1-UpdateSecretRequest) | [Secret](#bytebase-v1-Secret) | Permissions required: bb.databaseSecrets.update |
-| DeleteSecret | [DeleteSecretRequest](#bytebase-v1-DeleteSecretRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Permissions required: bb.databaseSecrets.delete |
 | ListChangelogs | [ListChangelogsRequest](#bytebase-v1-ListChangelogsRequest) | [ListChangelogsResponse](#bytebase-v1-ListChangelogsResponse) | Permissions required: bb.changelogs.list |
 | GetChangelog | [GetChangelogRequest](#bytebase-v1-GetChangelogRequest) | [Changelog](#bytebase-v1-Changelog) | Permissions required: changelogs.get |
 | GetSchemaString | [GetSchemaStringRequest](#bytebase-v1-GetSchemaStringRequest) | [GetSchemaStringResponse](#bytebase-v1-GetSchemaStringResponse) | Permissions required: databases.getSchema |
@@ -7214,6 +7260,7 @@ When paginating, all other parameters provided to `ListPlans` must match the cal
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | The name of the plan. `plan` is a system generated ID. Format: projects/{project}/plans/{plan} |
+| state | [State](#bytebase-v1-State) |  | The state of the plan. |
 | issue | [string](#string) |  | The issue associated with the plan. Can be empty. Format: projects/{project}/issues/{issue} |
 | rollout | [string](#string) |  | The rollout associated with the plan. Can be empty. Format: projects/{project}/rollouts/{rollout} |
 | title | [string](#string) |  |  |
@@ -7490,9 +7537,9 @@ When paginating, all other parameters provided to `ListPlans` must match the cal
 When paginating, all other parameters provided to `SearchPlans` must match the call that provided the page token. |
 | filter | [string](#string) |  | Filter is used to filter plans returned in the list. The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
 
-Supported filters: - creator: the plan creator full name in &#34;users/{email or id}&#34; format, support &#34;==&#34; operator. - create_time: issue create time in &#34;2006-01-02T15:04:05Z07:00&#34; format, support &#34;&gt;=&#34; or &#34;&lt;=&#34; operator. - has_pipeline: the plan has pipeline or not, support &#34;==&#34; operator, the value should be &#34;true&#34; or &#34;false&#34;. - has_issue: the plan has issue or not, support &#34;==&#34; operator, the value should be &#34;true&#34; or &#34;false&#34;.
+Supported filters: - creator: the plan creator full name in &#34;users/{email or id}&#34; format, support &#34;==&#34; operator. - create_time: the plan create time in &#34;2006-01-02T15:04:05Z07:00&#34; format, support &#34;&gt;=&#34; or &#34;&lt;=&#34; operator. - has_pipeline: the plan has pipeline or not, support &#34;==&#34; operator, the value should be &#34;true&#34; or &#34;false&#34;. - has_issue: the plan has issue or not, support &#34;==&#34; operator, the value should be &#34;true&#34; or &#34;false&#34;. - title: the plan title, support &#34;==&#34; operator for exact match and &#34;.matches()&#34; operator for case-insensitive substring match. - spec_type: the plan spec config type, support &#34;==&#34; operator, the value should be &#34;create_database_config&#34;, &#34;change_database_config&#34;, or &#34;export_data_config&#34;. - state: the plan state, support &#34;==&#34; operator, the value should be &#34;ACTIVE&#34; or &#34;DELETED&#34;.
 
-For example: creator == &#34;users/ed@bytebase.com&#34; &amp;&amp; create_time &gt;= &#34;2025-01-02T15:04:05Z07:00&#34; has_pipeline == false &amp;&amp; has_issue == true |
+For example: creator == &#34;users/ed@bytebase.com&#34; &amp;&amp; create_time &gt;= &#34;2025-01-02T15:04:05Z07:00&#34; has_pipeline == false &amp;&amp; has_issue == true title == &#34;My Plan&#34; title.matches(&#34;database migration&#34;) spec_type == &#34;change_database_config&#34; state == &#34;ACTIVE&#34; |
 
 
 
@@ -8964,9 +9011,9 @@ When paginating, all other parameters provided to `ListReleases` must match the 
 | ----- | ---- | ----- | ----------- |
 | id | [string](#string) |  | The unique identifier for the file. |
 | path | [string](#string) |  | The path of the file. e.g. `2.2/V0001_create_table.sql`. |
-| type | [ReleaseFileType](#bytebase-v1-ReleaseFileType) |  |  |
+| type | [Release.File.Type](#bytebase-v1-Release-File-Type) |  | The type of the file. |
 | version | [string](#string) |  |  |
-| change_type | [Release.File.ChangeType](#bytebase-v1-Release-File-ChangeType) |  |  |
+| change_type | [Release.File.ChangeType](#bytebase-v1-Release-File-ChangeType) |  | The change type of the file. For versioned files, it is the change type of the file. For declarative files, this field is always DDL, thus meaningless. |
 | sheet | [string](#string) |  | For inputs, we must either use `sheet` or `statement`. For outputs, we always use `sheet`. `statement` is the preview of the sheet content.
 
 The sheet that holds the content. Format: projects/{project}/sheets/{sheet} |
@@ -9056,9 +9103,9 @@ The sheet that holds the content. Format: projects/{project}/sheets/{sheet} |
 
 
 
-<a name="bytebase-v1-ReleaseFileType"></a>
+<a name="bytebase-v1-Release-File-Type"></a>
 
-### ReleaseFileType
+### Release.File.Type
 
 
 | Name | Number | Description |
@@ -9926,6 +9973,11 @@ When paginating, all other parameters provided to `ListRoles` must match the cal
 | page_token | [string](#string) |  | A page token, received from a previous `ListRollouts` call. Provide this to retrieve the subsequent page.
 
 When paginating, all other parameters provided to `ListRollouts` must match the call that provided the page token. |
+| filter | [string](#string) |  | Filter is used to filter rollouts returned in the list. The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+
+Supported filters: - creator: the rollout creator full name in &#34;users/{email or id}&#34; format, support &#34;==&#34; operator. - update_time: rollout update time in &#34;2006-01-02T15:04:05Z07:00&#34; format, support &#34;&gt;=&#34; or &#34;&lt;=&#34; operator. - task_type: the task type, support &#34;==&#34; and &#34;in&#34; operators, check the Task.Type enum for the values.
+
+For example: creator == &#34;users/ed@bytebase.com&#34; &amp;&amp; update_time &gt;= &#34;2025-01-02T15:04:05Z07:00&#34; task_type == &#34;DATABASE_SCHEMA_UPDATE&#34; task_type in [&#34;DATABASE_SCHEMA_UPDATE&#34;, &#34;DATABASE_DATA_UPDATE&#34;] |
 
 
 
@@ -10043,6 +10095,7 @@ When paginating, all other parameters provided to `ListTaskRuns` must match the 
 | stages | [Stage](#bytebase-v1-Stage) | repeated | stages and thus tasks of the rollout. |
 | creator | [string](#string) |  | Format: users/hello@world.com |
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | issue | [string](#string) |  | The issue associated with the rollout. Could be empty. Format: projects/{project}/issues/{issue} |
 
 
@@ -10086,6 +10139,8 @@ When paginating, all other parameters provided to `ListTaskRuns` must match the 
 | database_schema_update | [Task.DatabaseSchemaUpdate](#bytebase-v1-Task-DatabaseSchemaUpdate) |  |  |
 | database_data_update | [Task.DatabaseDataUpdate](#bytebase-v1-Task-DatabaseDataUpdate) |  |  |
 | database_data_export | [Task.DatabaseDataExport](#bytebase-v1-Task-DatabaseDataExport) |  |  |
+| update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) | optional | The update_time is the update time of latest task run. If there are no task runs, it will be empty. |
+| run_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) | optional | The run_time is the scheduled run time of latest task run. If there are no task runs or the task run is not scheduled, it will be empty. |
 
 
 
@@ -10978,7 +11033,6 @@ PlanFeature represents the available features in Bytebase
 | FEATURE_GOOGLE_AND_GITHUB_SSO | 37 |  |
 | FEATURE_USER_GROUPS | 38 |  |
 | FEATURE_DISALLOW_SELF_SERVICE_SIGNUP | 39 |  |
-| FEATURE_DATABASE_SECRET_VARIABLES | 40 |  |
 | FEATURE_CUSTOM_INSTANCE_SYNC_TIME | 41 |  |
 | FEATURE_CUSTOM_INSTANCE_CONNECTION_LIMIT | 42 |  |
 | FEATURE_RISK_ASSESSMENT | 43 |  |

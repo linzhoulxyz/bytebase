@@ -1,161 +1,267 @@
 <template>
-  <div
-    class="!w-80 bg-white z-[1] rounded-lg p-1"
-    :class="
-      twMerge(
-        isCreated ? 'bg-white shadow' : 'bg-zinc-50 border-2 border-dashed'
-      )
-    "
-  >
+  <div class="relative w-full flex items-center gap-4">
+    <!-- Stage card -->
     <div
-      class="w-full flex flex-row justify-between items-center gap-2 px-2 pt-2 pb-1"
+      class="flex-1 bg-white rounded-lg border p-4 shadow-sm"
+      :class="
+        twMerge(
+          isCreated
+            ? 'border-gray-200 cursor-pointer hover:shadow-md transition-shadow'
+            : 'border-gray-300 border-dashed'
+        )
+      "
+      @click="isCreated && handleClickStageTitle()"
     >
-      <div class="flex items-center space-x-1">
-        <span
-          class="text-base font-medium"
-          :class="[isCreated && 'cursor-pointer hover:underline']"
-          @click="handleClickStageTitle"
-        >
-          {{ environmentStore.getEnvironmentByName(stage.environment).title }}
-        </span>
-        <NTag v-if="!isCreated" round size="tiny">{{
-          $t("common.preview")
-        }}</NTag>
-      </div>
-      <div class="flex justify-end items-center">
-        <RunTasksButton
-          v-if="isCreated"
-          :stage="stage"
-          :disabled="!canRunTasks || runableTasks.length === 0"
-          @run-tasks="handleRunAllTasks"
-        />
-        <NPopconfirm
-          v-else-if="!isCreated && canCreateRollout"
-          :negative-text="null"
-          :positive-text="$t('common.confirm')"
-          :positive-button-props="{ size: 'tiny' }"
-          @positive-click="createRolloutToStage"
-        >
-          <template #trigger>
-            <NTooltip>
-              <template #trigger>
-                <NButton text size="small">
-                  <template #icon>
-                    <CircleFadingPlusIcon class="w-4 h-4" />
-                  </template>
-                </NButton>
-              </template>
-              {{ $t("common.create") }}
-            </NTooltip>
-          </template>
-          {{ $t("common.confirm-and-add") }}
-        </NPopconfirm>
-      </div>
-    </div>
-    <NVirtualList
-      v-if="filteredTasks.length > 0"
-      style="max-height: 80vh"
-      :items="filteredTasks"
-      :item-size="40"
-      item-resizable
-    >
-      <template #default="{ item: task }: { item: Task }">
-        <div
-          :key="task.name"
-          class="w-full border-t border-zinc-50 flex items-center justify-start truncate px-2 py-2 h-10 cursor-pointer hover:bg-zinc-50 transition-colors"
-          @click="handleTaskClick(task)"
-        >
-          <TaskStatus :status="task.status" size="small" class="shrink-0" />
-          <TaskDatabaseName :task="task" class="ml-2 flex-1" />
-          <div class="ml-auto flex items-center space-x-1 shrink-0">
-            <NTag round size="tiny">{{ semanticTaskType(task.type) }}</NTag>
+      <div class="flex items-start justify-between gap-4">
+        <!-- Left side: Stage title and status counts -->
+        <div class="flex items-start gap-2">
+          <div class="flex items-start gap-2">
+            <TaskStatus :status="stageStatus" size="medium" />
+            <div class="flex flex-col">
+              <h3
+                class="text-base font-medium text-gray-900 whitespace-nowrap w-24 truncate"
+              >
+                {{
+                  environmentStore.getEnvironmentByName(stage.environment).title
+                }}
+              </h3>
+              <span v-if="latestUpdateTime" class="text-xs text-gray-500">
+                {{ humanizeTs(latestUpdateTime / 1000) }}
+              </span>
+            </div>
+          </div>
 
-            <NTooltip v-if="extractSchemaVersionFromTask(task)">
-              <template #trigger>
-                <NTag round size="tiny">
-                  {{ extractSchemaVersionFromTask(task) }}
+          <!-- Tasks and task status counts -->
+          <div v-if="isCreated" class="flex-1 flex flex-col">
+            <!-- Task status counts -->
+            <div class="flex items-center gap-2 flex-wrap">
+              <template v-for="status in TASK_STATUS_FILTERS" :key="status">
+                <NTag
+                  v-if="getTaskCount(status) > 0"
+                  round
+                  size="medium"
+                  :type="
+                    status === Task_Status.RUNNING
+                      ? 'info'
+                      : status === Task_Status.FAILED
+                        ? 'error'
+                        : 'default'
+                  "
+                  class="cursor-pointer hover:opacity-80 transition-opacity"
+                  @click.stop="handleTaskStatusClick(status)"
+                >
+                  <template #avatar>
+                    <TaskStatus :status="status" size="small" disabled />
+                  </template>
+                  <div class="flex flex-row items-center gap-2">
+                    <span class="select-none text-base">{{
+                      stringifyTaskStatus(status)
+                    }}</span>
+                    <span class="select-none text-base font-medium">{{
+                      getTaskCount(status)
+                    }}</span>
+                  </div>
                 </NTag>
               </template>
-              {{ $t("common.version") }}
-            </NTooltip>
+              <!-- Toggle button for tasks -->
+              <NButton
+                v-if="filteredTasks.length > 0"
+                quaternary
+                round
+                size="small"
+                class="!px-2"
+                @click.stop="showTasks = !showTasks"
+              >
+                <template #icon>
+                  <ChevronDownIcon v-if="!showTasks" class="text-gray-500" />
+                  <ChevronUpIcon v-else class="text-gray-500" />
+                </template>
+              </NButton>
+            </div>
+            <!-- Tasks -->
+            <div
+              v-if="filteredTasks.length > 0 && showTasks"
+              class="mt-2 flex flex-row gap-2 flex-wrap"
+            >
+              <NTag
+                v-for="task in displayedTasks"
+                :key="task.name"
+                round
+                size="small"
+                :bordered="false"
+                :class="isCreated && 'cursor-pointer hover:opacity-80'"
+                @click.stop="handleTaskClick(task)"
+              >
+                <template #avatar>
+                  <TaskStatus :status="task.status" size="tiny" disabled />
+                </template>
+                <div class="flex items-center flex-nowrap">
+                  <DatabaseDisplay :database="task.target" />
+                  <NTooltip v-if="task.runTime">
+                    <template #trigger>
+                      <CalendarClockIcon
+                        class="w-3.5 h-3.5 ml-1 text-gray-500"
+                      />
+                    </template>
+                    ({{ $t("task.scheduled-time") }})
+                    {{
+                      humanizeTs(
+                        getTimeForPbTimestampProtoEs(task.runTime, 0) / 1000
+                      )
+                    }}
+                  </NTooltip>
+                </div>
+              </NTag>
+              <NTag
+                v-if="remainingTaskCount > 0"
+                round
+                size="small"
+                type="default"
+                :bordered="false"
+                class="opacity-80"
+                :class="isCreated && 'cursor-pointer hover:opacity-100'"
+                @click.stop="handleClickStageTitle()"
+              >
+                +{{ remainingTaskCount }} more
+              </NTag>
+            </div>
           </div>
         </div>
-      </template>
-    </NVirtualList>
-    <div v-else class="text-center text-zinc-500 py-2 text-sm leading-6">
-      {{ $t("task.no-tasks") }}
-    </div>
 
-    <!-- Task Rollout Action Panel -->
-    <TaskRolloutActionPanel
-      :show="showRunTasksPanel"
-      action="RUN"
-      :target="{ type: 'tasks', stage, tasks: runableTasks }"
-      @close="handlePanelClose"
-    />
+        <!-- Right side: Actions -->
+        <div v-if="!readonly" class="flex justify-end items-center">
+          <RunTasksButton
+            v-if="isCreated"
+            :stage="stage"
+            :size="'small'"
+            :disabled="!canRunTasks || runableTasks.length === 0"
+            @run-tasks="handleRunAllTasks"
+          />
+          <NPopconfirm
+            v-else-if="!isCreated && canCreateRollout"
+            :negative-text="null"
+            :positive-text="$t('common.confirm')"
+            @positive-click="createRolloutToStage"
+          >
+            <template #trigger>
+              <NTooltip>
+                <template #trigger>
+                  <NButton :size="'small'">
+                    <template #icon>
+                      <CircleFadingPlusIcon class="w-5 h-5" />
+                    </template>
+                    {{ $t("common.start") }}
+                  </NButton>
+                </template>
+                {{ $t("rollout.stage.start-stage") }}
+              </NTooltip>
+            </template>
+            {{ $t("common.confirm-and-add") }}
+          </NPopconfirm>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { create } from "@bufbuild/protobuf";
-import { CircleFadingPlusIcon } from "lucide-vue-next";
-import { NTag, NTooltip, NVirtualList, NButton, NPopconfirm } from "naive-ui";
-import { twMerge } from "tailwind-merge";
-import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
-import { semanticTaskType } from "@/components/IssueV1";
-import TaskStatus from "@/components/Rollout/kits/TaskStatus.vue";
-import { rolloutServiceClientConnect } from "@/grpcweb";
 import {
-  PROJECT_V1_ROUTE_ROLLOUT_DETAIL_TASK_DETAIL,
+  CircleFadingPlusIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  CalendarClockIcon,
+} from "lucide-vue-next";
+import { NTooltip, NButton, NPopconfirm, NTag } from "naive-ui";
+import { twMerge } from "tailwind-merge";
+import { computed, ref, watch } from "vue";
+import { useRouter } from "vue-router";
+import DatabaseDisplay from "@/components/Plan/components/common/DatabaseDisplay.vue";
+import { TASK_STATUS_FILTERS } from "@/components/Plan/constants/task";
+import TaskStatus from "@/components/Rollout/kits/TaskStatus.vue";
+import {
   PROJECT_V1_ROUTE_ROLLOUT_DETAIL_STAGE_DETAIL,
+  PROJECT_V1_ROUTE_ROLLOUT_DETAIL_TASK_DETAIL,
 } from "@/router/dashboard/projectV1";
 import {
   useCurrentProjectV1,
   useEnvironmentV1Store,
-  pushNotification,
+  batchGetOrFetchDatabases,
 } from "@/store";
-import { CreateRolloutRequestSchema } from "@/types/proto-es/v1/rollout_service_pb";
-import type { Stage, Task } from "@/types/proto-es/v1/rollout_service_pb";
+import { getTimeForPbTimestampProtoEs } from "@/types";
+import type {
+  Stage,
+  Task,
+  Rollout,
+} from "@/types/proto-es/v1/rollout_service_pb";
 import { Task_Status } from "@/types/proto-es/v1/rollout_service_pb";
-import { extractProjectResourceName } from "@/utils";
-import { extractSchemaVersionFromTask } from "@/utils";
-import { usePlanContextWithRollout } from "../../logic";
+import {
+  extractProjectResourceName,
+  stringifyTaskStatus,
+  getStageStatus,
+  humanizeTs,
+} from "@/utils";
 import RunTasksButton from "./RunTasksButton.vue";
-import TaskDatabaseName from "./TaskDatabaseName.vue";
-import TaskRolloutActionPanel from "./TaskRolloutActionPanel.vue";
-import { useRolloutViewContext } from "./context";
 import { useTaskActionPermissions } from "./taskPermissions";
 
 const props = defineProps<{
+  rollout: Rollout;
   stage: Stage;
-  taskStatusFilter: Task_Status[];
+  taskStatusFilter?: Task_Status[];
+  readonly?: boolean;
+  defaultShowTasks?: boolean;
 }>();
 
-const { t: $t } = useI18n();
 const router = useRouter();
 const { project } = useCurrentProjectV1();
 const environmentStore = useEnvironmentV1Store();
-const { events } = usePlanContextWithRollout();
-const { rollout } = useRolloutViewContext();
+const emit = defineEmits<{
+  (event: "run-tasks", stage: Stage, tasks: Task[]): void;
+  (event: "create-rollout-to-stage", stage: Stage): void;
+}>();
+
 const { canPerformTaskAction } = useTaskActionPermissions();
 
-const showRunTasksPanel = ref(false);
-
 const isCreated = computed(() => {
-  return rollout.value.stages.some(
+  return props.rollout.stages.some(
     (stage) => stage.environment === props.stage.environment
   );
 });
 
+// Toggle state for showing/hiding tasks - default based on parent coordination
+const showTasks = ref(props.defaultShowTasks || false);
+
 const filteredTasks = computed(() => {
-  if (props.taskStatusFilter.length === 0) {
-    return props.stage.tasks;
+  let tasks = props.stage.tasks;
+
+  // Apply status filter if provided
+  if (props.taskStatusFilter && props.taskStatusFilter.length > 0) {
+    tasks = tasks.filter((task) =>
+      props.taskStatusFilter!.includes(task.status)
+    );
   }
-  return props.stage.tasks.filter((task) =>
-    props.taskStatusFilter.includes(task.status)
-  );
+
+  // Sort tasks by status order defined in TASK_STATUS_FILTERS
+  const statusOrder = new Map<Task_Status, number>();
+  TASK_STATUS_FILTERS.forEach((status, index) => {
+    statusOrder.set(status, index);
+  });
+
+  return tasks.slice().sort((a, b) => {
+    const aOrder = statusOrder.get(a.status) ?? Number.MAX_SAFE_INTEGER;
+    const bOrder = statusOrder.get(b.status) ?? Number.MAX_SAFE_INTEGER;
+    return aOrder - bOrder;
+  });
+});
+
+// The maximum number of tasks to display before showing "more".
+const MAX_DISPLAYED_TASKS = 10;
+
+const displayedTasks = computed(() => {
+  return filteredTasks.value.slice(0, MAX_DISPLAYED_TASKS);
+});
+
+const remainingTaskCount = computed(() => {
+  return Math.max(0, filteredTasks.value.length - MAX_DISPLAYED_TASKS);
 });
 
 const runableTasks = computed(() => {
@@ -171,7 +277,7 @@ const runableTasks = computed(() => {
 const canRunTasks = computed(() => {
   return canPerformTaskAction(
     filteredTasks.value,
-    rollout.value,
+    props.rollout,
     project.value
   );
 });
@@ -180,74 +286,47 @@ const canCreateRollout = computed(() => {
   return canRunTasks.value;
 });
 
-// Helper function to extract IDs from task and stage names
-const getTaskRouteParams = (task: Task) => {
-  const rolloutId = rollout.value.name.split("/").pop();
-  const stageId = props.stage.name.split("/").pop();
-  const taskId = task.name.split("/").pop();
+const stageStatus = computed(() => {
+  // Create a temporary stage object with filtered tasks for status calculation
+  const stageWithFilteredTasks = {
+    ...props.stage,
+    tasks: filteredTasks.value,
+  };
+  return getStageStatus(stageWithFilteredTasks);
+});
 
-  return { rolloutId, stageId, taskId };
-};
+const latestUpdateTime = computed(() => {
+  let latestTime: number | undefined;
 
-// Task click handler
-const handleTaskClick = (task: Task) => {
-  const params = getTaskRouteParams(task);
-  if (params.rolloutId && params.stageId && params.taskId) {
-    router.push({
-      name: PROJECT_V1_ROUTE_ROLLOUT_DETAIL_TASK_DETAIL,
-      params: {
-        projectId: extractProjectResourceName(project.value.name),
-        rolloutId: params.rolloutId,
-        stageId: params.stageId,
-        taskId: params.taskId,
-      },
-    });
+  for (const task of props.stage.tasks) {
+    if (task.updateTime) {
+      const taskTime = getTimeForPbTimestampProtoEs(task.updateTime, 0);
+      if (!latestTime || taskTime > latestTime) {
+        latestTime = taskTime;
+      }
+    }
   }
+
+  return latestTime;
+});
+
+const getTaskCount = (status: Task_Status) => {
+  return filteredTasks.value.filter((task) => task.status === status).length;
 };
 
 const handleRunAllTasks = () => {
-  showRunTasksPanel.value = true;
+  emit("run-tasks", props.stage, runableTasks.value);
 };
 
-const handlePanelClose = () => {
-  showRunTasksPanel.value = false;
-};
-
-const createRolloutToStage = async () => {
-  try {
-    const request = create(CreateRolloutRequestSchema, {
-      parent: project.value.name,
-      rollout: {
-        plan: rollout.value.plan,
-      },
-      target: props.stage.environment,
-    });
-    await rolloutServiceClientConnect.createRollout(request);
-
-    pushNotification({
-      module: "bytebase",
-      style: "SUCCESS",
-      title: $t("common.success"),
-      description: $t("common.created"),
-    });
-
-    // Trigger immediate refresh of rollout data
-    events.emit("status-changed", { eager: true });
-  } catch (error) {
-    pushNotification({
-      module: "bytebase",
-      style: "CRITICAL",
-      title: $t("common.error"),
-      description: String(error),
-    });
-  }
+const createRolloutToStage = () => {
+  emit("create-rollout-to-stage", props.stage);
 };
 
 const handleClickStageTitle = () => {
   // Only navigate if the stage is created
   if (!isCreated.value) return;
 
-  const rolloutId = rollout.value.name.split("/").pop();
+  const rolloutId = props.rollout.name.split("/").pop();
   const stageId = props.stage.name.split("/").pop();
 
   if (!rolloutId || !stageId) return;
@@ -262,4 +341,72 @@ const handleClickStageTitle = () => {
     },
   });
 };
+
+const handleTaskStatusClick = (status: Task_Status) => {
+  // Only navigate if the stage is created
+  if (!isCreated.value) return;
+
+  const rolloutId = props.rollout.name.split("/").pop();
+  const stageId = props.stage.name.split("/").pop();
+
+  if (!rolloutId || !stageId) return;
+
+  // Navigate to the stage detail route with task status filter
+  router.push({
+    name: PROJECT_V1_ROUTE_ROLLOUT_DETAIL_STAGE_DETAIL,
+    params: {
+      projectId: extractProjectResourceName(project.value.name),
+      rolloutId,
+      stageId,
+    },
+    query: {
+      taskStatus: Task_Status[status],
+    },
+  });
+};
+
+const handleTaskClick = (task: Task) => {
+  // Only navigate if the stage is created
+  if (!isCreated.value) return;
+
+  const rolloutId = props.rollout.name.split("/").pop();
+  const stageId = props.stage.name.split("/").pop();
+  const taskId = task.name.split("/").pop();
+
+  if (!rolloutId || !stageId || !taskId) return;
+
+  // Navigate to the task detail route
+  router.push({
+    name: PROJECT_V1_ROUTE_ROLLOUT_DETAIL_TASK_DETAIL,
+    params: {
+      projectId: extractProjectResourceName(project.value.name),
+      rolloutId,
+      stageId,
+      taskId,
+    },
+  });
+};
+
+const prepareDatabases = async () => {
+  // Only load data when tasks are shown
+  if (!showTasks.value) return;
+
+  if (displayedTasks.value.length > 0) {
+    try {
+      await batchGetOrFetchDatabases(
+        displayedTasks.value.map((task) => task.target)
+      );
+    } catch {
+      // Ignore errors - this is just for pre-loading data
+    }
+  }
+};
+
+watch(
+  showTasks,
+  () => {
+    prepareDatabases();
+  },
+  { immediate: true }
+);
 </script>

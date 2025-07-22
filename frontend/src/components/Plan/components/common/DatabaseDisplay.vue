@@ -5,11 +5,14 @@
       class="inline-block mr-1"
       :instance="instanceResource"
     />
+    <span v-if="showEnvironment && environment" class="text-gray-500 mr-1">
+      ({{ environment.title }})
+    </span>
     <span class="truncate text-gray-600">
       {{ instanceDisplayName }}
     </span>
     <ChevronRightIcon
-      class="inline opacity-60 text-gray-600 w-4 h-4 shrink-0"
+      class="inline opacity-60 text-gray-500 w-4 h-4 shrink-0"
     />
     <span class="truncate text-gray-800">
       {{ databaseDisplayName }}
@@ -21,8 +24,12 @@
 import { ChevronRightIcon } from "lucide-vue-next";
 import { computed } from "vue";
 import { InstanceV1EngineIcon } from "@/components/v2";
-import { useInstanceV1Store } from "@/store";
-import { unknownInstance } from "@/types";
+import {
+  useDatabaseV1Store,
+  useEnvironmentV1Store,
+  useInstanceV1Store,
+} from "@/store";
+import { isValidDatabaseName, unknownInstance } from "@/types";
 import {
   extractDatabaseResourceName,
   extractInstanceResourceName,
@@ -30,11 +37,20 @@ import {
 
 const props = defineProps<{
   database: string;
+  showEnvironment?: boolean;
 }>();
 
+const environmentStore = useEnvironmentV1Store();
 const instanceStore = useInstanceV1Store();
 
+const databaseEntity = computed(() =>
+  useDatabaseV1Store().getDatabaseByName(props.database)
+);
+
 const instanceResource = computed(() => {
+  if (isValidDatabaseName(databaseEntity.value.name)) {
+    return databaseEntity.value.instanceResource;
+  }
   // Extract instance name from the database name (which is actually a target string)
   const instanceName = extractInstanceResourceName(props.database);
   if (instanceName) {
@@ -59,5 +75,15 @@ const instanceDisplayName = computed(() => {
 const databaseDisplayName = computed(() => {
   const { databaseName } = extractDatabaseResourceName(props.database);
   return databaseName || "Unknown Database";
+});
+
+const environment = computed(() => {
+  const environmentName =
+    databaseEntity.value.environment || instanceResource.value?.environment;
+  if (!environmentName) {
+    return undefined;
+  }
+
+  return environmentStore.getEnvironmentByName(environmentName);
 });
 </script>

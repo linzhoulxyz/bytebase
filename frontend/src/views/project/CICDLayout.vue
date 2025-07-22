@@ -3,7 +3,24 @@
     <template v-if="ready">
       <PollerProvider>
         <div class="h-full flex flex-col">
+          <!-- Banner Section -->
+          <div v-if="showBanner" class="banner-section">
+            <div
+              v-if="showClosedBanner"
+              class="h-8 w-full text-base font-medium bg-gray-400 text-white flex justify-center items-center"
+            >
+              {{ $t("common.closed") }}
+            </div>
+            <div
+              v-else-if="showSuccessBanner"
+              class="h-8 w-full text-base font-medium bg-success text-white flex justify-center items-center"
+            >
+              {{ $t("common.done") }}
+            </div>
+          </div>
+
           <HeaderSection />
+
           <NTabs
             type="line"
             :value="tabKey"
@@ -21,8 +38,7 @@
 
             <!-- Suffix slot -->
             <template #suffix>
-              <div class="pr-4 flex flex-row justify-end items-center gap-4">
-                <CurrentSpecSelector v-if="tabKey === TabKey.Specifications" />
+              <div class="pr-3 flex flex-row justify-end items-center gap-4">
                 <RefreshIndicator v-if="!isCreating" />
               </div>
             </template>
@@ -42,8 +58,9 @@
 
 <script lang="tsx" setup>
 import { useTitle } from "@vueuse/core";
-import { NSpin, NTab, NTabs } from "naive-ui";
-import { computed, toRef } from "vue";
+import { CirclePlayIcon, FileDiffIcon, Layers2Icon } from "lucide-vue-next";
+import { NSpin, NTab, NTabs, NTag } from "naive-ui";
+import { computed, ref, toRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import {
@@ -53,33 +70,33 @@ import {
 } from "@/components/Plan";
 import PollerProvider from "@/components/Plan/PollerProvider.vue";
 import { HeaderSection } from "@/components/Plan/components";
-import CurrentSpecSelector from "@/components/Plan/components/CurrentSpecSelector.vue";
 import RefreshIndicator from "@/components/Plan/components/RefreshIndicator.vue";
-import { useSpecsValidation } from "@/components/Plan/components/common";
 import { provideIssueReviewContext } from "@/components/Plan/logic/issue-review";
+import { useIssueLayoutVersion } from "@/composables/useIssueLayoutVersion";
 import { useBodyLayoutContext } from "@/layouts/common";
 import {
+  PROJECT_V1_ROUTE_ISSUE_DETAIL,
   PROJECT_V1_ROUTE_ISSUE_DETAIL_V1,
   PROJECT_V1_ROUTE_PLAN_DETAIL,
-  PROJECT_V1_ROUTE_PLAN_DETAIL_CHECK_RUNS,
   PROJECT_V1_ROUTE_PLAN_DETAIL_SPEC_DETAIL,
   PROJECT_V1_ROUTE_PLAN_DETAIL_SPECS,
   PROJECT_V1_ROUTE_ROLLOUT_DETAIL,
   PROJECT_V1_ROUTE_ROLLOUT_DETAIL_STAGE_DETAIL,
   PROJECT_V1_ROUTE_ROLLOUT_DETAIL_TASK_DETAIL,
 } from "@/router/dashboard/projectV1";
+import { State } from "@/types/proto-es/v1/common_pb";
+import { IssueStatus } from "@/types/proto-es/v1/issue_service_pb";
 import {
   extractIssueUID,
   extractPlanUID,
+  extractProjectResourceName,
   extractRolloutUID,
-  isNullOrUndefined,
+  issueV1Slug,
 } from "@/utils";
 
 enum TabKey {
-  Overview = "overview",
-  Specifications = "specifications",
-  Checks = "checks",
-  Review = "review",
+  Plan = "plan",
+  Issue = "issue",
   Rollout = "rollout",
 }
 
@@ -91,20 +108,30 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18n();
-const { isCreating, plan, planCheckRuns, issue, rollout, isInitializing } =
-  useInitializePlan(
-    toRef(props, "projectId"),
-    toRef(props, "planId"),
-    toRef(props, "issueId"),
-    toRef(props, "rolloutId")
-  );
+const {
+  isCreating,
+  plan,
+  planCheckRuns,
+  issue,
+  rollout,
+  taskRuns,
+  isInitializing,
+} = useInitializePlan(
+  toRef(props, "projectId"),
+  toRef(props, "planId"),
+  toRef(props, "issueId"),
+  toRef(props, "rolloutId")
+);
 const planBaseContext = useBasePlanContext({
   isCreating,
   plan,
+  issue,
 });
+const { enabledNewLayout } = useIssueLayoutVersion();
+const isLoading = ref(true);
 
 const ready = computed(() => {
-  return !isInitializing.value && !!plan.value;
+  return !isInitializing.value && !!plan.value && !isLoading.value;
 });
 
 const route = useRoute();
@@ -116,33 +143,54 @@ providePlanContext({
   planCheckRuns,
   issue,
   rollout,
+  taskRuns,
   ...planBaseContext,
 });
 
 provideIssueReviewContext(issue);
 
-const { isSpecEmpty } = useSpecsValidation(plan.value.specs);
+watch(
+  () => isInitializing.value,
+  () => {
+    if (isInitializing.value) {
+      return;
+    }
 
-const planCheckRunCount = computed(() =>
-  Object.values(plan.value.planCheckRunStatusCount).reduce(
-    (sum, count) => sum + count,
-    0
-  )
+    // Redirect all non-changeDatabaseConfig plans to the legacy issue page.
+    // Including create database and export data plans.
+    if (
+      plan.value.issue &&
+      plan.value.specs.some(
+        (spec) => spec.config.case !== "changeDatabaseConfig"
+      )
+    ) {
+      router.replace({
+        name: PROJECT_V1_ROUTE_ISSUE_DETAIL,
+        params: {
+          projectId: extractProjectResourceName(plan.value.name),
+          issueSlug: issueV1Slug(plan.value.issue),
+        },
+        query: route.query,
+      });
+    } else {
+      isLoading.value = false;
+    }
+  },
+  { once: true }
 );
 
 const tabKey = computed(() => {
   const routeName = route.name?.toString() as string;
   if (
     [
+      PROJECT_V1_ROUTE_PLAN_DETAIL,
       PROJECT_V1_ROUTE_PLAN_DETAIL_SPECS,
       PROJECT_V1_ROUTE_PLAN_DETAIL_SPEC_DETAIL,
     ].includes(routeName)
   ) {
-    return TabKey.Specifications;
-  } else if ([PROJECT_V1_ROUTE_PLAN_DETAIL_CHECK_RUNS].includes(routeName)) {
-    return TabKey.Checks;
+    return TabKey.Plan;
   } else if (routeName === PROJECT_V1_ROUTE_ISSUE_DETAIL_V1) {
-    return TabKey.Review;
+    return TabKey.Issue;
   } else if (
     [
       PROJECT_V1_ROUTE_ROLLOUT_DETAIL,
@@ -153,23 +201,14 @@ const tabKey = computed(() => {
     return TabKey.Rollout;
   }
   // Fallback to Overview if no specific tab is matched.
-  return TabKey.Overview;
+  return TabKey.Plan;
 });
 
 const availableTabs = computed<TabKey[]>(() => {
-  const tabs: TabKey[] = [TabKey.Overview, TabKey.Specifications];
+  const tabs: TabKey[] = [TabKey.Plan];
   if (!isCreating.value) {
-    if (
-      plan.value.specs.some(
-        (spec) =>
-          !isNullOrUndefined(spec.config) &&
-          spec.config.case === "changeDatabaseConfig"
-      )
-    ) {
-      tabs.push(TabKey.Checks);
-    }
-    if (plan.value.issue) {
-      tabs.push(TabKey.Review);
+    if (plan.value.issue && enabledNewLayout.value) {
+      tabs.unshift(TabKey.Issue);
     }
     if (plan.value.rollout) {
       tabs.push(TabKey.Rollout);
@@ -180,35 +219,32 @@ const availableTabs = computed<TabKey[]>(() => {
 
 const tabRender = (tab: TabKey) => {
   switch (tab) {
-    case TabKey.Overview:
-      return t("common.overview");
-    case TabKey.Specifications:
+    case TabKey.Issue:
       return (
-        <div>
-          {t("plan.navigator.specifications")}
-          {plan.value.specs.some(isSpecEmpty) && (
-            <span
-              class="text-error ml-0.5"
-              title={t("plan.navigator.statement-empty")}
-            >
-              *
-            </span>
+        <div class="flex items-center gap-2">
+          <Layers2Icon size={18} />
+          <span>{t("common.overview")}</span>
+        </div>
+      );
+    case TabKey.Plan:
+      return (
+        <div class="flex items-center gap-2">
+          <FileDiffIcon size={18} />
+          <span>{t("plan.navigator.changes")}</span>
+          {(isCreating.value || plan.value.specs.length > 1) && (
+            <NTag size="tiny" round>
+              {plan.value.specs.length}
+            </NTag>
           )}
         </div>
       );
-    case TabKey.Checks:
-      return (
-        <div>
-          {t("plan.navigator.checks")}
-          {planCheckRunCount.value > 0 && (
-            <span class="text-gray-500">({planCheckRunCount.value})</span>
-          )}
-        </div>
-      );
-    case TabKey.Review:
-      return t("plan.navigator.review");
     case TabKey.Rollout:
-      return t("plan.navigator.rollout");
+      return (
+        <div class="flex items-center gap-2">
+          <CirclePlayIcon size={18} />
+          <span>{t("plan.navigator.rollout")}</span>
+        </div>
+      );
     default:
       // Fallback to raw tab name.
       return tab;
@@ -236,27 +272,15 @@ const handleTabChange = (tab: TabKey) => {
 
   const query = route.query || {};
 
-  if (tab === TabKey.Overview) {
-    router.push({
-      name: PROJECT_V1_ROUTE_PLAN_DETAIL,
-      params: params,
-      query: query,
-    });
-  } else if (tab === TabKey.Specifications) {
-    router.push({
-      name: PROJECT_V1_ROUTE_PLAN_DETAIL_SPECS,
-      params: params,
-      query: query,
-    });
-  } else if (tab === TabKey.Checks) {
-    router.push({
-      name: PROJECT_V1_ROUTE_PLAN_DETAIL_CHECK_RUNS,
-      params: params,
-      query: query,
-    });
-  } else if (tab === TabKey.Review) {
+  if (tab === TabKey.Issue) {
     router.push({
       name: PROJECT_V1_ROUTE_ISSUE_DETAIL_V1,
+      params: params,
+      query: query,
+    });
+  } else if (tab === TabKey.Plan) {
+    router.push({
+      name: PROJECT_V1_ROUTE_PLAN_DETAIL,
       params: params,
       query: query,
     });
@@ -288,5 +312,22 @@ const documentTitle = computed(() => {
   }
   return t("common.loading");
 });
+
+// Banner conditions
+const showClosedBanner = computed(() => {
+  return (
+    plan.value.state === State.DELETED ||
+    (issue.value && issue.value.status === IssueStatus.CANCELED)
+  );
+});
+
+const showSuccessBanner = computed(() => {
+  return issue.value && issue.value.status === IssueStatus.DONE;
+});
+
+const showBanner = computed(() => {
+  return showClosedBanner.value || showSuccessBanner.value;
+});
+
 useTitle(documentTitle);
 </script>

@@ -14,11 +14,11 @@ import (
 	// Import Trino driver for side effects
 	_ "github.com/trinodb/trino-go-client/trino"
 
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
+	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	"github.com/bytebase/bytebase/backend/plugin/db/util"
 	"github.com/bytebase/bytebase/backend/plugin/parser/base"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
-	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
 func init() {
@@ -147,6 +147,13 @@ func (d *Driver) Execute(ctx context.Context, statement string, opts db.ExecuteO
 		return 0, nil
 	}
 
+	// Trino has limited transaction support:
+	// - Only supports transactions for data modification operations (INSERT, UPDATE, DELETE)
+	// - DDL operations are always auto-committed
+	// - Not all connectors support transactions
+	// Due to these limitations, we execute statements individually regardless of transaction mode
+	// but we still parse and respect the transaction mode directive for consistency
+
 	var totalRowsAffected int64
 	for i, command := range commands {
 		indexes := []int32{originalIndex[i]}
@@ -160,6 +167,7 @@ func (d *Driver) Execute(ctx context.Context, statement string, opts db.ExecuteO
 
 		rowsAffected, err := result.RowsAffected()
 		if err != nil {
+			// Trino doesn't always return rows affected, especially for DDL
 			rowsAffected = 0
 		}
 

@@ -11,9 +11,9 @@ import (
 
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/component/state"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
+	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
 	"github.com/bytebase/bytebase/backend/store"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
-	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
 func convertToPlans(ctx context.Context, s *store.Store, plans []*store.PlanMessage) ([]*v1pb.Plan, error) {
@@ -38,6 +38,7 @@ func convertToPlan(ctx context.Context, s *store.Store, plan *store.PlanMessage)
 		CreateTime:              timestamppb.New(plan.CreatedAt),
 		UpdateTime:              timestamppb.New(plan.UpdatedAt),
 		PlanCheckRunStatusCount: plan.PlanCheckRunStatusCount,
+		State:                   convertDeletedToState(plan.Deleted),
 	}
 
 	creator, err := s.GetUserByID(ctx, plan.CreatorUID)
@@ -567,6 +568,7 @@ func convertToRollout(ctx context.Context, s *store.Store, project *store.Projec
 		Title:      rollout.Name,
 		Stages:     nil,
 		CreateTime: timestamppb.New(rollout.CreatedAt),
+		UpdateTime: timestamppb.New(rollout.UpdatedAt),
 	}
 
 	creator, err := s.GetUserByID(ctx, rollout.CreatorUID)
@@ -682,7 +684,12 @@ func convertToTaskFromDatabaseCreate(ctx context.Context, s *store.Store, projec
 			},
 		},
 	}
-
+	if task.UpdatedAt != nil {
+		v1pbTask.UpdateTime = timestamppb.New(*task.UpdatedAt)
+	}
+	if task.RunAt != nil {
+		v1pbTask.RunTime = timestamppb.New(*task.RunAt)
+	}
 	return v1pbTask, nil
 }
 
@@ -711,6 +718,12 @@ func convertToTaskFromSchemaUpdate(ctx context.Context, s *store.Store, project 
 				SchemaVersion: task.Payload.GetSchemaVersion(),
 			},
 		},
+	}
+	if task.UpdatedAt != nil {
+		v1pbTask.UpdateTime = timestamppb.New(*task.UpdatedAt)
+	}
+	if task.RunAt != nil {
+		v1pbTask.RunTime = timestamppb.New(*task.RunAt)
 	}
 	return v1pbTask, nil
 }
@@ -744,6 +757,12 @@ func convertToTaskFromDataUpdate(ctx context.Context, s *store.Store, project *s
 	}
 
 	v1pbTask.Payload = v1pbTaskPayload
+	if task.UpdatedAt != nil {
+		v1pbTask.UpdateTime = timestamppb.New(*task.UpdatedAt)
+	}
+	if task.RunAt != nil {
+		v1pbTask.RunTime = timestamppb.New(*task.RunAt)
+	}
 	return v1pbTask, nil
 }
 
@@ -775,6 +794,12 @@ func convertToTaskFromDatabaseDataExport(ctx context.Context, s *store.Store, pr
 		Status:  convertToTaskStatus(task.LatestTaskRunStatus, false),
 		Target:  targetDatabaseName,
 		Payload: &v1pbTaskPayload,
+	}
+	if task.UpdatedAt != nil {
+		v1pbTask.UpdateTime = timestamppb.New(*task.UpdatedAt)
+	}
+	if task.RunAt != nil {
+		v1pbTask.RunTime = timestamppb.New(*task.RunAt)
 	}
 	return v1pbTask, nil
 }
@@ -815,6 +840,23 @@ func convertToTaskType(taskType storepb.Task_Type) v1pb.Task_Type {
 		return v1pb.Task_DATABASE_EXPORT
 	default:
 		return v1pb.Task_TYPE_UNSPECIFIED
+	}
+}
+
+func convertToStoreTaskType(taskType v1pb.Task_Type) storepb.Task_Type {
+	switch taskType {
+	case v1pb.Task_DATABASE_CREATE:
+		return storepb.Task_DATABASE_CREATE
+	case v1pb.Task_DATABASE_SCHEMA_UPDATE:
+		return storepb.Task_DATABASE_SCHEMA_UPDATE
+	case v1pb.Task_DATABASE_SCHEMA_UPDATE_GHOST:
+		return storepb.Task_DATABASE_SCHEMA_UPDATE_GHOST
+	case v1pb.Task_DATABASE_DATA_UPDATE:
+		return storepb.Task_DATABASE_DATA_UPDATE
+	case v1pb.Task_DATABASE_EXPORT:
+		return storepb.Task_DATABASE_EXPORT
+	default:
+		return storepb.Task_TASK_TYPE_UNSPECIFIED
 	}
 }
 

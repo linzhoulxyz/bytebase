@@ -13,8 +13,8 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/bytebase/bytebase/backend/common"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
 	"github.com/bytebase/bytebase/backend/plugin/db"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 // SyncInstance syncs the instance.
@@ -195,8 +195,8 @@ func getColumn(ctx context.Context, tx *spanner.ReadOnlyTransaction) (map[db.Tab
 		}
 		column.Position = int32(position)
 		if defaultStr.Valid {
-			// TODO: use correct default type
-			column.DefaultExpression = defaultStr.StringVal
+			// Store in Default field (migration from DefaultExpression to Default)
+			column.Default = defaultStr.StringVal
 		}
 		key := db.TableKey{Schema: schemaName, Table: tableName}
 		columnsMap[key] = append(columnsMap[key], column)

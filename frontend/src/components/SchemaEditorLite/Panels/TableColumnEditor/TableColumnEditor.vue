@@ -27,7 +27,7 @@
 
   <ColumnDefaultValueExpressionModal
     v-if="editColumnDefaultValueExpressionContext"
-    :expression="editColumnDefaultValueExpressionContext.defaultExpression"
+    :expression="editColumnDefaultValueExpressionContext.default"
     @close="editColumnDefaultValueExpressionContext = undefined"
     @update:expression="handleSelectColumnDefaultValueExpression"
   />
@@ -648,13 +648,9 @@ const schemaTemplateColumnTypes = computed(() => {
 
 const handleColumnDefaultInput = (column: ColumnMetadata, value: string) => {
   if (!column.hasDefault) return;
-  if (column.defaultNull) return;
+  if (column.default === "NULL") return;
 
-  if (typeof column.defaultString === "string") {
-    column.defaultString = value;
-  } else if (typeof column.defaultExpression === "string") {
-    column.defaultExpression = value;
-  }
+  column.default = value;
   markColumnStatus(column, "updated");
 };
 
@@ -668,33 +664,16 @@ const handleColumnDefaultSelect = (
     markColumnStatus(column, "updated");
     return;
   }
-  if (defaults.defaultNull) {
+  if (defaults.default === "NULL") {
     Object.assign(column, defaults);
     markColumnStatus(column, "updated");
     return;
   }
-  if (typeof defaults.defaultExpression === "string") {
+  if (typeof defaults.default === "string") {
     Object.assign(column, {
       ...defaults,
-      // copy current editing expr / string to column.defaultExpression
-      defaultExpression:
-        column.defaultExpression ??
-        column.defaultString ??
-        defaults.defaultExpression ??
-        "",
-    });
-    markColumnStatus(column, "updated");
-    return;
-  }
-  if (typeof defaults.defaultString === "string") {
-    Object.assign(column, {
-      ...defaults,
-      // copy current editing string to column.defaultString
-      defaultString:
-        column.defaultString ??
-        column.defaultExpression ??
-        defaults.defaultString ??
-        "",
+      // copy current editing string to column.default
+      default: column.default ?? defaults.default ?? "",
     });
     markColumnStatus(column, "updated");
     return;
@@ -707,9 +686,7 @@ const handleSelectColumnDefaultValueExpression = (expression: string) => {
     return;
   }
   column.hasDefault = true;
-  column.defaultNull = false;
-  column.defaultString = "";
-  column.defaultExpression = expression;
+  column.default = expression;
 
   markColumnStatus(column, "updated");
 };

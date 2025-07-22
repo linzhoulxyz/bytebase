@@ -82,8 +82,7 @@
     "snapshot": "Snapshot",
     "status": "Status",
     "stage": "Stage",
-    "task": "Task",
-    "tasks": "Tasks",
+    "task": "Task | Tasks",
     "blocking-task": "Blocking task",
     "sql": "SQL",
     "unassigned": "Unassigned",
@@ -171,6 +170,8 @@
     "download": "Download",
     "will-lose-unsaved-data": "Will lose any unsaved data.",
     "deleted": "Deleted",
+    "active": "Active",
+    "reopen": "Reopen",
     "will-override-current-data": "Will override current data.",
     "rollout": "Rollout",
     "upload": "Upload",
@@ -233,7 +234,9 @@
     "summary": "Summary",
     "errors": "Errors",
     "removed": "Removed",
-    "submit": "Submit"
+    "submit": "Submit",
+    "start": "Start",
+    "draft": "Draft"
   },
   "error-page": {
     "go-back-home": "Go back home"
@@ -281,13 +284,12 @@
     "cancel-task": "Cancel task | Cancel tasks",
     "created": "Created",
     "run-immediately": "Run task immediately | Run tasks immediately",
+    "select-task": "Select task | Select tasks",
     "selected-n-tasks": "{n} task selected | {n} tasks selected",
-    "no-tasks": "No tasks",
     "no-tasks-selected": "No tasks selected",
     "no-runnable-tasks": "No runnable tasks",
     "no-skippable-tasks": "No skippable tasks",
     "no-cancellable-tasks": "No cancellable tasks",
-    "cross-stage-not-supported": "Cross-stage operations not supported",
     "no-permission": "No permission to perform this action",
     "scheduled-time": "Scheduled time",
     "select-scheduled-time": "Select scheduled time",
@@ -314,12 +316,22 @@
     }
   },
   "task-run": {
+    "history": "Execution History",
+    "latest-logs": "Latest Logs",
     "status": {
       "enqueued": "Waiting for execution.",
       "enqueued-with-rollout-time": "Waiting to execute after {time}.",
       "waiting-connection": "Waiting for available instance connections. The instance connection count has reached the limit set on Bytebase. Last report at {time}.",
       "waiting-task": "Waiting for another task to finish. Last report at {time}.",
       "waiting-max-tasks-per-rollout": "Waiting for other tasks to finish. Maximum running tasks limit per rollout has been reached. Last report at {time}."
+    },
+    "rollback": {
+      "available": "Rollback available for {n} task | Rollback available for {n} tasks",
+      "preview-statement": {
+        "self": "Preview Statement",
+        "description": "Bytebase generates a rollback statement based on the task run. You can review the statement before executing the rollback."
+      },
+      "no-statement-generated": "No rollback statement generated"
     }
   },
   "banner": {
@@ -861,7 +873,7 @@
         },
         "creator": {
           "title": "Creator",
-          "description": "Search by the issue creator"
+          "description": "Search by the creator"
         },
         "subscriber": {},
         "approver": {
@@ -919,6 +931,13 @@
     "statement-from-sheet-warning": "Due to the SQL being oversized, it has been truncated to display, and editing is disabled. You can upload a new SQL file to overwrite it.",
     "overwrite-current-statement": "Overwrite current SQL statement",
     "upload-sql-file-max-size-exceeded": "Max file size ({size}) exceeded.",
+    "transaction-mode": {
+      "label": "Transaction Mode",
+      "on": "ON",
+      "off": "OFF",
+      "on-tooltip": "Wraps all statements in a single transaction (BEGIN/COMMIT).",
+      "off-tooltip": "Executes statements individually in auto-commit mode. Statements are committed immediately and cannot be rolled back if a later statement fails."
+    },
     "waiting-earliest-allowed-time": "Will run after {time}",
     "batch-transition": {
       "not-allowed-tips": "Some of selected issues cannot be {operation}",
@@ -976,7 +995,8 @@
     "error": {
       "you-don-have-privilege-to-edit-this-issue": "You don't have privilege to edit this issue",
       "you-are-not-allowed-to-perform-this-action": "You are not allowed to perform this action",
-      "cannot-close-issue-with-running-tasks": "Cannot close issue with running tasks"
+      "cannot-close-issue-with-running-tasks": "Cannot close issue with running tasks",
+      "statement-cannot-be-modified": "Statement cannot be modified after the issue is created"
     },
     "unfinished-resolved-issue-tips": "This issue is marked as \"Done\" but some of its tasks are not executed successfully.",
     "some-tasks-are-not-executed-successfully": "(Some tasks are not executed successfully)",
@@ -986,7 +1006,8 @@
       "options": "Options",
       "format": "Format",
       "encrypt": "Encrypt",
-      "file-downloaded": "File Downloaded"
+      "file-downloaded": "File Downloaded",
+      "download-tooltip": "Aavailable for 24 hours"
     },
     "task-run": {
       "logs": "Logs",
@@ -1021,7 +1042,6 @@
         "no-session-found": "No session found."
       }
     },
-    "sql-review-only": "SQL Review Only",
     "title": {
       "edit-schema": "Edit schema",
       "change-data": "Change data",
@@ -1042,18 +1062,17 @@
     "approval": {
       "rejected-title": "Issue Approval Rejected",
       "pending-title": "Issue Approval Pending",
-      "rejected-description": "This issue has been rejected by approvers. Force rollout is required to proceed.",
-      "pending-description": "This issue is waiting for approval. Force rollout is required to proceed.",
-      "rejected-error": "Issue approval has been rejected. Please enable force rollout to proceed.",
-      "pending-error": "Issue approval is pending. Please enable force rollout to proceed."
+      "rejected-description": "This issue has been rejected by approvers. Please enable force run to proceed.",
+      "pending-description": "This issue is waiting for approval. Please enable force run to proceed.",
+      "rejected-error": "Issue approval has been rejected. Please enable force run to proceed.",
+      "pending-error": "Issue approval is pending. Please enable force run to proceed."
     },
     "new-layout": "New CI/CD Layout"
   },
   "plan": {
-    "self": "Plan",
     "plans": "Plans",
     "new-plan": "New Plan",
-    "add-spec": "Add Specification",
+    "add-spec": "Add Change",
     "change-type": "Change Type",
     "schema-migration": "Schema Migration",
     "schema-migration-description": "Database structural changes (DDL) including tables, columns, indexes, constraints and schema alterations",
@@ -1062,16 +1081,13 @@
     "select-targets": "Select Targets",
     "ready-for-review": "Ready for Review",
     "overview": {
-      "description": "View and manage all specifications in this plan",
-      "total-specs": "Total Specs",
+      "total-changes": "Total Changes",
       "total-targets": "Total Targets",
-      "no-checks": "No checks",
-      "affected-resources": "Affected Resources"
+      "no-checks": "No checks"
     },
     "navigator": {
-      "specifications": "Specifications",
+      "changes": "Changes",
       "checks": "Checks",
-      "review": "Review",
       "rollout": "Rollout",
       "statement-empty": "Statement is empty"
     },
@@ -1089,13 +1105,7 @@
     "targets": {
       "title": "Targets",
       "no-targets-found": "No targets found",
-      "one-database": "1 database",
-      "multiple-databases": "{count} databases",
-      "database-group": "Database Group",
-      "database-not-found": "Database not found",
       "type": {
-        "instance": "Instance",
-        "database": "Database",
         "database-group": "Database Group"
       },
       "view-all": "View all ({count})"
@@ -1123,11 +1133,30 @@
     },
     "refresh-indicator": {
       "last-refresh": "Last refresh: {time}"
+    },
+    "state": {
+      "description": "Filter plans by their state",
+      "close-confirm": "Are you sure to close this plan?",
+      "reopen-confirm": "Are you sure to reopen this plan?"
     }
   },
   "rollout": {
     "rollouts": "Rollouts",
-    "force-rollout": "Force rollout"
+    "force-rollout": "Force run",
+    "stage": {
+      "self": "Stage | Stages",
+      "start-stage": "Start stage",
+      "no-stages": {
+        "self": "No stages",
+        "description": "No stages are defined for this rollout."
+      }
+    },
+    "message": {
+      "pervious-stages-incomplete": {
+        "title": "Previous stages are incomplete",
+        "description": "Some previous stages are not completed. Please enable force run to proceed."
+      }
+    }
   },
   "quick-action": {
     "create-db": "Create database",
@@ -1572,25 +1601,6 @@
     },
     "all": "All databases",
     "show-schemaless-databases": "Show schemaless databases. (Edit Schema is not applicable for schemaless databases.)",
-    "secret": {
-      "self": "Secret",
-      "new": "New secret",
-      "edit": "Edit secret",
-      "name-placeholder": "Input secret name",
-      "validation": {
-        "cannot-be-changed-later": "Cannot be changed later",
-        "duplicated-name": "Duplicated secret name",
-        "name-is-required": "Secret name is required",
-        "name-pattern-mismatch": "Secret name should contain only uppercase letters, digit, or _ (underscore)",
-        "name-cannot-prefix-with-bytebase": "Secret name cannot prefix with 'BYTEBASE_'",
-        "name-cannot-start-with-number": "Secret name cannot start with number"
-      },
-      "description-placeholder": "Input description",
-      "value": "Value",
-      "value-placeholder": "Input value (write only)",
-      "delete-tips": "Delete secret",
-      "description": "You can use secret in the change script to hide sensitive information, please refer to {guide}"
-    },
     "transfer": {
       "errors": {
         "select-target-project": "Select target project",
@@ -1619,7 +1629,6 @@
       "reference": "Reference"
     },
     "checks": "Checks",
-    "backup-unavailable-for-databases": "Backup is not available for databases: {databases}",
     "engine-not-supported-for-backup": "Prior backup is not supported for: {databases}",
     "revision": {
       "self": "Revision",
@@ -1981,6 +1990,7 @@
     "sync-in-progress": "Sync in progress",
     "create-a-worksheet": "Create a new worksheet",
     "select-a-database-to-start": "Select a database to start",
+    "show-empty-environments": "Show empty environments",
     "select-encoding": "Select encoding",
     "redis-command": {
       "self": "Run redis command on",
@@ -2030,8 +2040,6 @@
     "sync-sql-from-schema-editor": "Sync SQL from Schema Editor",
     "raw-sql": "Raw SQL",
     "search-database-and-table": "Search database and table",
-    "search-table": "Search table",
-    "search-column": "Search column",
     "nothing-changed-for-database": "Nothing changed for database {database}",
     "actions": {
       "create-schema": "Create schema",
@@ -2151,7 +2159,6 @@
     "request-with-qr": "Scan QR code",
     "require-subscription": "This feature requires {requiredPlan} subscription, please purchase Bytebase license to unlock it.",
     "required-plan-with-trial": "This feature requires {requiredPlan}. {startTrial}",
-    "trial-for-plan": "You can start a free trial for {plan} with {days} days - no credit card required.",
     "trial-for-days": "You can start a free trial for {days} days - no credit card required.",
     "contact-to-upgrade": "Contact your Workspace admin to upgrade the plan.",
     "upgrade-now": "Upgrade Now",

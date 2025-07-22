@@ -3,7 +3,6 @@ package command
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"slices"
 	"strings"
@@ -16,7 +15,7 @@ import (
 
 	"github.com/bytebase/bytebase/action/args"
 	"github.com/bytebase/bytebase/action/world"
-	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
+	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
 )
 
 func NewRolloutCommand(w *world.World) *cobra.Command {
@@ -38,7 +37,14 @@ func NewRolloutCommand(w *world.World) *cobra.Command {
 }
 
 func validateRolloutFlags(w *world.World) func(*cobra.Command, []string) error {
-	return func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		if p := cmd.Parent(); p != nil {
+			if p.PersistentPreRunE != nil {
+				if err := p.PersistentPreRunE(cmd, args); err != nil {
+					return err
+				}
+			}
+		}
 		switch w.CheckPlan {
 		case "SKIP", "FAIL_ON_WARNING", "FAIL_ON_ERROR":
 		default:
@@ -57,32 +63,32 @@ func runRollout(w *world.World) func(command *cobra.Command, _ []string) error {
 		}
 
 		// Check version compatibility
-		checkVersionCompatibility(client, args.Version)
+		checkVersionCompatibility(w, client, args.Version)
 
 		var plan *v1pb.Plan
 		if w.Plan != "" {
-			planP, err := client.getPlan(w.Plan)
+			planP, err := client.GetPlan(ctx, w.Plan)
 			if err != nil {
 				return errors.Wrapf(err, "failed to get plan")
 			}
 			plan = planP
-			slog.Info("use the provided plan", "url", fmt.Sprintf("%s/%s", client.url, plan.Name))
+			w.Logger.Info("use the provided plan", "url", fmt.Sprintf("%s/%s", client.url, plan.Name))
 		} else {
-			releaseFiles, err := getReleaseFiles(w.FilePattern)
+			releaseFiles, err := getReleaseFiles(w, w.FilePattern)
 			if err != nil {
 				return errors.Wrapf(err, "failed to get release files")
 			}
-			createReleaseResponse, err := client.createRelease(w.Project, &v1pb.Release{
+			createReleaseResponse, err := client.CreateRelease(ctx, w.Project, &v1pb.Release{
 				Title:     w.ReleaseTitle,
 				Files:     releaseFiles,
-				VcsSource: getVCSSource(),
+				VcsSource: getVCSSource(w),
 			})
 			if err != nil {
 				return errors.Wrapf(err, "failed to create release")
 			}
 			w.OutputMap["release"] = createReleaseResponse.Name
 
-			planCreated, err := client.createPlan(w.Project, &v1pb.Plan{
+			planCreated, err := client.CreatePlan(ctx, w.Project, &v1pb.Plan{
 				Title: w.ReleaseTitle,
 				Specs: []*v1pb.Plan_Spec{
 					{
@@ -100,7 +106,7 @@ func runRollout(w *world.World) func(command *cobra.Command, _ []string) error {
 				return errors.Wrapf(err, "failed to create plan")
 			}
 			plan = planCreated
-			slog.Info("plan created", "url", fmt.Sprintf("%s/%s", client.url, plan.Name))
+			w.Logger.Info("plan created", "url", fmt.Sprintf("%s/%s", client.url, plan.Name))
 		}
 		w.OutputMap["plan"] = plan.Name
 
@@ -124,13 +130,13 @@ func runAndWaitForPlanChecks(ctx context.Context, w *world.World, client *Client
 			return errors.Wrapf(ctx.Err(), "context cancelled")
 		}
 
-		runs, err := client.listAllPlanCheckRuns(planName)
+		runs, err := client.ListAllPlanCheckRuns(ctx, planName)
 		if err != nil {
 			return errors.Wrapf(err, "failed to list plan checks")
 		}
 		if len(runs.PlanCheckRuns) == 0 {
-			slog.Info("running plan checks")
-			_, err := client.runPlanChecks(&v1pb.RunPlanChecksRequest{
+			w.Logger.Info("running plan checks")
+			_, err := client.RunPlanChecks(ctx, &v1pb.RunPlanChecksRequest{
 				Name: planName,
 			})
 			if err != nil {
@@ -174,7 +180,7 @@ func runAndWaitForPlanChecks(ctx context.Context, w *world.World, client *Client
 		if runningCount == 0 {
 			break
 		}
-		slog.Info("waiting for plan checks to complete", "runningCount", runningCount)
+		w.Logger.Info("waiting for plan checks to complete", "runningCount", runningCount)
 		time.Sleep(5 * time.Second)
 	}
 
@@ -183,7 +189,7 @@ func runAndWaitForPlanChecks(ctx context.Context, w *world.World, client *Client
 
 func runAndWaitForRollout(ctx context.Context, w *world.World, client *Client, planName string) error {
 	// preview rollout with all pending stages
-	rolloutPreview, err := client.createRollout(&v1pb.CreateRolloutRequest{
+	rolloutPreview, err := client.CreateRollout(ctx, &v1pb.CreateRolloutRequest{
 		Parent: w.Project,
 		Rollout: &v1pb.Rollout{
 			Plan: planName,
@@ -202,7 +208,7 @@ func runAndWaitForRollout(ctx context.Context, w *world.World, client *Client, p
 
 	// create rollout with no stages to obtain the rollout name
 	emptyTarget := ""
-	rolloutEmpty, err := client.createRollout(&v1pb.CreateRolloutRequest{
+	rolloutEmpty, err := client.CreateRollout(ctx, &v1pb.CreateRolloutRequest{
 		Parent: w.Project,
 		Rollout: &v1pb.Rollout{
 			Plan:  planName,
@@ -216,14 +222,14 @@ func runAndWaitForRollout(ctx context.Context, w *world.World, client *Client, p
 	}
 	w.OutputMap["rollout"] = rolloutEmpty.Name
 
-	slog.Info("rollout created", "url", fmt.Sprintf("%s/%s", client.url, rolloutEmpty.Name))
+	w.Logger.Info("rollout created", "url", fmt.Sprintf("%s/%s", client.url, rolloutEmpty.Name))
 
 	return waitForRollout(ctx, w, client, pendingStages, rolloutEmpty.Name)
 }
 
 func waitForRollout(ctx context.Context, w *world.World, client *Client, pendingStages []string, rolloutName string) error {
 	if w.TargetStage == "" {
-		slog.Info("target stage is not specified, exiting...")
+		w.Logger.Info("target stage is not specified, exiting...")
 		return nil
 	}
 
@@ -231,10 +237,10 @@ func waitForRollout(ctx context.Context, w *world.World, client *Client, pending
 		if ctx.Err() == nil {
 			return
 		}
-		slog.Info("context cancelled, canceling the rollout")
+		w.Logger.Info("context cancelled, canceling the rollout")
 		// cancel rollout
 		if err := func() error {
-			taskRuns, err := client.listAllTaskRuns(rolloutName)
+			taskRuns, err := client.ListAllTaskRuns(context.Background(), rolloutName)
 			if err != nil {
 				return errors.Wrapf(err, "failed to list task runs")
 			}
@@ -247,7 +253,7 @@ func waitForRollout(ctx context.Context, w *world.World, client *Client, pending
 			}
 			var errs error
 			for stage, taskRuns := range taskRunsToCancelByStage {
-				_, err := client.batchCancelTaskRuns(&v1pb.BatchCancelTaskRunsRequest{
+				_, err := client.BatchCancelTaskRuns(context.Background(), &v1pb.BatchCancelTaskRunsRequest{
 					Parent:   stage + "/tasks/-",
 					TaskRuns: taskRuns,
 				})
@@ -258,17 +264,17 @@ func waitForRollout(ctx context.Context, w *world.World, client *Client, pending
 			}
 			return errs
 		}(); err != nil {
-			slog.Error("failed to cancel rollout", "error", err)
+			w.Logger.Error("failed to cancel rollout", "error", err)
 		}
 	}()
 
-	rollout, err := client.getRollout(rolloutName)
+	rollout, err := client.GetRollout(ctx, rolloutName)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get rollout")
 	}
 
-	slog.Info("exit after the target stage is completed", "targetStage", w.TargetStage)
-	slog.Info("the rollout has the following stages",
+	w.Logger.Info("exit after the target stage is completed", "targetStage", w.TargetStage)
+	w.Logger.Info("the rollout has the following stages",
 		"createdStages", slices.Collect(func(yield func(string) bool) {
 			for _, stage := range rollout.GetStages() {
 				if !yield(stage.Environment) {
@@ -277,6 +283,10 @@ func waitForRollout(ctx context.Context, w *world.World, client *Client, pending
 			}
 		}),
 		"pendingStages", pendingStages)
+	if len(pendingStages) == 0 && len(rollout.Stages) == 0 {
+		w.Logger.Info("no stages in the rollout. exiting...")
+		return nil
+	}
 
 	targetStageFound := false
 	for _, stage := range rollout.GetStages() {
@@ -292,7 +302,7 @@ func waitForRollout(ctx context.Context, w *world.World, client *Client, pending
 		}
 	}
 	if !targetStageFound {
-		slog.Info("the target stage is not found in the rollout. exiting...", "targetStage", w.TargetStage)
+		w.Logger.Info("the target stage is not found in the rollout. exiting...", "targetStage", w.TargetStage)
 		return nil
 	}
 
@@ -302,9 +312,9 @@ func waitForRollout(ctx context.Context, w *world.World, client *Client, pending
 		latestStage := rollout.Stages[len(rollout.Stages)-1].Environment
 		index := slices.Index(pendingStages, latestStage)
 		if index != -1 {
-			slog.Info("removing pending stage that already in the rollout stage", "latestStage", latestStage)
+			w.Logger.Info("removing pending stage that already in the rollout stage", "latestStage", latestStage)
 			pendingStages = pendingStages[index+1:]
-			_, err := client.createRollout(&v1pb.CreateRolloutRequest{
+			_, err := client.CreateRollout(ctx, &v1pb.CreateRolloutRequest{
 				Parent: w.Project,
 				Rollout: &v1pb.Rollout{
 					Plan: rollout.GetPlan(),
@@ -323,7 +333,7 @@ func waitForRollout(ctx context.Context, w *world.World, client *Client, pending
 			return errors.Wrapf(ctx.Err(), "context cancelled")
 		}
 		// get rollout
-		rollout, err := client.getRollout(rolloutName)
+		rollout, err := client.GetRollout(ctx, rolloutName)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get rollout")
 		}
@@ -335,7 +345,7 @@ func waitForRollout(ctx context.Context, w *world.World, client *Client, pending
 			target := pendingStages[0]
 			pendingStages = pendingStages[1:]
 
-			rolloutAdvanced, err := client.createRollout(&v1pb.CreateRolloutRequest{
+			rolloutAdvanced, err := client.CreateRollout(ctx, &v1pb.CreateRolloutRequest{
 				Parent: w.Project,
 				Rollout: &v1pb.Rollout{
 					Plan: rollout.GetPlan(),
@@ -383,7 +393,7 @@ func waitForRollout(ctx context.Context, w *world.World, client *Client, pending
 			return errors.Errorf("found canceled tasks. view on Bytebase")
 		}
 		if done {
-			slog.Info("stage completed", "stage", stage.Environment)
+			w.Logger.Info("stage completed", "stage", stage.Environment)
 			if w.TargetStage == stage.Environment {
 				break
 			}
@@ -393,12 +403,12 @@ func waitForRollout(ctx context.Context, w *world.World, client *Client, pending
 
 		// run stage tasks
 		if len(notStartedTasks) > 0 {
-			slog.Info("running stage tasks", "stage", stage.Environment, "taskCount", len(notStartedTasks))
-			if _, err := client.batchRunTasks(&v1pb.BatchRunTasksRequest{
+			w.Logger.Info("running stage tasks", "stage", stage.Environment, "taskCount", len(notStartedTasks))
+			if _, err := client.BatchRunTasks(ctx, &v1pb.BatchRunTasksRequest{
 				Parent: stage.Name,
 				Tasks:  notStartedTasks,
 			}); err != nil {
-				// ignore retryable error.
+				// Check for specific error indicating task runs already exist (retryable)
 				if !strings.Contains(err.Error(), "cannot create pending task runs because there are pending/running/done task runs") {
 					return errors.Wrapf(err, "failed to batch create tasks")
 				}
@@ -409,24 +419,24 @@ func waitForRollout(ctx context.Context, w *world.World, client *Client, pending
 	return nil
 }
 
-func getVCSSource() *v1pb.Release_VCSSource {
-	switch getJobPlatform() {
-	case GitHub:
+func getVCSSource(w *world.World) *v1pb.Release_VCSSource {
+	switch w.Platform {
+	case world.GitHub:
 		return &v1pb.Release_VCSSource{
 			VcsType: v1pb.VCSType_GITHUB,
 			Url:     os.Getenv("GITHUB_SERVER_URL") + "/" + os.Getenv("GITHUB_REPOSITORY") + "/commit/" + os.Getenv("GITHUB_SHA"),
 		}
-	case GitLab:
+	case world.GitLab:
 		return &v1pb.Release_VCSSource{
 			VcsType: v1pb.VCSType_GITLAB,
 			Url:     os.Getenv("CI_PROJECT_URL") + "/-/commit/" + os.Getenv("CI_COMMIT_SHA"),
 		}
-	case Bitbucket:
+	case world.Bitbucket:
 		return &v1pb.Release_VCSSource{
 			VcsType: v1pb.VCSType_BITBUCKET,
 			Url:     os.Getenv("BITBUCKET_GIT_HTTP_ORIGIN") + "/commits/" + os.Getenv("BITBUCKET_COMMIT"),
 		}
-	case AzureDevOps:
+	case world.AzureDevOps:
 		return &v1pb.Release_VCSSource{
 			VcsType: v1pb.VCSType_AZURE_DEVOPS,
 			Url:     os.Getenv("SYSTEM_COLLECTIONURI") + os.Getenv("SYSTEM_TEAMPROJECT") + "/_git/" + os.Getenv("BUILD_REPOSITORY_NAME") + "/commit/" + os.Getenv("BUILD_SOURCEVERSION"),

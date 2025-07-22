@@ -20,12 +20,12 @@ import (
 
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
+	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	"github.com/bytebase/bytebase/backend/plugin/db/util"
 	"github.com/bytebase/bytebase/backend/plugin/parser/base"
 	mysqlparser "github.com/bytebase/bytebase/backend/plugin/parser/mysql"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
-	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
 var (
@@ -153,11 +153,31 @@ func parseVersion(version string) (string, string, error) {
 }
 
 // Execute executes a SQL statement.
-func (d *Driver) Execute(ctx context.Context, statement string, _ db.ExecuteOptions) (int64, error) {
+func (d *Driver) Execute(ctx context.Context, statement string, opts db.ExecuteOptions) (int64, error) {
+	// Parse transaction mode from the script
+	transactionMode, cleanedStatement := base.ParseTransactionMode(statement)
+	statement = cleanedStatement
+
+	// Apply default when transaction mode is not specified
+	if transactionMode == common.TransactionModeUnspecified {
+		transactionMode = common.GetDefaultTransactionMode()
+	}
+
 	statement, err := mysqlparser.DealWithDelimiter(statement)
 	if err != nil {
 		return 0, errors.Wrapf(err, "failed to deal with delimiter")
 	}
+	// Execute based on transaction mode
+	// Note: StarRocks is an OLAP database with limited transaction support.
+	// For DDL operations, transactions are not supported. For DML operations,
+	// StarRocks supports transactions within certain limitations.
+	if transactionMode == common.TransactionModeOff {
+		return d.executeInAutoCommitMode(ctx, statement)
+	}
+	return d.executeInTransactionMode(ctx, statement, opts)
+}
+
+func (d *Driver) executeInTransactionMode(ctx context.Context, statement string, opts db.ExecuteOptions) (int64, error) {
 	conn, err := d.db.Conn(ctx)
 	if err != nil {
 		return 0, err
@@ -172,9 +192,23 @@ func (d *Driver) Execute(ctx context.Context, statement string, _ db.ExecuteOpti
 
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
+		opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_BEGIN, err.Error())
 		return 0, errors.Wrapf(err, "failed to begin execute transaction")
 	}
-	defer tx.Rollback()
+	opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_BEGIN, "")
+
+	committed := false
+	defer func() {
+		if !committed {
+			err := tx.Rollback()
+			var rerr string
+			if err != nil && !errors.Is(err, sql.ErrTxDone) {
+				rerr = err.Error()
+				slog.Debug("failed to rollback transaction", log.BBError(err))
+			}
+			opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_ROLLBACK, rerr)
+		}
+	}()
 
 	sqlResult, err := tx.ExecContext(ctx, statement)
 	if err != nil {
@@ -184,18 +218,54 @@ func (d *Driver) Execute(ctx context.Context, statement string, _ db.ExecuteOpti
 				slog.Error("failed to cancel connection", slog.String("connectionID", connectionID), log.BBError(err))
 			}
 		}
-
 		return 0, err
 	}
+
 	rowsAffected, err := sqlResult.RowsAffected()
 	if err != nil {
 		// Since we cannot differentiate DDL and DML yet, we have to ignore the error.
 		slog.Debug("rowsAffected returns error", log.BBError(err))
 	}
+
 	if err := tx.Commit(); err != nil {
+		opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_COMMIT, err.Error())
 		return 0, errors.Wrapf(err, "failed to commit execute transaction")
 	}
+	opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_COMMIT, "")
+	committed = true
+	return rowsAffected, nil
+}
 
+func (d *Driver) executeInAutoCommitMode(ctx context.Context, statement string) (int64, error) {
+	conn, err := d.db.Conn(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer conn.Close()
+
+	connectionID, err := getConnectionID(ctx, conn)
+	if err != nil {
+		return 0, err
+	}
+	slog.Debug("connectionID", slog.String("connectionID", connectionID))
+
+	// Execute in auto-commit mode
+	sqlResult, err := conn.ExecContext(ctx, statement)
+	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			slog.Info("cancel connection", slog.String("connectionID", connectionID))
+			if err := d.StopConnectionByID(connectionID); err != nil {
+				slog.Error("failed to cancel connection", slog.String("connectionID", connectionID), log.BBError(err))
+			}
+		}
+		return 0, err
+	}
+
+	rowsAffected, err := sqlResult.RowsAffected()
+	if err != nil {
+		// Since we cannot differentiate DDL and DML yet, we have to ignore the error.
+		slog.Debug("rowsAffected returns error", log.BBError(err))
+	}
 	return rowsAffected, nil
 }
 

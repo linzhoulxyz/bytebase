@@ -3,12 +3,16 @@ package v1
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"slices"
 	"strings"
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/google/cel-go/cel"
+	celast "github.com/google/cel-go/common/ast"
+	celoperators "github.com/google/cel-go/common/operators"
 	"github.com/jackc/pgtype"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -22,13 +26,13 @@ import (
 	"github.com/bytebase/bytebase/backend/component/state"
 	"github.com/bytebase/bytebase/backend/component/webhook"
 	"github.com/bytebase/bytebase/backend/enterprise"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
+	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
+	"github.com/bytebase/bytebase/backend/generated-go/v1/v1connect"
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	parserbase "github.com/bytebase/bytebase/backend/plugin/parser/base"
 	"github.com/bytebase/bytebase/backend/store"
 	"github.com/bytebase/bytebase/backend/utils"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
-	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
-	"github.com/bytebase/bytebase/proto/generated-go/v1/v1connect"
 )
 
 // RolloutService represents a service for managing rollout.
@@ -85,9 +89,6 @@ func (s *RolloutService) PreviewRollout(ctx context.Context, req *connect.Reques
 	rollout, err := GetPipelineCreate(ctx, s.store, s.sheetManager, s.dbFactory, request.GetPlan().GetName(), specs, nil /* snapshot */, project)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("failed to get pipeline create, error: %v", err))
-	}
-	if len(rollout.Tasks) == 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("plan has no stage created, hint: check deployment config setting that the target database is in a stage"))
 	}
 
 	rolloutV1, err := convertToRollout(ctx, s.store, project, rollout)
@@ -160,6 +161,9 @@ func (s *RolloutService) ListRollouts(ctx context.Context, req *connect.Request[
 		Limit:     &limitPlusOne,
 		Offset:    &offset.offset,
 	}
+	if err := s.buildRolloutFindWithFilter(ctx, find, request.Filter); err != nil {
+		return nil, err
+	}
 	pipelines, err := s.store.ListPipelineV2(ctx, find)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to list pipelines, error: %v", err))
@@ -194,6 +198,132 @@ func (s *RolloutService) ListRollouts(ctx context.Context, req *connect.Request[
 		Rollouts:      rollouts,
 		NextPageToken: nextPageToken,
 	}), nil
+}
+
+// buildRolloutFindWithFilter builds the filter for rollout find.
+func (s *RolloutService) buildRolloutFindWithFilter(ctx context.Context, pipelineFind *store.PipelineFind, filter string) error {
+	if filter == "" {
+		return nil
+	}
+
+	e, err := cel.NewEnv()
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, errors.Errorf("failed to create cel env"))
+	}
+	ast, iss := e.Parse(filter)
+	if iss != nil {
+		return connect.NewError(connect.CodeInvalidArgument, errors.Errorf("failed to parse filter %v, error: %v", filter, iss.String()))
+	}
+
+	var getFilter func(expr celast.Expr) (string, error)
+	var positionalArgs []any
+
+	getFilter = func(expr celast.Expr) (string, error) {
+		switch expr.Kind() {
+		case celast.CallKind:
+			functionName := expr.AsCall().FunctionName()
+			switch functionName {
+			case celoperators.LogicalAnd:
+				return getSubConditionFromExpr(expr, getFilter, "AND")
+			case celoperators.Equals:
+				variable, value := getVariableAndValueFromExpr(expr)
+				switch variable {
+				case "creator":
+					user, err := s.getUserByIdentifier(ctx, value.(string))
+					if err != nil {
+						return "", connect.NewError(connect.CodeInternal, errors.Errorf("failed to get user %v with error %v", value, err.Error()))
+					}
+					positionalArgs = append(positionalArgs, user.ID)
+					return fmt.Sprintf("pipeline.creator_id = $%d", len(positionalArgs)), nil
+				case "task_type":
+					taskType, ok := value.(string)
+					if !ok {
+						return "", connect.NewError(connect.CodeInvalidArgument, errors.Errorf("task_type value must be a string"))
+					}
+					// Validate task type
+					if _, ok := v1pb.Task_Type_value[taskType]; !ok {
+						return "", connect.NewError(connect.CodeInvalidArgument, errors.Errorf("invalid task_type value: %s", taskType))
+					}
+					// Convert v1pb.Task_Type to storepb.Task_Type
+					v1TaskType := v1pb.Task_Type(v1pb.Task_Type_value[taskType])
+					storeTaskType := convertToStoreTaskType(v1TaskType)
+					// Query tasks that have the specified type
+					positionalArgs = append(positionalArgs, storeTaskType.String())
+					return fmt.Sprintf("EXISTS (SELECT 1 FROM task WHERE task.pipeline_id = pipeline.id AND task.type = $%d)", len(positionalArgs)), nil
+				default:
+					return "", connect.NewError(connect.CodeInvalidArgument, errors.Errorf("unsupported variable %q", variable))
+				}
+			case celoperators.In:
+				variable, value := getVariableAndValueFromExpr(expr)
+				switch variable {
+				case "task_type":
+					rawList, ok := value.([]any)
+					if !ok {
+						return "", connect.NewError(connect.CodeInvalidArgument, errors.Errorf("invalid list value %q for %v", value, variable))
+					}
+					if len(rawList) == 0 {
+						return "", connect.NewError(connect.CodeInvalidArgument, errors.Errorf("empty list value for filter %v", variable))
+					}
+					var placeholders []string
+					for _, raw := range rawList {
+						taskType, ok := raw.(string)
+						if !ok {
+							return "", connect.NewError(connect.CodeInvalidArgument, errors.Errorf("task_type value must be a string"))
+						}
+						// Validate task type
+						if _, ok := v1pb.Task_Type_value[taskType]; !ok {
+							return "", connect.NewError(connect.CodeInvalidArgument, errors.Errorf("invalid task_type value: %s", taskType))
+						}
+						// Convert v1pb.Task_Type to storepb.Task_Type
+						v1TaskType := v1pb.Task_Type(v1pb.Task_Type_value[taskType])
+						storeTaskType := convertToStoreTaskType(v1TaskType)
+						positionalArgs = append(positionalArgs, storeTaskType.String())
+						placeholders = append(placeholders, fmt.Sprintf("$%d", len(positionalArgs)))
+					}
+					// Query tasks that have any of the specified types
+					return fmt.Sprintf("EXISTS (SELECT 1 FROM task WHERE task.pipeline_id = pipeline.id AND task.type IN (%s))", strings.Join(placeholders, ", ")), nil
+				default:
+					return "", connect.NewError(connect.CodeInvalidArgument, errors.Errorf("unsupported variable %q", variable))
+				}
+			case celoperators.GreaterEquals, celoperators.LessEquals:
+				variable, rawValue := getVariableAndValueFromExpr(expr)
+				value, ok := rawValue.(string)
+				if !ok {
+					return "", errors.Errorf("expect string, got %T, hint: filter literals should be string", rawValue)
+				}
+				if variable != "update_time" {
+					return "", errors.Errorf(`">=" and "<=" are only supported for "update_time"`)
+				}
+				t, err := time.Parse(time.RFC3339, value)
+				if err != nil {
+					return "", errors.Errorf("failed to parse time %v, error: %v", value, err)
+				}
+				positionalArgs = append(positionalArgs, t)
+				if functionName == celoperators.GreaterEquals {
+					return fmt.Sprintf("updated_at >= $%d", len(positionalArgs)), nil
+				}
+				return fmt.Sprintf("updated_at <= $%d", len(positionalArgs)), nil
+			default:
+				return "", connect.NewError(connect.CodeInvalidArgument, errors.Errorf("unsupported function %v", functionName))
+			}
+		default:
+			return "", errors.Errorf("unexpected expr kind %v", expr.Kind())
+		}
+	}
+
+	where, err := getFilter(ast.NativeRep().Expr())
+	if err != nil {
+		return err
+	}
+
+	if where != "" {
+		pipelineFind.Filter = &store.ListResourceFilter{
+			Where: "(" + where + ")",
+			Args:  positionalArgs,
+		}
+	}
+
+	return nil
 }
 
 // CreateRollout creates a rollout from plan.
@@ -236,9 +366,6 @@ func (s *RolloutService) CreateRollout(ctx context.Context, req *connect.Request
 	pipelineCreate, err := GetPipelineCreate(ctx, s.store, s.sheetManager, s.dbFactory, rolloutTitle, plan.Config.GetSpecs(), plan.Config.GetDeployment(), project)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("failed to get pipeline create, error: %v", err))
-	}
-	if len(pipelineCreate.Tasks) == 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("no database matched for deployment, hint: check deployment config setting that the target database is in a stage"))
 	}
 	if isChangeDatabasePlan(plan.Config.GetSpecs()) {
 		pipelineCreate, err = getPipelineCreateToTargetStage(ctx, s.store, plan.Config.GetDeployment(), pipelineCreate, request.Target)
@@ -973,9 +1100,6 @@ func GetPipelineCreate(ctx context.Context, s *store.Store, sheetManager *sheet.
 		}
 		taskCreates = append(taskCreates, tcs...)
 	}
-	if len(taskCreates) == 0 {
-		return nil, errors.Errorf("there is no tasks created from the plan")
-	}
 
 	// Filter out tasks not in deployment environments
 	filteredTasks := filterTasksByEnvironments(taskCreates, environmentIndex)
@@ -1123,4 +1247,19 @@ func getLastApproverUID(approval *storepb.IssuePayloadApproval) *int {
 		return &id
 	}
 	return nil
+}
+
+func (s *RolloutService) getUserByIdentifier(ctx context.Context, identifier string) (*store.UserMessage, error) {
+	email := strings.TrimPrefix(identifier, "users/")
+	if email == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid empty creator identifier"))
+	}
+	user, err := s.store.GetUserByEmail(ctx, email)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.Errorf(`failed to find user "%s" with error: %v`, email, err))
+	}
+	if user == nil {
+		return nil, errors.Errorf("cannot found user %s", email)
+	}
+	return user, nil
 }

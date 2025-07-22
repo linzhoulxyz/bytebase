@@ -7,9 +7,9 @@ import (
 	"cloud.google.com/go/bigquery"
 	"google.golang.org/api/iterator"
 
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	"github.com/bytebase/bytebase/backend/plugin/db/util"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 // SyncInstance syncs the instance.
@@ -88,7 +88,7 @@ func (d *Driver) SyncDBSchema(ctx context.Context) (*storepb.DatabaseSchemaMetad
 		if row.ColumnDefault.Valid {
 			column.Default = row.ColumnDefault.String()
 		} else {
-			column.DefaultNull = true
+			column.Default = "NULL"
 		}
 
 		key := db.TableKey{Schema: "", Table: row.TableName}

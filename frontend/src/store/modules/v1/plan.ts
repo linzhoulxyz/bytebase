@@ -6,6 +6,7 @@ import { planServiceClientConnect } from "@/grpcweb";
 import {
   SearchPlansRequestSchema,
   GetPlanRequestSchema,
+  UpdatePlanRequestSchema,
 } from "@/types/proto-es/v1/plan_service_pb";
 import type { Plan } from "@/types/proto-es/v1/plan_service_pb";
 import {
@@ -17,15 +18,21 @@ import { useUserStore } from "../user";
 
 export interface PlanFind {
   project: string;
+  query?: string;
   creator?: string;
   createdTsAfter?: number;
   createdTsBefore?: number;
   hasIssue?: boolean;
   hasPipeline?: boolean;
+  specType?: string;
+  state?: "ACTIVE" | "DELETED";
 }
 
 export const buildPlanFilter = (find: PlanFind): string => {
   const filter: string[] = [];
+  if (find.query) {
+    filter.push(`title.matches("${find.query.trim().toLowerCase()}")`);
+  }
   if (find.creator) {
     filter.push(`creator == "${find.creator}"`);
   }
@@ -45,6 +52,12 @@ export const buildPlanFilter = (find: PlanFind): string => {
   if (find.hasPipeline !== undefined) {
     filter.push(`has_pipeline == ${find.hasPipeline}`);
   }
+  if (find.specType) {
+    filter.push(`spec_type == "${find.specType}"`);
+  }
+  if (find.state) {
+    filter.push(`state == "${find.state}"`);
+  }
   return filter.join(" && ");
 };
 
@@ -56,13 +69,19 @@ export const buildPlanFindBySearchParams = (
   const projectScope = scopes.find((s) => s.id === "project");
 
   const createdTsRange = getTsRangeFromSearchParams(params, "created");
+  const state = getValueFromSearchParams(params, "state", "" /* prefix='' */, [
+    "ACTIVE",
+    "DELETED",
+  ]) as "ACTIVE" | "DELETED" | "";
 
   const filter: PlanFind = {
     ...defaultFind,
     project: `projects/${projectScope?.value ?? "-"}`,
+    query: params.query,
     createdTsAfter: createdTsRange?.[0],
     createdTsBefore: createdTsRange?.[1],
     creator: getValueFromSearchParams(params, "creator", "users/"),
+    state: state || defaultFind?.state,
   };
   return filter;
 };
@@ -100,8 +119,21 @@ export const usePlanStore = defineStore("plan", () => {
     return response;
   };
 
+  const updatePlan = async (
+    plan: Plan,
+    updateMask: string[]
+  ): Promise<Plan> => {
+    const request = create(UpdatePlanRequestSchema, {
+      plan,
+      updateMask: { paths: updateMask },
+    });
+    const response = await planServiceClientConnect.updatePlan(request);
+    return response;
+  };
+
   return {
     searchPlans,
     fetchPlanByName,
+    updatePlan,
   };
 });

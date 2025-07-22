@@ -83,7 +83,6 @@
     "status": "州",
     "stage": "ステージ",
     "task": "タスク",
-    "tasks": "タスク",
     "blocking-task": "タスクをブロック中",
     "sql": "SQL",
     "unassigned": "割り当てられていない",
@@ -171,6 +170,8 @@
     "download": "ダウンロード",
     "will-lose-unsaved-data": "これにより、現在保存されていないデータはすべて失われます。",
     "deleted": "削除されました",
+    "active": "アクティブ",
+    "reopen": "再開",
     "will-override-current-data": "現在のデータは上書きされます。",
     "rollout": "リリース",
     "upload": "アップロード",
@@ -233,7 +234,9 @@
     "summary": "まとめ",
     "errors": "エラー",
     "removed": "削除されました",
-    "submit": "提出する"
+    "submit": "提出する",
+    "start": "始める",
+    "draft": "下書き"
   },
   "error-page": {
     "go-back-home": "ホームページに戻る"
@@ -281,13 +284,12 @@
     "cancel-task": "タスクをキャンセルする",
     "created": "内蔵",
     "run-immediately": "すぐに実行",
+    "select-task": "タスクを選択 | タスクを選択",
     "selected-n-tasks": "{n} 個のタスクが選択されました | {n} 個のタスクが選択されました",
-    "no-tasks": "タスクなし",
     "no-tasks-selected": "タスクが選択されていません",
     "no-runnable-tasks": "実行可能なタスクはありません",
     "no-skippable-tasks": "スキップ可能なタスクはありません",
     "no-cancellable-tasks": "キャンセル可能なタスクはありません",
-    "cross-stage-not-supported": "ステージ間の操作はサポートされていません",
     "no-permission": "この操作を実行する権限がありません",
     "scheduled-time": "予定時刻",
     "select-scheduled-time": "予定時刻を選択してください",
@@ -314,12 +316,22 @@
     }
   },
   "task-run": {
+    "history": "タスク実行履歴",
+    "latest-logs": "最新のログ",
     "status": {
       "enqueued": "処刑を待っています。",
       "enqueued-with-rollout-time": "実行を待機しています。{time} の後に実行されます。",
       "waiting-connection": "利用可能なインスタンス接続を待っています。インスタンス接続カウントは、Bytebaseの制限設定に達しました。最後の報告は {time} です。",
       "waiting-task": "別のタスクが完了するのを待っています。最後の報告は {time} です。",
       "waiting-max-tasks-per-rollout": "他のタスクが完了するのを待っています。ロールアウトごとの最大実行タスク数制限に達しました。最後の報告は {time} です。"
+    },
+    "rollback": {
+      "available": "{n} タスクのロールバックが利用可能 | {n} タスクのロールバックが利用可能",
+      "preview-statement": {
+        "self": "プレビューステートメント",
+        "description": "Bytebaseはタスク実行に基づいてロールバックステートメントを生成します。ロールバックを実行する前にステートメントを確認できます。"
+      },
+      "no-statement-generated": "ロールバックステートメントは生成されません"
     }
   },
   "banner": {
@@ -861,7 +873,7 @@
         },
         "creator": {
           "title": "作成者",
-          "description": "イシュー作成者で検索"
+          "description": "作成者で検索"
         },
         "subscriber": {},
         "approver": {
@@ -919,6 +931,13 @@
     "statement-from-sheet-warning": "SQL が大きすぎるため、表示時に切り捨てられ、編集が無効になっています。新しい SQL ファイルをアップロードして上書きすることができます。",
     "overwrite-current-statement": "現在の SQL ステートメントを上書きする",
     "upload-sql-file-max-size-exceeded": "アップロード ファイルのサイズは {size} を超えることはできません。",
+    "transaction-mode": {
+      "label": "トランザクションモード",
+      "on": "オン",
+      "off": "オフ",
+      "on-tooltip": "すべてのステートメントを単一のトランザクション（BEGIN/COMMIT）でラップします。",
+      "off-tooltip": "自動コミットモードで個別にステートメントを実行します。ステートメントは即座にコミットされ、後続のステートメントが失敗してもロールバックできません。"
+    },
     "waiting-earliest-allowed-time": "{time}の後に実行されます",
     "batch-transition": {
       "not-allowed-tips": "選択したイシューの一部を {operation} にすることはできません",
@@ -976,7 +995,8 @@
     "error": {
       "you-don-have-privilege-to-edit-this-issue": "このイシューを編集する権限がありません",
       "you-are-not-allowed-to-perform-this-action": "このアクションを実行する権限がありません",
-      "cannot-close-issue-with-running-tasks": "実行中のタスクに関する問題を解決できません"
+      "cannot-close-issue-with-running-tasks": "実行中のタスクに関する問題を解決できません",
+      "statement-cannot-be-modified": "問題の作成後にステートメントを変更することはできません"
     },
     "unfinished-resolved-issue-tips": "イシューは「完了」とマークされましたが、一部のタスクは正常に実行されませんでした。",
     "some-tasks-are-not-executed-successfully": "(一部のタスクは正常に実行されませんでした)",
@@ -986,7 +1006,8 @@
       "options": "設定項目",
       "format": "エクスポート形式",
       "encrypt": "暗号化",
-      "file-downloaded": "ダウンロードされたファイル"
+      "file-downloaded": "ダウンロードされたファイル",
+      "download-tooltip": "24 時間利用可能"
     },
     "task-run": {
       "logs": "ログ",
@@ -1021,7 +1042,6 @@
         "no-session-found": "セッションが見つかりません。"
       }
     },
-    "sql-review-only": "SQLレビューのみ",
     "title": {
       "edit-schema": "スキーマを編集",
       "change-data": "データの変更",
@@ -1050,7 +1070,6 @@
     "new-layout": "新しいCI/CDレイアウト"
   },
   "plan": {
-    "self": "プラン",
     "plans": "予定",
     "new-plan": "新しい計画",
     "add-spec": "仕様を追加",
@@ -1062,16 +1081,13 @@
     "select-targets": "ターゲットを選択",
     "ready-for-review": "レビュー準備完了",
     "overview": {
-      "description": "このプランのすべての仕様を表示および管理します",
-      "total-specs": "合計スペック",
+      "total-changes": "合計変更数",
       "total-targets": "合計ターゲット",
-      "no-checks": "チェックなし",
-      "affected-resources": "影響を受けるリソース"
+      "no-checks": "チェックなし"
     },
     "navigator": {
-      "specifications": "仕様",
+      "changes": "変更点",
       "checks": "小切手",
-      "review": "レビュー",
       "rollout": "ロールアウトする",
       "statement-empty": "ステートメントが空です"
     },
@@ -1089,13 +1105,7 @@
     "targets": {
       "title": "ターゲット",
       "no-targets-found": "ターゲットが見つかりません",
-      "one-database": "1 つのデータベース",
-      "multiple-databases": "{count} データベース",
-      "database-group": "データベースグループ",
-      "database-not-found": "データベースが見つかりません",
       "type": {
-        "instance": "実例",
-        "database": "データベース",
         "database-group": "データベースグループ"
       },
       "view-all": "すべて表示 ({count})"
@@ -1123,11 +1133,30 @@
     },
     "refresh-indicator": {
       "last-refresh": "最終更新: {time}"
+    },
+    "state": {
+      "description": "州別にプランをフィルタリング",
+      "close-confirm": "このプランを閉じてもよろしいですか?",
+      "reopen-confirm": "このプランを再開してもよろしいですか?"
     }
   },
   "rollout": {
     "rollouts": "ロールアウト",
-    "force-rollout": "強制展開"
+    "force-rollout": "強制実行",
+    "stage": {
+      "self": "ステージ | ステージ",
+      "start-stage": "スタートステージ",
+      "no-stages": {
+        "self": "ステージなし",
+        "description": "このロールアウトにはステージが定義されていません。"
+      }
+    },
+    "message": {
+      "pervious-stages-incomplete": {
+        "title": "前の段階は未完了です",
+        "description": "前のステージの一部が完了していません。続行するには強制実行を有効にしてください。"
+      }
+    }
   },
   "quick-action": {
     "create-db": "データベースの作成",
@@ -1572,25 +1601,6 @@
     },
     "all": "すべてのデータベース",
     "show-schemaless-databases": "スキーマレス データベースを示します。 (スキーマの変更は、スキーマのないデータベースでは機能しません。)",
-    "secret": {
-      "self": "秘密変数",
-      "new": "シークレット変数を追加する",
-      "edit": "シークレット変数を編集する",
-      "name-placeholder": "シークレット変数名を入力してください",
-      "validation": {
-        "cannot-be-changed-later": "作成後に変更することはできません",
-        "duplicated-name": "シークレット変数名が重複しています",
-        "name-is-required": "変数名が必要です",
-        "name-pattern-mismatch": "シークレット名は大文字、数字、_ (アンダースコア) のみで設定する必要があります。",
-        "name-cannot-prefix-with-bytebase": "シークレット名に「BYTEBASE_」という接頭辞を付けることはできません",
-        "name-cannot-start-with-number": "シークレット名を数字で始めることはできません"
-      },
-      "description-placeholder": "説明を入力してください",
-      "value": "価値",
-      "value-placeholder": "値を入力してください (書き込みのみ)",
-      "delete-tips": "シークレット変数の削除",
-      "description": "変更スクリプトでシークレット変数を使用すると、機密情報を非表示にすることができます。{guide} を参照してください。"
-    },
     "transfer": {
       "errors": {
         "select-target-project": "対象プロジェクトを選択",
@@ -1619,7 +1629,6 @@
       "reference": "参照"
     },
     "checks": "チェック",
-    "backup-unavailable-for-databases": "データベースのバックアップは利用できません: {databases}",
     "engine-not-supported-for-backup": "以前のバックアップはサポートされていません: {databases}",
     "revision": {
       "self": "リビジョン",
@@ -1981,6 +1990,7 @@
     "sync-in-progress": "同期中",
     "create-a-worksheet": "新しいワークシートを作成する",
     "select-a-database-to-start": "開始するにはデータベースを選択してください",
+    "show-empty-environments": "空の環境を表示",
     "select-encoding": "エンコーディングの選択",
     "redis-command": {
       "self": "redisコマンドを実行する",
@@ -2030,8 +2040,6 @@
     "sync-sql-from-schema-editor": "スキーマエディタからSQLを同期する",
     "raw-sql": "SQL文",
     "search-database-and-table": "データベースとテーブルを検索する",
-    "search-table": "検索テーブル",
-    "search-column": "検索欄",
     "nothing-changed-for-database": "データベース {database} には何も変更されていません",
     "actions": {
       "create-schema": "新しいスキーマ",
@@ -2151,7 +2159,6 @@
     "request-with-qr": "QRコードを読み取ってトライアルを申し込みます",
     "require-subscription": "この機能は、{requiredPlan} のサブスクリプションが必要です。この機能のロックを解除するには、Bytebase ライセンスを購入してください。",
     "required-plan-with-trial": "この機能は、{requiredPlan} のサブスクリプションが必要です。{startTrial} ",
-    "trial-for-plan": "{plan} の {days} 日間の無料トライアルを開始できます。クレジット カードや前払いは必要ありません。",
     "trial-for-days": "{days} 日間の無料トライアルを開始できます。クレジット カードや前払いは必要ありません。",
     "contact-to-upgrade": "試用版にアップグレードするには、ワークスペースの所有者に問い合わせてください。",
     "upgrade-now": "今すぐアップグレード",

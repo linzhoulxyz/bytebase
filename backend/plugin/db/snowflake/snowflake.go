@@ -18,11 +18,11 @@ import (
 
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
+	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	"github.com/bytebase/bytebase/backend/plugin/db/util"
 	"github.com/bytebase/bytebase/backend/plugin/parser/base"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
-	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 
 	snow "github.com/snowflakedb/gosnowflake"
 )
@@ -228,24 +228,92 @@ func getDatabasesTxn(ctx context.Context, txn *sql.Tx) ([]string, error) {
 }
 
 // Execute executes a SQL statement and returns the affected rows.
-func (d *Driver) Execute(ctx context.Context, statement string, _ db.ExecuteOptions) (int64, error) {
+func (d *Driver) Execute(ctx context.Context, statement string, opts db.ExecuteOptions) (int64, error) {
+	// Parse transaction mode from the script
+	transactionMode, cleanedStatement := base.ParseTransactionMode(statement)
+	statement = cleanedStatement
+
+	// Apply default when transaction mode is not specified
+	if transactionMode == common.TransactionModeUnspecified {
+		transactionMode = common.GetDefaultTransactionMode()
+	}
+
+	// Execute based on transaction mode
+	if transactionMode == common.TransactionModeOff {
+		return d.executeInAutoCommitMode(ctx, statement, opts)
+	}
+	return d.executeInTransactionMode(ctx, statement, opts)
+}
+
+// executeInTransactionMode executes statements within a single transaction
+func (d *Driver) executeInTransactionMode(ctx context.Context, statement string, opts db.ExecuteOptions) (int64, error) {
 	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
+		opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_BEGIN, err.Error())
 		return 0, err
 	}
-	defer tx.Rollback()
+	opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_BEGIN, "")
+
+	committed := false
+	defer func() {
+		if !committed {
+			if err := tx.Rollback(); err != nil {
+				opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_ROLLBACK, err.Error())
+			} else {
+				opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_ROLLBACK, "")
+			}
+		}
+	}()
+
 	// To submit a variable number of SQL statements in the statement field, set MULTI_STATEMENT_COUNT to 0."
 	// https://docs.snowflake.com/en/developer-guide/sql-api/submitting-multiple-statements
 	mctx, err := snow.WithMultiStatement(ctx, 0 /* MULTI_STATEMENT_COUNT */)
 	if err != nil {
 		return 0, err
 	}
+
+	// Log the entire multi-statement execution
+	opts.LogCommandExecute([]int32{0})
+
 	result, err := tx.ExecContext(mctx, statement)
 	if err != nil {
+		opts.LogCommandResponse([]int32{0}, 0, nil, err.Error())
 		return 0, err
 	}
 
 	if err := tx.Commit(); err != nil {
+		opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_COMMIT, err.Error())
+		return 0, err
+	}
+	opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_COMMIT, "")
+	committed = true
+
+	rowsAffected, err := result.RowsAffected()
+	// Since we cannot differentiate DDL and DML yet, we have to ignore the error.
+	if err != nil {
+		slog.Debug("rowsAffected returns error", log.BBError(err))
+		opts.LogCommandResponse([]int32{0}, 0, nil, "")
+		return 0, nil
+	}
+	opts.LogCommandResponse([]int32{0}, int32(rowsAffected), nil, "")
+	return rowsAffected, nil
+}
+
+// executeInAutoCommitMode executes statements with autocommit enabled (no explicit transaction)
+func (d *Driver) executeInAutoCommitMode(ctx context.Context, statement string, opts db.ExecuteOptions) (int64, error) {
+	// To submit a variable number of SQL statements in the statement field, set MULTI_STATEMENT_COUNT to 0."
+	// https://docs.snowflake.com/en/developer-guide/sql-api/submitting-multiple-statements
+	mctx, err := snow.WithMultiStatement(ctx, 0 /* MULTI_STATEMENT_COUNT */)
+	if err != nil {
+		return 0, err
+	}
+
+	// Log the entire multi-statement execution
+	opts.LogCommandExecute([]int32{0})
+
+	result, err := d.db.ExecContext(mctx, statement)
+	if err != nil {
+		opts.LogCommandResponse([]int32{0}, 0, nil, err.Error())
 		return 0, err
 	}
 
@@ -253,8 +321,10 @@ func (d *Driver) Execute(ctx context.Context, statement string, _ db.ExecuteOpti
 	// Since we cannot differentiate DDL and DML yet, we have to ignore the error.
 	if err != nil {
 		slog.Debug("rowsAffected returns error", log.BBError(err))
+		opts.LogCommandResponse([]int32{0}, 0, nil, "")
 		return 0, nil
 	}
+	opts.LogCommandResponse([]int32{0}, int32(rowsAffected), nil, "")
 	return rowsAffected, nil
 }
 

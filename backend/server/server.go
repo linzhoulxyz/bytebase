@@ -26,6 +26,7 @@ import (
 	"github.com/bytebase/bytebase/backend/component/webhook"
 	"github.com/bytebase/bytebase/backend/demo"
 	"github.com/bytebase/bytebase/backend/enterprise"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
 	"github.com/bytebase/bytebase/backend/migrator"
 	"github.com/bytebase/bytebase/backend/resources/postgres"
 	"github.com/bytebase/bytebase/backend/runner/approval"
@@ -36,7 +37,6 @@ import (
 	"github.com/bytebase/bytebase/backend/runner/schemasync"
 	"github.com/bytebase/bytebase/backend/runner/taskrun"
 	"github.com/bytebase/bytebase/backend/store"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 const (
@@ -58,6 +58,7 @@ type Server struct {
 	schemaSyncer          *schemasync.Syncer
 	approvalRunner        *approval.Runner
 	columnDefaultMigrator *runnermigrator.ColumnDefaultMigrator
+	exportArchiveCleaner  *runnermigrator.ExportArchiveCleaner
 	runnerWG              sync.WaitGroup
 
 	webhookManager *webhook.Manager
@@ -207,6 +208,9 @@ func NewServer(ctx context.Context, profile *config.Profile) (*Server, error) {
 	// Column default value migrator
 	s.columnDefaultMigrator = runnermigrator.NewColumnDefaultMigrator(stores, runnermigrator.EnginesNeedingMigration())
 
+	// Export archive cleaner
+	s.exportArchiveCleaner = runnermigrator.NewExportArchiveCleaner(stores)
+
 	// Metric reporter
 	s.initMetricReporter()
 
@@ -244,6 +248,9 @@ func (s *Server) Run(ctx context.Context, port int) error {
 
 	s.runnerWG.Add(1)
 	go s.columnDefaultMigrator.Run(ctx, &s.runnerWG)
+
+	s.runnerWG.Add(1)
+	go s.exportArchiveCleaner.Run(ctx, &s.runnerWG)
 
 	s.runnerWG.Add(1)
 	mmm := monitor.NewMemoryMonitor(s.profile)

@@ -19,12 +19,12 @@ import (
 
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
+	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	"github.com/bytebase/bytebase/backend/plugin/db/util"
 	"github.com/bytebase/bytebase/backend/plugin/parser/base"
 	pgparser "github.com/bytebase/bytebase/backend/plugin/parser/pg"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
-	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
 var (
@@ -166,9 +166,13 @@ func (d *Driver) Execute(ctx context.Context, statement string, opts db.ExecuteO
 		return 0, nil
 	}
 
-	owner, err := d.GetCurrentDatabaseOwner()
-	if err != nil {
-		return 0, err
+	// Parse transaction mode from the script
+	transactionMode, cleanedStatement := base.ParseTransactionMode(statement)
+	statement = cleanedStatement
+
+	// Apply default when transaction mode is not specified
+	if transactionMode == common.TransactionModeUnspecified {
+		transactionMode = common.GetDefaultTransactionMode()
 	}
 
 	var commands []base.SingleSQL
@@ -181,12 +185,6 @@ func (d *Driver) Execute(ctx context.Context, statement string, opts db.ExecuteO
 		commands = base.FilterEmptySQL(singleSQLs)
 		if len(commands) <= common.MaximumCommands {
 			oneshot = false
-			for _, singleSQL := range commands {
-				if isSuperuserStatement(singleSQL.Text) {
-					// Use superuser privilege to run privileged statements.
-					singleSQL.Text = fmt.Sprintf("SET SESSION AUTHORIZATION NONE;%sSET SESSION AUTHORIZATION '%s';", singleSQL.Text, owner)
-				}
-			}
 		}
 	}
 	if oneshot {
@@ -196,41 +194,12 @@ func (d *Driver) Execute(ctx context.Context, statement string, opts db.ExecuteO
 			},
 		}
 	}
-	totalRowsAffected := int64(0)
-	if len(commands) != 0 {
-		tx, err := d.db.BeginTx(ctx, nil)
-		if err != nil {
-			return 0, err
-		}
-		defer tx.Rollback()
-		// Set the current transaction role to the database owner so that the owner of created objects will be the same as the database owner.
-		if _, err := tx.ExecContext(ctx, fmt.Sprintf("SET SESSION AUTHORIZATION '%s'", owner)); err != nil {
-			return 0, err
-		}
 
-		for _, command := range commands {
-			sqlResult, err := tx.ExecContext(ctx, command.Text)
-			if err != nil {
-				return 0, &db.ErrorWithPosition{
-					Err:   errors.Wrapf(err, "failed to execute context in a transaction"),
-					Start: command.Start,
-					End:   command.End,
-				}
-			}
-			rowsAffected, err := sqlResult.RowsAffected()
-			if err != nil {
-				// Since we cannot differentiate DDL and DML yet, we have to ignore the error.
-				slog.Debug("rowsAffected returns error", log.BBError(err))
-			}
-			totalRowsAffected += rowsAffected
-		}
-
-		if err := tx.Commit(); err != nil {
-			return 0, err
-		}
+	// Execute based on transaction mode
+	if transactionMode == common.TransactionModeOff {
+		return d.executeInAutoCommitMode(ctx, commands, opts)
 	}
-
-	return totalRowsAffected, nil
+	return d.executeInTransactionMode(ctx, commands, opts)
 }
 
 func (d *Driver) createDatabaseExecute(ctx context.Context, statement string) error {
@@ -257,9 +226,91 @@ func (d *Driver) createDatabaseExecute(ctx context.Context, statement string) er
 	return nil
 }
 
-func isSuperuserStatement(stmt string) bool {
-	upperCaseStmt := strings.ToUpper(strings.TrimLeft(stmt, " \n\t"))
-	return strings.HasPrefix(upperCaseStmt, "GRANT")
+// executeInTransactionMode executes statements within a single transaction
+func (d *Driver) executeInTransactionMode(ctx context.Context, commands []base.SingleSQL, opts db.ExecuteOptions) (int64, error) {
+	totalRowsAffected := int64(0)
+	if len(commands) == 0 {
+		return 0, nil
+	}
+
+	tx, err := d.db.BeginTx(ctx, nil)
+	if err != nil {
+		opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_BEGIN, err.Error())
+		return 0, err
+	}
+	opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_BEGIN, "")
+
+	committed := false
+	defer func() {
+		err := tx.Rollback()
+		if committed {
+			return
+		}
+		var rerr string
+		if err != nil && !errors.Is(err, sql.ErrTxDone) {
+			rerr = err.Error()
+			slog.Debug("failed to rollback transaction", log.BBError(err))
+		}
+		opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_ROLLBACK, rerr)
+	}()
+
+	for i, command := range commands {
+		opts.LogCommandExecute([]int32{int32(i)})
+		sqlResult, err := tx.ExecContext(ctx, command.Text)
+		if err != nil {
+			opts.LogCommandResponse([]int32{int32(i)}, 0, nil, err.Error())
+			return 0, &db.ErrorWithPosition{
+				Err:   errors.Wrapf(err, "failed to execute context in a transaction"),
+				Start: command.Start,
+				End:   command.End,
+			}
+		}
+		rowsAffected, err := sqlResult.RowsAffected()
+		if err != nil {
+			// Since we cannot differentiate DDL and DML yet, we have to ignore the error.
+			slog.Debug("rowsAffected returns error", log.BBError(err))
+		}
+		opts.LogCommandResponse([]int32{int32(i)}, int32(rowsAffected), nil, "")
+		totalRowsAffected += rowsAffected
+	}
+
+	if err := tx.Commit(); err != nil {
+		opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_COMMIT, err.Error())
+		return 0, err
+	}
+	opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_COMMIT, "")
+	committed = true
+
+	return totalRowsAffected, nil
+}
+
+// executeInAutoCommitMode executes statements sequentially in auto-commit mode
+func (d *Driver) executeInAutoCommitMode(ctx context.Context, commands []base.SingleSQL, opts db.ExecuteOptions) (int64, error) {
+	totalRowsAffected := int64(0)
+
+	for i, command := range commands {
+		opts.LogCommandExecute([]int32{int32(i)})
+		sqlResult, err := d.db.ExecContext(ctx, command.Text)
+		if err != nil {
+			opts.LogCommandResponse([]int32{int32(i)}, 0, nil, err.Error())
+			// In auto-commit mode, we stop at the first error
+			// The database is left in a partially migrated state
+			return totalRowsAffected, &db.ErrorWithPosition{
+				Err:   errors.Wrapf(err, "failed to execute statement %d in auto-commit mode", i+1),
+				Start: command.Start,
+				End:   command.End,
+			}
+		}
+		rowsAffected, err := sqlResult.RowsAffected()
+		if err != nil {
+			// Since we cannot differentiate DDL and DML yet, we have to ignore the error.
+			slog.Debug("rowsAffected returns error", log.BBError(err))
+		}
+		opts.LogCommandResponse([]int32{int32(i)}, int32(rowsAffected), nil, "")
+		totalRowsAffected += rowsAffected
+	}
+
+	return totalRowsAffected, nil
 }
 
 func getDatabaseInCreateDatabaseStatement(createDatabaseStatement string) (string, error) {

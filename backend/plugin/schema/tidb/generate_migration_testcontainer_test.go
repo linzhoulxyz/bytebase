@@ -19,11 +19,11 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 	"google.golang.org/protobuf/testing/protocmp"
 
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	tidbdb "github.com/bytebase/bytebase/backend/plugin/db/tidb"
 	"github.com/bytebase/bytebase/backend/plugin/schema"
 	"github.com/bytebase/bytebase/backend/store/model"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 // TestGenerateMigrationWithTestcontainer tests the generate migration function
@@ -1664,11 +1664,11 @@ func normalizeMetadataForComparison(metadata *storepb.DatabaseSchemaMetadata) {
 
 			// Clear auto-increment and auto-random values as they might differ
 			for _, col := range table.Columns {
-				if col.GetDefaultExpression() == "AUTO_INCREMENT" {
-					col.DefaultExpression = "AUTO_INCREMENT"
-				} else if strings.HasPrefix(col.GetDefaultExpression(), "AUTO_RANDOM") {
+				if col.Default == "AUTO_INCREMENT" {
+					col.Default = "AUTO_INCREMENT"
+				} else if strings.HasPrefix(col.Default, "AUTO_RANDOM") {
 					// Keep the AUTO_RANDOM marker but normalize the value
-					col.DefaultExpression = "AUTO_RANDOM"
+					col.Default = "AUTO_RANDOM"
 				}
 				// Clear column position as it might change during DDL operations
 				col.Position = 0

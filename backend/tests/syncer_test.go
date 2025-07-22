@@ -12,7 +12,7 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/bytebase/bytebase/backend/common"
-	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
+	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
 )
 
 func TestSyncerForPostgreSQL(t *testing.T) {
@@ -314,7 +314,7 @@ func TestSyncerForMySQL(t *testing.T) {
 							  "position":1,
 							  "nullable":true,
 							  "type":"int",
-							  "default_string": "NULL",
+							  "default": "NULL",
 						      "has_default": true
 						   },
 						   {
@@ -322,7 +322,7 @@ func TestSyncerForMySQL(t *testing.T) {
 							  "position":2,
 							  "nullable":true,
 							  "type":"int",
-							  "default_string": "NULL",
+							  "default": "NULL",
 						      "has_default": true
 						   },
 						   {
@@ -330,7 +330,7 @@ func TestSyncerForMySQL(t *testing.T) {
 							  "position":3,
 							  "nullable":true,
 							  "type":"int",
-							  "default_string": "NULL",
+							  "default": "NULL",
 						      "has_default": true
 						   }
 						],
@@ -402,7 +402,7 @@ func TestSyncerForMySQL(t *testing.T) {
 							  "position":1,
 							  "nullable":true,
 							  "type":"int",
-							  "default_string": "NULL",
+							  "default": "NULL",
 						      "has_default": true
 						   },
 						   {
@@ -410,7 +410,7 @@ func TestSyncerForMySQL(t *testing.T) {
 							  "position":2,
 							  "nullable":true,
 							  "type":"int",
-							  "default_string": "NULL",
+							  "default": "NULL",
 						      "has_default": true
 						   },
 						   {
@@ -418,7 +418,7 @@ func TestSyncerForMySQL(t *testing.T) {
 							  "position":3,
 							  "nullable":true,
 							  "type":"int",
-							  "default_string": "NULL",
+							  "default": "NULL",
 						      "has_default": true
 						   }
 						],

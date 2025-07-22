@@ -10,9 +10,9 @@ import (
 	parser "github.com/bytebase/plsql-parser"
 	"github.com/pkg/errors"
 
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
 	oracleparser "github.com/bytebase/bytebase/backend/plugin/parser/plsql"
 	"github.com/bytebase/bytebase/backend/plugin/schema"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 func init() {
@@ -592,7 +592,7 @@ func (e *metadataExtractor) extractColumnDefinition(ctx parser.IColumn_definitio
 	// Extract default value using ANTLR parser
 	if ctx.DEFAULT() != nil {
 		if expr := ctx.Expression(); expr != nil {
-			column.DefaultExpression = getTextFromContext(expr)
+			column.Default = getTextFromContext(expr)
 		}
 	}
 
@@ -664,7 +664,7 @@ func (e *metadataExtractor) extractVirtualColumnDefinition(ctx parser.IVirtual_c
 				i++
 			}
 			if parenCount == 0 {
-				column.DefaultExpression = remaining[openIdx+1 : i-1]
+				column.Default = remaining[openIdx+1 : i-1]
 			}
 		}
 	}

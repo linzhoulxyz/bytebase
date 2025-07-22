@@ -9,22 +9,34 @@
     <template #default>
       <div class="flex flex-col gap-y-4 h-full overflow-y-hidden px-1">
         <!-- Issue Approval Alert -->
-        <div v-if="shouldShowForceRollout" class="shrink-0">
-          <NAlert
-            type="warning"
-            :title="
-              issueApprovalStatus.status === 'rejected'
-                ? $t('issue.approval.rejected-title')
-                : $t('issue.approval.pending-title')
-            "
-          >
-            {{
-              issueApprovalStatus.status === "rejected"
-                ? $t("issue.approval.rejected-description")
-                : $t("issue.approval.pending-description")
-            }}
-          </NAlert>
-        </div>
+        <NAlert
+          v-if="
+            props.action === 'RUN' &&
+            issueApprovalStatus.hasIssue &&
+            !issueApprovalStatus.isApproved
+          "
+          type="warning"
+          :title="
+            issueApprovalStatus.status === 'rejected'
+              ? $t('issue.approval.rejected-title')
+              : $t('issue.approval.pending-title')
+          "
+        >
+          {{
+            issueApprovalStatus.status === "rejected"
+              ? $t("issue.approval.rejected-description")
+              : $t("issue.approval.pending-description")
+          }}
+        </NAlert>
+
+        <!-- Previous Stages Incomplete Alert -->
+        <NAlert
+          v-if="props.action === 'RUN' && previousStagesStatus.hasIncomplete"
+          type="warning"
+          :title="$t('rollout.message.pervious-stages-incomplete.title')"
+        >
+          {{ $t("rollout.message.pervious-stages-incomplete.description") }}
+        </NAlert>
 
         <div
           class="flex flex-row gap-x-2 shrink-0 overflow-y-hidden justify-start items-center"
@@ -45,12 +57,13 @@
         >
           <div class="flex items-center justify-between">
             <label class="font-medium text-control">
-              <template v-if="eligibleTasks.length === 1">
-                {{ $t("common.task") }}
-              </template>
-              <template v-else>{{ $t("common.tasks") }}</template>
+              {{ $t("common.task", eligibleTasks.length) }}
               <span class="opacity-80" v-if="eligibleTasks.length > 1">
-                ({{ eligibleTasks.length }})
+                ({{
+                  eligibleTasks.length === target.stage.tasks.length
+                    ? eligibleTasks.length
+                    : `${eligibleTasks.length} / ${target.stage.tasks.length}`
+                }})
               </span>
             </label>
           </div>
@@ -136,6 +149,7 @@
                 (date: number) => date < dayjs().startOf('day').valueOf()
               "
               format="yyyy-MM-dd HH:mm:ss"
+              :actions="['clear', 'confirm']"
               clearable
             />
           </div>
@@ -167,9 +181,9 @@
         </div>
         <div v-else></div>
 
-        <div class="flex justify-end gap-x-3">
-          <NButton @click="$emit('close')">
-            {{ $t("common.cancel") }}
+        <div class="flex justify-end gap-x-2">
+          <NButton quaternary @click="$emit('close')">
+            {{ $t("common.close") }}
           </NButton>
 
           <NTooltip :disabled="confirmErrors.length === 0" placement="top">
@@ -222,22 +236,26 @@ import { semanticTaskType } from "@/components/IssueV1";
 import CommonDrawer from "@/components/IssueV1/components/Panel/CommonDrawer.vue";
 import { ErrorList } from "@/components/IssueV1/components/common";
 import { rolloutServiceClientConnect } from "@/grpcweb";
-import { pushNotification, useEnvironmentV1Store } from "@/store";
+import {
+  pushNotification,
+  useCurrentProjectV1,
+  useEnvironmentV1Store,
+} from "@/store";
 import { Issue_Approver_Status } from "@/types/proto-es/v1/issue_service_pb";
 import {
   BatchRunTasksRequestSchema,
   BatchSkipTasksRequestSchema,
   BatchCancelTaskRunsRequestSchema,
+  ListTaskRunsRequestSchema,
+  TaskRun_Status,
 } from "@/types/proto-es/v1/rollout_service_pb";
-import type {
-  Stage,
-  Task,
-  TaskRun,
-} from "@/types/proto-es/v1/rollout_service_pb";
+import type { Stage, Task } from "@/types/proto-es/v1/rollout_service_pb";
 import { Task_Status } from "@/types/proto-es/v1/rollout_service_pb";
-import { usePlanContext } from "../../logic";
+import { hasWorkspacePermissionV2 } from "@/utils";
+import { usePlanContextWithRollout } from "../../logic";
 import { useIssueReviewContext } from "../../logic/issue-review";
 import TaskDatabaseName from "./TaskDatabaseName.vue";
+import { useTaskActionPermissions } from "./taskPermissions";
 
 // Default delay for running tasks if not scheduled immediately.
 const DEFAULT_RUN_DELAY_MS = 60000;
@@ -246,9 +264,7 @@ type LocalState = {
   loading: boolean;
 };
 
-export type TargetType =
-  | { type: "tasks"; tasks?: Task[]; stage: Stage }
-  | { type: "taskRuns"; taskRuns: TaskRun[]; stage: Stage };
+export type TargetType = { type: "tasks"; tasks?: Task[]; stage: Stage };
 
 const props = defineProps<{
   show: boolean;
@@ -258,15 +274,18 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: "close"): void;
+  (event: "confirm"): void;
 }>();
 
 const { t } = useI18n();
-const { issue } = usePlanContext();
+const { project } = useCurrentProjectV1();
+const { issue, rollout } = usePlanContextWithRollout();
 const reviewContext = useIssueReviewContext();
 const state = reactive<LocalState>({
   loading: false,
 });
 const environmentStore = useEnvironmentV1Store();
+const { canPerformTaskAction } = useTaskActionPermissions();
 const comment = ref("");
 const runTimeInMS = ref<number | undefined>(undefined);
 const forceRollout = ref(false);
@@ -305,12 +324,47 @@ const issueApprovalStatus = computed(() => {
   };
 });
 
+// Check if all previous stages are complete (done or skipped)
+const previousStagesStatus = computed(() => {
+  if (!rollout.value || !targetStage.value) {
+    return { allComplete: true, hasIncomplete: false };
+  }
+
+  const stages = rollout.value.stages;
+  const currentStageIndex = stages.findIndex(
+    (stage) => stage.environment === targetStage.value.environment
+  );
+
+  if (currentStageIndex <= 0) {
+    // This is the first stage or stage not found
+    return { allComplete: true, hasIncomplete: false };
+  }
+
+  // Check all previous stages
+  for (let i = 0; i < currentStageIndex; i++) {
+    const stage = stages[i];
+    const hasIncompleteTasks = stage.tasks.some(
+      (task) =>
+        task.status !== Task_Status.DONE && task.status !== Task_Status.SKIPPED
+    );
+    if (hasIncompleteTasks) {
+      return { allComplete: false, hasIncomplete: true };
+    }
+  }
+
+  return { allComplete: true, hasIncomplete: false };
+});
+
 const shouldShowForceRollout = computed(() => {
-  // Show force rollout checkbox only for RUN action with issue approval
+  // Show force rollout checkbox for RUN action when:
+  // 1. Issue approval is not complete, OR
+  // 2. Previous stages are not complete
   return (
     props.action === "RUN" &&
-    issueApprovalStatus.value.hasIssue &&
-    !issueApprovalStatus.value.isApproved
+    hasWorkspacePermissionV2("bb.taskRuns.create") &&
+    ((issueApprovalStatus.value.hasIssue &&
+      !issueApprovalStatus.value.isApproved) ||
+      previousStagesStatus.value.hasIncomplete)
   );
 });
 
@@ -323,14 +377,6 @@ const targetStage = computed(() => {
 const targetTasks = computed(() => {
   if (props.target.type === "tasks") {
     return props.target.tasks;
-  }
-  return undefined;
-});
-
-// Extract task runs if provided
-const targetTaskRuns = computed(() => {
-  if (props.target.type === "taskRuns") {
-    return props.target.taskRuns;
   }
   return undefined;
 });
@@ -407,6 +453,18 @@ const confirmErrors = computed(() => {
     errors.push(t("common.no-data"));
   }
 
+  if (
+    !canPerformTaskAction(
+      runnableTasks.value,
+      rollout.value,
+      project.value,
+      issue?.value
+    ) &&
+    !hasWorkspacePermissionV2("bb.taskRuns.create")
+  ) {
+    errors.push(t("task.no-permission"));
+  }
+
   // Validate scheduled time if not running immediately (only for RUN)
   if (props.action === "RUN" && runTimeInMS.value !== undefined) {
     if (runTimeInMS.value <= Date.now()) {
@@ -428,12 +486,25 @@ const confirmErrors = computed(() => {
     }
   }
 
-  // For CANCEL, we need task runs
+  // Check previous stages completion for RUN action
+  if (
+    props.action === "RUN" &&
+    previousStagesStatus.value.hasIncomplete &&
+    !forceRollout.value
+  ) {
+    errors.push(t("rollout.message.pervious-stages-incomplete.description"));
+  }
+
   if (
     props.action === "CANCEL" &&
-    (!targetTaskRuns.value || targetTaskRuns.value.length === 0)
+    runnableTasks.value.some(
+      (task) =>
+        task.status !== Task_Status.PENDING &&
+        task.status !== Task_Status.RUNNING
+    )
   ) {
-    errors.push("No active task runs to cancel");
+    // Check task status.
+    errors.push("No active task to cancel");
   }
 
   return errors;
@@ -468,14 +539,34 @@ const handleConfirm = async () => {
       });
       await rolloutServiceClientConnect.batchSkipTasks(request);
     } else if (props.action === "CANCEL") {
+      // Fetch task runs for the tasks to be canceled.
+      const taskRuns = (
+        await Promise.all(
+          runnableTasks.value.map(async (task) => {
+            const request = create(ListTaskRunsRequestSchema, {
+              parent: task.name,
+              pageSize: 10,
+            });
+            return rolloutServiceClientConnect
+              .listTaskRuns(request)
+              .then((response) => response.taskRuns || []);
+          })
+        )
+      ).flat();
+      const cancelableTaskRuns = taskRuns.filter(
+        (taskRun) =>
+          taskRun.status === TaskRun_Status.PENDING ||
+          taskRun.status === TaskRun_Status.RUNNING
+      );
       const request = create(BatchCancelTaskRunsRequestSchema, {
         parent: `${targetStage.value.name}/tasks/-`,
-        taskRuns: targetTaskRuns.value?.map((taskRun) => taskRun.name) || [],
+        taskRuns: cancelableTaskRuns.map((taskRun) => taskRun.name),
         reason: comment.value,
       });
       await rolloutServiceClientConnect.batchCancelTaskRuns(request);
     }
 
+    emit("confirm");
     pushNotification({
       module: "bytebase",
       style: "SUCCESS",

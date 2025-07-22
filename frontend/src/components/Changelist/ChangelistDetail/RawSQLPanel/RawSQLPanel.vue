@@ -106,8 +106,8 @@ const show = computed(() => {
 
 const isSheetOversize = computed(() => {
   if (!sheet.value) return false;
-  return getStatementSize(getSheetStatement(sheet.value)).lt(
-    sheet.value.contentSize
+  return (
+    getStatementSize(getSheetStatement(sheet.value)) < sheet.value.contentSize
   );
 });
 

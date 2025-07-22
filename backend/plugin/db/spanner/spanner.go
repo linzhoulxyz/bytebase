@@ -12,21 +12,20 @@ import (
 	"cloud.google.com/go/spanner"
 	spannerdb "cloud.google.com/go/spanner/admin/database/apiv1"
 	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
-
 	sppb "cloud.google.com/go/spanner/apiv1/spannerpb"
 	"github.com/pkg/errors"
-
-	"github.com/bytebase/bytebase/backend/common"
-	"github.com/bytebase/bytebase/backend/plugin/db"
-	"github.com/bytebase/bytebase/backend/plugin/db/util"
-	"github.com/bytebase/bytebase/backend/utils"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
-	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
-
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
+
+	"github.com/bytebase/bytebase/backend/common"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
+	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
+	"github.com/bytebase/bytebase/backend/plugin/db"
+	"github.com/bytebase/bytebase/backend/plugin/db/util"
+	"github.com/bytebase/bytebase/backend/plugin/parser/base"
+	"github.com/bytebase/bytebase/backend/utils"
 )
 
 var (
@@ -137,12 +136,21 @@ func (d *Driver) Execute(ctx context.Context, statement string, opts db.ExecuteO
 		return 0, nil
 	}
 
-	var rowCount int64
+	// Parse transaction mode from the script
+	transactionMode, cleanedStatement := base.ParseTransactionMode(statement)
+	statement = cleanedStatement
+
+	// Apply default when transaction mode is not specified
+	if transactionMode == common.TransactionModeUnspecified {
+		transactionMode = common.GetDefaultTransactionMode()
+	}
+
 	stmts, err := util.SanitizeSQL(statement)
 	if err != nil {
 		return 0, err
 	}
 
+	// Check if any statement is DDL
 	ddl := func() bool {
 		for _, stmt := range stmts {
 			if util.IsDDL(stmt) {
@@ -152,17 +160,36 @@ func (d *Driver) Execute(ctx context.Context, statement string, opts db.ExecuteO
 		return false
 	}()
 
+	// Spanner DDL is always non-transactional
 	if ddl {
-		op, err := d.dbClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
-			Database:   getDSN(d.config.DataSource.Host, d.databaseName),
-			Statements: stmts,
-		})
-		if err != nil {
-			return 0, err
-		}
-		return 0, op.Wait(ctx)
+		return d.executeDDL(ctx, stmts, opts)
 	}
 
+	// Execute based on transaction mode
+	if transactionMode == common.TransactionModeOff {
+		return d.executeInAutoCommitMode(ctx, stmts, opts)
+	}
+	return d.executeInTransactionMode(ctx, stmts, opts)
+}
+
+func (d *Driver) executeDDL(ctx context.Context, stmts []string, _ db.ExecuteOptions) (int64, error) {
+	op, err := d.dbClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
+		Database:   getDSN(d.config.DataSource.Host, d.databaseName),
+		Statements: stmts,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return 0, op.Wait(ctx)
+}
+
+func (d *Driver) executeInTransactionMode(ctx context.Context, stmts []string, opts db.ExecuteOptions) (int64, error) {
+	var rowCount int64
+
+	// Log transaction start
+	opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_BEGIN, "")
+
+	committed := false
 	if _, err := d.client.ReadWriteTransaction(ctx, func(ctx context.Context, rwt *spanner.ReadWriteTransaction) error {
 		spannerStmts := []spanner.Statement{}
 		for _, stmt := range stmts {
@@ -175,9 +202,29 @@ func (d *Driver) Execute(ctx context.Context, statement string, opts db.ExecuteO
 		for _, count := range counts {
 			rowCount += count
 		}
+		committed = true
 		return nil
 	}); err != nil {
+		opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_ROLLBACK, "")
 		return 0, err
+	}
+
+	if committed {
+		opts.LogTransactionControl(storepb.TaskRunLog_TransactionControl_COMMIT, "")
+	}
+	return rowCount, nil
+}
+
+func (d *Driver) executeInAutoCommitMode(ctx context.Context, stmts []string, _ db.ExecuteOptions) (int64, error) {
+	var rowCount int64
+	// Execute statements individually in auto-commit mode
+	for _, stmt := range stmts {
+		spannerStmt := spanner.NewStatement(stmt)
+		count, err := d.client.PartitionedUpdate(ctx, spannerStmt)
+		if err != nil {
+			return rowCount, err
+		}
+		rowCount += count
 	}
 	return rowCount, nil
 }

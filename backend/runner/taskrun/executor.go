@@ -15,12 +15,11 @@ import (
 	"github.com/bytebase/bytebase/backend/component/config"
 	"github.com/bytebase/bytebase/backend/component/dbfactory"
 	"github.com/bytebase/bytebase/backend/component/state"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	"github.com/bytebase/bytebase/backend/runner/schemasync"
 	"github.com/bytebase/bytebase/backend/store"
 	"github.com/bytebase/bytebase/backend/store/model"
-	"github.com/bytebase/bytebase/backend/utils"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 // Executor is the task executor.
@@ -404,10 +403,10 @@ func executeMigrationWithFunc(ctx context.Context, driverCtx context.Context, s 
 
 	// Phase 2 - Executing migration.
 	if mc.migrateType != db.Baseline {
-		materials := utils.GetSecretMapFromDatabaseMessage(mc.database)
+		// Database secrets feature has been removed
 		// To avoid leak the rendered statement, the error message should use the original statement and not the rendered statement.
-		renderedStatement := utils.RenderStatement(statement, materials)
-		if err := execFunc(driverCtx, renderedStatement); err != nil {
+		// Database secrets feature removed - using original statement directly
+		if err := execFunc(driverCtx, statement); err != nil {
 			return false, err
 		}
 	}

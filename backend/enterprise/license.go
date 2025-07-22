@@ -11,8 +11,8 @@ import (
 
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/enterprise/plugin"
+	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
 	"github.com/bytebase/bytebase/backend/store"
-	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
 // LicenseService is the service for enterprise license.
@@ -132,6 +132,11 @@ func (s *LicenseService) GetActivatedInstanceLimit(ctx context.Context) int {
 // GetUserLimit gets the user limit value for the plan.
 func (s *LicenseService) GetUserLimit(ctx context.Context) int {
 	subscription := s.LoadSubscription(ctx)
+	// Prefer to take values from the license first.
+	if subscription.Seats > 0 {
+		return int(subscription.Seats)
+	}
+
 	limit := userLimitValues[subscription.Plan]
 	if subscription.Plan == v1pb.PlanType_FREE {
 		return limit
@@ -149,6 +154,11 @@ func (s *LicenseService) GetUserLimit(ctx context.Context) int {
 // GetInstanceLimit gets the instance limit value for the plan.
 func (s *LicenseService) GetInstanceLimit(ctx context.Context) int {
 	subscription := s.LoadSubscription(ctx)
+	// Prefer to take values from the license first.
+	if subscription.Instances > 0 {
+		return int(subscription.Instances)
+	}
+
 	limit := instanceLimitValues[subscription.Plan]
 	if limit == -1 {
 		// Enterprise license.

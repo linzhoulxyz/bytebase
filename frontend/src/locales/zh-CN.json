@@ -83,7 +83,6 @@
     "status": "状态",
     "stage": "阶段",
     "task": "任务",
-    "tasks": "任务",
     "blocking-task": "阻塞任务",
     "sql": "SQL",
     "unassigned": "未指派",
@@ -171,6 +170,8 @@
     "download": "下载",
     "will-lose-unsaved-data": "这会丢失当前所有未保存的数据。",
     "deleted": "已删除",
+    "active": "开启",
+    "reopen": "重开",
     "will-override-current-data": "将会覆盖当前数据。",
     "rollout": "发布",
     "upload": "上传",
@@ -233,7 +234,9 @@
     "summary": "总结",
     "errors": "错误",
     "removed": "已移除",
-    "submit": "提交"
+    "submit": "提交",
+    "start": "开始",
+    "draft": "草稿"
   },
   "error-page": {
     "go-back-home": "回到主页"
@@ -281,13 +284,12 @@
     "cancel-task": "取消任务",
     "created": "创建于",
     "run-immediately": "立即运行任务",
+    "select-task": "选择任务 | 选择任务",
     "selected-n-tasks": "已选择 {n} 个任务",
-    "no-tasks": "没有任务",
     "no-tasks-selected": "未选择任何任务",
     "no-runnable-tasks": "没有可运行的任务",
     "no-skippable-tasks": "没有可跳过的任务",
     "no-cancellable-tasks": "没有可取消的任务",
-    "cross-stage-not-supported": "不支持跨阶段操作",
     "no-permission": "无权限执行该操作",
     "scheduled-time": "计划时间",
     "select-scheduled-time": "选择计划时间",
@@ -314,12 +316,22 @@
     }
   },
   "task-run": {
+    "history": "执行记录",
+    "latest-logs": "执行日志",
     "status": {
       "enqueued": "等待执行。",
       "enqueued-with-rollout-time": "等待执行，{time}后执行。",
       "waiting-connection": "等待可用的实例连接。实例连接数已达到 Bytebase 上设置的限制。上次报告时间：{time}。",
       "waiting-task": "等待另一个任务完成。上次报告时间：{time}。",
       "waiting-max-tasks-per-rollout": "正在等待其他任务完成。已达到每次发布的最大运行任务数限制。上次报告时间：{time}。"
+    },
+    "rollback": {
+      "available": "可回滚 {n} 个任务",
+      "preview-statement": {
+        "self": "预览语句",
+        "description": "Bytebase 根据任务运行情况生成回滚语句，您可以在执行回滚前查看该语句。"
+      },
+      "no-statement-generated": "生成的回滚语句为空"
     }
   },
   "banner": {
@@ -861,7 +873,7 @@
         },
         "creator": {
           "title": "创建人",
-          "description": "根据工单创建人搜索"
+          "description": "根据创建人搜索"
         },
         "subscriber": {},
         "approver": {
@@ -919,6 +931,13 @@
     "statement-from-sheet-warning": "由于 SQL 文件过大，因此被截断以便显示，并且编辑功能已禁用。你可以上传新的 SQL 文件以将其覆盖。",
     "overwrite-current-statement": "覆盖当前的 SQL 语句",
     "upload-sql-file-max-size-exceeded": "上传文件大小不能超过 {size}。",
+    "transaction-mode": {
+      "label": "事务模式",
+      "on": "开启",
+      "off": "关闭",
+      "on-tooltip": "将所有语句包装在单个事务中（BEGIN/COMMIT）。",
+      "off-tooltip": "以自动提交模式单独执行语句。语句立即提交，如果后续语句失败则无法回滚。"
+    },
     "waiting-earliest-allowed-time": "将于 {time} 之后执行",
     "batch-transition": {
       "not-allowed-tips": "部分选中的工单无法被{operation}",
@@ -976,7 +995,8 @@
     "error": {
       "you-don-have-privilege-to-edit-this-issue": "您没有权限编辑此工单",
       "you-are-not-allowed-to-perform-this-action": "您无权执行此操作",
-      "cannot-close-issue-with-running-tasks": "无法关闭还存在运行中任务的工单"
+      "cannot-close-issue-with-running-tasks": "无法关闭还存在运行中任务的工单",
+      "statement-cannot-be-modified": "工单创建后，语句将无法修改"
     },
     "unfinished-resolved-issue-tips": "该工单被标记为「已完成」，但其中部分任务并未成功执行。",
     "some-tasks-are-not-executed-successfully": "（部分任务并未成功执行）",
@@ -986,7 +1006,8 @@
       "options": "配置项",
       "format": "导出格式",
       "encrypt": "加密",
-      "file-downloaded": "文件已下载"
+      "file-downloaded": "文件已下载",
+      "download-tooltip": "24 小时可用"
     },
     "task-run": {
       "logs": "日志",
@@ -1021,7 +1042,6 @@
         "no-session-found": "未找到会话。"
       }
     },
-    "sql-review-only": "仅 SQL 审核",
     "title": {
       "edit-schema": "变更 Schema",
       "change-data": "变更数据",
@@ -1042,15 +1062,14 @@
     "approval": {
       "rejected-title": "工单被退回",
       "pending-title": "工单待审批",
-      "rejected-description": "此工单已被审批者退回。需要强制发布才能继续。",
-      "pending-description": "此工单正在等待审批。需要强制发布才能继续。",
-      "rejected-error": "此工单已被退回。请确认并勾选强制发布才能继续。",
-      "pending-error": "此工单正在等待审批。请确认并勾选强制发布才能继续。"
+      "rejected-description": "此工单已被审批者退回。确认并勾选强制运行才能继续。",
+      "pending-description": "此工单正在等待审批。确认并勾选强制运行才能继续。",
+      "rejected-error": "此工单已被退回。请确认并勾选强制运行才能继续。",
+      "pending-error": "此工单正在等待审批。请确认并勾选强制运行才能继续。"
     },
     "new-layout": "使用新版 CI/CD 页面"
   },
   "plan": {
-    "self": "变更计划",
     "plans": "变更计划",
     "new-plan": "创建变更计划",
     "add-spec": "添加变更项",
@@ -1062,16 +1081,13 @@
     "select-targets": "选择变更对象",
     "ready-for-review": "提交审批",
     "overview": {
-      "description": "查看和管理此变更计划中的所有变更项",
-      "total-specs": "变更项",
+      "total-changes": "变更项",
       "total-targets": "变更对象",
-      "no-checks": "没有检查",
-      "affected-resources": "受影响的资源"
+      "no-checks": "没有检查"
     },
     "navigator": {
-      "specifications": "变更项",
+      "changes": "变更项",
       "checks": "SQL 检查",
-      "review": "审批流",
       "rollout": "发布任务",
       "statement-empty": "变更语句为空"
     },
@@ -1089,13 +1105,7 @@
     "targets": {
       "title": "变更对象",
       "no-targets-found": "未找到变更对象",
-      "one-database": "1 个数据库",
-      "multiple-databases": "{count} 个数据库",
-      "database-group": "数据库组",
-      "database-not-found": "未找到数据库",
       "type": {
-        "instance": "实例",
-        "database": "数据库",
         "database-group": "数据库组"
       },
       "view-all": "查看全部 ({count})"
@@ -1123,11 +1133,30 @@
     },
     "refresh-indicator": {
       "last-refresh": "上次刷新：{time}"
+    },
+    "state": {
+      "description": "按状态过滤",
+      "close-confirm": "确定关闭该变更计划？",
+      "reopen-confirm": "确定重新开启该变更计划？"
     }
   },
   "rollout": {
     "rollouts": "发布任务",
-    "force-rollout": "强制发布"
+    "force-rollout": "强制运行",
+    "stage": {
+      "self": "阶段 | 阶段",
+      "start-stage": "开始该阶段",
+      "no-stages": {
+        "self": "没有阶段",
+        "description": "本次发布任务未定义任何阶段。"
+      }
+    },
+    "message": {
+      "pervious-stages-incomplete": {
+        "title": "前置阶段尚未完成",
+        "description": "存在未完成的前置阶段。请确认并勾选强制运行才能继续。"
+      }
+    }
   },
   "quick-action": {
     "create-db": "创建数据库",
@@ -1572,25 +1601,6 @@
     },
     "all": "所有数据库",
     "show-schemaless-databases": "显示无模式的数据库。（变更 Schema 不适用于无 schema 的数据库. ）",
-    "secret": {
-      "self": "保密变量",
-      "new": "添加保密变量",
-      "edit": "编辑保密变量",
-      "name-placeholder": "输入保密变量名称",
-      "validation": {
-        "cannot-be-changed-later": "创建之后无法修改",
-        "duplicated-name": "保密变量名称重复",
-        "name-is-required": "变量名必需",
-        "name-pattern-mismatch": "秘密名称应该只由大写字母，数字和 _（下划线）组成",
-        "name-cannot-prefix-with-bytebase": "秘密名称不能以 'BYTEBASE_' 为前缀",
-        "name-cannot-start-with-number": "秘密名称不能以数字开头"
-      },
-      "description-placeholder": "输入描述",
-      "value": "值",
-      "value-placeholder": "输入值（仅写入）",
-      "delete-tips": "删除保密变量",
-      "description": "您可以在变更脚本中使用保密变量，来隐藏敏感信息, 请参考{guide}"
-    },
     "transfer": {
       "errors": {
         "select-target-project": "选择目标项目",
@@ -1619,7 +1629,6 @@
       "reference": "引用"
     },
     "checks": "Check 约束",
-    "backup-unavailable-for-databases": "数据库无法开启备份：{databases}",
     "engine-not-supported-for-backup": "引擎不支持预备份：{databases}",
     "revision": {
       "self": "版本",
@@ -1981,6 +1990,7 @@
     "sync-in-progress": "正在同步",
     "create-a-worksheet": "新建工作表",
     "select-a-database-to-start": "选择数据库以开始",
+    "show-empty-environments": "显示空环境",
     "select-encoding": "选择编码",
     "redis-command": {
       "self": "运行 redis 命令",
@@ -2030,8 +2040,6 @@
     "sync-sql-from-schema-editor": "从 Schema 编辑器中同步 SQL",
     "raw-sql": "SQL 语句",
     "search-database-and-table": "搜索数据库和表",
-    "search-table": "搜索表",
-    "search-column": "搜索列",
     "nothing-changed-for-database": "数据库 {database} 未发生任何变化",
     "actions": {
       "create-schema": "新建 Schema",
@@ -2151,7 +2159,6 @@
     "request-with-qr": "扫描二维码申请试用",
     "require-subscription": "这个功能需要{requiredPlan}订阅，请购买 Bytebase 证书来解锁该功能。",
     "required-plan-with-trial": "这个功能需要{requiredPlan}订阅，{startTrial}",
-    "trial-for-plan": "您可以开启{plan}的 {days} 天免费试用 - 无需任何信用卡或预付费。",
     "trial-for-days": "您可以开启 {days} 天的免费试用 - 无需任何信用卡或预付费。",
     "contact-to-upgrade": "请联系工作空间所有者来升级到试用版。",
     "upgrade-now": "现在升级",

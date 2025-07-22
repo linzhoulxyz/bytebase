@@ -1,5 +1,5 @@
 <template>
-  <NTooltip>
+  <NTooltip :disabled="disabled">
     <template #trigger>
       <div
         :class="
@@ -51,12 +51,12 @@
         </template>
         <template v-else-if="status === Task_Status.CANCELED">
           <heroicons-solid:minus-sm
-            class="w-full h-full rounded-full select-none bg-white border-2 border-gray-400 text-gray-400"
+            class="w-full h-full rounded-full select-none bg-white border-2 border-control-light text-control-light"
           />
         </template>
       </div>
     </template>
-    {{ status }}
+    {{ stringifyTaskStatus(status) }}
   </NTooltip>
 </template>
 
@@ -66,15 +66,20 @@ import { NTooltip } from "naive-ui";
 import { twMerge } from "tailwind-merge";
 import { computed } from "vue";
 import { Task_Status } from "@/types/proto-es/v1/rollout_service_pb";
+import { stringifyTaskStatus } from "@/utils";
 
 const props = defineProps<{
   status: Task_Status;
-  size?: "small" | "medium" | "large";
+  size?: "tiny" | "small" | "medium" | "large";
+  disabled?: boolean;
 }>();
 
 const classes = computed((): string => {
   let sizeClass = "";
   switch (props.size) {
+    case "tiny":
+      sizeClass = "w-4 h-4";
+      break;
     case "small":
       sizeClass = "w-5 h-5";
       break;
@@ -95,13 +100,13 @@ const classes = computed((): string => {
       statusClass = "bg-white border-2 border-control";
       break;
     case Task_Status.PENDING:
-      statusClass = "bg-white border-2 border-yellow-600 text-yellow-600";
+      statusClass = "bg-white border-2 border-info text-info";
       break;
     case Task_Status.RUNNING:
       statusClass = "bg-white border-2 border-info text-info";
       break;
     case Task_Status.SKIPPED:
-      statusClass = "bg-white border-2 text-gray-500";
+      statusClass = "bg-white border-2 border-control-light text-gray-600";
       break;
     case Task_Status.DONE:
       statusClass = "bg-success text-white";

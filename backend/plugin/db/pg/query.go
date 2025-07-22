@@ -16,9 +16,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/bytebase/bytebase/backend/common/log"
+	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
 	"github.com/bytebase/bytebase/backend/plugin/db/util"
 	pgparser "github.com/bytebase/bytebase/backend/plugin/parser/pg"
-	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
 func makeValueByTypeName(typeName string, _ *sql.ColumnType) any {
@@ -163,8 +163,18 @@ func padZeroes(rawStr string, acc int) string {
 	if plusIndex := strings.Index(rawStr, "+"); plusIndex >= 0 {
 		endIndex = plusIndex
 	} else if minusIndex := strings.Index(rawStr, "-"); minusIndex >= 0 {
-		endIndex = minusIndex
+		// For negative intervals like "-00:04:37.530865", ignore the leading minus
+		// Only consider minus signs that appear after the decimal point (timezone indicators)
+		if minusIndex > dotIndex {
+			endIndex = minusIndex
+		}
 	}
+
+	// Validate slice bounds to prevent runtime panic
+	if endIndex <= dotIndex {
+		return rawStr
+	}
+
 	decimalPart := rawStr[dotIndex+1 : endIndex]
 	if len(decimalPart) < acc {
 		rawStr = rawStr[:endIndex] + strings.Repeat("0", acc-len(decimalPart)) + rawStr[endIndex:]

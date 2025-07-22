@@ -1,12 +1,11 @@
 package oracle
 
 import (
-	"fmt"
 	"strings"
 
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
 	"github.com/bytebase/bytebase/backend/plugin/parser/base"
 	"github.com/bytebase/bytebase/backend/plugin/schema"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 func init() {
@@ -552,16 +551,9 @@ func writeColumn(buf *strings.Builder, column *storepb.ColumnMetadata) error {
 	//	}
 	// }
 	// Handle default values
-	hasDefault := column.DefaultNull || column.DefaultExpression != "" || column.Default != ""
+	hasDefault := column.Default != ""
 	if hasDefault {
-		defaultExpr := ""
-		if column.DefaultExpression != "" {
-			defaultExpr = column.DefaultExpression
-		} else if column.Default != "" {
-			defaultExpr = fmt.Sprintf("'%s'", column.Default)
-		} else if column.DefaultNull {
-			defaultExpr = "NULL"
-		}
+		defaultExpr := column.Default
 
 		// Skip system-generated sequence references as they can't be manually created
 		if defaultExpr != "" && !strings.Contains(defaultExpr, "ISEQ$$_") {

@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/bytebase/bytebase/backend/common/testcontainer"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	oracledb "github.com/bytebase/bytebase/backend/plugin/db/oracle"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 // TestGetDatabaseMetadataWithTestcontainer tests the get_database_metadata function
@@ -1463,14 +1463,8 @@ func compareColumnDefaults(t *testing.T, dbCol, parsedCol *storepb.ColumnMetadat
 }
 
 func getColumnDefaultString(col *storepb.ColumnMetadata) string {
-	if col.DefaultExpression != "" {
-		return col.DefaultExpression
-	}
 	if col.Default != "" {
 		return col.Default
-	}
-	if col.DefaultNull {
-		return "NULL"
 	}
 	return ""
 }

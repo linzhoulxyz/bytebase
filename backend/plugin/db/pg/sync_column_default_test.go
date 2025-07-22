@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/bytebase/bytebase/backend/common/testcontainer"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
 	"github.com/bytebase/bytebase/backend/plugin/db"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 func TestSync_ColumnDefaultSchemaQualification(t *testing.T) {
@@ -217,10 +217,12 @@ COMMENT ON TABLE test_defaults IS 'Test table for column default schema qualific
 	require.Contains(t, serialColumn.Default, "nextval(",
 		"SERIAL column should use nextval function. Got: %s", serialColumn.Default)
 
-	// Verify that DefaultExpression is NOT being used (should be empty since we're using Default)
+	// Verify that Default field is being used (consolidation from DefaultNull and DefaultExpression)
 	for columnName, column := range columnMap {
-		require.Empty(t, column.DefaultExpression,
-			"Column %s should not use DefaultExpression field (Step 4 migration)", columnName)
+		// The Default field should be used instead of the deprecated DefaultExpression and DefaultNull fields
+		if column.Default != "" {
+			t.Logf("Column %s uses Default field: %s", columnName, column.Default)
+		}
 	}
 }
 

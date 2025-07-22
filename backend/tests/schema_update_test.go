@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/testing/protocmp"
 
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
-	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
+	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
 )
 
 func TestSchemaAndDataUpdate(t *testing.T) {
@@ -172,22 +172,22 @@ func TestGetLatestSchema(t *testing.T) {
 								DataSize:  16384,
 								Columns: []*v1pb.ColumnMetadata{
 									{
-										Name:          "id",
-										Position:      1,
-										Nullable:      true,
-										HasDefault:    true,
-										DefaultString: "NULL",
-										Type:          "int",
+										Name:       "id",
+										Position:   1,
+										Nullable:   true,
+										HasDefault: true,
+										Default:    "NULL",
+										Type:       "int",
 									},
 									{
-										Name:          "name",
-										Position:      2,
-										Nullable:      true,
-										Type:          "text",
-										HasDefault:    true,
-										DefaultString: "NULL",
-										CharacterSet:  "utf8mb4",
-										Collation:     "utf8mb4_general_ci",
+										Name:         "name",
+										Position:     2,
+										Nullable:     true,
+										Type:         "text",
+										HasDefault:   true,
+										Default:      "NULL",
+										CharacterSet: "utf8mb4",
+										Collation:    "utf8mb4_general_ci",
 									},
 								},
 							},

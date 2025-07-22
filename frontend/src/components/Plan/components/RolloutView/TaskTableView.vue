@@ -4,8 +4,10 @@
     <TaskOperations
       :tasks="selectedTasks"
       :rollout="rollout"
+      :stage="props.stage"
+      :readonly="props.readonly"
       @refresh="handleRefresh"
-      @task-action-completed="handleTaskActionCompleted"
+      @action-confirmed="handleTaskActionConfirmed"
     />
 
     <!-- Task Table -->
@@ -13,9 +15,9 @@
       <TaskTable
         :task-status-filter="props.taskStatusFilter"
         :selected-tasks="selectedTasks"
-        :stage="props.stage"
+        :tasks="props.stage.tasks"
+        :task-selectable="(task) => task.status !== Task_Status.DONE"
         @update:selected-tasks="handleSelectedTasksUpdate"
-        @refresh="handleRefresh"
       />
     </div>
   </div>
@@ -23,10 +25,10 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import type {
-  Task,
+import {
+  type Task,
   Task_Status,
-  Stage,
+  type Stage,
 } from "@/types/proto-es/v1/rollout_service_pb";
 import { usePlanContextWithRollout } from "../../logic";
 import TaskOperations from "./TaskOperations.vue";
@@ -34,7 +36,8 @@ import TaskTable from "./TaskTable.vue";
 
 const props = defineProps<{
   taskStatusFilter: Task_Status[];
-  stage?: Stage;
+  stage: Stage;
+  readonly?: boolean;
 }>();
 
 const { rollout, events } = usePlanContextWithRollout();
@@ -48,8 +51,8 @@ const handleRefresh = () => {
   events.emit("status-changed", { eager: true });
 };
 
-const handleTaskActionCompleted = () => {
-  // Clear selection after action is completed
+const handleTaskActionConfirmed = () => {
+  // Clear selection after action is confirmed.
   selectedTasks.value = [];
   handleRefresh();
 };

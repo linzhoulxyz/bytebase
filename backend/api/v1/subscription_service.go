@@ -9,10 +9,10 @@ import (
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/component/config"
 	"github.com/bytebase/bytebase/backend/enterprise"
+	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
+	"github.com/bytebase/bytebase/backend/generated-go/v1/v1connect"
 	"github.com/bytebase/bytebase/backend/runner/metricreport"
 	"github.com/bytebase/bytebase/backend/store"
-	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
-	"github.com/bytebase/bytebase/proto/generated-go/v1/v1connect"
 )
 
 // SubscriptionService implements the subscription service.
@@ -46,6 +46,9 @@ func (s *SubscriptionService) GetSubscription(ctx context.Context, _ *connect.Re
 
 // UpdateSubscription updates the subscription license.
 func (s *SubscriptionService) UpdateSubscription(ctx context.Context, req *connect.Request[v1pb.UpdateSubscriptionRequest]) (*connect.Response[v1pb.Subscription], error) {
+	if s.profile.SaaS {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("cannot update license in the SaaS mode"))
+	}
 	if err := s.licenseService.StoreLicense(ctx, req.Msg.License); err != nil {
 		if common.ErrorCode(err) == common.Invalid {
 			return nil, connect.NewError(connect.CodeInvalidArgument, err)

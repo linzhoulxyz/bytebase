@@ -37,17 +37,13 @@
           {{ $t("subscription.try-for-free") }}
         </div>
         <div class="mt-1">
-          <NButton
-            type="primary"
-            size="large"
-            @click="state.showTrialModal = true"
-          >
+          <RequireEnterpriseButton type="primary" size="large">
             {{
               $t("subscription.enterprise-free-trial", {
                 days: subscriptionStore.trialingDays,
               })
             }}
-          </NButton>
+          </RequireEnterpriseButton>
         </div>
       </div>
       <div
@@ -61,9 +57,9 @@
           {{ $t("subscription.inquire-enterprise-plan") }}
         </div>
         <div class="mt-1 ml-auto">
-          <NButton type="primary" size="large" @click="inquireEnterprise">
+          <RequireEnterpriseButton type="primary" size="large">
             {{ $t("subscription.contact-us") }}
-          </NButton>
+          </RequireEnterpriseButton>
         </div>
       </div>
       <WorkspaceInstanceLicenseStats v-if="allowManageInstanceLicenses" />
@@ -105,7 +101,11 @@
       </div>
     </div>
     <div
-      v-if="allowEdit && subscriptionStore.isSelfHostLicense"
+      v-if="
+        allowEdit &&
+        subscriptionStore.isSelfHostLicense &&
+        !actuatorStore.isSaaSMode
+      "
       class="w-full mt-4 flex flex-col"
     >
       <label class="flex items-center gap-x-2">
@@ -117,11 +117,16 @@
         {{ $t("subscription.description") }}
         {{ $t("subscription.plan-compare") }}
         <LearnMoreLink url="https://www.bytebase.com/pricing?source=console" />
-        <span v-if="subscriptionStore.showTrial" class="ml-1">
-          <span class="text-accent cursor-pointer" @click="openTrialModal">
+        <div class="ml-1 inline-block">
+          <RequireEnterpriseButton
+            v-if="subscriptionStore.showTrial"
+            text
+            type="primary"
+            size="small"
+          >
             {{ $t("subscription.plan.try") }}
-          </span>
-        </span>
+          </RequireEnterpriseButton>
+        </div>
       </div>
 
       <NInput
@@ -140,17 +145,7 @@
         </NButton>
       </div>
     </div>
-    <TrialModal
-      v-if="state.showTrialModal"
-      @cancel="state.showTrialModal = false"
-    />
   </div>
-
-  <WeChatQRModal
-    v-if="state.showQRCodeModal"
-    :title="$t('subscription.inquire-enterprise-plan')"
-    @close="state.showQRCodeModal = false"
-  />
 </template>
 
 <script lang="ts" setup>
@@ -159,18 +154,15 @@ import { storeToRefs } from "pinia";
 import { computed, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import LearnMoreLink from "@/components/LearnMoreLink.vue";
-import TrialModal from "@/components/TrialModal.vue";
-import WeChatQRModal from "@/components/WeChatQRModal.vue";
+import RequireEnterpriseButton from "@/components/RequireEnterpriseButton.vue";
 import WorkspaceInstanceLicenseStats from "@/components/WorkspaceInstanceLicenseStats.vue";
 import { CopyButton } from "@/components/v2";
-import { useLanguage } from "@/composables/useLanguage";
 import {
   pushNotification,
   useActuatorV1Store,
   useSettingV1Store,
   useSubscriptionV1Store,
 } from "@/store";
-import { ENTERPRISE_INQUIRE_LINK } from "@/types";
 import { Setting_SettingName } from "@/types/proto-es/v1/setting_service_pb";
 import { PlanType } from "@/types/proto-es/v1/subscription_service_pb";
 import { hasWorkspacePermissionV2 } from "@/utils";
@@ -178,8 +170,6 @@ import { hasWorkspacePermissionV2 } from "@/utils";
 interface LocalState {
   loading: boolean;
   license: string;
-  showQRCodeModal: boolean;
-  showTrialModal: boolean;
 }
 
 const props = defineProps<{
@@ -187,7 +177,6 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18n();
-const { locale } = useLanguage();
 const subscriptionStore = useSubscriptionV1Store();
 const settingV1Store = useSettingV1Store();
 const actuatorStore = useActuatorV1Store();
@@ -195,8 +184,6 @@ const actuatorStore = useActuatorV1Store();
 const state = reactive<LocalState>({
   loading: false,
   license: "",
-  showTrialModal: false,
-  showQRCodeModal: false,
 });
 
 const disabled = computed((): boolean => {
@@ -271,16 +258,4 @@ const currentPlan = computed((): string => {
       return t("subscription.plan.free.title");
   }
 });
-
-const openTrialModal = () => {
-  state.showTrialModal = true;
-};
-
-const inquireEnterprise = () => {
-  if (locale.value === "zh-CN") {
-    state.showQRCodeModal = true;
-  } else {
-    window.open(ENTERPRISE_INQUIRE_LINK, "_blank");
-  }
-};
 </script>

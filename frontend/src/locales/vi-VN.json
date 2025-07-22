@@ -83,7 +83,6 @@
     "status": "Trạng thái",
     "stage": "Giai đoạn",
     "task": "Tác vụ",
-    "tasks": "Tác vụ",
     "blocking-task": "Tác vụ chặn",
     "sql": "SQL",
     "unassigned": "Chưa gán",
@@ -171,6 +170,8 @@
     "download": "Tải xuống",
     "will-lose-unsaved-data": "Sẽ mất dữ liệu chưa lưu.",
     "deleted": "Đã xóa",
+    "active": "Tích cực",
+    "reopen": "Mở lại",
     "will-override-current-data": "Sẽ ghi đè dữ liệu hiện tại.",
     "rollout": "Triển khai",
     "upload": "Tải lên",
@@ -233,7 +234,9 @@
     "summary": "Tóm tắt",
     "errors": "Lỗi",
     "removed": "LOẠI BỎ",
-    "submit": "Nộp"
+    "submit": "Nộp",
+    "start": "Bắt đầu",
+    "draft": "Bản nháp"
   },
   "error-page": {
     "go-back-home": "Về trang chủ"
@@ -281,13 +284,12 @@
     "cancel-task": "Hủy tác vụ | Hủy các tác vụ",
     "created": "Đã tạo",
     "run-immediately": "Chạy nhiệm vụ ngay lập tức",
+    "select-task": "Chọn nhiệm vụ | Chọn nhiệm vụ",
     "selected-n-tasks": "{n} nhiệm vụ đã chọn | {n} nhiệm vụ đã chọn",
-    "no-tasks": "Không có nhiệm vụ",
     "no-tasks-selected": "Không có nhiệm vụ nào được chọn",
     "no-runnable-tasks": "Không có tác vụ nào có thể chạy được",
     "no-skippable-tasks": "Không có nhiệm vụ nào có thể bỏ qua",
     "no-cancellable-tasks": "Không có nhiệm vụ nào có thể hủy bỏ",
-    "cross-stage-not-supported": "Hoạt động liên giai đoạn không được hỗ trợ",
     "no-permission": "Không có quyền thực hiện hành động này",
     "scheduled-time": "Thời gian đã lên lịch",
     "select-scheduled-time": "Chọn thời gian đã lên lịch",
@@ -314,12 +316,22 @@
     }
   },
   "task-run": {
+    "history": "Lịch sử thực hiện nhiệm vụ",
+    "latest-logs": "Nhật ký mới nhất",
     "status": {
       "enqueued": "Đang chờ thực thi.",
       "enqueued-with-rollout-time": "Đang chờ thực thi sau {time}.",
       "waiting-connection": "Đang chờ kết nối thể hiện có sẵn. Số lượng kết nối thể hiện đã đạt đến giới hạn được đặt trên Bytebase. Báo cáo gần nhất lúc {time}.",
       "waiting-task": "Đang chờ một tác vụ khác kết thúc. Báo cáo gần nhất lúc {time}.",
       "waiting-max-tasks-per-rollout": "Đang chờ các tác vụ khác hoàn thành. Đã đạt đến giới hạn số lượng tác vụ đang chạy tối đa cho mỗi lần triển khai. Báo cáo gần nhất lúc {time}."
+    },
+    "rollback": {
+      "available": "Có thể khôi phục lại cho tác vụ {n} | Có thể khôi phục lại cho tác vụ {n}",
+      "preview-statement": {
+        "self": "Xem trước tuyên bố",
+        "description": "Bytebase tạo ra một câu lệnh khôi phục dựa trên tác vụ đang chạy. Bạn có thể xem lại câu lệnh này trước khi thực hiện khôi phục."
+      },
+      "no-statement-generated": "Không có câu lệnh khôi phục nào được tạo ra"
     }
   },
   "banner": {
@@ -861,7 +873,7 @@
         },
         "creator": {
           "title": "Người tạo",
-          "description": "Tìm kiếm theo người tạo vấn đề"
+          "description": "Tìm kiếm theo người sáng tạo"
         },
         "subscriber": {},
         "approver": {
@@ -919,6 +931,13 @@
     "statement-from-sheet-warning": "Do kích thước SQL vượt quá, nó đã bị cắt bớt để hiển thị và chỉnh sửa bị vô hiệu hóa. Bạn có thể tải lên một tệp SQL mới để ghi đè nó.",
     "overwrite-current-statement": "Ghi đè câu lệnh SQL hiện tại",
     "upload-sql-file-max-size-exceeded": "Vượt quá kích thước tệp tối đa ({size}).",
+    "transaction-mode": {
+      "label": "Chế độ giao dịch",
+      "on": "Bật",
+      "off": "Tắt",
+      "on-tooltip": "Gói tất cả các câu lệnh trong một giao dịch duy nhất (BEGIN/COMMIT).",
+      "off-tooltip": "Thực thi các câu lệnh riêng lẻ trong chế độ tự động commit. Các câu lệnh được commit ngay lập tức và không thể khôi phục nếu câu lệnh sau đó thất bại."
+    },
     "waiting-earliest-allowed-time": "Sẽ chạy sau {time}",
     "batch-transition": {
       "not-allowed-tips": "Một số vấn đề đã chọn không thể {operation}",
@@ -976,7 +995,8 @@
     "error": {
       "you-don-have-privilege-to-edit-this-issue": "Bạn không có quyền chỉnh sửa vấn đề này",
       "you-are-not-allowed-to-perform-this-action": "Bạn không được phép thực hiện hành động này",
-      "cannot-close-issue-with-running-tasks": "Không thể đóng vấn đề với các tác vụ đang chạy"
+      "cannot-close-issue-with-running-tasks": "Không thể đóng vấn đề với các tác vụ đang chạy",
+      "statement-cannot-be-modified": "Không thể sửa đổi câu lệnh sau khi vấn đề được tạo"
     },
     "unfinished-resolved-issue-tips": "Vấn đề này được đánh dấu là \"Hoàn tất\" nhưng một số tác vụ của nó không được thực hiện thành công.",
     "some-tasks-are-not-executed-successfully": "(Một số tác vụ không được thực hiện thành công)",
@@ -986,7 +1006,8 @@
       "options": "Tùy chọn",
       "format": "Định dạng",
       "encrypt": "Mã hóa",
-      "file-downloaded": "Tệp đã tải xuống"
+      "file-downloaded": "Tệp đã tải xuống",
+      "download-tooltip": "Có sẵn trong 24 giờ"
     },
     "task-run": {
       "logs": "Nhật ký",
@@ -1021,7 +1042,6 @@
         "no-session-found": "Không tìm thấy phiên."
       }
     },
-    "sql-review-only": "Chỉ đánh giá SQL",
     "title": {
       "edit-schema": "Chỉnh sửa lược đồ",
       "change-data": "Thay đổi dữ liệu",
@@ -1050,7 +1070,6 @@
     "new-layout": "Bố cục CI/CD mới"
   },
   "plan": {
-    "self": "Kế hoạch",
     "plans": "Kế hoạch",
     "new-plan": "Kế hoạch mới",
     "add-spec": "Thêm thông số kỹ thuật",
@@ -1062,16 +1081,13 @@
     "select-targets": "Chọn mục tiêu",
     "ready-for-review": "Sẵn sàng để xem xét",
     "overview": {
-      "description": "Xem và quản lý tất cả các thông số kỹ thuật trong kế hoạch này",
-      "total-specs": "Tổng số thông số kỹ thuật",
+      "total-changes": "Tổng số thay đổi",
       "total-targets": "Tổng số mục tiêu",
-      "no-checks": "Không kiểm tra",
-      "affected-resources": "Tài nguyên bị ảnh hưởng"
+      "no-checks": "Không kiểm tra"
     },
     "navigator": {
-      "specifications": "Thông số kỹ thuật",
+      "changes": "Thay đổi",
       "checks": "Kiểm tra",
-      "review": "Ôn tập",
       "rollout": "Triển khai",
       "statement-empty": "Câu lệnh trống rỗng"
     },
@@ -1089,13 +1105,7 @@
     "targets": {
       "title": "Mục tiêu",
       "no-targets-found": "Không tìm thấy mục tiêu",
-      "one-database": "1 cơ sở dữ liệu",
-      "multiple-databases": "{count} cơ sở dữ liệu",
-      "database-group": "Nhóm cơ sở dữ liệu",
-      "database-not-found": "Không tìm thấy cơ sở dữ liệu",
       "type": {
-        "instance": "Ví dụ",
-        "database": "Cơ sở dữ liệu",
         "database-group": "Nhóm cơ sở dữ liệu"
       },
       "view-all": "Xem tất cả ({count})"
@@ -1123,11 +1133,30 @@
     },
     "refresh-indicator": {
       "last-refresh": "Làm mới lần cuối: {time}"
+    },
+    "state": {
+      "description": "Lọc các kế hoạch theo trạng thái của chúng",
+      "close-confirm": "Bạn có chắc chắn muốn đóng kế hoạch này không?",
+      "reopen-confirm": "Bạn có chắc chắn muốn mở lại kế hoạch này không?"
     }
   },
   "rollout": {
     "rollouts": "Triển khai",
-    "force-rollout": "Buộc triển khai"
+    "force-rollout": "Chạy bắt buộc",
+    "stage": {
+      "self": "Giai đoạn | Các giai đoạn",
+      "start-stage": "Giai đoạn bắt đầu",
+      "no-stages": {
+        "self": "Không có giai đoạn",
+        "description": "Không có giai đoạn nào được xác định cho lần triển khai này."
+      }
+    },
+    "message": {
+      "pervious-stages-incomplete": {
+        "title": "Các giai đoạn trước chưa hoàn thành",
+        "description": "Một số giai đoạn trước chưa hoàn tất. Vui lòng bật chế độ chạy bắt buộc để tiếp tục."
+      }
+    }
   },
   "quick-action": {
     "create-db": "Tạo cơ sở dữ liệu",
@@ -1572,25 +1601,6 @@
     },
     "all": "Tất cả cơ sở dữ liệu",
     "show-schemaless-databases": "Hiển thị cơ sở dữ liệu không có lược đồ. (Chỉnh sửa lược đồ không áp dụng cho cơ sở dữ liệu không có lược đồ.)",
-    "secret": {
-      "self": "Bí mật",
-      "new": "Bí mật mới",
-      "edit": "Chỉnh sửa bí mật",
-      "name-placeholder": "Nhập tên bí mật",
-      "validation": {
-        "cannot-be-changed-later": "Không thể thay đổi sau này",
-        "duplicated-name": "Tên bí mật trùng lặp",
-        "name-is-required": "Tên bí mật là bắt buộc",
-        "name-pattern-mismatch": "Tên bí mật chỉ nên chứa chữ cái viết hoa, chữ số hoặc _ (dấu gạch dưới)",
-        "name-cannot-prefix-with-bytebase": "Tên bí mật không được bắt đầu bằng 'BYTEBASE_'",
-        "name-cannot-start-with-number": "Tên bí mật không được bắt đầu bằng số"
-      },
-      "description-placeholder": "Nhập mô tả",
-      "value": "Giá trị",
-      "value-placeholder": "Nhập giá trị (chỉ ghi)",
-      "delete-tips": "Xóa bí mật",
-      "description": "Bạn có thể sử dụng bí mật trong tập lệnh thay đổi để ẩn thông tin nhạy cảm, vui lòng tham khảo {guide}"
-    },
     "transfer": {
       "errors": {
         "select-target-project": "Chọn dự án đích",
@@ -1619,7 +1629,6 @@
       "reference": "Tham chiếu"
     },
     "checks": "Kiểm tra",
-    "backup-unavailable-for-databases": "Sao lưu không khả dụng cho cơ sở dữ liệu: {databases}",
     "engine-not-supported-for-backup": "Sao lưu trước đó không được hỗ trợ cho: {databases}",
     "revision": {
       "self": "Bản sửa đổi",
@@ -1981,6 +1990,7 @@
     "sync-in-progress": "Đang đồng bộ",
     "create-a-worksheet": "Tạo một trang tính mới",
     "select-a-database-to-start": "Chọn một cơ sở dữ liệu để bắt đầu",
+    "show-empty-environments": "Hiển thị môi trường trống",
     "select-encoding": "Chọn mã hóa",
     "redis-command": {
       "self": "Chạy lệnh redis trên",
@@ -2030,8 +2040,6 @@
     "sync-sql-from-schema-editor": "Đồng bộ SQL từ Trình soạn thảo lược đồ",
     "raw-sql": "SQL thô",
     "search-database-and-table": "Tìm kiếm cơ sở dữ liệu và bảng",
-    "search-table": "Tìm kiếm bảng",
-    "search-column": "Tìm kiếm cột",
     "nothing-changed-for-database": "Không có gì thay đổi cho cơ sở dữ liệu {database}",
     "actions": {
       "create-schema": "Tạo lược đồ",
@@ -2151,7 +2159,6 @@
     "request-with-qr": "Quét mã QR",
     "require-subscription": "Tính năng này yêu cầu đăng ký {requiredPlan}, vui lòng mua giấy phép Bytebase để mở khóa.",
     "required-plan-with-trial": "Tính năng này yêu cầu {requiredPlan}. {startTrial}",
-    "trial-for-plan": "Bạn có thể bắt đầu dùng thử miễn phí cho {plan} với {days} ngày - không cần thẻ tín dụng.",
     "trial-for-days": "Bạn có thể bắt đầu dùng thử miễn phí trong {days} ngày - không cần thẻ tín dụng.",
     "contact-to-upgrade": "Liên hệ với quản trị viên Không gian làm việc của bạn để nâng cấp gói.",
     "upgrade-now": "Nâng cấp ngay",

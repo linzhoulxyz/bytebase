@@ -17,11 +17,11 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/bytebase/bytebase/backend/common/testcontainer"
+	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	mysqldb "github.com/bytebase/bytebase/backend/plugin/db/mysql"
 	"github.com/bytebase/bytebase/backend/plugin/schema"
 	"github.com/bytebase/bytebase/backend/store/model"
-	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
 
 // TestGenerateMigrationWithTestcontainer tests the generate migration function
@@ -34,7 +34,7 @@ func TestGenerateMigrationWithTestcontainer(t *testing.T) {
 	ctx := context.Background()
 
 	// Start MySQL container using common testcontainer interface
-	container, err := testcontainer.GetMySQLContainer(ctx)
+	container, err := testcontainer.GetTestMySQLContainer(ctx)
 	require.NoError(t, err)
 	defer container.Close(ctx)
 
@@ -1800,9 +1800,9 @@ func normalizeMetadataForComparison(metadata *storepb.DatabaseSchemaMetadata) {
 
 			// Clear auto-increment values as they might differ
 			for _, col := range table.Columns {
-				if col.GetDefaultExpression() == "AUTO_INCREMENT" {
+				if col.Default == "AUTO_INCREMENT" {
 					// Keep the AUTO_INCREMENT marker but clear any current value
-					col.DefaultExpression = "AUTO_INCREMENT"
+					col.Default = "AUTO_INCREMENT"
 				}
 			}
 
