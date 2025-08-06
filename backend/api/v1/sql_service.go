@@ -83,7 +83,9 @@ func NewSQLService(
 func (s *SQLService) AdminExecute(ctx context.Context, stream *connect.BidiStream[v1pb.AdminExecuteRequest, v1pb.AdminExecuteResponse]) error {
 	var driver db.Driver
 	var conn *sql.Conn
-	defer func() {
+	var connectionName string
+
+	clean := func() {
 		if conn != nil {
 			if err := conn.Close(); err != nil {
 				slog.Warn("failed to close connection", log.BBError(err))
@@ -92,7 +94,8 @@ func (s *SQLService) AdminExecute(ctx context.Context, stream *connect.BidiStrea
 		if driver != nil {
 			driver.Close(ctx)
 		}
-	}()
+	}
+	defer clean()
 	for {
 		request, err := stream.Receive()
 		if err != nil {
@@ -108,7 +111,9 @@ func (s *SQLService) AdminExecute(ctx context.Context, stream *connect.BidiStrea
 		}
 
 		// We only need to get the driver and connection once.
-		if driver == nil {
+		if driver == nil || connectionName != request.Name {
+			clean()
+			connectionName = request.Name
 			driver, err = s.dbFactory.GetAdminDatabaseDriver(ctx, instance, database, db.ConnectionContext{})
 			if err != nil {
 				return connect.NewError(connect.CodeInternal, errors.Errorf("failed to get database driver: %v", err))
@@ -146,6 +151,10 @@ func (s *SQLService) AdminExecute(ctx context.Context, stream *connect.BidiStrea
 			}
 		} else {
 			response.Results = result
+			for _, result := range response.Results {
+				// The AdminExecute requires bb.sql.admin permission, so we can presume the users have enough permission to export.
+				result.AllowExport = true
+			}
 		}
 
 		if err := stream.Send(response); err != nil {
@@ -1181,6 +1190,7 @@ func (s *SQLService) convertToV1QueryHistory(ctx context.Context, history *store
 		historyType = v1pb.QueryHistory_EXPORT
 	case store.QueryHistoryTypeQuery:
 		historyType = v1pb.QueryHistory_QUERY
+	default:
 	}
 
 	return &v1pb.QueryHistory{
@@ -1338,6 +1348,7 @@ func (s *SQLService) accessCheck(
 				permission = iam.PermissionSQLInfo
 			case parserbase.Select:
 				// Conditional permission check below.
+			default:
 			}
 			if isExplain {
 				permission = iam.PermissionSQLExplain
@@ -1685,6 +1696,7 @@ func (s *SQLService) SQLReviewCheck(
 			adviceLevel = storepb.Advice_ERROR
 		case storepb.Advice_SUCCESS, storepb.Advice_STATUS_UNSPECIFIED:
 			continue
+		default:
 		}
 
 		advices = append(advices, convertToV1Advice(advice))
@@ -1786,16 +1798,16 @@ func (*SQLService) DiffMetadata(_ context.Context, req *connect.Request[v1pb.Dif
 
 func sanitizeCommentForSchemaMetadata(dbSchema *storepb.DatabaseSchemaMetadata, dbModelConfig *model.DatabaseConfig, classificationFromConfig bool) {
 	for _, schema := range dbSchema.Schemas {
-		schemaConfig := dbModelConfig.CreateOrGetSchemaConfig(schema.Name)
+		schemaConfig := dbModelConfig.GetSchemaConfig(schema.Name)
 		for _, table := range schema.Tables {
-			tableConfig := schemaConfig.CreateOrGetTableConfig(table.Name)
+			tableConfig := schemaConfig.GetTableConfig(table.Name)
 			classificationID := ""
 			if !classificationFromConfig {
 				classificationID = tableConfig.Classification
 			}
 			table.Comment = common.GetCommentFromClassificationAndUserComment(classificationID, table.UserComment)
 			for _, col := range table.Columns {
-				columnConfig := tableConfig.CreateOrGetColumnConfig(col.Name)
+				columnConfig := tableConfig.GetColumnConfig(col.Name)
 				classificationID := ""
 				if !classificationFromConfig {
 					classificationID = columnConfig.Classification
@@ -1984,6 +1996,7 @@ func checkDataSourceQueryPolicy(ctx context.Context, storeInstance *store.Store,
 			if policy.DisallowDml {
 				return connect.NewError(connect.CodePermissionDenied, errors.Errorf("disallow execute DML statement in environment %q", environment.Title))
 			}
+		default:
 		}
 	}
 	return nil

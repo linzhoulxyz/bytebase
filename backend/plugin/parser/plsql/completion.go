@@ -24,7 +24,6 @@ var (
 
 func init() {
 	base.RegisterCompleteFunc(store.Engine_ORACLE, Completion)
-	base.RegisterCompleteFunc(store.Engine_OCEANBASE_ORACLE, Completion)
 }
 
 func Completion(ctx context.Context, cCtx base.CompletionContext, statement string, caretLine int, caretOffset int) ([]base.Candidate, error) {
@@ -651,6 +650,8 @@ func (c *Completer) convertCandidates(candidates *base.CandidatesCollection) ([]
 					columnEntries.insertColumns(c, schemas, tables)
 				}
 			}
+		default:
+			// Handle other candidates
 		}
 	}
 
@@ -763,6 +764,8 @@ func (c *Completer) fetchSelectItemAliases(ruleStack []*base.RuleContext) []stri
 			}
 			slices.Sort(result)
 			return result
+		default:
+			// Other cases
 		}
 	}
 	return nil
@@ -933,6 +936,8 @@ func (c *Completer) collectRemainingTableReferences() {
 				if level == 0 {
 					found = true
 				}
+			default:
+				// Other tokens, continue scanning
 			}
 		}
 
@@ -980,6 +985,8 @@ func (c *Completer) collectLeadingTableReferences(caretIndex int) {
 				c.referencesStack = c.referencesStack[1:]
 			case plsql.PlSqlLexerFROM:
 				found = true
+			default:
+				// Other tokens, continue scanning
 			}
 		}
 

@@ -462,6 +462,8 @@ func (q *querySpanExtractor) extractTableSourceFromSystemFunction(node *pgquery.
 			Type:  "function",
 			Name:  funcName,
 		}
+	default:
+		// For unknown functions, continue with the generic handling below
 	}
 
 	if node.RangeFunction.Alias == nil {
@@ -731,8 +733,9 @@ func (q *querySpanExtractor) getColumnsForFunction(name, definition string) ([]b
 		return q.extractTableSourceFromSQLFunction(createFunc, name, asBody)
 	case languageTypePLPGSQL:
 		return q.extractTableSourceFromPLPGSQLFunction(createFunc, name, definition)
+	default:
+		return nil, errors.Errorf("unsupported language type: %d", language)
 	}
-	return nil, errors.Errorf("unsupported language type: %d", language)
 }
 
 func (q *querySpanExtractor) extractTableSourceFromPLPGSQLFunction(createFunc *pgquery.Node_CreateFunctionStmt, name, definition string) ([]base.QuerySpanResult, error) {
@@ -745,6 +748,8 @@ func (q *querySpanExtractor) extractTableSourceFromPLPGSQLFunction(createFunc *p
 		switch funcPara.Mode {
 		case pgquery.FunctionParameterMode_FUNC_PARAM_OUT, pgquery.FunctionParameterMode_FUNC_PARAM_TABLE:
 			columnNames = append(columnNames, funcPara.Name)
+		default:
+			// IN, INOUT, VARIADIC parameters are not included in the column names
 		}
 	}
 
@@ -958,6 +963,9 @@ func extractSQL(data any) string {
 			return extractSQL(data["query"])
 		case data["PLpgSQL_expr"] != nil:
 			return extractSQL(data["PLpgSQL_expr"])
+		default:
+			// No SQL found in this map
+			return ""
 		}
 	}
 	return ""
@@ -985,6 +993,8 @@ func (q *querySpanExtractor) extractTableSourceFromSQLFunction(createFunc *pgque
 		switch funcPara.Mode {
 		case pgquery.FunctionParameterMode_FUNC_PARAM_OUT, pgquery.FunctionParameterMode_FUNC_PARAM_TABLE:
 			columnNames = append(columnNames, funcPara.Name)
+		default:
+			// IN, INOUT, VARIADIC parameters are not included in the column names
 		}
 	}
 	if len(columnNames) != len(span.Results) {
@@ -1608,14 +1618,15 @@ func (q *querySpanExtractor) extractSourceColumnSetFromExpressionNode(node *pgqu
 		// So that the subquery can access the outer schema.
 		// The reason for new extractor is that we still need the current fromFieldList, overriding it is not expected.
 		subqueryExtractor := &querySpanExtractor{
-			ctx:               q.ctx,
-			defaultDatabase:   q.defaultDatabase,
-			searchPath:        q.searchPath,
-			metaCache:         q.metaCache,
-			gCtx:              q.gCtx,
-			ctes:              q.ctes,
-			outerTableSources: append(q.outerTableSources, q.tableSourcesFrom...),
-			tableSourcesFrom:  []base.TableSource{},
+			ctx:                     q.ctx,
+			defaultDatabase:         q.defaultDatabase,
+			searchPath:              q.searchPath,
+			metaCache:               q.metaCache,
+			gCtx:                    q.gCtx,
+			ctes:                    q.ctes,
+			outerTableSources:       append(q.outerTableSources, q.tableSourcesFrom...),
+			tableSourcesFrom:        []base.TableSource{},
+			sourceColumnsInFunction: make(base.SourceColumnSet),
 		}
 		tableSource, err := subqueryExtractor.extractTableSourceFromNode(node.SubLink.Subselect)
 		if err != nil {
@@ -1990,6 +2001,8 @@ func pgExtractFieldName(node *pgquery.Node) (string, error) {
 		case pgquery.XmlExprOp_IS_XMLSERIALIZE:
 			return "xmlserialize", nil
 		case pgquery.XmlExprOp_IS_DOCUMENT:
+			return pgUnknownFieldName, nil
+		default:
 			return pgUnknownFieldName, nil
 		}
 	case *pgquery.Node_TypeCast:

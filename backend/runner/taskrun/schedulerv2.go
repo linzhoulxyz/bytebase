@@ -502,18 +502,20 @@ func (s *SchedulerV2) scheduleRunningTaskRun(ctx context.Context, taskRun *store
 		}
 	}()
 
-	s.stateCfg.TaskRunSchedulerInfo.Delete(taskRun.ID)
-
-	s.stateCfg.RunningTaskRuns.Store(taskRun.ID, true)
-	if task.DatabaseName != nil {
-		s.stateCfg.RunningDatabaseMigration.Store(getDatabaseKey(task.InstanceID, *task.DatabaseName), task.ID)
-	}
-
 	// Set taskrun StartAt when it's about to run.
 	// So that the waiting time is not taken into account of the actual execution time.
 	if err := s.store.UpdateTaskRunStartAt(ctx, taskRun.ID); err != nil {
 		return errors.Wrapf(err, "failed to update task run start at")
 	}
+
+	// We MUST NOT return early below this line.
+	// If we do want to return early, we must revert related states.
+	s.stateCfg.TaskRunSchedulerInfo.Delete(taskRun.ID)
+	s.stateCfg.RunningTaskRuns.Store(taskRun.ID, true)
+	if task.DatabaseName != nil {
+		s.stateCfg.RunningDatabaseMigration.Store(getDatabaseKey(task.InstanceID, *task.DatabaseName), task.ID)
+	}
+
 	s.store.CreateTaskRunLogS(ctx, taskRun.ID, time.Now(), s.profile.DeployID, &storepb.TaskRunLog{
 		Type: storepb.TaskRunLog_TASK_RUN_STATUS_UPDATE,
 		TaskRunStatusUpdate: &storepb.TaskRunLog_TaskRunStatusUpdate{
@@ -559,7 +561,7 @@ func (s *SchedulerV2) runTaskRunOnce(ctx context.Context, taskRun *store.TaskRun
 	case !done && err != nil:
 		slog.Debug("Encountered transient error running task, will retry",
 			slog.Int("id", task.ID),
-			slog.String("type", string(task.Type)),
+			slog.String("type", task.Type.String()),
 			log.BBError(err),
 		)
 		return
@@ -567,7 +569,7 @@ func (s *SchedulerV2) runTaskRunOnce(ctx context.Context, taskRun *store.TaskRun
 	case done && err != nil && errors.Is(err, context.Canceled):
 		slog.Warn("task run is canceled",
 			slog.Int("id", task.ID),
-			slog.String("type", string(task.Type)),
+			slog.String("type", task.Type.String()),
 			log.BBError(err),
 		)
 		resultBytes, marshalErr := protojson.Marshal(&storepb.TaskRunResult{
@@ -578,7 +580,7 @@ func (s *SchedulerV2) runTaskRunOnce(ctx context.Context, taskRun *store.TaskRun
 		if marshalErr != nil {
 			slog.Error("Failed to marshal task run result",
 				slog.Int("task_id", task.ID),
-				slog.String("type", string(task.Type)),
+				slog.String("type", task.Type.String()),
 				log.BBError(marshalErr),
 			)
 			return
@@ -604,7 +606,7 @@ func (s *SchedulerV2) runTaskRunOnce(ctx context.Context, taskRun *store.TaskRun
 	case done && err != nil:
 		slog.Warn("task run failed",
 			slog.Int("id", task.ID),
-			slog.String("type", string(task.Type)),
+			slog.String("type", task.Type.String()),
 			log.BBError(err),
 		)
 		taskRunResult := &storepb.TaskRunResult{
@@ -621,7 +623,7 @@ func (s *SchedulerV2) runTaskRunOnce(ctx context.Context, taskRun *store.TaskRun
 		if marshalErr != nil {
 			slog.Error("Failed to marshal task run result",
 				slog.Int("task_id", task.ID),
-				slog.String("type", string(task.Type)),
+				slog.String("type", task.Type.String()),
 				log.BBError(marshalErr),
 			)
 			return
@@ -665,7 +667,7 @@ func (s *SchedulerV2) runTaskRunOnce(ctx context.Context, taskRun *store.TaskRun
 		if marshalErr != nil {
 			slog.Error("Failed to marshal task run result",
 				slog.Int("task_id", task.ID),
-				slog.String("type", string(task.Type)),
+				slog.String("type", task.Type.String()),
 				log.BBError(marshalErr),
 			)
 			return
@@ -703,6 +705,15 @@ func (s *SchedulerV2) runTaskRunOnce(ctx context.Context, taskRun *store.TaskRun
 		}
 		s.createActivityForTaskRunStatusUpdate(ctx, task, storepb.TaskRun_DONE, "")
 		s.stateCfg.TaskSkippedOrDoneChan <- task.ID
+		return
+	default:
+		// This case should not happen in normal flow, but adding for completeness
+		slog.Error("Unexpected task execution state",
+			slog.Int("id", task.ID),
+			slog.String("type", task.Type.String()),
+			slog.Bool("done", done),
+			slog.Bool("has_error", err != nil),
+		)
 		return
 	}
 }

@@ -17,7 +17,6 @@ import (
 
 func init() {
 	base.RegisterSchemaDiffFunc(storepb.Engine_ORACLE, SchemaDiff)
-	base.RegisterSchemaDiffFunc(storepb.Engine_OCEANBASE_ORACLE, SchemaDiff)
 }
 
 type diffNode struct {
@@ -298,6 +297,8 @@ func (diff *diffNode) getConstraintID(ctx plsql.IRelational_propertyContext) str
 			}
 			_, constraintName := NormalizeConstraintName(constraint.Constraint_name())
 			return strings.TrimSpace(constraintName)
+		default:
+			return ""
 		}
 	} else if ctx.Out_of_line_constraint() != nil || ctx.Out_of_line_ref_constraint() != nil {
 		return strings.TrimSpace(EraseString(EraseContext{
@@ -349,6 +350,8 @@ func (diff *diffNode) diffConstraint(oldTable, newTable *tableInfo) error {
 				dropConstraints = append(dropConstraints, id)
 			}
 			delete(oldConstraintMap, id)
+		default:
+			// Ignore other relational properties
 		}
 	}
 	for _, item := range oldConstraintMap {
@@ -380,8 +383,9 @@ func getConstraintName(ctx plsql.IRelational_propertyContext) string {
 		}
 		_, constraintName := NormalizeConstraintName(constraint.Constraint_name())
 		return constraintName
+	default:
+		return ""
 	}
-	return ""
 }
 
 func (diff *diffNode) appendConstraintDiff(tableName string, addConstraints []plsql.IRelational_propertyContext, dropConstraints []string) error {

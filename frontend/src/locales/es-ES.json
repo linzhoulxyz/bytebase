@@ -236,7 +236,8 @@
     "removed": "Remoto",
     "submit": "Entregar",
     "start": "Comenzar",
-    "draft": "Borrador"
+    "draft": "Borrador",
+    "import": "Importar"
   },
   "error-page": {
     "go-back-home": "Volver al inicio"
@@ -283,7 +284,14 @@
     "action-all-tasks-in-current-stage": "{action} todas las tareas en la etapa actual",
     "cancel-task": "Cancelar tarea | Cancelar tareas",
     "created": "Creado",
-    "run-immediately": "Ejecutar tarea inmediatamente",
+    "run-immediately": {
+      "self": "Corre inmediatamente",
+      "description": "Las tareas comenzarán a ejecutarse en cuanto haga clic en \"Ejecutar\". No requiere demora ni programación."
+    },
+    "schedule-for-later": {
+      "self": "Programar para más tarde",
+      "description": "Establezca una fecha y hora específicas para que las tareas comiencen a ejecutarse automáticamente. Útil para periodos de mantenimiento o horas de baja demanda."
+    },
     "select-task": "Seleccionar tarea | Seleccionar tareas",
     "selected-n-tasks": "{n} tarea seleccionada | {n} tareas seleccionadas",
     "no-tasks-selected": "No hay tareas seleccionadas",
@@ -1065,7 +1073,8 @@
       "rejected-description": "Este problema ha sido rechazado por los aprobadores. Se requiere una implementación forzada para continuar.",
       "pending-description": "Este problema está pendiente de aprobación. Se requiere una implementación forzada para continuar.",
       "rejected-error": "Se ha rechazado la aprobación del problema. Habilite la implementación forzada para continuar.",
-      "pending-error": "La aprobación del problema está pendiente. Habilite la implementación forzada para continuar."
+      "pending-error": "La aprobación del problema está pendiente. Habilite la implementación forzada para continuar.",
+      "approved-and-waiting-for-rollout": "Este problema ha sido aprobado y está listo para implementarse."
     },
     "new-layout": "Nuevo diseño de CI/CD"
   },
@@ -1081,8 +1090,6 @@
     "select-targets": "Seleccionar objetivos",
     "ready-for-review": "Listo para revisión",
     "overview": {
-      "total-changes": "Cambios totales",
-      "total-targets": "Objetivos totales",
       "no-checks": "Sin controles"
     },
     "navigator": {
@@ -1634,6 +1641,34 @@
       "self": "Revisión",
       "applied-at": "Aplicado en",
       "filename": "Nombre del archivo",
+      "import-revision": "Revisión de importación",
+      "select-source": "Seleccionar fuente",
+      "select-release": "Seleccionar lanzamiento",
+      "select-files": "Seleccionar archivos",
+      "from-release": "Desde el lanzamiento",
+      "from-release-description": "Importar revisiones de bases de datos desde archivos en una versión",
+      "from-local-files": "De archivos locales",
+      "from-local-files-description": "Cargar e importar revisiones de bases de datos desde archivos SQL locales",
+      "select-release-description": "Seleccione una versión para importar revisiones desde",
+      "select-files-description": "Seleccione uno o más archivos para crear revisiones",
+      "no-releases-found": "No se encontraron lanzamientos en este proyecto",
+      "no-files-found": "No se encontraron archivos en esta versión",
+      "available-files": "Archivos disponibles",
+      "available-files-description": "Seleccionar archivos para importar como nuevas revisiones",
+      "files-already-imported": "Ya importado",
+      "files-already-imported-description": "Las versiones de estos archivos ya existen en la base de datos de destino y no se pueden volver a importar.",
+      "upload-files": "Subir archivos",
+      "upload-files-description": "Cargue archivos SQL desde su computadora local para crear revisiones de base de datos",
+      "drag-drop-or-click": "Arrastre y suelte archivos aquí, o haga clic para seleccionar",
+      "supported-formats": "Compatible con: archivos .sql, .txt, .md",
+      "uploaded-files": "Archivos subidos",
+      "add-more-files": "Añadir más",
+      "content-preview": "Vista previa del contenido",
+      "revision-type": "Tipo de revisión",
+      "type-versioned": "Versionado",
+      "type-declarative": "Declarativo",
+      "invalid-version-format": "La versión debe tener partes numéricas separadas por puntos (por ejemplo, 1.0.0)",
+      "version-already-exists": "Esta versión ya existe en la base de datos",
       "delete-confirm-dialog": {
         "title": "¿Estas seguro de eliminarlo?",
         "content": "Esto eliminará las revisiones aplicadas y el esquema de la base de datos no se modificará. Esta acción no se puede deshacer."

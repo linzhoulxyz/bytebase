@@ -265,7 +265,7 @@ func (s *PlanService) CreatePlan(ctx context.Context, request *connect.Request[v
 	}
 	planMessage.Config.Deployment = deployment
 
-	if _, err := GetPipelineCreate(ctx, s.store, s.sheetManager, s.dbFactory, planMessage.Name, planMessage.Config.GetSpecs(), deployment, project); err != nil {
+	if _, err := GetPipelineCreate(ctx, s.store, s.sheetManager, s.dbFactory, planMessage.Config.GetSpecs(), deployment, project); err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("failed to get pipeline from the plan, please check you request, error: %v", err))
 	}
 	plan, err := s.store.CreatePlan(ctx, planMessage, principalID)
@@ -391,7 +391,6 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *connect.Request[v
 				s.store,
 				s.sheetManager,
 				s.dbFactory,
-				oldPlan.Name,
 				allSpecs,
 				oldPlan.Config.GetDeployment(),
 				project); err != nil {
@@ -566,6 +565,8 @@ func (s *PlanService) UpdatePlan(ctx context.Context, request *connect.Request[v
 									},
 								})
 							}
+						default:
+							// Other task types
 						}
 						return nil
 					}(); err != nil {
@@ -1379,6 +1380,8 @@ func getTaskTypeFromSpec(spec *v1pb.Plan_Spec) (storepb.Task_Type, error) {
 			return storepb.Task_DATABASE_SCHEMA_UPDATE, nil
 		case v1pb.Plan_ChangeDatabaseConfig_MIGRATE_GHOST:
 			return storepb.Task_DATABASE_SCHEMA_UPDATE_GHOST, nil
+		default:
+			return storepb.Task_TASK_TYPE_UNSPECIFIED, errors.Errorf("invalid change database config type %s", s.ChangeDatabaseConfig.Type)
 		}
 	case *v1pb.Plan_Spec_ExportDataConfig:
 		return storepb.Task_DATABASE_EXPORT, nil

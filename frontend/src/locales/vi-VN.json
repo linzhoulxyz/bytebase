@@ -236,7 +236,8 @@
     "removed": "LOẠI BỎ",
     "submit": "Nộp",
     "start": "Bắt đầu",
-    "draft": "Bản nháp"
+    "draft": "Bản nháp",
+    "import": "Nhập khẩu"
   },
   "error-page": {
     "go-back-home": "Về trang chủ"
@@ -283,7 +284,14 @@
     "action-all-tasks-in-current-stage": "{action} tất cả các tác vụ trong giai đoạn hiện tại",
     "cancel-task": "Hủy tác vụ | Hủy các tác vụ",
     "created": "Đã tạo",
-    "run-immediately": "Chạy nhiệm vụ ngay lập tức",
+    "run-immediately": {
+      "self": "Chạy ngay lập tức",
+      "description": "Các tác vụ sẽ bắt đầu thực thi ngay khi bạn nhấp vào Chạy. Không cần trì hoãn hay lên lịch."
+    },
+    "schedule-for-later": {
+      "self": "Lên lịch cho sau",
+      "description": "Đặt ngày và giờ cụ thể để các tác vụ tự động bắt đầu chạy. Hữu ích cho các khung giờ bảo trì hoặc ngoài giờ cao điểm."
+    },
     "select-task": "Chọn nhiệm vụ | Chọn nhiệm vụ",
     "selected-n-tasks": "{n} nhiệm vụ đã chọn | {n} nhiệm vụ đã chọn",
     "no-tasks-selected": "Không có nhiệm vụ nào được chọn",
@@ -1065,7 +1073,8 @@
       "rejected-description": "Vấn đề này đã bị người phê duyệt từ chối. Cần phải triển khai bắt buộc để tiếp tục.",
       "pending-description": "Sự cố này đang chờ phê duyệt. Cần phải triển khai bắt buộc để tiếp tục.",
       "rejected-error": "Đã từ chối phê duyệt vấn đề. Vui lòng bật triển khai bắt buộc để tiếp tục.",
-      "pending-error": "Đang chờ phê duyệt vấn đề. Vui lòng bật triển khai bắt buộc để tiếp tục."
+      "pending-error": "Đang chờ phê duyệt vấn đề. Vui lòng bật triển khai bắt buộc để tiếp tục.",
+      "approved-and-waiting-for-rollout": "Phiên bản này đã được chấp thuận và sẵn sàng triển khai."
     },
     "new-layout": "Bố cục CI/CD mới"
   },
@@ -1081,8 +1090,6 @@
     "select-targets": "Chọn mục tiêu",
     "ready-for-review": "Sẵn sàng để xem xét",
     "overview": {
-      "total-changes": "Tổng số thay đổi",
-      "total-targets": "Tổng số mục tiêu",
       "no-checks": "Không kiểm tra"
     },
     "navigator": {
@@ -1634,6 +1641,34 @@
       "self": "Bản sửa đổi",
       "applied-at": "Đã áp dụng vào",
       "filename": "Tên tệp",
+      "import-revision": "Nhập bản sửa đổi",
+      "select-source": "Chọn nguồn",
+      "select-release": "Chọn bản phát hành",
+      "select-files": "Chọn tệp",
+      "from-release": "Từ bản phát hành",
+      "from-release-description": "Nhập bản sửa đổi cơ sở dữ liệu từ các tệp trong bản phát hành",
+      "from-local-files": "Từ các tập tin cục bộ",
+      "from-local-files-description": "Tải lên và nhập bản sửa đổi cơ sở dữ liệu từ các tệp SQL cục bộ",
+      "select-release-description": "Chọn bản phát hành để nhập bản sửa đổi từ",
+      "select-files-description": "Chọn một hoặc nhiều tệp để tạo bản sửa đổi",
+      "no-releases-found": "Không tìm thấy bản phát hành nào trong dự án này",
+      "no-files-found": "Không tìm thấy tệp nào trong bản phát hành này",
+      "available-files": "Các tập tin có sẵn",
+      "available-files-description": "Chọn các tập tin để nhập dưới dạng bản sửa đổi mới",
+      "files-already-imported": "Đã nhập khẩu",
+      "files-already-imported-description": "Các phiên bản của các tệp này đã tồn tại trong cơ sở dữ liệu đích và không thể nhập lại được",
+      "upload-files": "Tải lên tập tin",
+      "upload-files-description": "Tải lên các tệp SQL từ máy tính cục bộ của bạn để tạo bản sửa đổi cơ sở dữ liệu",
+      "drag-drop-or-click": "Kéo và thả tệp vào đây hoặc nhấp để chọn",
+      "supported-formats": "Được hỗ trợ: các tệp .sql, .txt, .md",
+      "uploaded-files": "Tệp đã tải lên",
+      "add-more-files": "Thêm nữa",
+      "content-preview": "Xem trước nội dung",
+      "revision-type": "Loại sửa đổi",
+      "type-versioned": "Phiên bản",
+      "type-declarative": "Tuyên bố",
+      "invalid-version-format": "Phiên bản phải là các phần số được phân tách bằng dấu chấm (ví dụ: 1.0.0)",
+      "version-already-exists": "Phiên bản này đã tồn tại trong cơ sở dữ liệu",
       "delete-confirm-dialog": {
         "title": "Bạn có chắc chắn muốn xóa?",
         "content": "Thao tác này sẽ xóa các bản sửa đổi đã áp dụng này và lược đồ cơ sở dữ liệu sẽ không bị thay đổi. Hành động này không thể hoàn tác."

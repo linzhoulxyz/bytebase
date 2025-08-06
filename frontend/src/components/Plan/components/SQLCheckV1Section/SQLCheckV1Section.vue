@@ -1,8 +1,22 @@
 <template>
   <div v-if="show" class="px-4 pt-3 flex flex-col gap-y-1 overflow-hidden">
     <div class="flex items-center justify-between gap-2">
-      <div class="flex items-center gap-1">
+      <div class="flex items-center gap-2">
         <h3 class="text-base font-medium">{{ $t("plan.checks.self") }}</h3>
+
+        <NTooltip v-if="checkResults && affectedRows > 0">
+          <template #trigger>
+            <NTag round :bordered="false">
+              <span class="text-sm text-control-light mr-1">{{
+                $t("task.check-type.affected-rows.self")
+              }}</span>
+              <span class="text-sm font-medium">
+                {{ affectedRows }}
+              </span>
+            </NTag>
+          </template>
+          {{ $t("task.check-type.affected-rows.description") }}
+        </NTooltip>
       </div>
 
       <div class="flex items-center gap-4">
@@ -58,44 +72,65 @@
         class="w-[40rem] max-w-[100vw] relative"
       >
         <div class="w-full h-full flex flex-col">
-          <!-- Drawer Content -->
-          <div v-if="drawerAdvices.length > 0" class="w-full space-y-2">
+          <!-- Status Tabs Header -->
+          <div class="flex items-center gap-3">
             <div
-              v-for="(advice, idx) in drawerAdvices"
-              :key="idx"
-              class="space-y-1 p-3 border rounded-lg bg-gray-50"
+              v-if="summary.error > 0"
+              class="flex items-center gap-1 px-2 py-1 cursor-pointer"
+              :class="[
+                selectedStatus === 'ERROR' && 'bg-gray-100 rounded-lg',
+                'text-lg text-error',
+              ]"
+              @click="selectedStatus = 'ERROR'"
             >
-              <div class="flex items-start justify-between">
-                <div class="text-sm font-medium text-main">
-                  {{ getAdviceTitle(advice) }}
-                </div>
-                <component
-                  :is="getStatusIcon(advice.status)"
-                  class="w-4 h-4 flex-shrink-0"
-                  :class="getStatusColor(advice.status)"
-                />
-              </div>
-
-              <!-- Target Database -->
-              <DatabaseDisplay :database="advice.target" />
-
-              <!-- Advice Content -->
-              <div v-if="advice.content" class="text-xs text-control-light">
-                {{ advice.content }}
-              </div>
-
-              <!-- Location Info -->
-              <div
-                v-if="advice.startPosition && advice.startPosition.line > 0"
-                class="text-xs text-control-lighter"
-              >
-                Line {{ advice.startPosition.line }}, Column
-                {{ advice.startPosition.column }}
-              </div>
+              <XCircleIcon class="w-6 h-6" />
+              <span>{{ $t("common.error") }}</span>
+              <span class="font-semibold">{{ summary.error }}</span>
+            </div>
+            <div
+              v-if="summary.warning > 0"
+              class="flex items-center gap-1 px-2 py-1 cursor-pointer"
+              :class="[
+                selectedStatus === 'WARNING' && 'bg-gray-100 rounded-lg',
+                'text-lg text-warning',
+              ]"
+              @click="selectedStatus = 'WARNING'"
+            >
+              <AlertCircleIcon class="w-6 h-6" />
+              <span>{{ $t("common.warning") }}</span>
+              <span class="font-semibold">{{ summary.warning }}</span>
+            </div>
+            <div
+              v-if="summary.success > 0"
+              class="flex items-center gap-1 px-2 py-1 cursor-pointer"
+              :class="[
+                selectedStatus === 'SUCCESS' && 'bg-gray-100 rounded-lg',
+                'text-lg text-success',
+              ]"
+              @click="selectedStatus = 'SUCCESS'"
+            >
+              <CheckCircleIcon class="w-6 h-6" />
+              <span>{{ $t("common.success") }}</span>
+              <span class="font-semibold">{{ summary.success }}</span>
             </div>
           </div>
-          <div v-else class="w-full text-center py-8 text-control-light">
-            No check results
+
+          <!-- Drawer Content -->
+          <div class="flex-1 overflow-y-auto py-4">
+            <div v-if="drawerAdvices.length > 0" class="space-y-2">
+              <CheckResultItem
+                v-for="(advice, idx) in drawerAdvices"
+                :key="idx"
+                :status="getCheckResultStatus(advice.status)"
+                :title="advice.title"
+                :content="advice.content"
+                :position="advice.startPosition"
+                :report-type="'sqlReviewReport'"
+              />
+            </div>
+            <div v-else class="text-center py-8 text-control-light">
+              {{ $t("common.no-data") }}
+            </div>
           </div>
         </div>
       </DrawerContent>
@@ -111,13 +146,13 @@ import {
   XCircleIcon,
   PlayIcon,
 } from "lucide-vue-next";
-import { NButton } from "naive-ui";
+import { NButton, NTag, NTooltip } from "naive-ui";
 import { computed, ref, watch } from "vue";
 import { getLocalSheetByName } from "@/components/Plan";
 import Drawer from "@/components/v2/Container/Drawer.vue";
 import DrawerContent from "@/components/v2/Container/DrawerContent.vue";
 import { releaseServiceClientConnect } from "@/grpcweb";
-import { getRuleLocalization, ruleTemplateMapV2 } from "@/types";
+import { projectNamePrefix } from "@/store";
 import { Plan_ChangeDatabaseConfig_Type } from "@/types/proto-es/v1/plan_service_pb";
 import {
   CheckReleaseRequestSchema,
@@ -128,11 +163,15 @@ import {
   type CheckReleaseResponse_CheckResult,
 } from "@/types/proto-es/v1/release_service_pb";
 import { Advice_Status, type Advice } from "@/types/proto-es/v1/sql_service_pb";
-import { getSheetStatement, isNullOrUndefined } from "@/utils";
+import {
+  extractProjectResourceName,
+  getSheetStatement,
+  isNullOrUndefined,
+} from "@/utils";
 import { usePlanContext } from "../../logic/context";
 import { targetsForSpec } from "../../logic/plan";
 import { useSelectedSpec } from "../SpecDetailView/context";
-import DatabaseDisplay from "../common/DatabaseDisplay.vue";
+import CheckResultItem from "../common/CheckResultItem.vue";
 
 const { plan } = usePlanContext();
 const selectedSpec = useSelectedSpec();
@@ -231,12 +270,9 @@ const runChecks = async () => {
     // Get targets
     const targets = targetsForSpec(selectedSpec.value);
 
-    // Get project from plan name
-    const projectName = `projects/${plan.value.name.split("/")[1]}`;
-
     // Run check for all targets
     const request = create(CheckReleaseRequestSchema, {
-      parent: projectName,
+      parent: `${projectNamePrefix}${extractProjectResourceName(plan.value.name)}`,
       release: {
         files: [
           {
@@ -254,30 +290,22 @@ const runChecks = async () => {
       targets,
     });
     const response = await releaseServiceClientConnect.checkRelease(request);
-
     checkResults.value = response.results || [];
   } finally {
     isRunningChecks.value = false;
   }
 };
 
+const affectedRows = computed(() => {
+  if (!checkResults.value) return 0;
+  return checkResults.value.reduce((acc, result) => {
+    return acc + result.affectedRows;
+  }, 0);
+});
+
 const openDrawer = (status: "ERROR" | "WARNING" | "SUCCESS") => {
   selectedStatus.value = status;
   drawerVisible.value = true;
-};
-
-const getStatusIcon = (status: Advice_Status | string) => {
-  if (status === Advice_Status.ERROR || status === "ERROR") return XCircleIcon;
-  if (status === Advice_Status.WARNING || status === "WARNING")
-    return AlertCircleIcon;
-  return CheckCircleIcon;
-};
-
-const getStatusColor = (status: Advice_Status | string) => {
-  if (status === Advice_Status.ERROR || status === "ERROR") return "text-error";
-  if (status === Advice_Status.WARNING || status === "WARNING")
-    return "text-warning";
-  return "text-success";
 };
 
 watch(
@@ -292,24 +320,18 @@ watch(
   }
 );
 
-const getAdviceTitle = (advice: Advice): string => {
-  let title = advice.title;
-  const rule = getRuleTemplateByType(advice.title);
-  if (rule) {
-    const ruleLocalization = getRuleLocalization(rule.type, rule.engine);
-    if (ruleLocalization.title) {
-      title = ruleLocalization.title;
-    }
+const getCheckResultStatus = (
+  status: Advice_Status
+): "SUCCESS" | "WARNING" | "ERROR" => {
+  switch (status) {
+    case Advice_Status.ERROR:
+      return "ERROR";
+    case Advice_Status.WARNING:
+      return "WARNING";
+    case Advice_Status.SUCCESS:
+      return "SUCCESS";
+    default:
+      return "SUCCESS";
   }
-  return title;
-};
-
-const getRuleTemplateByType = (type: string) => {
-  for (const mapByType of ruleTemplateMapV2.values()) {
-    if (mapByType.has(type)) {
-      return mapByType.get(type);
-    }
-  }
-  return;
 };
 </script>

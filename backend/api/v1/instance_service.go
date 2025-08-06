@@ -64,10 +64,7 @@ func (s *InstanceService) GetInstance(ctx context.Context, req *connect.Request[
 	if err != nil {
 		return nil, err
 	}
-	result, err := convertInstanceMessage(instance)
-	if err != nil {
-		return nil, err
-	}
+	result := convertInstanceMessage(instance)
 	return connect.NewResponse(result), nil
 }
 
@@ -238,10 +235,7 @@ func (s *InstanceService) ListInstances(ctx context.Context, req *connect.Reques
 		NextPageToken: nextPageToken,
 	}
 	for _, instance := range instances {
-		ins, err := convertInstanceMessage(instance)
-		if err != nil {
-			return nil, err
-		}
+		ins := convertInstanceMessage(instance)
 		response.Instances = append(response.Instances, ins)
 	}
 	return connect.NewResponse(response), nil
@@ -322,10 +316,7 @@ func (s *InstanceService) CreateInstance(ctx context.Context, req *connect.Reque
 			}
 		}
 
-		result, err := convertInstanceMessage(instanceMessage)
-		if err != nil {
-			return nil, err
-		}
+		result := convertInstanceMessage(instanceMessage)
 		return connect.NewResponse(result), nil
 	}
 
@@ -372,10 +363,7 @@ func (s *InstanceService) CreateInstance(ctx context.Context, req *connect.Reque
 		},
 	})
 
-	result, err := convertInstanceMessage(instance)
-	if err != nil {
-		return nil, err
-	}
+	result := convertInstanceMessage(instance)
 	return connect.NewResponse(result), nil
 }
 
@@ -432,10 +420,7 @@ func (s *InstanceService) UpdateInstance(ctx context.Context, req *connect.Reque
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("instance %q has been deleted", req.Msg.Instance.Name))
 	}
 
-	metadata, ok := proto.Clone(instance.Metadata).(*storepb.Instance)
-	if !ok {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to convert instance metadata type"))
-	}
+	metadata := proto.CloneOf(instance.Metadata)
 	patch := &store.UpdateInstanceMessage{
 		ResourceID: instance.ResourceID,
 		Metadata:   metadata,
@@ -506,10 +491,7 @@ func (s *InstanceService) UpdateInstance(ctx context.Context, req *connect.Reque
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	result, err := convertInstanceMessage(ins)
-	if err != nil {
-		return nil, err
-	}
+	result := convertInstanceMessage(ins)
 	return connect.NewResponse(result), nil
 }
 
@@ -546,10 +528,7 @@ func (s *InstanceService) DeleteInstance(ctx context.Context, req *connect.Reque
 		}
 	}
 
-	metadata, ok := proto.Clone(instance.Metadata).(*storepb.Instance)
-	if !ok {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to convert instance metadata type"))
-	}
+	metadata := proto.CloneOf(instance.Metadata)
 	metadata.Activation = false
 	if _, err := s.store.UpdateInstanceV2(ctx, &store.UpdateInstanceMessage{
 		ResourceID: instance.ResourceID,
@@ -583,10 +562,7 @@ func (s *InstanceService) UndeleteInstance(ctx context.Context, req *connect.Req
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	result, err := convertInstanceMessage(ins)
-	if err != nil {
-		return nil, err
-	}
+	result := convertInstanceMessage(ins)
 	return connect.NewResponse(result), nil
 }
 
@@ -709,10 +685,7 @@ func (s *InstanceService) AddDataSource(ctx context.Context, req *connect.Reques
 		if err != nil {
 			return nil, err
 		}
-		result, err := convertInstanceMessage(instance)
-		if err != nil {
-			return nil, err
-		}
+		result := convertInstanceMessage(instance)
 		return connect.NewResponse(result), nil
 	}
 
@@ -723,20 +696,14 @@ func (s *InstanceService) AddDataSource(ctx context.Context, req *connect.Reques
 		return nil, connect.NewError(connect.CodePermissionDenied, err)
 	}
 
-	metadata, ok := proto.Clone(instance.Metadata).(*storepb.Instance)
-	if !ok {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to convert instance metadata type"))
-	}
+	metadata := proto.CloneOf(instance.Metadata)
 	metadata.DataSources = append(metadata.DataSources, dataSource)
 	instance, err = s.store.UpdateInstanceV2(ctx, &store.UpdateInstanceMessage{ResourceID: instance.ResourceID, Metadata: metadata})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	result, err := convertInstanceMessage(instance)
-	if err != nil {
-		return nil, err
-	}
+	result := convertInstanceMessage(instance)
 	return connect.NewResponse(result), nil
 }
 
@@ -756,10 +723,7 @@ func (s *InstanceService) UpdateDataSource(ctx context.Context, req *connect.Req
 	if instance.Deleted {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("instance %q has been deleted", req.Msg.Name))
 	}
-	metadata, ok := proto.Clone(instance.Metadata).(*storepb.Instance)
-	if !ok {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to convert instance metadata type"))
-	}
+	metadata := proto.CloneOf(instance.Metadata)
 	var dataSource *storepb.DataSource
 	for _, ds := range metadata.GetDataSources() {
 		if ds.GetId() == req.Msg.DataSource.Id {
@@ -883,6 +847,7 @@ func (s *InstanceService) UpdateDataSource(ctx context.Context, req *connect.Req
 				} else {
 					dataSource.IamExtension = nil
 				}
+			default:
 			}
 		default:
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf(`unsupported update_mask "%s"`, path))
@@ -912,10 +877,7 @@ func (s *InstanceService) UpdateDataSource(ctx context.Context, req *connect.Req
 		if err != nil {
 			return nil, err
 		}
-		result, err := convertInstanceMessage(instance)
-		if err != nil {
-			return nil, err
-		}
+		result := convertInstanceMessage(instance)
 		return connect.NewResponse(result), nil
 	}
 
@@ -923,10 +885,7 @@ func (s *InstanceService) UpdateDataSource(ctx context.Context, req *connect.Req
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	result, err := convertInstanceMessage(instance)
-	if err != nil {
-		return nil, err
-	}
+	result := convertInstanceMessage(instance)
 	return connect.NewResponse(result), nil
 }
 
@@ -944,10 +903,7 @@ func (s *InstanceService) RemoveDataSource(ctx context.Context, req *connect.Req
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("instance %q has been deleted", req.Msg.Name))
 	}
 
-	metadata, ok := proto.Clone(instance.Metadata).(*storepb.Instance)
-	if !ok {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to convert instance metadata type"))
-	}
+	metadata := proto.CloneOf(instance.Metadata)
 	var updatedDataSources []*storepb.DataSource
 	var dataSource *storepb.DataSource
 	for _, ds := range instance.Metadata.GetDataSources() {
@@ -979,10 +935,7 @@ func (s *InstanceService) RemoveDataSource(ctx context.Context, req *connect.Req
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	result, err := convertInstanceMessage(instance)
-	if err != nil {
-		return nil, err
-	}
+	result := convertInstanceMessage(instance)
 	return connect.NewResponse(result), nil
 }
 
@@ -1024,12 +977,9 @@ func buildEnvironmentName(environmentID string) string {
 	return b.String()
 }
 
-func convertInstanceMessage(instance *store.InstanceMessage) (*v1pb.Instance, error) {
+func convertInstanceMessage(instance *store.InstanceMessage) *v1pb.Instance {
 	engine := convertToEngine(instance.Metadata.GetEngine())
-	dataSources, err := convertDataSources(instance.Metadata.GetDataSources())
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to convert data source"))
-	}
+	dataSources := convertDataSources(instance.Metadata.GetDataSources())
 
 	return &v1pb.Instance{
 		Name:               buildInstanceName(instance.ResourceID),
@@ -1046,7 +996,7 @@ func convertInstanceMessage(instance *store.InstanceMessage) (*v1pb.Instance, er
 		SyncDatabases:      instance.Metadata.GetSyncDatabases(),
 		Roles:              convertInstanceRoles(instance, instance.Metadata.GetRoles()),
 		LastSyncTime:       instance.Metadata.GetLastSyncTime(),
-	}, nil
+	}
 }
 
 // buildRoleName builds the role name with the given instance ID and role name.
@@ -1103,11 +1053,8 @@ func convertInstanceToInstanceMessage(instanceID string, instance *v1pb.Instance
 	}, nil
 }
 
-func convertInstanceMessageToInstanceResource(instanceMessage *store.InstanceMessage) (*v1pb.InstanceResource, error) {
-	instance, err := convertInstanceMessage(instanceMessage)
-	if err != nil {
-		return nil, err
-	}
+func convertInstanceMessageToInstanceResource(instanceMessage *store.InstanceMessage) *v1pb.InstanceResource {
+	instance := convertInstanceMessage(instanceMessage)
 	return &v1pb.InstanceResource{
 		Name:          instance.Name,
 		Title:         instance.Title,
@@ -1116,7 +1063,7 @@ func convertInstanceMessageToInstanceResource(instanceMessage *store.InstanceMes
 		DataSources:   instance.DataSources,
 		Activation:    instance.Activation,
 		Environment:   instance.Environment,
-	}, nil
+	}
 }
 
 func convertV1DataSources(dataSources []*v1pb.DataSource) ([]*storepb.DataSource, error) {
@@ -1132,50 +1079,46 @@ func convertV1DataSources(dataSources []*v1pb.DataSource) ([]*storepb.DataSource
 	return values, nil
 }
 
-func convertDataSourceExternalSecret(externalSecret *storepb.DataSourceExternalSecret) (*v1pb.DataSourceExternalSecret, error) {
+func convertDataSourceExternalSecret(externalSecret *storepb.DataSourceExternalSecret) *v1pb.DataSourceExternalSecret {
 	if externalSecret == nil {
-		return nil, nil
-	}
-	secret := new(v1pb.DataSourceExternalSecret)
-	if err := convertProtoToProto(externalSecret, secret); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to convert external secret"))
+		return nil
 	}
 
 	resp := &v1pb.DataSourceExternalSecret{
-		SecretType:      secret.SecretType,
-		Url:             secret.Url,
-		AuthType:        secret.AuthType,
-		EngineName:      secret.EngineName,
-		SecretName:      secret.SecretName,
-		PasswordKeyName: secret.PasswordKeyName,
+		SecretType:      v1pb.DataSourceExternalSecret_SecretType(externalSecret.SecretType),
+		Url:             externalSecret.Url,
+		AuthType:        v1pb.DataSourceExternalSecret_AuthType(externalSecret.AuthType),
+		EngineName:      externalSecret.EngineName,
+		SecretName:      externalSecret.SecretName,
+		PasswordKeyName: externalSecret.PasswordKeyName,
 	}
 
 	// clear sensitive data.
 	switch resp.AuthType {
 	case v1pb.DataSourceExternalSecret_VAULT_APP_ROLE:
-		appRole := secret.GetAppRole()
-		resp.AuthOption = &v1pb.DataSourceExternalSecret_AppRole{
-			AppRole: &v1pb.DataSourceExternalSecret_AppRoleAuthOption{
-				Type:      appRole.Type,
-				MountPath: appRole.MountPath,
-			},
+		appRole := externalSecret.GetAppRole()
+		if appRole != nil {
+			resp.AuthOption = &v1pb.DataSourceExternalSecret_AppRole{
+				AppRole: &v1pb.DataSourceExternalSecret_AppRoleAuthOption{
+					Type:      v1pb.DataSourceExternalSecret_AppRoleAuthOption_SecretType(appRole.Type),
+					MountPath: appRole.MountPath,
+				},
+			}
 		}
 	case v1pb.DataSourceExternalSecret_TOKEN:
 		resp.AuthOption = &v1pb.DataSourceExternalSecret_Token{
 			Token: "",
 		}
+	default:
 	}
 
-	return resp, nil
+	return resp
 }
 
-func convertDataSources(dataSources []*storepb.DataSource) ([]*v1pb.DataSource, error) {
+func convertDataSources(dataSources []*storepb.DataSource) []*v1pb.DataSource {
 	var v1DataSources []*v1pb.DataSource
 	for _, ds := range dataSources {
-		externalSecret, err := convertDataSourceExternalSecret(ds.GetExternalSecret())
-		if err != nil {
-			return nil, err
-		}
+		externalSecret := convertDataSourceExternalSecret(ds.GetExternalSecret())
 
 		dataSourceType := v1pb.DataSourceType_DATA_SOURCE_UNSPECIFIED
 		switch ds.GetType() {
@@ -1183,6 +1126,7 @@ func convertDataSources(dataSources []*storepb.DataSource) ([]*v1pb.DataSource, 
 			dataSourceType = v1pb.DataSourceType_ADMIN
 		case storepb.DataSourceType_READ_ONLY:
 			dataSourceType = v1pb.DataSourceType_READ_ONLY
+		default:
 		}
 
 		authenticationType := v1pb.DataSource_AUTHENTICATION_UNSPECIFIED
@@ -1195,6 +1139,7 @@ func convertDataSources(dataSources []*storepb.DataSource) ([]*v1pb.DataSource, 
 			authenticationType = v1pb.DataSource_AWS_RDS_IAM
 		case storepb.DataSource_AZURE_IAM:
 			authenticationType = v1pb.DataSource_AZURE_IAM
+		default:
 		}
 
 		dataSource := &v1pb.DataSource{
@@ -1249,22 +1194,47 @@ func convertDataSources(dataSources []*storepb.DataSource) ([]*v1pb.DataSource, 
 					GcpCredential: &v1pb.DataSource_GCPCredential{},
 				}
 			}
+		default:
 		}
 
 		v1DataSources = append(v1DataSources, dataSource)
 	}
 
-	return v1DataSources, nil
+	return v1DataSources
 }
 
 func convertV1DataSourceExternalSecret(externalSecret *v1pb.DataSourceExternalSecret) (*storepb.DataSourceExternalSecret, error) {
 	if externalSecret == nil {
 		return nil, nil
 	}
-	secret := new(storepb.DataSourceExternalSecret)
-	if err := convertProtoToProto(externalSecret, secret); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to convert external secret"))
+
+	secret := &storepb.DataSourceExternalSecret{
+		SecretType:      storepb.DataSourceExternalSecret_SecretType(externalSecret.SecretType),
+		Url:             externalSecret.Url,
+		AuthType:        storepb.DataSourceExternalSecret_AuthType(externalSecret.AuthType),
+		EngineName:      externalSecret.EngineName,
+		SecretName:      externalSecret.SecretName,
+		PasswordKeyName: externalSecret.PasswordKeyName,
 	}
+
+	// Convert auth options
+	switch externalSecret.AuthOption.(type) {
+	case *v1pb.DataSourceExternalSecret_Token:
+		secret.AuthOption = &storepb.DataSourceExternalSecret_Token{
+			Token: externalSecret.GetToken(),
+		}
+	case *v1pb.DataSourceExternalSecret_AppRole:
+		appRole := externalSecret.GetAppRole()
+		if appRole != nil {
+			secret.AuthOption = &storepb.DataSourceExternalSecret_AppRole{
+				AppRole: &storepb.DataSourceExternalSecret_AppRoleAuthOption{
+					Type:      storepb.DataSourceExternalSecret_AppRoleAuthOption_SecretType(appRole.Type),
+					MountPath: appRole.MountPath,
+				},
+			}
+		}
+	}
+
 	switch secret.SecretType {
 	case storepb.DataSourceExternalSecret_VAULT_KV_V2:
 		if secret.Url == "" {
@@ -1284,6 +1254,7 @@ func convertV1DataSourceExternalSecret(externalSecret *v1pb.DataSourceExternalSe
 		if secret.SecretName == "" {
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("missing GCP secret name"))
 		}
+	default:
 	}
 
 	switch secret.AuthType {
@@ -1295,6 +1266,7 @@ func convertV1DataSourceExternalSecret(externalSecret *v1pb.DataSourceExternalSe
 		if secret.GetAppRole() == nil {
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("missing Vault approle"))
 		}
+	default:
 	}
 
 	return secret, nil
@@ -1381,6 +1353,7 @@ func convertV1AuthenticationType(authType v1pb.DataSource_AuthenticationType) st
 		authenticationType = storepb.DataSource_AWS_RDS_IAM
 	case v1pb.DataSource_AZURE_IAM:
 		authenticationType = storepb.DataSource_AZURE_IAM
+	default:
 	}
 	return authenticationType
 }
@@ -1394,6 +1367,7 @@ func convertV1RedisType(redisType v1pb.DataSource_RedisType) storepb.DataSource_
 		authenticationType = storepb.DataSource_SENTINEL
 	case v1pb.DataSource_CLUSTER:
 		authenticationType = storepb.DataSource_CLUSTER
+	default:
 	}
 	return authenticationType
 }
@@ -1407,6 +1381,7 @@ func convertRedisType(redisType storepb.DataSource_RedisType) v1pb.DataSource_Re
 		authenticationType = v1pb.DataSource_SENTINEL
 	case storepb.DataSource_CLUSTER:
 		authenticationType = v1pb.DataSource_CLUSTER
+	default:
 	}
 	return authenticationType
 }
@@ -1488,6 +1463,7 @@ func convertV1DataSource(dataSource *v1pb.DataSource) (*storepb.DataSource, erro
 				},
 			}
 		}
+	default:
 	}
 
 	return storeDataSource, nil

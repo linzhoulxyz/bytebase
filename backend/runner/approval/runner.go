@@ -416,7 +416,7 @@ func (r *Runner) getDatabaseGeneralIssueRisk(ctx context.Context, issue *store.I
 		return 0, store.RiskSourceUnknown, false, nil
 	}
 
-	pipelineCreate, err := apiv1.GetPipelineCreate(ctx, r.store, r.sheetManager, r.dbFactory, plan.Name, plan.Config.GetSpecs(), plan.Config.GetDeployment(), issue.Project)
+	pipelineCreate, err := apiv1.GetPipelineCreate(ctx, r.store, r.sheetManager, r.dbFactory, plan.Config.GetSpecs(), plan.Config.GetDeployment(), issue.Project)
 	if err != nil {
 		return 0, store.RiskSourceUnknown, false, errors.Wrap(err, "failed to get pipeline create")
 	}
@@ -527,7 +527,7 @@ func (r *Runner) getDatabaseDataExportIssueRisk(ctx context.Context, issue *stor
 		return 0, store.RiskSourceUnknown, false, errors.Errorf("plan %v not found", *issue.PlanUID)
 	}
 
-	pipelineCreate, err := apiv1.GetPipelineCreate(ctx, r.store, r.sheetManager, r.dbFactory, plan.Name, plan.Config.GetSpecs(), plan.Config.GetDeployment(), issue.Project)
+	pipelineCreate, err := apiv1.GetPipelineCreate(ctx, r.store, r.sheetManager, r.dbFactory, plan.Config.GetSpecs(), plan.Config.GetDeployment(), issue.Project)
 	if err != nil {
 		return 0, store.RiskSourceUnknown, false, errors.Wrap(err, "failed to get pipeline create")
 	}
@@ -759,6 +759,8 @@ func getRiskSourceFromPlan(config *storepb.PlanConfig) store.RiskSource {
 				return store.RiskSourceDatabaseSchemaUpdate
 			case storepb.PlanConfig_ChangeDatabaseConfig_DATA:
 				return store.RiskSourceDatabaseDataUpdate
+			default:
+				return store.RiskSourceDatabaseSchemaUpdate
 			}
 		}
 	}
@@ -786,6 +788,7 @@ func convertRiskLevel(riskLevel int32) (storepb.IssuePayloadApproval_RiskLevel, 
 		return storepb.IssuePayloadApproval_MODERATE, nil
 	case 300:
 		return storepb.IssuePayloadApproval_HIGH, nil
+	default:
+		return storepb.IssuePayloadApproval_RISK_LEVEL_UNSPECIFIED, errors.Errorf("unexpected risk level %d", riskLevel)
 	}
-	return storepb.IssuePayloadApproval_RISK_LEVEL_UNSPECIFIED, errors.Errorf("unexpected risk level %d", riskLevel)
 }

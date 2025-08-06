@@ -1,9 +1,10 @@
 <template>
-  <div class="flex items-center text-sm truncate">
+  <div :class="containerClass">
     <InstanceV1EngineIcon
       v-if="instanceResource"
       class="inline-block mr-1"
       :instance="instanceResource"
+      :size="props.size || 'small'"
     />
     <span v-if="showEnvironment && environment" class="text-gray-500 mr-1">
       ({{ environment.title }})
@@ -11,17 +12,23 @@
     <span class="truncate text-gray-600">
       {{ instanceDisplayName }}
     </span>
-    <ChevronRightIcon
-      class="inline opacity-60 text-gray-500 w-4 h-4 shrink-0"
-    />
+    <ChevronRightIcon :class="chevronClass" />
     <span class="truncate text-gray-800">
       {{ databaseDisplayName }}
     </span>
+    <router-link
+      class="pl-2 opacity-60 hover:opacity-100"
+      :to="`/${database}`"
+      target="_blank"
+      @click.stop
+    >
+      <ExternalLinkIcon :size="16" />
+    </router-link>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ChevronRightIcon } from "lucide-vue-next";
+import { ChevronRightIcon, ExternalLinkIcon } from "lucide-vue-next";
 import { computed } from "vue";
 import { InstanceV1EngineIcon } from "@/components/v2";
 import {
@@ -38,6 +45,7 @@ import {
 const props = defineProps<{
   database: string;
   showEnvironment?: boolean;
+  size?: "small" | "medium" | "large";
 }>();
 
 const environmentStore = useEnvironmentV1Store();
@@ -85,5 +93,25 @@ const environment = computed(() => {
   }
 
   return environmentStore.getEnvironmentByName(environmentName);
+});
+
+const containerClass = computed(() => {
+  const baseClass = "flex items-center truncate";
+  const sizeClasses = {
+    small: "text-xs",
+    medium: "text-sm",
+    large: "text-base",
+  };
+  return [baseClass, sizeClasses[props.size || "medium"]];
+});
+
+const chevronClass = computed(() => {
+  const baseClass = "inline opacity-60 text-gray-500 shrink-0";
+  const sizeClasses = {
+    small: "w-3 h-3",
+    medium: "w-4 h-4",
+    large: "w-5 h-5",
+  };
+  return [baseClass, sizeClasses[props.size || "medium"]];
 });
 </script>

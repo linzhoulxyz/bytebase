@@ -12,7 +12,6 @@ import (
 	celoperators "github.com/google/cel-go/common/operators"
 	celoverloads "github.com/google/cel-go/common/overloads"
 	"github.com/pkg/errors"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	"github.com/bytebase/bytebase/backend/common"
@@ -118,6 +117,7 @@ func getVariableAndValueFromExpr(expr celast.Expr) (string, any) {
 				}
 			}
 			value = list
+		default:
 		}
 	}
 	return variable, value
@@ -436,7 +436,6 @@ func (s *DatabaseService) UpdateDatabase(ctx context.Context, req *connect.Reque
 	patch := &store.UpdateDatabaseMessage{
 		InstanceID:   databaseMessage.InstanceID,
 		DatabaseName: databaseMessage.DatabaseName,
-		Metadata:     proto.Clone(databaseMessage.Metadata).(*storepb.DatabaseMetadata),
 	}
 	for _, path := range req.Msg.UpdateMask.Paths {
 		switch path {
@@ -460,7 +459,9 @@ func (s *DatabaseService) UpdateDatabase(ctx context.Context, req *connect.Reque
 			}
 			patch.ProjectID = &project.ResourceID
 		case "labels":
-			patch.Metadata.Labels = req.Msg.Database.Labels
+			patch.MetadataUpdates = append(patch.MetadataUpdates, func(dm *storepb.DatabaseMetadata) {
+				dm.Labels = req.Msg.Database.Labels
+			})
 		case "environment":
 			if req.Msg.Database.Environment != "" {
 				environmentID, err := common.GetEnvironmentID(req.Msg.Database.Environment)
@@ -498,7 +499,10 @@ func (s *DatabaseService) UpdateDatabase(ctx context.Context, req *connect.Reque
 				}}); err != nil {
 				return nil, errors.Wrapf(err, "failed to create changelog")
 			}
-			patch.Metadata.Drifted = false
+			patch.MetadataUpdates = append(patch.MetadataUpdates, func(dm *storepb.DatabaseMetadata) {
+				dm.Drifted = false
+			})
+		default:
 		}
 	}
 
@@ -794,6 +798,7 @@ func (s *DatabaseService) GetDatabaseSchema(ctx context.Context, req *connect.Re
 				return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to convert schema to sdl format, error %v", err.Error()))
 			}
 			schema = sdlSchema
+		default:
 		}
 	}
 	return connect.NewResponse(&v1pb.DatabaseSchema{Schema: schema}), nil
@@ -822,6 +827,11 @@ func (s *DatabaseService) DiffSchema(ctx context.Context, req *connect.Request[v
 		schemaDiff, err := schema.GetDatabaseSchemaDiff(engine, sourceDBSchema, targetDBSchema)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to compute schema diff, error: %v", err))
+		}
+
+		// Filter out bbdataarchive schema changes for Postgres
+		if engine == storepb.Engine_POSTGRES {
+			schemaDiff = schema.FilterPostgresArchiveSchema(schemaDiff)
 		}
 
 		migrationSQL, err := schema.GenerateMigration(engine, schemaDiff)
@@ -1090,48 +1100,30 @@ func (s *DatabaseService) getTargetSchema(ctx context.Context, request *v1pb.Dif
 
 func (s *DatabaseService) getParserEngine(ctx context.Context, request *v1pb.DiffSchemaRequest) (storepb.Engine, error) {
 	var instanceID string
-	var engine storepb.Engine
 
 	if strings.Contains(request.Name, common.ChangelogPrefix) {
 		insID, _, _, err := common.GetInstanceDatabaseChangelogUID(request.Name)
 		if err != nil {
-			return engine, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("%v", err.Error()))
+			return storepb.Engine_ENGINE_UNSPECIFIED, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("%v", err.Error()))
 		}
 		instanceID = insID
 	} else {
 		insID, _, err := common.GetInstanceDatabaseID(request.Name)
 		if err != nil {
-			return engine, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("%v", err.Error()))
+			return storepb.Engine_ENGINE_UNSPECIFIED, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("%v", err.Error()))
 		}
 		instanceID = insID
 	}
 
 	instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{ResourceID: &instanceID})
 	if err != nil {
-		return engine, errors.Wrapf(err, "failed to get instance %s", instanceID)
+		return storepb.Engine_ENGINE_UNSPECIFIED, errors.Wrapf(err, "failed to get instance %s", instanceID)
 	}
 	if instance == nil {
-		return engine, connect.NewError(connect.CodeNotFound, errors.Errorf("instance %q not found", instanceID))
+		return storepb.Engine_ENGINE_UNSPECIFIED, connect.NewError(connect.CodeNotFound, errors.Errorf("instance %q not found", instanceID))
 	}
 
-	switch instance.Metadata.GetEngine() {
-	case storepb.Engine_POSTGRES:
-		engine = storepb.Engine_POSTGRES
-	case storepb.Engine_MYSQL, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
-		engine = storepb.Engine_MYSQL
-	case storepb.Engine_TIDB:
-		engine = storepb.Engine_TIDB
-	case storepb.Engine_ORACLE, storepb.Engine_DM, storepb.Engine_OCEANBASE_ORACLE:
-		engine = storepb.Engine_ORACLE
-	case storepb.Engine_MSSQL:
-		engine = storepb.Engine_MSSQL
-	case storepb.Engine_COCKROACHDB:
-		engine = storepb.Engine_COCKROACHDB
-	default:
-		return engine, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("invalid engine type %v", instance.Metadata.GetEngine()))
-	}
-
-	return engine, nil
+	return common.ConvertToParserEngine(instance.Metadata.GetEngine())
 }
 
 func convertToChangedResources(r *storepb.ChangedResources) *v1pb.ChangedResources {
@@ -1206,10 +1198,7 @@ func (s *DatabaseService) convertToDatabase(ctx context.Context, database *store
 	if database.EffectiveEnvironmentID != "" {
 		effectiveEnvironment = common.FormatEnvironment(database.EffectiveEnvironmentID)
 	}
-	instanceResource, err := convertInstanceMessageToInstanceResource(instance)
-	if err != nil {
-		return nil, err
-	}
+	instanceResource := convertInstanceMessageToInstanceResource(instance)
 	return &v1pb.Database{
 		Name:                 common.FormatDatabase(database.InstanceID, database.DatabaseName),
 		State:                convertDeletedToState(database.Deleted),

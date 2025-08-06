@@ -1,9 +1,14 @@
 <template>
   <div class="w-full flex flex-col">
-    <!-- Breadcrumb - only show on stage and task routes -->
-    <NBreadcrumb v-if="showBreadcrumb" class="px-4 pt-2">
-      <NBreadcrumbItem @click="navigateToRollout">
+    <NBreadcrumb class="px-4 pt-2">
+      <NBreadcrumbItem :clickable="false">
         {{ $t("common.rollout") }}
+      </NBreadcrumbItem>
+      <NBreadcrumbItem @click="navigateToRollout">
+        <span>{{ $t("rollout.stage.self", 2) }}</span>
+        <span v-if="rollout.stages.length > 1" class="opacity-80 ml-1"
+          >({{ rollout.stages.length }})</span
+        >
       </NBreadcrumbItem>
       <NBreadcrumbItem v-if="stageId" @click="navigateToStage">
         {{ stageTitle }}
@@ -24,6 +29,7 @@
 import { NBreadcrumb, NBreadcrumbItem } from "naive-ui";
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { usePlanContextWithRollout } from "@/components/Plan";
 import { provideRolloutViewContext } from "@/components/Plan/components/RolloutView/context";
 import {
   PROJECT_V1_ROUTE_ROLLOUT_DETAIL,
@@ -34,6 +40,7 @@ import { extractProjectResourceName } from "@/utils";
 
 const route = useRoute();
 const router = useRouter();
+const { rollout } = usePlanContextWithRollout();
 const { project } = useCurrentProjectV1();
 const environmentStore = useEnvironmentV1Store();
 const { mergedStages } = provideRolloutViewContext();
@@ -42,11 +49,6 @@ const { mergedStages } = provideRolloutViewContext();
 const rolloutId = computed(() => route.params.rolloutId as string);
 const stageId = computed(() => route.params.stageId as string);
 const taskId = computed(() => route.params.taskId as string);
-
-// Only show breadcrumb on stage and task routes
-const showBreadcrumb = computed(() => {
-  return Boolean(stageId.value || taskId.value);
-});
 
 // Get stage title from environment
 const stageTitle = computed(() => {

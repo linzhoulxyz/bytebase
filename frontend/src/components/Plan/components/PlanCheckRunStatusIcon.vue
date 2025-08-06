@@ -13,7 +13,11 @@
     <template
       v-else-if="planCheckRunStatus === PlanCheckRun_Result_Status.WARNING"
     >
-      <span class="h-3 w-3 bg-white rounded-full" aria-hidden="true"></span>
+      <span
+        class="h-2 w-2 rounded-full text-center pb-6 font-normal text-base"
+        aria-hidden="true"
+        >!</span
+      >
     </template>
     <template
       v-else-if="planCheckRunStatus === PlanCheckRun_Result_Status.SUCCESS"
@@ -33,6 +37,7 @@ import {
   PlanCheckRun_Result_Status,
   type Plan,
 } from "@/types/proto-es/v1/plan_service_pb";
+import { usePlanCheckStatus } from "../logic";
 
 export type SizeType = "small" | "normal";
 
@@ -47,17 +52,9 @@ const props = defineProps({
   },
 });
 
-const planCheckRunStatus = computed(() => {
-  const { planCheckRunStatusCount } = props.plan;
-  if (planCheckRunStatusCount["ERROR"] > 0) {
-    return PlanCheckRun_Result_Status.ERROR;
-  } else if (planCheckRunStatusCount["WARNING"] > 0) {
-    return PlanCheckRun_Result_Status.WARNING;
-  } else if (planCheckRunStatusCount["SUCCESS"] > 0) {
-    return PlanCheckRun_Result_Status.SUCCESS;
-  }
-  return PlanCheckRun_Result_Status.STATUS_UNSPECIFIED;
-});
+const { getOverallStatus: planCheckRunStatus } = usePlanCheckStatus(
+  computed(() => props.plan)
+);
 
 const iconClass = () => {
   const iconClass = props.size === "normal" ? "w-5 h-5" : "w-4 h-4";

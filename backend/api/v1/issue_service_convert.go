@@ -135,6 +135,8 @@ func (s *IssueService) convertToIssueReleasers(ctx context.Context, issue *store
 				}
 				releasers = append(releasers, common.FormatUserEmail(user.Email))
 			}
+		default:
+			// Handle other roles
 		}
 	}
 
@@ -422,9 +424,12 @@ func convertToIssueCommentEventTaskUpdateStatus(s *storepb.IssueCommentPayload_T
 		return nil
 	}
 	var r v1pb.IssueComment_TaskUpdate_Status
+	//exhaustive:enforce
 	switch *s {
 	case storepb.IssueCommentPayload_TaskUpdate_DONE:
 		r = v1pb.IssueComment_TaskUpdate_DONE
+	case storepb.IssueCommentPayload_TaskUpdate_CANCELED:
+		r = v1pb.IssueComment_TaskUpdate_CANCELED
 	case storepb.IssueCommentPayload_TaskUpdate_FAILED:
 		r = v1pb.IssueComment_TaskUpdate_FAILED
 	case storepb.IssueCommentPayload_TaskUpdate_PENDING:

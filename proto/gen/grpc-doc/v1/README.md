@@ -507,8 +507,6 @@
     - [ExportRequest](#bytebase-v1-ExportRequest)
     - [ExportResponse](#bytebase-v1-ExportResponse)
     - [MaskingReason](#bytebase-v1-MaskingReason)
-    - [ParseMyBatisMapperRequest](#bytebase-v1-ParseMyBatisMapperRequest)
-    - [ParseMyBatisMapperResponse](#bytebase-v1-ParseMyBatisMapperResponse)
     - [PrettyRequest](#bytebase-v1-PrettyRequest)
     - [PrettyResponse](#bytebase-v1-PrettyResponse)
     - [QueryHistory](#bytebase-v1-QueryHistory)
@@ -545,6 +543,8 @@
     - [Release](#bytebase-v1-Release)
     - [Release.File](#bytebase-v1-Release-File)
     - [Release.VCSSource](#bytebase-v1-Release-VCSSource)
+    - [SearchReleasesRequest](#bytebase-v1-SearchReleasesRequest)
+    - [SearchReleasesResponse](#bytebase-v1-SearchReleasesResponse)
     - [UndeleteReleaseRequest](#bytebase-v1-UndeleteReleaseRequest)
     - [UpdateReleaseRequest](#bytebase-v1-UpdateReleaseRequest)
   
@@ -574,6 +574,8 @@
     - [ListRevisionsRequest](#bytebase-v1-ListRevisionsRequest)
     - [ListRevisionsResponse](#bytebase-v1-ListRevisionsResponse)
     - [Revision](#bytebase-v1-Revision)
+  
+    - [Revision.Type](#bytebase-v1-Revision-Type)
   
     - [RevisionService](#bytebase-v1-RevisionService)
   
@@ -812,9 +814,6 @@ offset.
 | REDSHIFT | 12 |  |
 | MARIADB | 13 |  |
 | OCEANBASE | 14 |  |
-| DM | 15 |  |
-| RISINGWAVE | 16 |  |
-| OCEANBASE_ORACLE | 17 |  |
 | STARROCKS | 18 |  |
 | DORIS | 19 |  |
 | HIVE | 20 |  |
@@ -7269,7 +7268,7 @@ When paginating, all other parameters provided to `ListPlans` must match the cal
 | creator | [string](#string) |  | Format: users/hello@world.com |
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | update_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
-| plan_check_run_status_count | [Plan.PlanCheckRunStatusCountEntry](#bytebase-v1-Plan-PlanCheckRunStatusCountEntry) | repeated | The status count of the latest plan check runs. Keys are: - SUCCESS - WARNING - ERROR |
+| plan_check_run_status_count | [Plan.PlanCheckRunStatusCountEntry](#bytebase-v1-Plan-PlanCheckRunStatusCountEntry) | repeated | The status count of the latest plan check runs. Keys are: - SUCCESS - WARNING - ERROR - RUNNING |
 | deployment | [Plan.Deployment](#bytebase-v1-Plan-Deployment) |  |  |
 
 
@@ -8417,36 +8416,6 @@ ISSUE_CREATE represents creating an issue. |
 
 
 
-<a name="bytebase-v1-ParseMyBatisMapperRequest"></a>
-
-### ParseMyBatisMapperRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| content | [bytes](#bytes) |  |  |
-
-
-
-
-
-
-<a name="bytebase-v1-ParseMyBatisMapperResponse"></a>
-
-### ParseMyBatisMapperResponse
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| statements | [string](#string) | repeated |  |
-
-
-
-
-
-
 <a name="bytebase-v1-PrettyRequest"></a>
 
 ### PrettyRequest
@@ -8954,7 +8923,7 @@ For example: project == &#34;projects/{project}&#34; database == &#34;instances/
 | ----- | ---- | ----- | ----------- |
 | parent | [string](#string) |  | Format: projects/{project} |
 | page_size | [int32](#int32) |  | The maximum number of releases to return. The service may return fewer than this value. If unspecified, at most 10 releases will be returned. The maximum value is 1000; values above 1000 will be coerced to 1000. |
-| page_token | [string](#string) |  | Not used. A page token, received from a previous `ListReleases` call. Provide this to retrieve the subsequent page.
+| page_token | [string](#string) |  | A page token, received from a previous `ListReleases` call. Provide this to retrieve the subsequent page.
 
 When paginating, all other parameters provided to `ListReleases` must match the call that provided the page token. |
 | show_deleted | [bool](#bool) |  | Show deleted releases if specified. |
@@ -8995,6 +8964,7 @@ When paginating, all other parameters provided to `ListReleases` must match the 
 | creator | [string](#string) |  | Format: users/hello@world.com |
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | state | [State](#bytebase-v1-State) |  |  |
+| digest | [string](#string) |  | The digest of the release. The user can provide the digest of the release. It can be used later to retrieve the release in GetRelease. Whether to provide digest and how to generate it is up to the user. If the digest is not empty, it must be unique in the project. Otherwise, an ALREADY_EXISTS error will be returned. |
 
 
 
@@ -9036,6 +9006,42 @@ The sheet that holds the content. Format: projects/{project}/sheets/{sheet} |
 | ----- | ---- | ----- | ----------- |
 | vcs_type | [VCSType](#bytebase-v1-VCSType) |  |  |
 | url | [string](#string) |  | The url link to the e.g. GitHub commit or pull request. |
+
+
+
+
+
+
+<a name="bytebase-v1-SearchReleasesRequest"></a>
+
+### SearchReleasesRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| parent | [string](#string) |  | Format: projects/{project} |
+| page_size | [int32](#int32) |  | The maximum number of releases to return. The service may return fewer than this value. If unspecified, at most 10 releases will be returned. The maximum value is 1000; values above 1000 will be coerced to 1000. |
+| page_token | [string](#string) |  | A page token, received from a previous `ListReleases` call. Provide this to retrieve the subsequent page.
+
+When paginating, all other parameters provided to `ListReleases` must match the call that provided the page token. |
+| digest | [string](#string) | optional | Search by the digest of the release. |
+
+
+
+
+
+
+<a name="bytebase-v1-SearchReleasesResponse"></a>
+
+### SearchReleasesResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| releases | [Release](#bytebase-v1-Release) | repeated |  |
+| next_page_token | [string](#string) |  | A token, which can be sent as `page_token` to retrieve the next page. If this field is omitted, there are no subsequent pages. |
 
 
 
@@ -9112,6 +9118,7 @@ The sheet that holds the content. Format: projects/{project}/sheets/{sheet} |
 | ---- | ------ | ----------- |
 | TYPE_UNSPECIFIED | 0 |  |
 | VERSIONED | 1 |  |
+| DECLARATIVE | 2 |  |
 
 
  
@@ -9128,6 +9135,7 @@ The sheet that holds the content. Format: projects/{project}/sheets/{sheet} |
 | ----------- | ------------ | ------------- | ------------|
 | GetRelease | [GetReleaseRequest](#bytebase-v1-GetReleaseRequest) | [Release](#bytebase-v1-Release) | Permissions required: bb.releases.get |
 | ListReleases | [ListReleasesRequest](#bytebase-v1-ListReleasesRequest) | [ListReleasesResponse](#bytebase-v1-ListReleasesResponse) | Permissions required: bb.releases.list |
+| SearchReleases | [SearchReleasesRequest](#bytebase-v1-SearchReleasesRequest) | [SearchReleasesResponse](#bytebase-v1-SearchReleasesResponse) | Permissions required: bb.releases.get |
 | CreateRelease | [CreateReleaseRequest](#bytebase-v1-CreateReleaseRequest) | [Release](#bytebase-v1-Release) | Permissions required: bb.releases.create |
 | UpdateRelease | [UpdateReleaseRequest](#bytebase-v1-UpdateReleaseRequest) | [Release](#bytebase-v1-Release) | Permissions required: bb.releases.update |
 | DeleteRelease | [DeleteReleaseRequest](#bytebase-v1-DeleteReleaseRequest) | [.google.protobuf.Empty](#google-protobuf-Empty) | Permissions required: bb.releases.delete |
@@ -9426,12 +9434,26 @@ When paginating, all other parameters provided to `ListRevisions` must match the
 | statement_size | [int64](#int64) |  |  |
 | issue | [string](#string) |  | The issue associated with the revision. Can be empty. Format: projects/{project}/issues/{issue} |
 | task_run | [string](#string) |  | The task run associated with the revision. Can be empty. Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task}/taskRuns/{taskRun} |
+| type | [Revision.Type](#bytebase-v1-Revision-Type) |  | The type of the revision. |
 
 
 
 
 
  
+
+
+<a name="bytebase-v1-Revision-Type"></a>
+
+### Revision.Type
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| TYPE_UNSPECIFIED | 0 |  |
+| VERSIONED | 1 |  |
+| DECLARATIVE | 2 |  |
+
 
  
 
@@ -10091,7 +10113,7 @@ When paginating, all other parameters provided to `ListTaskRuns` must match the 
 | ----- | ---- | ----- | ----------- |
 | name | [string](#string) |  | The resource name of the rollout. Format: projects/{project}/rollouts/{rollout} |
 | plan | [string](#string) |  | The plan that this rollout is based on. Format: projects/{project}/plans/{plan} |
-| title | [string](#string) |  |  |
+| title | [string](#string) |  | The title of the rollout, inherited from the associated plan. This field is output only and cannot be directly set. |
 | stages | [Stage](#bytebase-v1-Stage) | repeated | stages and thus tasks of the rollout. |
 | creator | [string](#string) |  | Format: users/hello@world.com |
 | create_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |

@@ -429,6 +429,8 @@ func normalizePostgreSQLType(typeName string) string {
 		return "timestamp with time zone"
 	case "timetz":
 		return "time with time zone"
+	default:
+		// Return type as-is for unrecognized types
 	}
 
 	// Handle specific length specifications for character types
@@ -649,6 +651,8 @@ func (e *metadataExtractor) extractColumnConstraint(ctx parser.IColconstraintele
 
 		// Create identity sequence for this column
 		e.createIdentitySequence(table, column, schemaName)
+	default:
+		// Ignore other column constraints
 	}
 }
 
@@ -785,6 +789,8 @@ func (e *metadataExtractor) extractTableConstraint(ctx parser.ITableconstraintCo
 			table.ForeignKeys = []*storepb.ForeignKeyMetadata{}
 		}
 		table.ForeignKeys = append(table.ForeignKeys, fk)
+	default:
+		// Other constraint types not handled
 	}
 }
 
@@ -1412,6 +1418,8 @@ func (*metadataExtractor) extractSequenceOption(ctx parser.ISeqoptelemContext, s
 	case ctx.NO() != nil && ctx.CYCLE() != nil:
 		// NO CYCLE
 		sequence.Cycle = false
+	default:
+		// Other sequence options
 	}
 }
 

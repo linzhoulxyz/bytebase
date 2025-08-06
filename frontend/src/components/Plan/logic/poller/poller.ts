@@ -1,3 +1,4 @@
+import { create } from "@bufbuild/protobuf";
 import { includes, uniq } from "lodash-es";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -21,6 +22,10 @@ import {
   PROJECT_V1_ROUTE_ROLLOUT_DETAIL_TASK_DETAIL,
 } from "@/router/dashboard/projectV1";
 import { useCurrentProjectV1 } from "@/store";
+import { isValidRolloutName } from "@/types";
+import { IssueSchema } from "@/types/proto-es/v1/issue_service_pb";
+import { RolloutSchema } from "@/types/proto-es/v1/rollout_service_pb";
+import { isValidIssueName } from "@/utils";
 import { usePlanContext } from "../context";
 import {
   refreshPlan,
@@ -69,21 +74,6 @@ export const provideResourcePoller = () => {
   // Track last refresh time
   const lastRefreshTime = ref(0);
 
-  const enhancedPollingResources = ref<ResourceType[]>([]);
-
-  const requestEnhancedPolling = (
-    resources: ResourceType[],
-    once?: boolean
-  ) => {
-    if (once) {
-      // For one-time refresh, directly call refreshAll
-      refreshAll(true);
-      restartPoller();
-    } else {
-      enhancedPollingResources.value = resources;
-    }
-  };
-
   const resourcesFromRoute = computed<ResourceType[]>(() => {
     if (isCreating.value) {
       return [];
@@ -101,7 +91,7 @@ export const provideResourcePoller = () => {
         routeName
       )
     ) {
-      return ["plan", "planCheckRuns"];
+      return ["plan"];
     }
 
     // Issue-specific pages
@@ -128,10 +118,7 @@ export const provideResourcePoller = () => {
   });
 
   const resourcesToPolled = computed<ResourceType[]>(() => {
-    return uniq([
-      ...enhancedPollingResources.value,
-      ...resourcesFromRoute.value,
-    ]);
+    return uniq([...resourcesFromRoute.value]);
   });
 
   // Create refresh functions for each resource
@@ -160,40 +147,33 @@ export const provideResourcePoller = () => {
     await refreshTaskRuns(rollout.value, project.value, taskRuns);
   };
 
-  // Single refresh function for all resources
-  const refreshActiveResources = async () => {
-    const activeResources = resourcesToPolled.value;
-    if (activeResources.length === 0 || isRefreshing.value) return;
+  const refreshResources = async (
+    resources: ResourceType[] = resourcesToPolled.value,
+    force?: boolean
+  ) => {
+    if ((resources.length === 0 || isRefreshing.value) && !force) return;
 
     isRefreshing.value = true;
     const refreshPromises = [];
 
     try {
-      if (activeResources.includes("plan") && plan.value) {
+      if (resources.includes("plan") && plan.value) {
         refreshPromises.push(refreshPlan(plan));
       }
-      if (
-        activeResources.includes("planCheckRuns") &&
-        plan.value &&
-        planCheckRuns
-      ) {
+      if (resources.includes("planCheckRuns") && plan.value && planCheckRuns) {
         refreshPromises.push(
           refreshPlanCheckRuns(plan.value, project.value, planCheckRuns)
         );
       }
-      if (activeResources.includes("issue") && issue?.value) {
+      if (resources.includes("issue") && issue?.value) {
         refreshPromises.push(refreshIssue(issue as any));
       }
-      if (
-        activeResources.includes("rollout") &&
-        plan.value?.rollout &&
-        rollout
-      ) {
+      if (resources.includes("rollout") && plan.value?.rollout && rollout) {
         refreshPromises.push(
           refreshRollout(plan.value.rollout, project.value, rollout)
         );
       }
-      if (activeResources.includes("taskRuns") && rollout?.value && taskRuns) {
+      if (resources.includes("taskRuns") && rollout?.value && taskRuns) {
         refreshPromises.push(
           refreshTaskRuns(rollout.value, project.value, taskRuns)
         );
@@ -206,16 +186,21 @@ export const provideResourcePoller = () => {
 
       // Emit event after successful refresh
       events.emit("resource-refresh-completed", {
-        resources: activeResources,
+        resources: resources,
         isManual: false,
       });
     } finally {
       isRefreshing.value = false;
     }
+
+    // If force is true, restart the poller to ensure it continues polling.
+    if (force) {
+      resourcePoller.restart();
+    }
   };
 
   // Create a single poller for all resources
-  const resourcePoller = useProgressivePoll(refreshActiveResources, {
+  const resourcePoller = useProgressivePoll(refreshResources, {
     interval: POLLER_INTERVAL,
   });
 
@@ -261,6 +246,50 @@ export const provideResourcePoller = () => {
     { deep: true }
   );
 
+  // Watch for plan issue/rollout changes on plan pages
+  // This ensures we fetch issue/rollout once when they are created
+  watch(
+    () => ({
+      issue: plan.value?.issue,
+      rollout: plan.value?.rollout,
+    }),
+    async (newValues, oldValues) => {
+      const routeName = route.name as string;
+      // Only react to changes on plan-specific pages
+      if (
+        includes(
+          [
+            PROJECT_V1_ROUTE_PLAN_DETAIL,
+            PROJECT_V1_ROUTE_PLAN_DETAIL_SPECS,
+            PROJECT_V1_ROUTE_PLAN_DETAIL_SPEC_DETAIL,
+          ],
+          routeName
+        )
+      ) {
+        // Check if issue or rollout was added (changed from empty to non-empty)
+        const issueAdded = !oldValues?.issue && newValues.issue;
+        const rolloutAdded = !oldValues?.rollout && newValues.rollout;
+
+        if (issueAdded && isValidIssueName(newValues.issue)) {
+          issue.value = create(IssueSchema, {
+            name: newValues.issue,
+          });
+          await refreshIssueOnly();
+        }
+        if (rolloutAdded && isValidRolloutName(newValues.rollout)) {
+          rollout.value = create(RolloutSchema, {
+            name: newValues.rollout,
+          });
+          await refreshRolloutOnly();
+        }
+        if (issueAdded || rolloutAdded) {
+          // Emit status changed to refresh the UI
+          events.emit("status-changed", { eager: true });
+        }
+      }
+    }
+  );
+
   const refreshAll = async (isManual = false) => {
     const activeResources = resourcesToPolled.value;
     if (activeResources.length === 0 || isRefreshing.value) return;
@@ -293,11 +322,6 @@ export const provideResourcePoller = () => {
     } finally {
       isRefreshing.value = false;
     }
-  };
-
-  const refreshAllManual = async () => {
-    if (isRefreshing.value) return;
-    await refreshAll(true);
   };
 
   // Set up event listeners
@@ -346,11 +370,8 @@ export const provideResourcePoller = () => {
   });
 
   const poller = {
-    refreshAllManual,
-    requestEnhancedPolling,
-    restartPoller,
+    refreshResources,
     isRefreshing,
-    activeResources: resourcesToPolled,
     lastRefreshTime,
   };
 

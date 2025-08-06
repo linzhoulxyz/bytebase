@@ -15,8 +15,6 @@ import (
 
 func init() {
 	base.RegisterSplitterFunc(storepb.Engine_POSTGRES, SplitSQL)
-	base.RegisterSplitterFunc(storepb.Engine_REDSHIFT, SplitSQL)
-	base.RegisterSplitterFunc(storepb.Engine_RISINGWAVE, SplitSQL)
 	base.RegisterSplitterFunc(storepb.Engine_COCKROACHDB, SplitSQL)
 }
 
@@ -180,6 +178,8 @@ func splitSQLImpl(stream *antlr.CommonTokenStream, statement string) ([]base.Sin
 				semicolonStack = popSemicolonStack(semicolonStack, beginCaseStack[len(beginCaseStack)-1].pos)
 				beginCaseStack = beginCaseStack[:len(beginCaseStack)-1]
 			}
+		default:
+			// Other tokens
 		}
 	}
 

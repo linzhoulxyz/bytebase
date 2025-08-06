@@ -79,6 +79,8 @@ func generateMigration(diff *schema.MetadataDiff) (string, error) {
 				_, _ = buf.WriteString(fk.Name)
 				_, _ = buf.WriteString("];\n")
 			}
+		default:
+			// Ignore other actions for this phase
 		}
 	}
 
@@ -456,6 +458,8 @@ func generateMigration(diff *schema.MetadataDiff) (string, error) {
 				_, _ = buf.WriteString(";")
 			}
 			_, _ = buf.WriteString("\nGO\n")
+		default:
+			// Ignore other actions
 		}
 	}
 
@@ -531,6 +535,8 @@ func generateCreateTable(schemaName, tableName string, table *storepb.TableMetad
 				_, _ = buf.WriteString(" CLUSTERED")
 			case "NONCLUSTERED":
 				_, _ = buf.WriteString(" NONCLUSTERED")
+			default:
+				// Default to "" if not specified
 			}
 			_, _ = buf.WriteString(" (")
 			for j, expr := range idx.Expressions {
@@ -630,6 +636,8 @@ func generateAlterTable(tableDiff *schema.TableDiff) string {
 					_, _ = buf.WriteString(" CLUSTERED")
 				case "NONCLUSTERED":
 					_, _ = buf.WriteString(" NONCLUSTERED")
+				default:
+					// Other index types
 				}
 				_, _ = buf.WriteString(" (")
 				for j, expr := range indexDiff.NewIndex.Expressions {
@@ -860,6 +868,8 @@ func generateCreateIndex(schemaName, tableName string, index *storepb.IndexMetad
 			_, _ = buf.WriteString(" CLUSTERED")
 		case "NONCLUSTERED":
 			_, _ = buf.WriteString(" NONCLUSTERED")
+		default:
+			// Other index types
 		}
 
 		_, _ = buf.WriteString(" INDEX [")
@@ -986,6 +996,8 @@ func generateExtendedPropertySQL(action, objectType, schemaName, objectName, com
 		_, _ = buf.WriteString("', '")
 		_, _ = buf.WriteString(objectName)
 		_, _ = buf.WriteString("'")
+	default:
+		// Other actions
 	}
 
 	return buf.String()
@@ -1044,6 +1056,8 @@ func generateColumnCommentSQL(action, schemaName, tableName, columnName, comment
 		_, _ = buf.WriteString("', 'COLUMN', '")
 		_, _ = buf.WriteString(columnName)
 		_, _ = buf.WriteString("'")
+	default:
+		// Other actions
 	}
 
 	return buf.String()

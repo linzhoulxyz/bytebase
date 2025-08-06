@@ -14,8 +14,6 @@ import (
 
 func init() {
 	base.RegisterSplitterFunc(storepb.Engine_ORACLE, SplitSQL)
-	base.RegisterSplitterFunc(storepb.Engine_DM, SplitSQL)
-	base.RegisterSplitterFunc(storepb.Engine_OCEANBASE_ORACLE, SplitSQL)
 }
 
 // SplitSQL splits the given SQL statement into multiple SQL statements.
@@ -158,6 +156,7 @@ func needSemicolon(stmt parser.IUnit_statementContext) bool {
 		stmt.Create_package_body() != nil,
 		stmt.Create_trigger() != nil:
 		return true
+	default:
+		return false
 	}
-	return false
 }

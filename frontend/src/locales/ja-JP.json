@@ -236,7 +236,8 @@
     "removed": "削除されました",
     "submit": "提出する",
     "start": "始める",
-    "draft": "下書き"
+    "draft": "下書き",
+    "import": "輸入"
   },
   "error-page": {
     "go-back-home": "ホームページに戻る"
@@ -283,7 +284,14 @@
     "action-all-tasks-in-current-stage": "{action}現在のステージのすべてのタスク",
     "cancel-task": "タスクをキャンセルする",
     "created": "内蔵",
-    "run-immediately": "すぐに実行",
+    "run-immediately": {
+      "self": "すぐに実行",
+      "description": "「実行」をクリックするとすぐにタスクの実行が開始されます。遅延やスケジュール設定は必要ありません。"
+    },
+    "schedule-for-later": {
+      "self": "後でスケジュールする",
+      "description": "タスクを自動的に実行開始する日時を指定します。メンテナンス期間やオフピーク時に便利です。"
+    },
     "select-task": "タスクを選択 | タスクを選択",
     "selected-n-tasks": "{n} 個のタスクが選択されました | {n} 個のタスクが選択されました",
     "no-tasks-selected": "タスクが選択されていません",
@@ -1065,7 +1073,8 @@
       "rejected-description": "この問題は承認者によって拒否されました。続行するには強制ロールアウトが必要です。",
       "pending-description": "この問題は承認待ちです。続行するには強制ロールアウトが必要です。",
       "rejected-error": "問題の承認が拒否されました。続行するには強制ロールアウトを有効にしてください。",
-      "pending-error": "問題の承認が保留中です。続行するには強制ロールアウトを有効にしてください。"
+      "pending-error": "問題の承認が保留中です。続行するには強制ロールアウトを有効にしてください。",
+      "approved-and-waiting-for-rollout": "この問題は承認されており、展開する準備ができています。"
     },
     "new-layout": "新しいCI/CDレイアウト"
   },
@@ -1081,8 +1090,6 @@
     "select-targets": "ターゲットを選択",
     "ready-for-review": "レビュー準備完了",
     "overview": {
-      "total-changes": "合計変更数",
-      "total-targets": "合計ターゲット",
       "no-checks": "チェックなし"
     },
     "navigator": {
@@ -1634,6 +1641,34 @@
       "self": "リビジョン",
       "applied-at": "申請先",
       "filename": "ファイル名",
+      "import-revision": "インポートリビジョン",
+      "select-source": "ソースを選択",
+      "select-release": "リリースを選択",
+      "select-files": "ファイルを選択",
+      "from-release": "リリースより",
+      "from-release-description": "リリース内のファイルからデータベースのリビジョンをインポートする",
+      "from-local-files": "ローカルファイルから",
+      "from-local-files-description": "ローカルSQLファイルからデータベースリビジョンをアップロードおよびインポートする",
+      "select-release-description": "リビジョンをインポートするリリースを選択してください",
+      "select-files-description": "1 つ以上のファイルを選択してリビジョンを作成します",
+      "no-releases-found": "このプロジェクトにはリリースが見つかりません",
+      "no-files-found": "このリリースではファイルが見つかりません",
+      "available-files": "利用可能なファイル",
+      "available-files-description": "新しいリビジョンとしてインポートするファイルを選択",
+      "files-already-imported": "すでにインポート済み",
+      "files-already-imported-description": "これらのファイルのバージョンはターゲットデータベースに既に存在するため、再度インポートすることはできません。",
+      "upload-files": "ファイルをアップロードする",
+      "upload-files-description": "ローカルコンピュータからSQLファイルをアップロードしてデータベースのリビジョンを作成します",
+      "drag-drop-or-click": "ファイルをここにドラッグアンドドロップするか、クリックして選択してください",
+      "supported-formats": "サポート対象: .sql、.txt、.md ファイル",
+      "uploaded-files": "アップロードされたファイル",
+      "add-more-files": "さらに追加",
+      "content-preview": "コンテンツプレビュー",
+      "revision-type": "リビジョンタイプ",
+      "type-versioned": "バージョン管理",
+      "type-declarative": "宣言的",
+      "invalid-version-format": "バージョンはドットで区切られた数字部分でなければなりません（例：1.0.0）",
+      "version-already-exists": "このバージョンは既にデータベースに存在します",
       "delete-confirm-dialog": {
         "title": "本当に削除しますか?",
         "content": "これにより、適用されたリビジョンが削除され、データベース スキーマは変更されません。このアクションは元に戻せません。"

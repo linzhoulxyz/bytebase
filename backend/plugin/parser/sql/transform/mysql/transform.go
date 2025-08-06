@@ -346,6 +346,8 @@ func removeRedundantTableOption(table *ast.CreateTableStmt, standard *ast.Create
 			if collation == nil {
 				continue
 			}
+		default:
+			// Keep other table options as-is
 		}
 		newOptionList = append(newOptionList, option)
 	}
@@ -361,6 +363,8 @@ func extractEngineCharsetAndCollation(table *ast.CreateTableStmt) (engine, chars
 			charset = option
 		case ast.TableOptionCollate:
 			collation = option
+		default:
+			// Ignore other table options
 		}
 	}
 	return engine, charset, collation
@@ -432,6 +436,8 @@ func (*SchemaTransformer) Check(schema string) (int, error) {
 						return int(stmt.End.GetLine()), errors.Errorf("The column-level check constraint is invalid SDL format. Please use table-level check constraints, such as \"CREATE TABLE t(id INT, CONSTRAINT ck_t CHECK (id > 0));\"")
 					case ast.ColumnOptionReference:
 						return int(stmt.End.GetLine()), errors.Errorf("The column-level foreign key constraint is invalid SDL format. Please use table-level foreign key constraints, such as \"CREATE TABLE t(id INT, CONSTRAINT fk_t_id FOREIGN KEY (id) REFERENCES t1(c1));\"")
+					default:
+						// Ignore other column options
 					}
 				}
 			}
@@ -447,6 +453,8 @@ func (*SchemaTransformer) Check(schema string) (int, error) {
 					if constraint.Name == "" {
 						return int(stmt.End.GetLine()), errors.Errorf("The constraint name is required for SDL format")
 					}
+				default:
+					// Other constraint types
 				}
 			}
 			if node.Partition != nil {
@@ -544,6 +552,8 @@ func (*SchemaTransformer) Transform(schema string) (string, error) {
 					})
 				case ast.ConstraintPrimaryKey, ast.ConstraintKey, ast.ConstraintForeignKey, ast.ConstraintFulltext, ast.ConstraintCheck:
 					constraintList = append(constraintList, constraint)
+				default:
+					// Other constraint types
 				}
 			}
 			node.Constraints = constraintList

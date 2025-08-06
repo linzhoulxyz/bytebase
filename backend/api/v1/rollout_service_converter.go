@@ -37,8 +37,8 @@ func convertToPlan(ctx context.Context, s *store.Store, plan *store.PlanMessage)
 		Deployment:              convertToPlanDeployment(plan.Config.Deployment),
 		CreateTime:              timestamppb.New(plan.CreatedAt),
 		UpdateTime:              timestamppb.New(plan.UpdatedAt),
-		PlanCheckRunStatusCount: plan.PlanCheckRunStatusCount,
 		State:                   convertDeletedToState(plan.Deleted),
+		PlanCheckRunStatusCount: map[string]int32{},
 	}
 
 	creator, err := s.GetUserByID(ctx, plan.CreatorUID)
@@ -56,6 +56,18 @@ func convertToPlan(ctx context.Context, s *store.Store, plan *store.PlanMessage)
 	}
 	if plan.PipelineUID != nil {
 		p.Rollout = common.FormatRollout(plan.ProjectID, *plan.PipelineUID)
+	}
+	planCheckRuns, err := s.ListPlanCheckRuns(ctx, &store.FindPlanCheckRunMessage{
+		PlanUID: &plan.UID,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list plan check runs for plan uid %d", plan.UID)
+	}
+	for _, run := range planCheckRuns {
+		p.PlanCheckRunStatusCount[string(run.Status)]++
+		for _, result := range run.Result.Results {
+			p.PlanCheckRunStatusCount[storepb.PlanCheckRunResult_Result_Status_name[int32(result.Status)]]++
+		}
 	}
 	return p, nil
 }
@@ -305,8 +317,9 @@ func convertToPlanCheckRunType(t store.PlanCheckRunType) v1pb.PlanCheckRun_Type 
 		return v1pb.PlanCheckRun_DATABASE_CONNECT
 	case store.PlanCheckDatabaseGhostSync:
 		return v1pb.PlanCheckRun_DATABASE_GHOST_SYNC
+	default:
+		return v1pb.PlanCheckRun_TYPE_UNSPECIFIED
 	}
-	return v1pb.PlanCheckRun_TYPE_UNSPECIFIED
 }
 
 func convertToPlanCheckRunStatus(status store.PlanCheckRunStatus) v1pb.PlanCheckRun_Status {
@@ -319,8 +332,9 @@ func convertToPlanCheckRunStatus(status store.PlanCheckRunStatus) v1pb.PlanCheck
 		return v1pb.PlanCheckRun_FAILED
 	case store.PlanCheckRunStatusRunning:
 		return v1pb.PlanCheckRun_RUNNING
+	default:
+		return v1pb.PlanCheckRun_STATUS_UNSPECIFIED
 	}
-	return v1pb.PlanCheckRun_STATUS_UNSPECIFIED
 }
 
 func convertToPlanCheckRunResults(results []*storepb.PlanCheckRunResult_Result) []*v1pb.PlanCheckRun_Result {
@@ -371,8 +385,9 @@ func convertToPlanCheckRunResultStatus(status storepb.PlanCheckRunResult_Result_
 		return v1pb.PlanCheckRun_Result_WARNING
 	case storepb.PlanCheckRunResult_Result_ERROR:
 		return v1pb.PlanCheckRun_Result_ERROR
+	default:
+		return v1pb.PlanCheckRun_Result_STATUS_UNSPECIFIED
 	}
-	return v1pb.PlanCheckRun_Result_STATUS_UNSPECIFIED
 }
 
 func convertToTaskRuns(ctx context.Context, s *store.Store, stateCfg *state.State, taskRuns []*store.TaskRunMessage) ([]*v1pb.TaskRun, error) {
@@ -565,7 +580,7 @@ func convertToRollout(ctx context.Context, s *store.Store, project *store.Projec
 	rolloutV1 := &v1pb.Rollout{
 		Name:       common.FormatRollout(project.ResourceID, rollout.ID),
 		Plan:       "",
-		Title:      rollout.Name,
+		Title:      "",
 		Stages:     nil,
 		CreateTime: timestamppb.New(rollout.CreatedAt),
 		UpdateTime: timestamppb.New(rollout.UpdatedAt),
@@ -586,6 +601,7 @@ func convertToRollout(ctx context.Context, s *store.Store, project *store.Projec
 	}
 	if plan != nil {
 		rolloutV1.Plan = common.FormatPlan(project.ResourceID, plan.UID)
+		rolloutV1.Title = plan.Name
 	}
 
 	if rollout.IssueID != nil {
@@ -644,15 +660,18 @@ func convertToRollout(ctx context.Context, s *store.Store, project *store.Projec
 }
 
 func convertToTask(ctx context.Context, s *store.Store, project *store.ProjectMessage, task *store.TaskMessage) (*v1pb.Task, error) {
+	//exhaustive:enforce
 	switch task.Type {
 	case storepb.Task_DATABASE_CREATE:
 		return convertToTaskFromDatabaseCreate(ctx, s, project, task)
-	case storepb.Task_DATABASE_SCHEMA_UPDATE, storepb.Task_DATABASE_SCHEMA_UPDATE_GHOST:
+	case storepb.Task_DATABASE_SCHEMA_UPDATE, storepb.Task_DATABASE_SCHEMA_UPDATE_GHOST, storepb.Task_DATABASE_SCHEMA_UPDATE_SDL:
 		return convertToTaskFromSchemaUpdate(ctx, s, project, task)
 	case storepb.Task_DATABASE_DATA_UPDATE:
 		return convertToTaskFromDataUpdate(ctx, s, project, task)
 	case storepb.Task_DATABASE_EXPORT:
 		return convertToTaskFromDatabaseDataExport(ctx, s, project, task)
+	case storepb.Task_TASK_TYPE_UNSPECIFIED:
+		return nil, errors.Errorf("task type %v is not supported", task.Type)
 	default:
 		return nil, errors.Errorf("task type %v is not supported", task.Type)
 	}
@@ -827,6 +846,7 @@ func convertToTaskStatus(latestTaskRunStatus storepb.TaskRun_Status, skipped boo
 }
 
 func convertToTaskType(taskType storepb.Task_Type) v1pb.Task_Type {
+	//exhaustive:enforce
 	switch taskType {
 	case storepb.Task_DATABASE_CREATE:
 		return v1pb.Task_DATABASE_CREATE
@@ -834,16 +854,21 @@ func convertToTaskType(taskType storepb.Task_Type) v1pb.Task_Type {
 		return v1pb.Task_DATABASE_SCHEMA_UPDATE
 	case storepb.Task_DATABASE_SCHEMA_UPDATE_GHOST:
 		return v1pb.Task_DATABASE_SCHEMA_UPDATE_GHOST
+	case storepb.Task_DATABASE_SCHEMA_UPDATE_SDL:
+		return v1pb.Task_DATABASE_SCHEMA_UPDATE_SDL
 	case storepb.Task_DATABASE_DATA_UPDATE:
 		return v1pb.Task_DATABASE_DATA_UPDATE
 	case storepb.Task_DATABASE_EXPORT:
 		return v1pb.Task_DATABASE_EXPORT
+	case storepb.Task_TASK_TYPE_UNSPECIFIED:
+		return v1pb.Task_TYPE_UNSPECIFIED
 	default:
 		return v1pb.Task_TYPE_UNSPECIFIED
 	}
 }
 
 func convertToStoreTaskType(taskType v1pb.Task_Type) storepb.Task_Type {
+	//exhaustive:enforce
 	switch taskType {
 	case v1pb.Task_DATABASE_CREATE:
 		return storepb.Task_DATABASE_CREATE
@@ -851,10 +876,14 @@ func convertToStoreTaskType(taskType v1pb.Task_Type) storepb.Task_Type {
 		return storepb.Task_DATABASE_SCHEMA_UPDATE
 	case v1pb.Task_DATABASE_SCHEMA_UPDATE_GHOST:
 		return storepb.Task_DATABASE_SCHEMA_UPDATE_GHOST
+	case v1pb.Task_DATABASE_SCHEMA_UPDATE_SDL:
+		return storepb.Task_DATABASE_SCHEMA_UPDATE_SDL
 	case v1pb.Task_DATABASE_DATA_UPDATE:
 		return storepb.Task_DATABASE_DATA_UPDATE
 	case v1pb.Task_DATABASE_EXPORT:
 		return storepb.Task_DATABASE_EXPORT
+	case v1pb.Task_TYPE_UNSPECIFIED, v1pb.Task_GENERAL:
+		return storepb.Task_TASK_TYPE_UNSPECIFIED
 	default:
 		return storepb.Task_TASK_TYPE_UNSPECIFIED
 	}
@@ -1002,6 +1031,7 @@ func convertToTaskRunLogEntries(logs []*store.TaskRunLog) []*v1pb.TaskRunLogEntr
 				},
 			}
 			entries = append(entries, e)
+		default:
 		}
 	}
 

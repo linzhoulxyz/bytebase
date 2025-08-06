@@ -81,6 +81,7 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, even
 	titleZh := ""
 	link := ""
 	if e.Issue != nil {
+		// TODO(steven): Remove the slug dependency when the legacy issue page is removed.
 		link = fmt.Sprintf("%s/projects/%s/issues/%s-%d", setting.ExternalUrl, e.Project.ResourceID, slug.Make(e.Issue.Title), e.Issue.UID)
 	} else if e.Rollout != nil {
 		link = fmt.Sprintf("%s/projects/%s/rollouts/%d", setting.ExternalUrl, e.Project.ResourceID, e.Rollout.UID)
@@ -102,6 +103,9 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, even
 		case "CANCELED":
 			title = "Issue canceled"
 			titleZh = "工单取消"
+		default:
+			title = "Issue status changed"
+			titleZh = "工单状态变更"
 		}
 
 	case common.EventTypeIssueCommentCreate:
@@ -188,6 +192,8 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, even
 					usersGetters = append(usersGetters, getUsersFromIssueLastApprover(m.store, e.Issue.Approval))
 				case "roles/CREATOR":
 					usersGetters = append(usersGetters, getUsersFromUsers(e.Issue.Creator))
+				default:
+					// Skip unknown issue roles
 				}
 			}
 		}
@@ -260,6 +266,9 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, even
 				mentions = append(mentions, phone)
 			}
 		}
+	default:
+		// Unsupported event type
+		return nil, errors.Errorf("unsupported activity type %q for generating webhook context", e.Type)
 	}
 
 	var mentionEndUsers []*store.UserMessage
@@ -302,8 +311,7 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, even
 	}
 	if e.Rollout != nil {
 		webhookCtx.Rollout = &webhook.Rollout{
-			UID:   e.Rollout.UID,
-			Title: e.Rollout.Title,
+			UID: e.Rollout.UID,
 		}
 	}
 	if u := e.TaskRunStatusUpdate; u != nil {

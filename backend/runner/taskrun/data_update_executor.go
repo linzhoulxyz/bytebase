@@ -127,7 +127,7 @@ func (exec *DataUpdateExecutor) RunOnce(ctx context.Context, driverCtx context.C
 		}
 	}
 
-	terminated, result, err := runMigration(ctx, driverCtx, exec.store, exec.dbFactory, exec.stateCfg, exec.schemaSyncer, exec.profile, task, taskRunUID, db.Data, statement, task.Payload.GetSchemaVersion(), &sheetID)
+	terminated, result, err := runMigration(ctx, driverCtx, exec.store, exec.dbFactory, exec.stateCfg, exec.schemaSyncer, exec.profile, task, taskRunUID, statement, task.Payload.GetSchemaVersion(), &sheetID)
 	if result != nil {
 		// Save prior backup detail to task run result.
 		result.PriorBackupDetail = priorBackupDetail
@@ -279,6 +279,8 @@ func (exec *DataUpdateExecutor) backupData(
 			if _, err := driver.Execute(driverCtx, fmt.Sprintf(`COMMENT ON TABLE "%s"."%s" IS '%s, source table (%s, %s)'`, backupDatabaseName, statement.TargetTableName, bbSource, database.DatabaseName, statement.SourceTableName), db.ExecuteOptions{}); err != nil {
 				return nil, errors.Wrap(err, "failed to set table comment")
 			}
+		default:
+			// No action needed for other database engines
 		}
 
 		item := &storepb.PriorBackupDetail_Item{
@@ -401,6 +403,8 @@ func getPrependStatements(engine storepb.Engine, statement string) (string, erro
 			switch n.Name {
 			case "role", "search_path":
 				return n.Text(), nil
+			default:
+				// Ignore other variable names
 			}
 		}
 	}

@@ -12,46 +12,7 @@
           <span class="text-control shrink-0">{{
             $t("plan.navigator.checks")
           }}</span>
-          <div class="flex items-center gap-3">
-            <div
-              v-if="planCheckStatus.error > 0"
-              class="flex items-center gap-1"
-            >
-              <XCircleIcon class="w-5 h-5 text-error" />
-              <span class="text-base font-semibold text-error">{{
-                planCheckStatus.error
-              }}</span>
-            </div>
-            <div
-              v-if="planCheckStatus.warning > 0"
-              class="flex items-center gap-1"
-            >
-              <AlertCircleIcon class="w-5 h-5 text-warning" />
-              <span class="text-base font-semibold text-warning">{{
-                planCheckStatus.warning
-              }}</span>
-            </div>
-            <div
-              v-if="planCheckStatus.success > 0"
-              class="flex items-center gap-1"
-            >
-              <CheckCircleIcon class="w-5 h-5 text-success" />
-              <span class="text-base font-semibold text-success">{{
-                planCheckStatus.success
-              }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-y-1">
-          <div class="text-control">
-            {{ $t("common.title") }}
-            <span class="text-red-600">*</span>
-          </div>
-          <NInput
-            v-model:value="state.title"
-            :placeholder="$t('common.title')"
-          />
+          <PlanCheckStatusCount :plan="plan" />
         </div>
 
         <div class="flex flex-col gap-y-1">
@@ -59,7 +20,7 @@
             {{ $t("common.description") }}
           </div>
           <NInput
-            v-model:value="state.description"
+            v-model:value="description"
             type="textarea"
             :placeholder="$t('issue.add-some-description')"
             :autosize="{
@@ -76,10 +37,10 @@
           </div>
           <IssueLabelSelector
             :disabled="false"
-            :selected="state.labels"
+            :selected="labels"
             :project="project"
             :size="'medium'"
-            @update:selected="state.labels = $event"
+            @update:selected="labels = $event"
           />
         </div>
 
@@ -121,43 +82,41 @@
 
 <script setup lang="ts">
 import { create } from "@bufbuild/protobuf";
-import { CheckCircleIcon, XCircleIcon, AlertCircleIcon } from "lucide-vue-next";
 import { NButton, NInput, NTooltip } from "naive-ui";
-import { computed, nextTick, reactive, ref, watchEffect } from "vue";
+import { computed, nextTick, ref, watchEffect } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import IssueLabelSelector from "@/components/IssueV1/components/IssueLabelSelector.vue";
 import CommonDrawer from "@/components/IssueV1/components/Panel/CommonDrawer.vue";
+import PlanCheckStatusCount from "@/components/Plan/components/PlanCheckStatusCount.vue";
 import { ErrorList } from "@/components/Plan/components/common";
-import { usePlanContext } from "@/components/Plan/logic";
+import { usePlanContext, usePlanCheckStatus } from "@/components/Plan/logic";
 import {
   issueServiceClientConnect,
+  planServiceClientConnect,
   rolloutServiceClientConnect,
 } from "@/grpcweb";
-import {
-  PROJECT_V1_ROUTE_ISSUE_DETAIL,
-  PROJECT_V1_ROUTE_ISSUE_DETAIL_V1,
-} from "@/router/dashboard/projectV1";
+import { PROJECT_V1_ROUTE_ISSUE_DETAIL_V1 } from "@/router/dashboard/projectV1";
 import {
   useCurrentProjectV1,
   useCurrentUserV1,
   usePolicyV1Store,
 } from "@/store";
-import { CreateIssueRequestSchema } from "@/types/proto-es/v1/issue_service_pb";
 import {
-  IssueStatus,
-  Issue_Type,
-  type Issue,
+  CreateIssueRequestSchema,
+  IssueSchema,
 } from "@/types/proto-es/v1/issue_service_pb";
+import { IssueStatus, Issue_Type } from "@/types/proto-es/v1/issue_service_pb";
 import { PolicyType } from "@/types/proto-es/v1/org_policy_service_pb";
-import { PlanCheckRun_Result_Status } from "@/types/proto-es/v1/plan_service_pb";
+import {
+  PlanCheckRun_Result_Status,
+  UpdatePlanRequestSchema,
+} from "@/types/proto-es/v1/plan_service_pb";
 import { CreateRolloutRequestSchema } from "@/types/proto-es/v1/rollout_service_pb";
 import {
   extractProjectResourceName,
   hasProjectPermissionV2,
   extractIssueUID,
-  isDev,
-  issueV1Slug,
 } from "@/utils";
 
 const props = defineProps<{
@@ -170,62 +129,23 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const router = useRouter();
-const loading = ref(false);
-const state = reactive<Pick<Issue, "title" | "description" | "labels">>({
-  title: "",
-  description: "",
-  labels: [],
-});
 const { project } = useCurrentProjectV1();
 const currentUser = useCurrentUserV1();
 const policyV1Store = usePolicyV1Store();
 const { plan, events } = usePlanContext();
+const loading = ref(false);
+const description = ref(plan.value.description || "");
+const labels = ref<string[]>([]);
 const restrictIssueCreationForSqlReviewPolicy = ref(false);
-
-// Initialize issue title and description from plan
-watchEffect(() => {
-  state.title = plan.value.title;
-  state.description = plan.value.description;
-});
 
 const title = computed(() => {
   return t("plan.ready-for-review");
 });
 
-const planCheckStatus = computed(() => {
-  const statusCount = plan.value.planCheckRunStatusCount || {};
-  const success =
-    statusCount[
-      PlanCheckRun_Result_Status[PlanCheckRun_Result_Status.SUCCESS]
-    ] || 0;
-  const warning =
-    statusCount[
-      PlanCheckRun_Result_Status[PlanCheckRun_Result_Status.WARNING]
-    ] || 0;
-  const error =
-    statusCount[PlanCheckRun_Result_Status[PlanCheckRun_Result_Status.ERROR]] ||
-    0;
-
-  return {
-    total: success + warning + error,
-    success,
-    warning,
-    error,
-  };
-});
-
-const planCheckSummaryStatus = computed((): PlanCheckRun_Result_Status => {
-  if (planCheckStatus.value.error > 0) {
-    return PlanCheckRun_Result_Status.ERROR;
-  }
-  if (planCheckStatus.value.warning > 0) {
-    return PlanCheckRun_Result_Status.WARNING;
-  }
-  if (planCheckStatus.value.success > 0) {
-    return PlanCheckRun_Result_Status.SUCCESS;
-  }
-  return PlanCheckRun_Result_Status.STATUS_UNSPECIFIED;
-});
+const {
+  statusSummary: planCheckStatus,
+  getOverallStatus: planCheckSummaryStatus,
+} = usePlanCheckStatus(plan);
 
 const tips = computed(() => {
   const tipsList: string[] = [];
@@ -245,10 +165,6 @@ const confirmErrors = computed(() => {
     errors.push(t("common.missing-required-permission"));
   }
 
-  if (!state.title.trim()) {
-    errors.push("Missing issue title");
-  }
-
   if (
     planCheckSummaryStatus.value === PlanCheckRun_Result_Status.ERROR &&
     restrictIssueCreationForSqlReviewPolicy.value
@@ -260,7 +176,7 @@ const confirmErrors = computed(() => {
     );
   }
 
-  if (project.value.forceIssueLabels && state.labels.length === 0) {
+  if (project.value.forceIssueLabels && labels.value.length === 0) {
     errors.push(
       t("project.settings.issue-related.labels.force-issue-labels.warning")
     );
@@ -310,27 +226,36 @@ const doCreateIssue = async () => {
   loading.value = true;
 
   try {
-    const issueToCreate = {
-      creator: `users/${currentUser.value.email}`,
-      title: state.title,
-      description: state.description,
-      labels: state.labels,
-      plan: plan.value.name,
-      status: IssueStatus.OPEN,
-      type: Issue_Type.DATABASE_CHANGE,
-      rollout: "",
-    };
+    // Update the plan description if it has changed before creating the issue.
+    if (description.value !== plan.value.description) {
+      await planServiceClientConnect.updatePlan(
+        create(UpdatePlanRequestSchema, {
+          plan: {
+            name: plan.value.name,
+            description: description.value,
+          },
+          updateMask: { paths: ["description"] },
+        })
+      );
+    }
+
     const request = create(CreateIssueRequestSchema, {
       parent: project.value.name,
-      issue: issueToCreate,
+      issue: create(IssueSchema, {
+        creator: `users/${currentUser.value.email}`,
+        labels: labels.value,
+        plan: plan.value.name,
+        status: IssueStatus.OPEN,
+        type: Issue_Type.DATABASE_CHANGE,
+        rollout: "",
+      }),
     });
     const createdIssue = await issueServiceClientConnect.createIssue(request);
 
-    // Then create the rollout from the plan
+    // Then create the rollout from the plan.
     const rolloutRequest = create(CreateRolloutRequestSchema, {
       parent: project.value.name,
       rollout: {
-        title: plan.value.title,
         plan: plan.value.name,
       },
     });
@@ -340,24 +265,13 @@ const doCreateIssue = async () => {
     events.emit("status-changed", { eager: true });
 
     nextTick(() => {
-      if (isDev()) {
-        router.push({
-          name: PROJECT_V1_ROUTE_ISSUE_DETAIL_V1,
-          params: {
-            projectId: extractProjectResourceName(plan.value.name),
-            issueId: extractIssueUID(createdIssue.name),
-          },
-        });
-      } else {
-        // TODO(steven): remove me please.
-        router.push({
-          name: PROJECT_V1_ROUTE_ISSUE_DETAIL,
-          params: {
-            projectId: extractProjectResourceName(plan.value.name),
-            issueSlug: issueV1Slug(createdIssue.name, createdIssue.title),
-          },
-        });
-      }
+      router.push({
+        name: PROJECT_V1_ROUTE_ISSUE_DETAIL_V1,
+        params: {
+          projectId: extractProjectResourceName(plan.value.name),
+          issueId: extractIssueUID(createdIssue.name),
+        },
+      });
     });
   } finally {
     loading.value = false;

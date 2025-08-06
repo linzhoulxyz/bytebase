@@ -236,7 +236,8 @@
     "removed": "Removed",
     "submit": "Submit",
     "start": "Start",
-    "draft": "Draft"
+    "draft": "Draft",
+    "import": "Import"
   },
   "error-page": {
     "go-back-home": "Go back home"
@@ -283,7 +284,14 @@
     "action-all-tasks-in-current-stage": "{action} all tasks in current stage",
     "cancel-task": "Cancel task | Cancel tasks",
     "created": "Created",
-    "run-immediately": "Run task immediately | Run tasks immediately",
+    "run-immediately": {
+      "self": "Run immediately",
+      "description": "Tasks will start executing as soon as you click Run. No delay or scheduling required."
+    },
+    "schedule-for-later": {
+      "self": "Schedule for later",
+      "description": "Set a specific date and time for tasks to automatically start running. Useful for maintenance windows or off-peak hours."
+    },
     "select-task": "Select task | Select tasks",
     "selected-n-tasks": "{n} task selected | {n} tasks selected",
     "no-tasks-selected": "No tasks selected",
@@ -1065,7 +1073,8 @@
       "rejected-description": "This issue has been rejected by approvers. Please enable force run to proceed.",
       "pending-description": "This issue is waiting for approval. Please enable force run to proceed.",
       "rejected-error": "Issue approval has been rejected. Please enable force run to proceed.",
-      "pending-error": "Issue approval is pending. Please enable force run to proceed."
+      "pending-error": "Issue approval is pending. Please enable force run to proceed.",
+      "approved-and-waiting-for-rollout": "This issue has been approved and is ready to rollout."
     },
     "new-layout": "New CI/CD Layout"
   },
@@ -1081,8 +1090,6 @@
     "select-targets": "Select Targets",
     "ready-for-review": "Ready for Review",
     "overview": {
-      "total-changes": "Total Changes",
-      "total-targets": "Total Targets",
       "no-checks": "No checks"
     },
     "navigator": {
@@ -1634,6 +1641,34 @@
       "self": "Revision",
       "applied-at": "Applied at",
       "filename": "Filename",
+      "import-revision": "Import Revision",
+      "select-source": "Select Source",
+      "select-release": "Select Release",
+      "select-files": "Select Files",
+      "from-release": "From Release",
+      "from-release-description": "Import database revisions from files in a release",
+      "from-local-files": "From Local Files",
+      "from-local-files-description": "Upload and import database revisions from local SQL files",
+      "select-release-description": "Select a release to import revisions from",
+      "select-files-description": "Select one or more files to create revisions",
+      "no-releases-found": "No releases found in this project",
+      "no-files-found": "No files found in this release",
+      "available-files": "Available Files",
+      "available-files-description": "Select files to import as new revisions",
+      "files-already-imported": "Already Imported",
+      "files-already-imported-description": "These files' versions already exist in the target database and cannot be imported again",
+      "upload-files": "Upload Files",
+      "upload-files-description": "Upload SQL files from your local computer to create database revisions",
+      "drag-drop-or-click": "Drag and drop files here, or click to select",
+      "supported-formats": "Supported: .sql, .txt, .md files",
+      "uploaded-files": "Uploaded Files",
+      "add-more-files": "Add More",
+      "content-preview": "Content Preview",
+      "revision-type": "Revision Type",
+      "type-versioned": "Versioned",
+      "type-declarative": "Declarative",
+      "invalid-version-format": "Version must be numeric parts separated by dots (e.g., 1.0.0)",
+      "version-already-exists": "This version already exists in the database",
       "delete-confirm-dialog": {
         "title": "Are you sure to delete?",
         "content": "This will delete these applied revisions and the database schema will not be changed. This action cannot be undone."
@@ -1967,7 +2002,7 @@
         "tooltip": "Will find available data sources with restriction policy, then apply the selection.",
         "admin": "Admin",
         "readonly": "Read-only",
-        "not-match": "Data source not match, expect {expect} but got {actual}."
+        "not-match": "Data source mismatch, expect {expect} but got {actual}."
       }
     },
     "batch-export": {

@@ -24,9 +24,6 @@ var (
 
 func init() {
 	base.RegisterCompleteFunc(store.Engine_POSTGRES, Completion)
-	base.RegisterCompleteFunc(store.Engine_REDSHIFT, Completion)
-	base.RegisterCompleteFunc(store.Engine_RISINGWAVE, Completion)
-	base.RegisterCompleteFunc(store.Engine_DM, Completion)
 	base.RegisterCompleteFunc(store.Engine_SNOWFLAKE, Completion)
 	base.RegisterCompleteFunc(store.Engine_COCKROACHDB, Completion)
 }
@@ -659,6 +656,8 @@ func (c *Completer) convertCandidates(candidates *base.CandidatesCollection) ([]
 					columnEntries.insertColumns(c, schemas, tables)
 				}
 			}
+		default:
+			// No specific completion for this rule
 		}
 	}
 
@@ -772,6 +771,8 @@ func (c *Completer) fetchSelectItemAliases(ruleStack []*base.RuleContext) []stri
 			return result
 		case pg.PostgreSQLParserRULE_opt_sort_clause, pg.PostgreSQLParserRULE_group_clause, pg.PostgreSQLParserRULE_having_clause:
 			canUseAliases = true
+		default:
+			// Other cases
 		}
 	}
 
@@ -967,6 +968,8 @@ func (c *Completer) collectRemainingTableReferences() {
 				if level == 0 {
 					found = true
 				}
+			default:
+				// Other tokens, continue scanning
 			}
 		}
 
@@ -1009,6 +1012,8 @@ func (c *Completer) collectLeadingTableReferences(caretIndex int) {
 				c.referencesStack = c.referencesStack[1:]
 			case pg.PostgreSQLLexerFROM:
 				found = true
+			default:
+				// Other tokens, continue scanning
 			}
 		}
 
@@ -1130,6 +1135,8 @@ func (l *TableRefListener) EnterTable_ref(ctx *pg.Table_refContext) {
 
 				l.context.referencesStack[0] = append(l.context.referencesStack[0], virtualReference)
 			}
+		default:
+			// Other cases
 		}
 	}
 }

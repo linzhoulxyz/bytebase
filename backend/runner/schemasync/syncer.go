@@ -288,10 +288,7 @@ func (s *Syncer) SyncInstance(ctx context.Context, instance *store.InstanceMessa
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	metadata, ok := proto.Clone(instance.Metadata).(*storepb.Instance)
-	if !ok {
-		return nil, nil, nil, errors.Errorf("failed to convert instance metadata type")
-	}
+	metadata := proto.CloneOf(instance.Metadata)
 	metadata.LastSyncTime = instanceMeta.Metadata.LastSyncTime
 	metadata.MysqlLowerCaseTableNames = instanceMeta.Metadata.MysqlLowerCaseTableNames
 	metadata.Roles = instanceMeta.Metadata.Roles
@@ -355,8 +352,8 @@ func (s *Syncer) SyncInstance(ctx context.Context, instance *store.InstanceMessa
 	return updatedInstance, instanceMeta.Databases, newDatabases, nil
 }
 
-// SyncDatabaseSchema will sync the schema for a database.
-func (s *Syncer) SyncDatabaseSchemaToHistory(ctx context.Context, database *store.DatabaseMessage) (int64, error) {
+// syncDatabaseSchemaImpl is the internal implementation that handles both regular sync and sync with history.
+func (s *Syncer) syncDatabaseSchemaImpl(ctx context.Context, database *store.DatabaseMessage, createSyncHistory bool) (syncHistoryID int64, retErr error) {
 	instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{ResourceID: &database.InstanceID})
 	if err != nil {
 		return 0, errors.Wrapf(err, "failed to get instance %q", database.InstanceID)
@@ -376,6 +373,11 @@ func (s *Syncer) SyncDatabaseSchemaToHistory(ctx context.Context, database *stor
 	if err != nil {
 		return 0, errors.Wrapf(err, "failed to sync database schema for database %q", database.DatabaseName)
 	}
+	var schemaBuf bytes.Buffer
+	if err := driver.Dump(deadlineCtx, &schemaBuf, databaseMetadata); err != nil {
+		return 0, errors.Wrapf(err, "failed to dump database schema for database %q", database.DatabaseName)
+	}
+	rawDump := schemaBuf.Bytes()
 
 	dbSchema, err := s.store.GetDBSchema(ctx, database.InstanceID, database.DatabaseName)
 	if err != nil {
@@ -402,42 +404,54 @@ func (s *Syncer) SyncDatabaseSchemaToHistory(ctx context.Context, database *stor
 		// Force to disable classification from comment if the engine is not MYSQL or PG.
 		classificationConfig.ClassificationFromConfig = true
 	}
+	var dbConfig *storepb.DatabaseConfig
 	if classificationConfig.ClassificationFromConfig {
 		// Only set the user comment.
 		setUserCommentFromComment(databaseMetadata)
+		dbConfig = dbModelConfig.BuildDatabaseConfig()
 	} else {
 		// Get classification from the comment.
 		if err := s.licenseService.IsFeatureEnabledForInstance(v1pb.PlanFeature_FEATURE_DATA_CLASSIFICATION, instance); err == nil {
-			setClassificationAndUserCommentFromComment(databaseMetadata, dbModelConfig, classificationConfig)
+			dbConfig = buildDatabaseConfigWithClassificationFromComment(databaseMetadata, dbModelConfig, classificationConfig)
+		} else {
+			dbConfig = dbModelConfig.BuildDatabaseConfig()
 		}
 	}
 
-	d := false
-	metadata, ok := proto.Clone(database.Metadata).(*storepb.DatabaseMetadata)
-	if !ok {
-		return 0, errors.Errorf("failed to convert database metadata type")
+	// Check for schema drift only when not creating sync history
+	var drifted, skipped bool
+	if !createSyncHistory {
+		drifted, skipped, err = s.getSchemaDrifted(ctx, instance, database, string(rawDump))
+		if err != nil {
+			return 0, errors.Wrapf(err, "failed to get schema drifted for database %q", database.DatabaseName)
+		}
 	}
-	metadata.LastSyncTime = timestamppb.New(time.Now())
-	metadata.BackupAvailable = s.databaseBackupAvailable(ctx, instance, databaseMetadata)
-	metadata.Datashare = databaseMetadata.Datashare
+
+	// Build metadata updates
+	metadataUpdates := []func(*storepb.DatabaseMetadata){
+		func(md *storepb.DatabaseMetadata) {
+			md.LastSyncTime = timestamppb.Now()
+			md.BackupAvailable = s.databaseBackupAvailable(ctx, instance, databaseMetadata)
+			md.Datashare = databaseMetadata.Datashare
+			if !createSyncHistory {
+				md.Drifted = !skipped && drifted
+			}
+		},
+	}
+
 	if _, err := s.store.UpdateDatabase(ctx, &store.UpdateDatabaseMessage{
-		InstanceID:   database.InstanceID,
-		DatabaseName: database.DatabaseName,
-		Deleted:      &d,
-		Metadata:     metadata,
+		InstanceID:      database.InstanceID,
+		DatabaseName:    database.DatabaseName,
+		Deleted:         proto.Bool(false),
+		MetadataUpdates: metadataUpdates,
 	}); err != nil {
 		return 0, errors.Wrapf(err, "failed to update database %q for instance %q", database.DatabaseName, database.InstanceID)
 	}
-	var schemaBuf bytes.Buffer
-	if err := driver.Dump(ctx, &schemaBuf, databaseMetadata); err != nil {
-		return 0, errors.Wrapf(err, "failed to dump database schema for database %q", database.DatabaseName)
-	}
-	rawDump := schemaBuf.Bytes()
 
 	todo := !common.EngineDBSchemaReadyToMigrate(instance.Metadata.GetEngine())
 	if err := s.store.UpsertDBSchema(ctx,
 		database.InstanceID, database.DatabaseName,
-		databaseMetadata, dbModelConfig.BuildDatabaseConfig(), rawDump, todo,
+		databaseMetadata, dbConfig, rawDump, todo,
 	); err != nil {
 		if strings.Contains(err.Error(), "escape sequence") {
 			if metadataBytes, err := protojson.Marshal(databaseMetadata); err == nil {
@@ -447,117 +461,32 @@ func (s *Syncer) SyncDatabaseSchemaToHistory(ctx context.Context, database *stor
 		return 0, errors.Wrapf(err, "failed to upsert database schema for database %q", database.DatabaseName)
 	}
 
-	id, err := s.store.CreateSyncHistory(ctx, database.InstanceID, database.DatabaseName, databaseMetadata, string(rawDump))
-	if err != nil {
-		if strings.Contains(err.Error(), "escape sequence") {
-			if metadataBytes, err := protojson.Marshal(databaseMetadata); err == nil {
-				slog.Error("unsupported Unicode escape sequence", slog.String("metadata", string(metadataBytes)), slog.String("raw_dump", string(rawDump)))
+	// Create sync history if requested
+	if createSyncHistory {
+		id, err := s.store.CreateSyncHistory(ctx, database.InstanceID, database.DatabaseName, databaseMetadata, string(rawDump))
+		if err != nil {
+			if strings.Contains(err.Error(), "escape sequence") {
+				if metadataBytes, err := protojson.Marshal(databaseMetadata); err == nil {
+					slog.Error("unsupported Unicode escape sequence", slog.String("metadata", string(metadataBytes)), slog.String("raw_dump", string(rawDump)))
+				}
 			}
+			return 0, errors.Wrapf(err, "failed to insert sync history for database %q", database.DatabaseName)
 		}
-		return 0, errors.Wrapf(err, "failed to insert sync history for database %q", database.DatabaseName)
+		return id, nil
 	}
 
-	return id, nil
+	return 0, nil
+}
+
+// SyncDatabaseSchemaToHistory will sync the schema for a database and create a sync history record.
+func (s *Syncer) SyncDatabaseSchemaToHistory(ctx context.Context, database *store.DatabaseMessage) (int64, error) {
+	return s.syncDatabaseSchemaImpl(ctx, database, true)
 }
 
 // SyncDatabaseSchema will sync the schema for a database.
-func (s *Syncer) SyncDatabaseSchema(ctx context.Context, database *store.DatabaseMessage) (retErr error) {
-	instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{ResourceID: &database.InstanceID})
-	if err != nil {
-		return errors.Wrapf(err, "failed to get instance %q", database.InstanceID)
-	}
-	if instance == nil {
-		return errors.Errorf("instance %q not found", database.InstanceID)
-	}
-	driver, err := s.dbFactory.GetAdminDatabaseDriver(ctx, instance, database, db.ConnectionContext{})
-	if err != nil {
-		return err
-	}
-	defer driver.Close(ctx)
-	// Sync database schema
-	deadlineCtx, cancelFunc := context.WithDeadline(ctx, time.Now().Add(syncTimeout))
-	defer cancelFunc()
-	databaseMetadata, err := driver.SyncDBSchema(deadlineCtx)
-	if err != nil {
-		return errors.Wrapf(err, "failed to sync database schema for database %q", database.DatabaseName)
-	}
-	var schemaBuf bytes.Buffer
-	if err := driver.Dump(deadlineCtx, &schemaBuf, databaseMetadata); err != nil {
-		return errors.Wrapf(err, "failed to dump database schema for database %q", database.DatabaseName)
-	}
-	rawDump := schemaBuf.Bytes()
-
-	dbSchema, err := s.store.GetDBSchema(ctx, database.InstanceID, database.DatabaseName)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get database schema for database %q", database.DatabaseName)
-	}
-
-	dbModelConfig := model.NewDatabaseConfig(nil)
-	if dbSchema != nil {
-		dbModelConfig = dbSchema.GetInternalConfig()
-	}
-
-	project, err := s.store.GetProjectV2(ctx, &store.FindProjectMessage{
-		ResourceID: &database.ProjectID,
-	})
-	if err != nil {
-		return errors.Wrapf(err, `failed to get project by id "%s"`, database.ProjectID)
-	}
-	classificationConfig, err := s.store.GetDataClassificationConfigByID(ctx, project.DataClassificationConfigID)
-	if err != nil {
-		return errors.Wrapf(err, `failed to get classification config by id "%s"`, project.DataClassificationConfigID)
-	}
-
-	if instance.Metadata.GetEngine() != storepb.Engine_MYSQL && instance.Metadata.GetEngine() != storepb.Engine_POSTGRES {
-		// Force to disable classification from comment if the engine is not MYSQL or PG.
-		classificationConfig.ClassificationFromConfig = true
-	}
-	if classificationConfig.ClassificationFromConfig {
-		// Only set the user comment.
-		setUserCommentFromComment(databaseMetadata)
-	} else {
-		// Get classification from the comment.
-		setClassificationAndUserCommentFromComment(databaseMetadata, dbModelConfig, classificationConfig)
-	}
-
-	d := false
-	metadata, ok := proto.Clone(database.Metadata).(*storepb.DatabaseMetadata)
-	if !ok {
-		return errors.Errorf("failed to convert database metadata type")
-	}
-	metadata.LastSyncTime = timestamppb.New(time.Now())
-	metadata.BackupAvailable = s.databaseBackupAvailable(ctx, instance, databaseMetadata)
-	metadata.Datashare = databaseMetadata.Datashare
-	drifted, skipped, err := s.getSchemaDrifted(ctx, instance, database, string(rawDump))
-	if err != nil {
-		return errors.Wrapf(err, "failed to get schema drifted for database %q", database.DatabaseName)
-	}
-	if !skipped {
-		metadata.Drifted = drifted
-	}
-	if _, err := s.store.UpdateDatabase(ctx, &store.UpdateDatabaseMessage{
-		InstanceID:   database.InstanceID,
-		DatabaseName: database.DatabaseName,
-		Deleted:      &d,
-		Metadata:     metadata,
-	}); err != nil {
-		return errors.Wrapf(err, "failed to update database %q for instance %q", database.DatabaseName, database.InstanceID)
-	}
-
-	todo := !common.EngineDBSchemaReadyToMigrate(instance.Metadata.GetEngine())
-	if err := s.store.UpsertDBSchema(ctx,
-		database.InstanceID, database.DatabaseName,
-		databaseMetadata, dbModelConfig.BuildDatabaseConfig(), rawDump, todo,
-	); err != nil {
-		if strings.Contains(err.Error(), "escape sequence") {
-			if metadataBytes, err := protojson.Marshal(databaseMetadata); err == nil {
-				slog.Error("unsupported Unicode escape sequence", slog.String("metadata", string(metadataBytes)), slog.String("raw_dump", string(rawDump)))
-			}
-		}
-		return errors.Wrapf(err, "failed to upsert database schema for database %q", database.DatabaseName)
-	}
-
-	return nil
+func (s *Syncer) SyncDatabaseSchema(ctx context.Context, database *store.DatabaseMessage) error {
+	_, err := s.syncDatabaseSchemaImpl(ctx, database, false)
+	return err
 }
 
 func (s *Syncer) getSchemaDrifted(ctx context.Context, instance *store.InstanceMessage, database *store.DatabaseMessage, rawDump string) (drifted bool, skipped bool, err error) {
@@ -569,7 +498,7 @@ func (s *Syncer) getSchemaDrifted(ctx context.Context, instance *store.InstanceM
 	list, err := s.store.ListChangelogs(ctx, &store.FindChangelogMessage{
 		InstanceID:     &database.InstanceID,
 		DatabaseName:   &database.DatabaseName,
-		TypeList:       []string{string(db.Migrate), string(db.Baseline)},
+		TypeList:       []string{storepb.ChangelogPayload_BASELINE.String(), storepb.ChangelogPayload_MIGRATE.String(), storepb.ChangelogPayload_MIGRATE_GHOST.String(), storepb.ChangelogPayload_MIGRATE_SDL.String()},
 		HasSyncHistory: true,
 		Limit:          &limit,
 		ShowFull:       true,
@@ -628,47 +557,86 @@ func (s *Syncer) databaseBackupAvailable(ctx context.Context, instance *store.In
 			return false
 		}
 		return backupDB != nil
+	default:
+		// Unsupported database engine for backup
+		slog.Debug("Unsupported database engine for backup", "engine", instance.Metadata.GetEngine())
+		return false
 	}
 	return false
 }
 
-func setClassificationAndUserCommentFromComment(dbSchema *storepb.DatabaseSchemaMetadata, databaseConfig *model.DatabaseConfig, classificationConfig *storepb.DataClassificationSetting_DataClassificationConfig) {
+func buildDatabaseConfigWithClassificationFromComment(dbSchema *storepb.DatabaseSchemaMetadata, databaseConfig *model.DatabaseConfig, classificationConfig *storepb.DataClassificationSetting_DataClassificationConfig) *storepb.DatabaseConfig {
+	// Create a new DatabaseConfig to build from scratch
+	newConfig := &storepb.DatabaseConfig{
+		Name: dbSchema.Name,
+	}
+
 	for _, schema := range dbSchema.Schemas {
-		schemaConfig := databaseConfig.CreateOrGetSchemaConfig(schema.Name)
+		var tables []*storepb.TableCatalog
+		hasSchemaContent := false
+
+		// Get existing schema config to preserve SemanticType and Labels
+		schemaConfig := databaseConfig.GetSchemaConfig(schema.Name)
 
 		for _, table := range schema.Tables {
-			tableConfig := schemaConfig.CreateOrGetTableConfig(table.Name)
 			classification, userComment := common.GetClassificationAndUserComment(table.Comment, classificationConfig)
 
 			table.UserComment = userComment
-			tableConfig.Classification = classification
+
+			// Get existing table config
+			tableConfig := schemaConfig.GetTableConfig(table.Name)
+
+			var columns []*storepb.ColumnCatalog
+			hasTableContent := false
+
+			// Check if table has classification
+			if classification != "" {
+				hasTableContent = true
+			}
 
 			for _, col := range table.Columns {
-				columnConfig := tableConfig.CreateOrGetColumnConfig(col.Name)
 				colClassification, colUserComment := common.GetClassificationAndUserComment(col.Comment, classificationConfig)
 
 				col.UserComment = colUserComment
-				columnConfig.Classification = colClassification
 
-				if isEmptyColumnConfig(columnConfig) {
-					tableConfig.RemoveColumnConfig(col.Name)
+				// Get existing column config to preserve SemanticType and Labels
+				existingColumnConfig := tableConfig.GetColumnConfig(col.Name)
+
+				// Add column config if it has any meaningful data
+				if colClassification != "" || existingColumnConfig.SemanticType != "" || len(existingColumnConfig.Labels) > 0 {
+					columns = append(columns, &storepb.ColumnCatalog{
+						Name:           col.Name,
+						Classification: colClassification,
+						SemanticType:   existingColumnConfig.SemanticType,
+						Labels:         existingColumnConfig.Labels,
+					})
+					hasTableContent = true
 				}
 			}
 
-			if tableConfig.IsEmpty() {
-				schemaConfig.RemoveTableConfig(table.Name)
+			// Only add table catalog if it has content (either table classification or column configurations)
+			if hasTableContent {
+				tableCatalog := &storepb.TableCatalog{
+					Name:           table.Name,
+					Classification: classification,
+					Columns:        columns,
+				}
+				tables = append(tables, tableCatalog)
+				hasSchemaContent = true
 			}
 		}
-		if schemaConfig.IsEmpty() {
-			databaseConfig.RemoveSchemaConfig(schema.Name)
+
+		// Only add schema catalog if it has content
+		if hasSchemaContent {
+			schemaCatalog := &storepb.SchemaCatalog{
+				Name:   schema.Name,
+				Tables: tables,
+			}
+			newConfig.Schemas = append(newConfig.Schemas, schemaCatalog)
 		}
 	}
-}
 
-func isEmptyColumnConfig(config *storepb.ColumnCatalog) bool {
-	return config == nil || (len(config.Labels) == 0 &&
-		config.Classification == "" &&
-		config.SemanticType == "")
+	return newConfig
 }
 
 func setUserCommentFromComment(dbSchema *storepb.DatabaseSchemaMetadata) {
@@ -704,10 +672,9 @@ func getOrDefaultLastSyncTime(t *timestamppb.Timestamp) time.Time {
 
 func disableSchemaDriftCheck(dbTp storepb.Engine) bool {
 	m := map[storepb.Engine]struct{}{
-		storepb.Engine_MONGODB:    {},
-		storepb.Engine_REDIS:      {},
-		storepb.Engine_REDSHIFT:   {},
-		storepb.Engine_RISINGWAVE: {},
+		storepb.Engine_MONGODB:  {},
+		storepb.Engine_REDIS:    {},
+		storepb.Engine_REDSHIFT: {},
 	}
 	_, ok := m[dbTp]
 	return ok

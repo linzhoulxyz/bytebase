@@ -88,6 +88,8 @@ func (checker *indexNoDuplicateColumnChecker) Enter(in ast.Node) (ast.Node, bool
 						line:   constraint.OriginTextPosition(),
 					})
 				}
+			default:
+				// Ignore other constraint types
 			}
 		}
 	case *ast.CreateIndexStmt:
@@ -118,6 +120,7 @@ func (checker *indexNoDuplicateColumnChecker) Enter(in ast.Node) (ast.Node, bool
 							line:   checker.line,
 						})
 					}
+				default:
 				}
 			}
 		}
@@ -165,6 +168,7 @@ func indexTypeString(tp ast.ConstraintType) string {
 		return "FOREIGN KEY"
 	case ast.ConstraintIndex:
 		return "INDEX"
+	default:
 	}
 	return "INDEX"
 }

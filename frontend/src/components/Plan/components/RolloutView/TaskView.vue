@@ -6,14 +6,7 @@
         <div class="flex flex-row items-center gap-x-3">
           <TaskStatus :size="'large'" :status="task.status" />
           <div class="flex flex-row items-center text-xl">
-            <InstanceV1EngineIcon
-              class="mr-2"
-              :size="'large'"
-              :instance="database.instanceResource"
-            />
-            <span>{{ database.instanceResource.title }}</span>
-            <ChevronRightIcon class="inline opacity-40 mx-1 w-5" />
-            <span class="font-medium">{{ database.databaseName }}</span>
+            <DatabaseDisplay :database="database.name" :size="'large'" />
           </div>
           <div class="flex flex-row gap-x-2">
             <NTag round>{{ semanticTaskType(task.type) }}</NTag>
@@ -88,15 +81,14 @@
 </template>
 
 <script setup lang="ts">
-import { head } from "lodash-es";
-import { ChevronRightIcon } from "lucide-vue-next";
+import { last } from "lodash-es";
 import { NTag, NTooltip } from "naive-ui";
 import { computed, watchEffect } from "vue";
 import { semanticTaskType } from "@/components/IssueV1";
 import TaskRunDetail from "@/components/IssueV1/components/TaskRunSection/TaskRunDetail.vue";
 import { MonacoEditor } from "@/components/MonacoEditor";
 import TaskStatus from "@/components/Rollout/kits/TaskStatus.vue";
-import { InstanceV1EngineIcon, CopyButton } from "@/components/v2";
+import { CopyButton } from "@/components/v2";
 import {
   taskRunNamePrefix,
   useCurrentProjectV1,
@@ -111,6 +103,7 @@ import {
   sheetNameOfTaskV1,
 } from "@/utils";
 import { usePlanContextWithRollout } from "../../logic";
+import DatabaseDisplay from "../common/DatabaseDisplay.vue";
 import TaskRollbackButton from "./TaskRollbackButton.vue";
 import TaskRunTable from "./TaskRunTable.vue";
 import TaskStatusActions from "./TaskStatusActions.vue";
@@ -144,7 +137,7 @@ const taskRuns = computed(() => {
   );
 });
 
-const latestTaskRun = computed(() => head(taskRuns.value));
+const latestTaskRun = computed(() => last(taskRuns.value));
 
 const rollbackableTaskRun = computed(() => {
   if (

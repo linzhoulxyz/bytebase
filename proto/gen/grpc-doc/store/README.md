@@ -250,6 +250,8 @@
 - [store/revision.proto](#store_revision-proto)
     - [RevisionPayload](#bytebase-store-RevisionPayload)
   
+    - [RevisionPayload.Type](#bytebase-store-RevisionPayload-Type)
+  
 - [store/role.proto](#store_role-proto)
     - [RolePermissions](#bytebase-store-RolePermissions)
   
@@ -425,9 +427,6 @@ offset.
 | REDSHIFT | 12 |  |
 | MARIADB | 13 |  |
 | OCEANBASE | 14 |  |
-| DM | 15 |  |
-| RISINGWAVE | 16 |  |
-| OCEANBASE_ORACLE | 17 |  |
 | STARROCKS | 18 |  |
 | DORIS | 19 |  |
 | HIVE | 20 |  |
@@ -3932,6 +3931,7 @@ RestrictIssueCreationForSQLReviewPolicy is the policy configuration for restrict
 | ---- | ------ | ----------- |
 | TYPE_UNSPECIFIED | 0 |  |
 | VERSIONED | 1 |  |
+| DECLARATIVE | 2 |  |
 
 
  
@@ -3993,12 +3993,26 @@ RestrictIssueCreationForSQLReviewPolicy is the policy configuration for restrict
 | sheet | [string](#string) |  | The sheet that holds the content. Format: projects/{project}/sheets/{sheet} |
 | sheet_sha256 | [string](#string) |  | The SHA256 hash value of the sheet. |
 | task_run | [string](#string) |  | The task run associated with the revision. Can be empty. Format: projects/{project}/rollouts/{rollout}/stages/{stage}/tasks/{task}/taskRuns/{taskRun} |
+| type | [RevisionPayload.Type](#bytebase-store-RevisionPayload-Type) |  | The type of the revision. |
 
 
 
 
 
  
+
+
+<a name="bytebase-store-RevisionPayload-Type"></a>
+
+### RevisionPayload.Type
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| TYPE_UNSPECIFIED | 0 |  |
+| VERSIONED | 1 |  |
+| DECLARATIVE | 2 |  |
+
 
  
 
@@ -4856,6 +4870,7 @@ We support three levels of AlertLevel: INFO, WARNING, and ERROR.
 | DATABASE_SCHEMA_UPDATE_GHOST | 3 |  |
 | DATABASE_DATA_UPDATE | 4 |  |
 | DATABASE_EXPORT | 5 |  |
+| DATABASE_SCHEMA_UPDATE_SDL | 6 |  |
 
 
  

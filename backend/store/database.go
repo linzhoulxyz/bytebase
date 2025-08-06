@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/bytebase/bytebase/backend/common"
 	storepb "github.com/bytebase/bytebase/backend/generated-go/store"
@@ -38,8 +39,8 @@ type UpdateDatabaseMessage struct {
 	ProjectID *string
 	Deleted   *bool
 	// Empty string will unset the environment.
-	EnvironmentID *string
-	Metadata      *storepb.DatabaseMetadata
+	EnvironmentID   *string
+	MetadataUpdates []func(*storepb.DatabaseMetadata)
 }
 
 // BatchUpdateDatabases is the message for batch updating databases.
@@ -244,8 +245,19 @@ func (s *Store) UpdateDatabase(ctx context.Context, patch *UpdateDatabaseMessage
 	if v := patch.Deleted; v != nil {
 		set, args = append(set, fmt.Sprintf("deleted = $%d", len(args)+1)), append(args, *v)
 	}
-	if v := patch.Metadata; v != nil {
-		metadataBytes, err := protojson.Marshal(v)
+	if fs := patch.MetadataUpdates; len(fs) > 0 {
+		database, err := s.GetDatabaseV2(ctx, &FindDatabaseMessage{
+			InstanceID:   &patch.InstanceID,
+			DatabaseName: &patch.DatabaseName,
+		})
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get database %q", common.FormatDatabase(patch.InstanceID, patch.DatabaseName))
+		}
+		md := proto.CloneOf(database.Metadata)
+		for _, f := range fs {
+			f(md)
+		}
+		metadataBytes, err := protojson.Marshal(md)
 		if err != nil {
 			return nil, err
 		}

@@ -86,7 +86,7 @@ func (s *RolloutService) PreviewRollout(ctx context.Context, req *connect.Reques
 
 	specs := convertPlanSpecs(request.Plan.Specs)
 
-	rollout, err := GetPipelineCreate(ctx, s.store, s.sheetManager, s.dbFactory, request.GetPlan().GetName(), specs, nil /* snapshot */, project)
+	rollout, err := GetPipelineCreate(ctx, s.store, s.sheetManager, s.dbFactory, specs, nil /* snapshot */, project)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("failed to get pipeline create, error: %v", err))
 	}
@@ -359,11 +359,7 @@ func (s *RolloutService) CreateRollout(ctx context.Context, req *connect.Request
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("plan not found for id: %d", planID))
 	}
 
-	rolloutTitle := request.GetRollout().GetTitle()
-	if rolloutTitle == "" {
-		rolloutTitle = plan.Name
-	}
-	pipelineCreate, err := GetPipelineCreate(ctx, s.store, s.sheetManager, s.dbFactory, rolloutTitle, plan.Config.GetSpecs(), plan.Config.GetDeployment(), project)
+	pipelineCreate, err := GetPipelineCreate(ctx, s.store, s.sheetManager, s.dbFactory, plan.Config.GetSpecs(), plan.Config.GetDeployment(), project)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("failed to get pipeline create, error: %v", err))
 	}
@@ -684,7 +680,7 @@ func (s *RolloutService) BatchRunTasks(ctx context.Context, req *connect.Request
 
 	// Don't need to check if issue is approved if
 	// the user has bb.taskruns.create permission.
-	ok, err = s.iamManager.CheckPermission(ctx, iam.PermissionTaskRunsCreate, user)
+	ok, err = s.iamManager.CheckPermission(ctx, iam.PermissionTaskRunsCreate, user, projectID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.Errorf("failed to check permission with error: %v", err.Error()))
 	}
@@ -1077,13 +1073,10 @@ func filterTasksByEnvironments(tasks []*store.TaskMessage, environmentIndex map[
 }
 
 // GetPipelineCreate gets a pipeline create message from a plan.
-func GetPipelineCreate(ctx context.Context, s *store.Store, sheetManager *sheet.Manager, dbFactory *dbfactory.DBFactory, rolloutTitle string, specs []*storepb.PlanConfig_Spec, deployment *storepb.PlanConfig_Deployment /* nullable */, project *store.ProjectMessage) (*store.PipelineMessage, error) {
+func GetPipelineCreate(ctx context.Context, s *store.Store, sheetManager *sheet.Manager, dbFactory *dbfactory.DBFactory, specs []*storepb.PlanConfig_Spec, deployment *storepb.PlanConfig_Deployment /* nullable */, project *store.ProjectMessage) (*store.PipelineMessage, error) {
 	// Step 1 - transform database group specs.
 	// Others are untouched.
-	transformedSpecs, err := applyDatabaseGroupSpecTransformations(specs, deployment)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to apply database group spec transformations")
-	}
+	transformedSpecs := applyDatabaseGroupSpecTransformations(specs, deployment)
 
 	// Step 2 - list snapshot environments.
 	_, environmentIndex, err := getPlanEnvironmentSnapshots(ctx, s, deployment)
@@ -1105,7 +1098,6 @@ func GetPipelineCreate(ctx context.Context, s *store.Store, sheetManager *sheet.
 	filteredTasks := filterTasksByEnvironments(taskCreates, environmentIndex)
 
 	return &store.PipelineMessage{
-		Name:      rolloutTitle,
 		ProjectID: project.ResourceID,
 		Tasks:     filteredTasks,
 	}, nil

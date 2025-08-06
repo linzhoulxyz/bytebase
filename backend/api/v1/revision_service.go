@@ -16,6 +16,7 @@ import (
 	v1pb "github.com/bytebase/bytebase/backend/generated-go/v1"
 	"github.com/bytebase/bytebase/backend/generated-go/v1/v1connect"
 	"github.com/bytebase/bytebase/backend/store"
+	"github.com/bytebase/bytebase/backend/store/model"
 )
 
 // RevisionService implements the revision service.
@@ -64,7 +65,7 @@ func (s *RevisionService) ListRevisions(
 
 	revisions, err := s.store.ListRevisions(ctx, find)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to find revisions, err"))
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to find revisions"))
 	}
 
 	var nextPageToken string
@@ -77,7 +78,7 @@ func (s *RevisionService) ListRevisions(
 
 	converted, err := convertToRevisions(ctx, s.store, request.Parent, revisions)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to convert to revisions, err"))
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to convert to revisions"))
 	}
 
 	return connect.NewResponse(&v1pb.ListRevisionsResponse{
@@ -102,7 +103,7 @@ func (s *RevisionService) GetRevision(
 	parent := fmt.Sprintf("%s%s/%s%s", common.InstanceNamePrefix, instanceName, common.DatabaseIDPrefix, databaseName)
 	converted, err := convertToRevision(ctx, s.store, parent, revision)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to convert to revision, err"))
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to convert to revision"))
 	}
 	return connect.NewResponse(converted), nil
 }
@@ -114,6 +115,10 @@ func (s *RevisionService) CreateRevision(
 	request := req.Msg
 	if request.Revision == nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Errorf("request.Revision is not set"))
+	}
+	// Validate the version format.
+	if _, err := model.NewVersion(request.Revision.Version); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.Wrapf(err, "failed to parse version %q", request.Revision.Version))
 	}
 	database, err := getDatabaseMessage(ctx, s.store, request.Parent)
 	if err != nil {
@@ -128,7 +133,7 @@ func (s *RevisionService) CreateRevision(
 	}
 	sheet, err := s.store.GetSheet(ctx, &store.FindSheetMessage{UID: &sheetUID})
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get sheet, err"))
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get sheet"))
 	}
 	if sheet == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("sheet %q not found", request.Revision.Sheet))
@@ -141,7 +146,7 @@ func (s *RevisionService) CreateRevision(
 		}
 		taskRun, err := s.store.GetTaskRun(ctx, taskRunID)
 		if err != nil {
-			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get taskRun, err"))
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get taskRun"))
 		}
 		if taskRun == nil {
 			return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("taskRun %q not found", request.Revision.TaskRun))
@@ -174,7 +179,7 @@ func (s *RevisionService) CreateRevision(
 		}
 		release, err := s.store.GetRelease(ctx, releaseUID)
 		if err != nil {
-			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get release, err"))
+			return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to get release"))
 		}
 		if release == nil {
 			return nil, connect.NewError(connect.CodeNotFound, errors.Errorf("release %q not found", request.Revision.Release))
@@ -197,11 +202,11 @@ func (s *RevisionService) CreateRevision(
 	revisionCreate := convertRevision(request.Revision, database, sheet)
 	revisionM, err := s.store.CreateRevision(ctx, revisionCreate)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to create revision, err"))
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to create revision"))
 	}
 	converted, err := convertToRevision(ctx, s.store, request.Parent, revisionM)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to convert to revision, err"))
+		return nil, connect.NewError(connect.CodeInternal, errors.Wrapf(err, "failed to convert to revision"))
 	}
 
 	return connect.NewResponse(converted), nil
@@ -311,6 +316,7 @@ func convertToRevision(ctx context.Context, s *store.Store, parent string, revis
 		File:          revision.Payload.File,
 		Issue:         issueName,
 		TaskRun:       taskRunName,
+		Type:          convertToRevisionType(revision.Payload.Type),
 	}
 
 	if revision.DeleterUID != nil {
@@ -330,6 +336,20 @@ func convertToRevision(ctx context.Context, s *store.Store, parent string, revis
 	return r, nil
 }
 
+func convertToRevisionType(t storepb.RevisionPayload_Type) v1pb.Revision_Type {
+	//exhaustive:enforce
+	switch t {
+	case storepb.RevisionPayload_TYPE_UNSPECIFIED:
+		return v1pb.Revision_TYPE_UNSPECIFIED
+	case storepb.RevisionPayload_VERSIONED:
+		return v1pb.Revision_VERSIONED
+	case storepb.RevisionPayload_DECLARATIVE:
+		return v1pb.Revision_DECLARATIVE
+	default:
+		return v1pb.Revision_TYPE_UNSPECIFIED
+	}
+}
+
 func convertRevision(revision *v1pb.Revision, database *store.DatabaseMessage, sheet *store.SheetMessage) *store.RevisionMessage {
 	r := &store.RevisionMessage{
 		InstanceID:   database.InstanceID,
@@ -341,7 +361,22 @@ func convertRevision(revision *v1pb.Revision, database *store.DatabaseMessage, s
 			Sheet:       revision.Sheet,
 			SheetSha256: sheet.GetSha256Hex(),
 			TaskRun:     revision.TaskRun,
+			Type:        convertRevisionType(revision.Type),
 		},
 	}
 	return r
+}
+
+func convertRevisionType(t v1pb.Revision_Type) storepb.RevisionPayload_Type {
+	//exhaustive:enforce
+	switch t {
+	case v1pb.Revision_TYPE_UNSPECIFIED:
+		return storepb.RevisionPayload_TYPE_UNSPECIFIED
+	case v1pb.Revision_VERSIONED:
+		return storepb.RevisionPayload_VERSIONED
+	case v1pb.Revision_DECLARATIVE:
+		return storepb.RevisionPayload_DECLARATIVE
+	default:
+		return storepb.RevisionPayload_TYPE_UNSPECIFIED
+	}
 }

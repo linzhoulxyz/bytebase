@@ -545,6 +545,8 @@ func SQLReviewCheck(
 			if err := finder.WalkThrough(asts); err != nil {
 				return convertWalkThroughErrorToAdvice(err)
 			}
+		default:
+			// Other database types don't need walkthrough
 		}
 	}
 
@@ -818,12 +820,14 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLWhereRequirementForSelect, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLWhereRequirementForSelect, nil
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleWhereRequirementForSelect, nil
 		case storepb.Engine_SNOWFLAKE:
 			return SnowflakeWhereRequirementForSelect, nil
 		case storepb.Engine_MSSQL:
 			return MSSQLWhereRequirementForSelect, nil
+		default:
+			// Unsupported engine for this rule
 		}
 	case SchemaRuleStatementRequireWhereForUpdateDelete:
 		switch engine {
@@ -831,12 +835,14 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLWhereRequirementForUpdateDelete, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLWhereRequirementForUpdateDelete, nil
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleWhereRequirementForUpdateDelete, nil
 		case storepb.Engine_SNOWFLAKE:
 			return SnowflakeWhereRequirementForUpdateDelete, nil
 		case storepb.Engine_MSSQL:
 			return MSSQLWhereRequirementForUpdateDelete, nil
+		default:
+			// Unsupported engine for this rule
 		}
 	case SchemaRuleStatementNoLeadingWildcardLike:
 		switch engine {
@@ -844,8 +850,10 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLNoLeadingWildcardLike, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLNoLeadingWildcardLike, nil
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleNoLeadingWildcardLike, nil
+		default:
+			// Unsupported engine for this rule
 		}
 	case SchemaRuleStatementNoSelectAll:
 		switch engine {
@@ -853,12 +861,14 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLNoSelectAll, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLNoSelectAll, nil
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleNoSelectAll, nil
 		case storepb.Engine_SNOWFLAKE:
 			return SnowflakeNoSelectAll, nil
 		case storepb.Engine_MSSQL:
 			return MSSQLNoSelectAll, nil
+		default:
+			// Unsupported engine for this rule
 		}
 	case SchemaRuleSchemaBackwardCompatibility:
 		switch engine {
@@ -870,6 +880,8 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return SnowflakeMigrationCompatibility, nil
 		case storepb.Engine_MSSQL:
 			return MSSQLMigrationCompatibility, nil
+		default:
+			// Unsupported engine for this rule
 		}
 	case SchemaRuleFullyQualifiedObjectName:
 		if engine == storepb.Engine_POSTGRES {
@@ -881,12 +893,14 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLNamingTableConvention, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLNamingTableConvention, nil
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleNamingTableConvention, nil
 		case storepb.Engine_SNOWFLAKE:
 			return SnowflakeNamingTableConvention, nil
 		case storepb.Engine_MSSQL:
 			return MSSQLNamingTableConvention, nil
+		default:
+			// Unsupported engine for this rule
 		}
 	case SchemaRuleIDXNaming:
 		switch engine {
@@ -894,6 +908,8 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLNamingIndexConvention, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLNamingIndexConvention, nil
+		default:
+			// Unsupported engine for this rule
 		}
 	case SchemaRulePKNaming:
 		if engine == storepb.Engine_POSTGRES {
@@ -905,6 +921,8 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLNamingUKConvention, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLNamingUKConvention, nil
+		default:
+			// Unsupported engine for this rule
 		}
 	case SchemaRuleFKNaming:
 		switch engine {
@@ -912,6 +930,8 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLNamingFKConvention, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLNamingFKConvention, nil
+		default:
+			// Unsupported engine for this rule
 		}
 	case SchemaRuleColumnNaming:
 		switch engine {
@@ -919,24 +939,30 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLNamingColumnConvention, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLNamingColumnConvention, nil
+		default:
+			// Unsupported engine for this rule
 		}
 	case SchemaRuleAutoIncrementColumnNaming:
 		switch engine {
 		case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
 			return MySQLNamingAutoIncrementColumnConvention, nil
+		default:
+			// Unsupported engine for this rule
 		}
 	case SchemaRuleTableNameNoKeyword:
 		switch engine {
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleTableNamingNoKeyword, nil
 		case storepb.Engine_SNOWFLAKE:
 			return SnowflakeTableNamingNoKeyword, nil
 		case storepb.Engine_MSSQL:
 			return MSSQLTableNamingNoKeyword, nil
+		default:
+			// Unsupported engine for this rule
 		}
 	case SchemaRuleIdentifierNoKeyword:
 		switch engine {
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleIdentifierNamingNoKeyword, nil
 		case storepb.Engine_SNOWFLAKE:
 			return SnowflakeIdentifierNamingNoKeyword, nil
@@ -944,13 +970,17 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MSSQLIdentifierNamingNoKeyword, nil
 		case storepb.Engine_MYSQL:
 			return MySQLIdentifierNamingNoKeyword, nil
+		default:
+			// Unsupported engine for this rule
 		}
 	case SchemaRuleIdentifierCase:
 		switch engine {
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleIdentifierCase, nil
 		case storepb.Engine_SNOWFLAKE:
 			return SnowflakeIdentifierCase, nil
+		default:
+			// Unsupported engine for this rule
 		}
 	case SchemaRuleRequiredColumn:
 		switch engine {
@@ -958,12 +988,14 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLColumnRequirement, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLColumnRequirement, nil
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleColumnRequirement, nil
 		case storepb.Engine_SNOWFLAKE:
 			return SnowflakeColumnRequirement, nil
 		case storepb.Engine_MSSQL:
 			return MSSQLColumnRequirement, nil
+		default:
+			// Unsupported engine for this rule
 		}
 	case SchemaRuleColumnNotNull:
 		switch engine {
@@ -971,12 +1003,14 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLColumnNoNull, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLColumnNoNull, nil
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleColumnNoNull, nil
 		case storepb.Engine_SNOWFLAKE:
 			return SnowflakeColumnNoNull, nil
 		case storepb.Engine_MSSQL:
 			return MSSQLColumnNoNull, nil
+		default:
+			// Unsupported engine for this rule
 		}
 	case SchemaRuleColumnDisallowChangeType:
 		switch engine {
@@ -984,23 +1018,27 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLColumnDisallowChangingType, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLColumnDisallowChangingType, nil
+		default:
 		}
 	case SchemaRuleColumnSetDefaultForNotNull:
 		switch engine {
 		case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
 			return MySQLColumnSetDefaultForNotNull, nil
-		case storepb.Engine_OCEANBASE_ORACLE, storepb.Engine_ORACLE, storepb.Engine_DM:
+		case storepb.Engine_ORACLE:
 			return OracleAddNotNullColumnRequireDefault, nil
+		default:
 		}
 	case SchemaRuleColumnDisallowChange:
 		switch engine {
 		case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
 			return MySQLColumnDisallowChanging, nil
+		default:
 		}
 	case SchemaRuleColumnDisallowChangingOrder:
 		switch engine {
 		case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
 			return MySQLColumnDisallowChangingOrder, nil
+		default:
 		}
 	case SchemaRuleColumnDisallowDrop:
 		if engine == storepb.Engine_OCEANBASE {
@@ -1010,6 +1048,7 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 		switch engine {
 		case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
 			return MySQLColumnDisallowDropInIndex, nil
+		default:
 		}
 	case SchemaRuleColumnCommentConvention:
 		switch engine {
@@ -1017,13 +1056,15 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLColumnCommentConvention, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLColumnCommentConvention, nil
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleColumnCommentConvention, nil
+		default:
 		}
 	case SchemaRuleColumnAutoIncrementMustInteger:
 		switch engine {
 		case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
 			return MySQLAutoIncrementColumnMustInteger, nil
+		default:
 		}
 	case SchemaRuleColumnTypeDisallowList:
 		switch engine {
@@ -1031,15 +1072,17 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLColumnTypeDisallowList, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLColumnTypeDisallowList, nil
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleColumnTypeDisallowList, nil
 		case storepb.Engine_MSSQL:
 			return MSSQLColumnTypeDisallowList, nil
+		default:
 		}
 	case SchemaRuleColumnDisallowSetCharset:
 		switch engine {
 		case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
 			return MySQLDisallowSetColumnCharset, nil
+		default:
 		}
 	case SchemaRuleColumnMaximumCharacterLength:
 		switch engine {
@@ -1047,34 +1090,39 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLColumnMaximumCharacterLength, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLColumnMaximumCharacterLength, nil
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleColumnMaximumCharacterLength, nil
+		default:
 		}
 	case SchemaRuleColumnMaximumVarcharLength:
 		switch engine {
 		case storepb.Engine_MYSQL, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
 			return MySQLColumnMaximumVarcharLength, nil
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleColumnMaximumVarcharLength, nil
 		case storepb.Engine_SNOWFLAKE:
 			return SnowflakeColumnMaximumVarcharLength, nil
 		case storepb.Engine_MSSQL:
 			return MSSQLColumnMaximumVarcharLength, nil
+		default:
 		}
 	case SchemaRuleColumnAutoIncrementInitialValue:
 		switch engine {
 		case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
 			return MySQLAutoIncrementColumnInitialValue, nil
+		default:
 		}
 	case SchemaRuleColumnAutoIncrementMustUnsigned:
 		switch engine {
 		case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
 			return MySQLAutoIncrementColumnMustUnsigned, nil
+		default:
 		}
 	case SchemaRuleCurrentTimeColumnCountLimit:
 		switch engine {
 		case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
 			return MySQLCurrentTimeColumnCountLimit, nil
+		default:
 		}
 	case SchemaRuleColumnRequireDefault:
 		switch engine {
@@ -1082,8 +1130,9 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLRequireColumnDefault, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLRequireColumnDefault, nil
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleRequireColumnDefault, nil
+		default:
 		}
 	case SchemaRuleColumnDefaultDisallowVolatile:
 		if engine == storepb.Engine_POSTGRES {
@@ -1107,12 +1156,13 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLTableRequirePK, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLTableRequirePK, nil
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleTableRequirePK, nil
 		case storepb.Engine_SNOWFLAKE:
 			return SnowflakeTableRequirePK, nil
 		case storepb.Engine_MSSQL:
 			return MSSQLTableRequirePK, nil
+		default:
 		}
 	case SchemaRuleTableNoFK:
 		switch engine {
@@ -1120,12 +1170,13 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLTableNoFK, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLTableNoFK, nil
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleTableNoFK, nil
 		case storepb.Engine_SNOWFLAKE:
 			return SnowflakeTableNoFK, nil
 		case storepb.Engine_MSSQL:
 			return MSSQLTableNoFK, nil
+		default:
 		}
 	case SchemaRuleTableDropNamingConvention:
 		switch engine {
@@ -1137,6 +1188,7 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return SnowflakeTableDropNamingConvention, nil
 		case storepb.Engine_MSSQL:
 			return MSSQLTableDropNamingConvention, nil
+		default:
 		}
 	case SchemaRuleTableCommentConvention:
 		switch engine {
@@ -1144,8 +1196,9 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLTableCommentConvention, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLTableCommentConvention, nil
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleTableCommentConvention, nil
+		default:
 		}
 	case SchemaRuleTableDisallowPartition:
 		switch engine {
@@ -1153,6 +1206,7 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLTableDisallowPartition, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLTableDisallowPartition, nil
+		default:
 		}
 	case SchemaRuleTableDisallowTrigger:
 		if engine == storepb.Engine_MYSQL {
@@ -1176,6 +1230,7 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLTableDisallowDDL, nil
 		case storepb.Engine_MSSQL:
 			return MSSQLTableDisallowDDL, nil
+		default:
 		}
 	case SchemaRuleTableDisallowDML:
 		switch engine {
@@ -1183,6 +1238,7 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLTableDisallowDML, nil
 		case storepb.Engine_MSSQL:
 			return MSSQLTableDisallowDML, nil
+		default:
 		}
 	case SchemaRuleTableLimitSize:
 		if engine == storepb.Engine_MYSQL {
@@ -1200,11 +1256,13 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 		switch engine {
 		case storepb.Engine_MYSQL, storepb.Engine_MARIADB:
 			return MySQLUseInnoDB, nil
+		default:
 		}
 	case SchemaRuleDropEmptyDatabase:
 		switch engine {
 		case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
 			return MySQLDatabaseAllowDropIfEmpty, nil
+		default:
 		}
 	case SchemaRuleIndexNoDuplicateColumn:
 		switch engine {
@@ -1212,6 +1270,7 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLIndexNoDuplicateColumn, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLIndexNoDuplicateColumn, nil
+		default:
 		}
 	case SchemaRuleIndexKeyNumberLimit:
 		switch engine {
@@ -1219,8 +1278,9 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLIndexKeyNumberLimit, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLIndexKeyNumberLimit, nil
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleIndexKeyNumberLimit, nil
+		default:
 		}
 	case SchemaRuleIndexTotalNumberLimit:
 		switch engine {
@@ -1228,6 +1288,7 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLIndexTotalNumberLimit, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLIndexTotalNumberLimit, nil
+		default:
 		}
 	case SchemaRuleIndexNotRedundant:
 		if engine == storepb.Engine_MSSQL {
@@ -1247,6 +1308,7 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLStatementDisallowCommit, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLStatementDisallowCommit, nil
+		default:
 		}
 	case SchemaRuleStatementDisallowUsingFilesort:
 		if engine == storepb.Engine_MYSQL {
@@ -1262,10 +1324,11 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLStatementDisallowMixInDDL, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLStatementDisallowMixInDDL, nil
-		case storepb.Engine_ORACLE, storepb.Engine_DM, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleStatementDisallowMixInDDL, nil
 		case storepb.Engine_MSSQL:
 			return MSSQLStatementDisallowMixInDDL, nil
+		default:
 		}
 	case SchemaRuleStatementDisallowMixInDML:
 		switch engine {
@@ -1273,10 +1336,11 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLStatementDisallowMixInDML, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLStatementDisallowMixInDML, nil
-		case storepb.Engine_ORACLE, storepb.Engine_DM, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleStatementDisallowMixInDML, nil
 		case storepb.Engine_MSSQL:
 			return MSSQLStatementDisallowMixInDML, nil
+		default:
 		}
 	case SchemaRuleStatementAddColumnWithoutPosition:
 		if engine == storepb.Engine_OCEANBASE {
@@ -1288,6 +1352,7 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLCharsetAllowlist, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLEncodingAllowlist, nil
+		default:
 		}
 	case SchemaRuleCollationAllowlist:
 		switch engine {
@@ -1295,16 +1360,19 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLCollationAllowlist, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLCollationAllowlist, nil
+		default:
 		}
 	case SchemaRuleIndexPKTypeLimit:
 		switch engine {
 		case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
 			return MySQLIndexPKType, nil
+		default:
 		}
 	case SchemaRuleIndexTypeNoBlob:
 		switch engine {
 		case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
 			return MySQLIndexTypeNoBlob, nil
+		default:
 		}
 	case SchemaRuleIndexPrimaryKeyTypeAllowlist:
 		switch engine {
@@ -1312,6 +1380,7 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLPrimaryKeyTypeAllowlist, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLPrimaryKeyTypeAllowlist, nil
+		default:
 		}
 	case SchemaRuleCreateIndexConcurrently:
 		if engine == storepb.Engine_POSTGRES {
@@ -1327,6 +1396,7 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLInsertRowLimit, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLInsertRowLimit, nil
+		default:
 		}
 	case SchemaRuleStatementInsertMustSpecifyColumn:
 		switch engine {
@@ -1334,8 +1404,9 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLInsertMustSpecifyColumn, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLInsertMustSpecifyColumn, nil
-		case storepb.Engine_ORACLE, storepb.Engine_OCEANBASE_ORACLE:
+		case storepb.Engine_ORACLE:
 			return OracleInsertMustSpecifyColumn, nil
+		default:
 		}
 	case SchemaRuleStatementInsertDisallowOrderByRand:
 		switch engine {
@@ -1343,16 +1414,19 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLInsertDisallowOrderByRand, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLInsertDisallowOrderByRand, nil
+		default:
 		}
 	case SchemaRuleStatementDisallowLimit:
 		switch engine {
 		case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
 			return MySQLStatementDisallowLimit, nil
+		default:
 		}
 	case SchemaRuleStatementDisallowOrderBy:
 		switch engine {
 		case storepb.Engine_MYSQL, storepb.Engine_TIDB, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
 			return MySQLDisallowOrderBy, nil
+		default:
 		}
 	case SchemaRuleStatementMergeAlterTable:
 		switch engine {
@@ -1360,6 +1434,7 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLMergeAlterTable, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLMergeAlterTable, nil
+		default:
 		}
 	case SchemaRuleStatementAffectedRowLimit:
 		switch engine {
@@ -1367,6 +1442,7 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLStatementAffectedRowLimit, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLStatementAffectedRowLimit, nil
+		default:
 		}
 	case SchemaRuleStatementDMLDryRun:
 		switch engine {
@@ -1376,6 +1452,7 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return PostgreSQLStatementDMLDryRun, nil
 		case storepb.Engine_ORACLE:
 			return OracleStatementDMLDryRun, nil
+		default:
 		}
 	case SchemaRuleStatementDisallowAddColumnWithDefault:
 		if engine == storepb.Engine_POSTGRES {
@@ -1397,6 +1474,7 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 		switch engine {
 		case storepb.Engine_MYSQL, storepb.Engine_MARIADB, storepb.Engine_OCEANBASE:
 			return MySQLStatementSelectFullTableScan, nil
+		default:
 		}
 	case SchemaRuleStatementCreateSpecifySchema:
 		if engine == storepb.Engine_POSTGRES {
@@ -1434,6 +1512,7 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MySQLStatementMaximumLimitValue, nil
 		case storepb.Engine_POSTGRES:
 			return PostgreSQLStatementMaximumLimitValue, nil
+		default:
 		}
 	case SchemaRuleStatementMaximumJoinTableCount:
 		if engine == storepb.Engine_MYSQL {
@@ -1520,7 +1599,11 @@ func getAdvisorTypeByRule(ruleType SQLReviewRuleType, engine storepb.Engine) (Ty
 			return MSSQLBuiltinPriorBackupCheck, nil
 		case storepb.Engine_ORACLE:
 			return OracleBuiltinPriorBackupCheck, nil
+		default:
+			// Unsupported engine for this rule
 		}
+	default:
+		// Unknown rule type
 	}
 	return "", errors.Errorf("unknown SQL review rule type %v for %v", ruleType, engine)
 }

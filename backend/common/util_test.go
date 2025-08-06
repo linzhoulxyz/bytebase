@@ -1,3 +1,4 @@
+//nolint:revive
 package common
 
 import (
@@ -218,7 +219,7 @@ func TestNormalizeExternalURL(t *testing.T) {
 				}
 			} else {
 				if tt.wantErr {
-					t.Errorf("expect error")
+					t.Error("expect error")
 				} else if tt.want != g {
 					t.Errorf("expect %s, got %s", tt.want, g)
 				}
